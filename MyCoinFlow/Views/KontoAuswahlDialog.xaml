@@ -1,0 +1,28 @@
+﻿<Window x:Class="MyCoinFlow.Views.KontoAuswahlDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Konto wählen"
+        Height="180" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Loaded="Window_Loaded">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Vertical" Grid.Row="0">
+            <TextBlock Text="Bitte Konto wählen:" Margin="0,0,0,6"/>
+            <ComboBox x:Name="KontoBox"
+                      DisplayMemberPath="Anzeige"
+                      SelectedValuePath="Id"
+                      Height="32"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Abbrechen" Width="100" Margin="0,0,8,0" Click="Abbrechen_Click"/>
+            <Button Content="Übernehmen" Width="120" IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

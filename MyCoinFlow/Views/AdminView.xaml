@@ -1,0 +1,331 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.AdminView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             Loaded="AdminView_Loaded">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240"/>
+            <!-- Navigation -->
+            <ColumnDefinition Width="*"/>
+            <!-- Inhalt -->
+        </Grid.ColumnDefinitions>
+
+        <!-- NAVIGATION -->
+        <Border Grid.Column="0" Background="{DynamicResource MaterialDesignCardBackground}" Margin="12"
+                CornerRadius="8" Padding="8">
+            <StackPanel>
+                <TextBlock Text="Admin" FontSize="20" FontWeight="SemiBold" Margin="8,4,8,12"/>
+                <ListBox x:Name="NavList" SelectionChanged="NavList_SelectionChanged">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Margin" Value="0,4,0,4"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <ListBoxItem Tag="Kontenplan">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ClipboardListOutline" Margin="0,0,8,0"/>
+                            <TextBlock Text="Kontenplan"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="Kreditkarten">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="CreditCardOutline" Margin="0,0,8,0"/>
+                            <TextBlock Text="Kreditkarten"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="Mandanten">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="AccountMultiplePlusOutline" Margin="0,0,8,0"/>
+                            <TextBlock Text="Mandanten"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="Backup">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DatabaseArrowDown" Margin="0,0,8,0"/>
+                            <TextBlock Text="Backup"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </StackPanel>
+        </Border>
+
+        <!-- CONTENT -->
+        <Grid Grid.Column="1" Margin="0,12,12,12">
+            <!-- KONTENPLAN -->
+            <Grid x:Name="SecKontenplan" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Import/Export -->
+                <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+                    <Button Click="ImportExcel_Click"
+                            Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileImport" Margin="0,0,6,0"/>
+                            <TextBlock Text="Kontenplan importieren (Excel)"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ExportExcel_Click"
+                            Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileExport" Margin="0,0,6,0"/>
+                            <TextBlock Text="Kontenplan exportieren (Excel)"/>
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+
+                <!-- 3 Spalten mit Hosts -->
+                <Grid Grid.Row="1" Margin="0,8,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Margin="4" Padding="8" CornerRadius="6"
+                            Background="{DynamicResource MaterialDesignCardBackground}">
+                        <StackPanel>
+                            <TextBlock Text="Konten-Art" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <ContentControl x:Name="KontenArtHost"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Margin="4" Padding="8" CornerRadius="6"
+                            Background="{DynamicResource MaterialDesignCardBackground}">
+                        <StackPanel>
+                            <TextBlock Text="Konten-Gruppe" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <ContentControl x:Name="KontenGruppeHost"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Margin="4" Padding="8" CornerRadius="6"
+                            Background="{DynamicResource MaterialDesignCardBackground}">
+                        <StackPanel>
+                            <TextBlock Text="Konten-Untergruppe" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <ContentControl x:Name="KontenUnterGruppeHost"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Grid.Row="2" Margin="0,8,0,0" Padding="8" CornerRadius="6"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <TextBlock Text="(weitere Konten-Funktionen hier …)" Opacity="0.6"/>
+                </Border>
+            </Grid>
+
+            <!-- KREDITKARTEN -->
+            <Grid x:Name="SecKreditkarten" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <WrapPanel Grid.Row="0">
+                    <Button Click="OpenCreditCardMapping_Click"
+                            Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Cog" Margin="0,0,6,0"/>
+                            <TextBlock Text="Mapping im Dialog öffnen"/>
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+
+                <Border Grid.Row="1" Margin="0,8,0,0" Padding="8" CornerRadius="6"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel>
+                        <TextBlock Text="Mapping (inline)" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ContentControl x:Name="CreditCardImportMappingHost"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- MANDANTEN -->
+            <Grid x:Name="SecMandanten" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Neuer Mandant (leer) -->
+                <Border Padding="12" CornerRadius="8" Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel>
+                        <TextBlock Text="Neuen Mandanten anlegen (leer – Schema nur)"
+                                   FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <DockPanel>
+                            <TextBox x:Name="NewTenantNameBox"
+                                     materialDesign:HintAssist.Hint="Neuer DB-Name (z. B. MyCoinFlow_Test)"
+                                     Width="300"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                                    Click="CreateEmptyTenant_Click"
+                                    Style="{StaticResource MaterialDesignRaisedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="DatabasePlus" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Anlegen (leer)"/>
+                                </StackPanel>
+                            </Button>
+                        </DockPanel>
+                        <TextBlock x:Name="TenantCreateStatus"
+                                   Foreground="Tomato" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- DB-Kopie (Quelle → Ziel) -->
+                <Border Grid.Row="1" Margin="0,12,0,0" Padding="12" CornerRadius="8"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel>
+                        <StackPanel.Resources>
+                            <Style TargetType="FrameworkElement">
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                            </Style>
+                        </StackPanel.Resources>
+
+                        <TextBlock Text="Daten zwischen Datenbanken kopieren (Quelle → Ziel)"
+                                   FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                        <!-- Quelle & Ziel nebeneinander -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Quelle -->
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Quelle (DB)"/>
+                                <ComboBox x:Name="Copy_SourceDbCombo"
+                                          IsEditable="True" IsTextSearchEnabled="True"
+                                          Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
+                            </StackPanel>
+
+                            <!-- Ziel -->
+                            <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                                <TextBlock Text="Ziel (DB)"/>
+                                <ComboBox x:Name="Copy_TargetDbCombo"
+                                          IsEditable="False"
+                                          Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Optionen -->
+                        <TextBlock Text="Welche Daten kopieren?" FontWeight="SemiBold" Margin="0,12,0,8"/>
+                        <WrapPanel>
+                            <CheckBox x:Name="Copy_CbKonten"  Content="Kontenstruktur" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbAdressen" Content="Adressen" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbAliase"   Content="Aliase" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbGeldinst" Content="Geldinstitute (ohne Anfangsbestand)" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbImport"   Content="Import-Schema &amp; Mapping" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbKatMap"   Content="Kategorie→Konto" IsChecked="True" Margin="0,0,16,0"/>
+                            <CheckBox x:Name="Copy_CbBudget"   Content="Budgetzeitraum (aktuelles Jahr)" IsChecked="True"/>
+                        </WrapPanel>
+
+                        <!-- Ausführen -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Button Click="Copy_Run_Click" Style="{StaticResource MaterialDesignRaisedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="PlayCircle" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Ausführen"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <TextBlock x:Name="Copy_StatusText"
+                                   Foreground="Tomato" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- BACKUP -->
+            <Grid x:Name="SecBackup" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Backup &amp; Restore (aktive DB)" FontSize="16" FontWeight="SemiBold"/>
+
+                <Border Grid.Row="1" Margin="0,12,0,0" Padding="12" CornerRadius="8"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel>
+                        <StackPanel.Resources>
+                            <Style TargetType="FrameworkElement">
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                            </Style>
+                        </StackPanel.Resources>
+
+                        <!-- BACKUP -->
+                        <TextBlock x:Name="Backup_ActiveDbText" />
+                        <DockPanel>
+                            <TextBox x:Name="BackupFileBox"
+                                     materialDesign:HintAssist.Hint="Ziel-Datei (*.bak)"
+                                     Width="380"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                                    Click="Backup_Browse_Click"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="FolderSearchOutline" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Ziel wählen"/>
+                                </StackPanel>
+                            </Button>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Click="Backup_Run_Click"
+                                    Style="{StaticResource MaterialDesignRaisedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="DatabaseArrowDown" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Backup erstellen"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock x:Name="Backup_StatusText"
+                                   Foreground="Tomato" TextWrapping="Wrap"/>
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- RESTORE -->
+                        <TextBlock Text="Backup zurückspielen (überschreibt aktive DB)" FontWeight="SemiBold"/>
+                        <DockPanel>
+                            <TextBox x:Name="Restore_FileBox"
+                                     materialDesign:HintAssist.Hint="Quelle (*.bak)"
+                                     Width="380"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                                    Click="Restore_BrowseBak_Click"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="FileSearchOutline" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Quelle wählen"/>
+                                </StackPanel>
+                            </Button>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Click="Restore_Run_Click"
+                                    Style="{StaticResource MaterialDesignRaisedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="DatabaseRefresh" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Wiederherstellen"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock x:Name="Restore_StatusText"
+                                   Foreground="Tomato" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

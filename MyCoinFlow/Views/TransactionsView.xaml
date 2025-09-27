@@ -1,0 +1,70 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.TransactionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0 0 0 10">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="invoiceplus"
+                    Content="Buchung"
+                    Margin="0 10 10 0"
+                    Command="{Binding NeuBuchungCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="invoiceedit"
+                    Content="Bearbeiten"
+                    Margin="0 10 10 0"
+                    Command="{Binding BearbeitenCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton.Danger}"
+                    Tag="invoiceremove"
+                    Content="Löschen"
+                    Margin="0 10 10 0"
+                    Command="{Binding LoeschenCommand}"/>
+
+            <!-- NEU: Bankimport öffnen -->
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="fileimport"
+                    Content="Bankimport…"
+                    Margin="20 10 0 0"
+                    Command="{Binding OpenBankImportCommand}"/>
+            
+            <!-- NEU: Kreditkarten-Import öffnen -->
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="creditcard"
+                    Content="Kreditkarten"
+                    Margin="10 10 0 0"
+                    Click="OpenCreditCardImport_Click"/>
+
+        </StackPanel>
+
+        <!-- Liste -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Transaktionen}"
+                  SelectedItem="{Binding AusgewaehlteTransaktion}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
+                <DataGridTextColumn Header="Von"   Binding="{Binding VonAnzeige}" Width="*"/>
+                <DataGridTextColumn Header="Nach"  Binding="{Binding NachAnzeige}" Width="*"/>
+                <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:C2}}" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                            <Setter Property="TextAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="*"/>
+                <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" Width="*"/>
+                <DataGridTextColumn Header="Notiz"   Binding="{Binding Notiz}" Width="2*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

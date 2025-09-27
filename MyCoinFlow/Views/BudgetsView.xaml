@@ -1,0 +1,60 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.BudgetsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <!-- Buttons -->
+            <RowDefinition Height="*" />
+            <!-- Tabelle -->
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0 0 0 10">
+
+            <Button Style="{StaticResource IconTextButton}"
+                Tag="TimerPlus"
+                Content="Zeitraum hinzufügen"
+                Margin="0 10 10 0"
+                Command="{Binding NeuerZeitraumCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                Tag="TimerEdit"
+                Content="Zeitraum bearbeiten"
+                Margin="0 10 10 0"
+                Command="{Binding BearbeitenZeitraumCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton.Danger}"
+                Tag="TimerMinus"
+                Content="Zeitraum löschen"
+                Margin="0 10 10 0"
+                Command="{Binding LoeschenEintragCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                Tag="HandCoin"
+                Content="Budget erfassen"
+                Margin="0 10 10 0"
+                Command="{Binding BudgetwerteErfassenCommand}"/>
+
+        </StackPanel>
+
+        <DataGrid Grid.Row="1"
+              ItemsSource="{Binding Budgetzeitraeume}"
+              SelectedItem="{Binding AusgewaehlterZeitraum}"
+              AutoGenerateColumns="False"
+              CanUserAddRows="False"
+              Margin="0,10,0,0"
+              IsReadOnly="True">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="*" />
+                <DataGridTextColumn Header="Startdatum" Binding="{Binding Startdatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
+                <DataGridTextColumn Header="Enddatum" Binding="{Binding Enddatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
+                <DataGridCheckBoxColumn Header="Aktiv" Binding="{Binding IstAktiv}" Width="Auto" />
+                
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+
+</UserControl>

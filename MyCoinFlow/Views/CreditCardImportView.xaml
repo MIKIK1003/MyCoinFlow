@@ -1,0 +1,268 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.CreditCardImportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="1200" d:DesignHeight="700">
+
+    <!-- Ressourcen -->
+    <UserControl.Resources>
+        <!-- Rechts ausgerichteter Text -->
+        <Style x:Key="RightAlignText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+
+        <!-- Icon-Button: ZUORDNEN (sichtbar wenn KontoId == null) -->
+        <Style x:Key="AssignIconButtonStyle" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding KontoId}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Icon-Button: ÄNDERN (sichtbar wenn KontoId != null) -->
+        <Style x:Key="EditIconButtonStyle" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding KontoId}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Summen -->
+            <RowDefinition Height="*"/>
+            <!-- Grid -->
+        </Grid.RowDefinitions>
+
+        <!-- ======= Toolbar ======= -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LINKS: Aktionen + Batch-Auswahl -->
+            <StackPanel Orientation="Horizontal" Grid.Column="0" Margin="0,0,20,10" VerticalAlignment="Center">
+                <Button Content="Excel wählen…" Margin="0,0,10,0"
+                        Command="{Binding DateiWaehlenCommand}"/>
+
+                <Button Content="Buchen" Margin="0,0,10,0"
+                        Command="{Binding BuchenCommand}"/>
+
+                <!-- Batch verwerfen -->
+                <Button Margin="10,0,0,0"
+                        Command="{Binding BatchVerwerfenCommand}"
+                        Style="{StaticResource MaterialDesignRaisedButton}"
+                        Background="{DynamicResource MaterialDesignValidationErrorBrush}"
+                        Foreground="White"
+                        ToolTip="Import-Batch verwerfen">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="DeleteForever" Width="20" Height="20" Margin="0,0,6,0"/>
+                        <TextBlock Text="Batch verwerfen"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Batch-Auswahl + Laden + Aktualisieren -->
+                <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Batch:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox Width="380"
+                              ItemsSource="{Binding Batches}"
+                              DisplayMemberPath="Anzeige"
+                              SelectedItem="{Binding AusgewaehlterBatch}"/>
+                    <Button Content="Laden"
+                            Margin="6,0,0,0"
+                            Command="{Binding BatchLadenCommand}"/>
+                    <Button Margin="6,0,0,0"
+                            ToolTip="Batchliste aktualisieren"
+                            Command="{Binding BatchesNeuLadenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Refresh" Width="20" Height="20" Margin="0,0,6,0"/>
+                            <TextBlock Text="Aktualisieren"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Filter -->
+                <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Filter:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox Width="140"
+                              SelectedValue="{Binding FilterModus}"
+                              SelectedValuePath="Content">
+                        <ComboBoxItem Content="Alle"/>
+                        <ComboBoxItem Content="Offen"/>
+                        <ComboBoxItem Content="Zugewiesen"/>
+                    </ComboBox>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- RECHTS: Verrechnungskonto + Geldinstitut -->
+            <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="0,0,0,10" VerticalAlignment="Center">
+                <TextBlock Text="Verrechnungskonto:" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <ComboBox Width="320" Margin="0,0,20,0"
+                          ItemsSource="{Binding KreditkartenKonten}"
+                          DisplayMemberPath="Anzeige"
+                          SelectedValuePath="Id"
+                          SelectedValue="{Binding AusgleichsKontoId}"/>
+
+                <TextBlock Text="Geldinstitut:" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <ComboBox Width="240"
+                          ItemsSource="{Binding Geldinstitute}"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Id"
+                          SelectedValue="{Binding AusgewaehltesGeldinstitutId}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ======= Summenleiste ======= -->
+        <Border Grid.Row="1" Padding="12" Margin="0,0,0,10" BorderBrush="#DDD" BorderThickness="1" CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0" HorizontalAlignment="Left">
+                    <TextBlock Text="Summe Liste:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SummeListe, StringFormat={}{0:N2}}" Style="{StaticResource RightAlignText}" Width="120"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="1" HorizontalAlignment="Left">
+                    <TextBlock Text="Zugeordnet:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SummeZugeordnet, StringFormat={}{0:N2}}" Style="{StaticResource RightAlignText}" Width="120"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="2" HorizontalAlignment="Left">
+                    <TextBlock Text="Offen:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SummeOffen, StringFormat={}{0:N2}}" Style="{StaticResource RightAlignText}" Width="120"/>
+                </StackPanel>
+
+                <!-- Abrechnungssumme (VM setzt sie aus dem Verrechnungskonto) -->
+                <StackPanel Orientation="Horizontal" Grid.Column="3" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Abrechnungssumme:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBox Width="120"
+                             Text="{Binding Abrechnungssumme, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             HorizontalContentAlignment="Right"/>
+                </StackPanel>
+
+                <!-- Differenz -->
+                <StackPanel Orientation="Horizontal" Grid.Column="4" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Differenz:" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding DifferenzZurAbrechnung, StringFormat={}{0:N2}}"
+                               Style="{StaticResource RightAlignText}" Width="120"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ======= Liste ======= -->
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding ZeilenView}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  RowHeight="32"
+                  FrozenColumnCount="2">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                </Style>
+            </DataGrid.RowStyle>
+
+            <DataGrid.Columns>
+                <!-- pro Zeile löschen (kleiner Button) -->
+                <DataGridTemplateColumn Header="" Width="44" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Width="32" Height="24" MinHeight="0" Padding="0"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Style="{StaticResource MaterialDesignRaisedButton}"
+                                    Background="{DynamicResource MaterialDesignValidationErrorBrush}"
+                                    Foreground="White"
+                                    ToolTip="Zeile löschen"
+                                    Command="{Binding DataContext.ZeileLoeschenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding .}">
+                                <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Datum / Betrag / Debit-Kredit -->
+                <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
+                <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:N2}}" Width="110">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                            <Setter Property="TextAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Debit/Kredit" Binding="{Binding DebitKredit}" Width="110"/>
+
+                <!-- Zuordnen-Icon vor Beschreibung (wenn kein Konto gesetzt) -->
+                <DataGridTemplateColumn Header="" Width="52" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource AssignIconButtonStyle}"
+                                    ToolTip="Zuordnen"
+                                    Command="{Binding DataContext.ZuweisenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding .}">
+                                <materialDesign:PackIcon Kind="FolderCog" Width="18" Height="18"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Beschreibung / Händler / Kategorie -->
+                <DataGridTextColumn Header="Beschreibung" Binding="{Binding Beschreibung}" Width="3*"/>
+                <DataGridTextColumn Header="Händler" Binding="{Binding Haendler}" Width="2*"/>
+                <DataGridTextColumn Header="Händlerkategorie" Binding="{Binding Kategorie}" Width="2*"/>
+
+                <!-- Ändern-Icon vor Konto (wenn Konto gesetzt) -->
+                <DataGridTemplateColumn Header="" Width="52" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource EditIconButtonStyle}"
+                                    ToolTip="Zuordnung ändern"
+                                    Command="{Binding DataContext.ZuweisenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding .}">
+                                <materialDesign:PackIcon Kind="PencilBox" Width="18" Height="18"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Konto-Text -->
+                <DataGridTextColumn Header="Konto" Binding="{Binding Konto}" Width="2*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

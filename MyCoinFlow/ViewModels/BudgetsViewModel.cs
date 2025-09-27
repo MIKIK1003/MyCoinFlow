@@ -1,0 +1,142 @@
+﻿using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using MyCoinFlow.Helpers;
+using MyCoinFlow.Models;
+using MyCoinFlow.Services;
+using MyCoinFlow.Views;
+
+namespace MyCoinFlow.ViewModels
+{
+    public class BudgetsViewModel : INotifyPropertyChanged
+    {
+        public ObservableCollection<Budgetzeitraum> Budgetzeitraeume { get; set; } = new ObservableCollection<Budgetzeitraum>();
+
+        private Budgetzeitraum? _ausgewaehlterZeitraum;
+        public Budgetzeitraum? AusgewaehlterZeitraum
+        {
+            get => _ausgewaehlterZeitraum;
+            set
+            {
+                _ausgewaehlterZeitraum = value;
+                OnPropertyChanged();
+
+                // Buttons neu bewerten
+                (BearbeitenZeitraumCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (LoeschenEintragCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (BudgetwerteErfassenCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        // Commands
+        public ICommand NeuerZeitraumCommand { get; }
+        public ICommand BearbeitenZeitraumCommand { get; }
+        public ICommand LoeschenEintragCommand { get; }
+        public ICommand BudgetwerteErfassenCommand { get; }
+
+        public BudgetsViewModel()
+        {
+            LadeBudgetzeitraeume();
+
+            NeuerZeitraumCommand = new RelayCommand(_ => NeuenZeitraumHinzufuegen());
+            BearbeitenZeitraumCommand = new RelayCommand(_ => ZeitraumBearbeiten(), _ => AusgewaehlterZeitraum != null);
+            LoeschenEintragCommand = new RelayCommand(_ => ZeitraumLoeschen(), _ => AusgewaehlterZeitraum != null);
+
+            // NEU: Budgetwerte erfassen
+            BudgetwerteErfassenCommand = new RelayCommand(
+                _ => BudgetwerteErfassen(),
+                _ => AusgewaehlterZeitraum != null
+            );
+        }
+
+        private void LadeBudgetzeitraeume()
+        {
+            Budgetzeitraeume.Clear();
+            DatabaseService dbService = new DatabaseService();
+            var zeitraeume = dbService.LadeBudgetzeitraeume();
+
+            foreach (var z in zeitraeume)
+                Budgetzeitraeume.Add(z);
+        }
+
+        private void NeuenZeitraumHinzufuegen()
+        {
+            var dialog = new MyCoinFlow.Views.BudgetzeitraumDialog();
+
+            if (dialog.ShowDialog() == true)
+            {
+                DatabaseService dbService = new DatabaseService();
+                dbService.BudgetzeitraumSpeichern(dialog.BezeichnungBox.Text,
+                                                  dialog.StartdatumPicker.SelectedDate ?? DateTime.Now,
+                                                  dialog.EnddatumPicker.SelectedDate ?? DateTime.Now,
+                                                  dialog.AktivCheckBox.IsChecked ?? false);
+
+                LadeBudgetzeitraeume();
+            }
+        }
+
+        private void ZeitraumBearbeiten()
+        {
+            if (AusgewaehlterZeitraum == null) return;
+
+            var dialog = new MyCoinFlow.Views.BudgetzeitraumDialog();
+
+            // Felder vorausfüllen
+            dialog.BezeichnungBox.Text = AusgewaehlterZeitraum.Bezeichnung;
+            dialog.StartdatumPicker.SelectedDate = AusgewaehlterZeitraum.Startdatum;
+            dialog.EnddatumPicker.SelectedDate = AusgewaehlterZeitraum.Enddatum;
+            dialog.AktivCheckBox.IsChecked = AusgewaehlterZeitraum.IstAktiv;
+
+            if (dialog.ShowDialog() == true)
+            {
+                DatabaseService dbService = new DatabaseService();
+                dbService.BudgetzeitraumAktualisieren(AusgewaehlterZeitraum.Id,
+                                                      dialog.BezeichnungBox.Text,
+                                                      dialog.StartdatumPicker.SelectedDate ?? DateTime.Now,
+                                                      dialog.EnddatumPicker.SelectedDate ?? DateTime.Now,
+                                                      dialog.AktivCheckBox.IsChecked ?? false);
+
+                LadeBudgetzeitraeume();
+            }
+        }
+
+        private void ZeitraumLoeschen()
+        {
+            if (AusgewaehlterZeitraum == null) return;
+
+            var result = MessageBox.Show(
+                $"Möchten Sie den Zeitraum \"{AusgewaehlterZeitraum.Bezeichnung}\" wirklich löschen?",
+                "Löschen bestätigen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                DatabaseService dbService = new DatabaseService();
+                dbService.BudgetzeitraumLoeschen(AusgewaehlterZeitraum.Id);
+
+                LadeBudgetzeitraeume();
+            }
+        }
+
+        // NEU: Fenster zur Budgetwerterfassung öffnen
+        private void BudgetwerteErfassen()
+        {
+            if (AusgewaehlterZeitraum == null) return;
+
+            var win = new BudgetDetailWindow(AusgewaehlterZeitraum.Id)
+            {
+                Owner = Application.Current.MainWindow
+            };
+            win.ShowDialog();
+        }
+
+        // INotifyPropertyChanged
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}

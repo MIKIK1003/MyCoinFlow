@@ -1,0 +1,125 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.InstitutionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             MinWidth="1100">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Kopf -->
+            <RowDefinition Height="*"/>
+            <!-- Tabelle -->
+        </Grid.RowDefinitions>
+
+        <!-- KOPF: Links Buttons, rechts Abgrenzungsdatum -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <!-- Buttons -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Datum -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Buttons links -->
+            <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,10,0"
+                        Command="{Binding NeuCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="BankPlus" Width="20" Height="20" Margin="0,0,8,0"/>
+                        <TextBlock Text="Neues Geldinstitut"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,10,0"
+                        Command="{Binding BearbeitenCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Pencil" Width="20" Height="20" Margin="0,0,8,0"/>
+                        <TextBlock Text="Bearbeiten"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                        Command="{Binding LoeschenCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="DeleteForever" Width="20" Height="20" Margin="0,0,8,0"/>
+                        <TextBlock Text="Löschen"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Abgrenzungsdatum rechts -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Abgrenzungsdatum:" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <DatePicker SelectedDate="{Binding Abgrenzungsdatum}" Width="160"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- TABELLE -->
+        <DataGrid Grid.Row="1"
+                  x:Name="InstituteGrid"
+                  ItemsSource="{Binding Institute}"
+                  SelectedItem="{Binding AusgewaehltesInstitut}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  MouseDoubleClick="InstituteGrid_MouseDoubleClick">
+
+            <DataGrid.Resources>
+                <!-- Rechtsbündige Zahlen -->
+                <Style x:Key="RightAlignedCell" TargetType="TextBlock">
+                    <Setter Property="TextAlignment" Value="Right"/>
+                    <Setter Property="Padding" Value="0,0,8,0"/>
+                </Style>
+
+                <!-- Schmaler Icon-Button -->
+                <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
+                    <Setter Property="Padding" Value="6"/>
+                    <Setter Property="MinWidth" Value="36"/>
+                    <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
+                </Style>
+            </DataGrid.Resources>
+
+            <DataGrid.Columns>
+                <!-- NEU: Spalte 'Transaktionen anzeigen' -->
+                <DataGridTemplateColumn Header=" " Width="80" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource IconButtonStyle}"
+                    Click="OpenTransaktionen_Click"
+                    ToolTip="Transaktionen dieses Geldinstituts anzeigen">
+                                <materialDesign:PackIcon Kind="History" Width="24" Height="24"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+
+                <DataGridTextColumn Header="Name"        Binding="{Binding Name}" Width="2*"/>
+                <DataGridTextColumn Header="BIC"         Binding="{Binding BIC}" Width="*"/>
+                <DataGridTextColumn Header="IBAN"        Binding="{Binding IBAN}" Width="*"/>
+                <DataGridTextColumn Header="Kontonummer" Binding="{Binding KontoNummer}" Width="*"/>
+                <DataGridTextColumn Header="Notiz"       Binding="{Binding Notiz}" Width="2*"/>
+
+                <!-- Anfangswerte -->
+                <DataGridTextColumn Header="Anfangsbestand"
+                                    Binding="{Binding Anfangsbestand, StringFormat=F2}"
+                                    ElementStyle="{StaticResource RightAlignedCell}"
+                                    Width="*"/>
+                <DataGridTextColumn Header="ab Datum"
+                                    Binding="{Binding Anfangsdatum, StringFormat=d}"
+                                    Width="*"/>
+
+                <!-- Berechnet -->
+                <DataGridTextColumn Header="Gebucht (bis Abgrenzung)"
+                                    Binding="{Binding Gebucht, StringFormat=F2}"
+                                    ElementStyle="{StaticResource RightAlignedCell}"
+                                    Width="*"/>
+                <DataGridTextColumn Header="Schlussaldo"
+                                    Binding="{Binding Schlussaldo, StringFormat=F2}"
+                                    ElementStyle="{StaticResource RightAlignedCell}"
+                                    Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,112 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.AccountsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!-- Konverter für Sichtbarkeit -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Buttons -->
+        <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
+            <Button Content="Neuen Kontoplan-Eintrag hinzufügen"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Margin="0 10 10 0"
+                    Command="{Binding NeuerEintragCommand}" />
+
+            <Button Content="Ausgewählten Eintrag bearbeiten"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Margin="0 10 10 0"
+                    Command="{Binding BearbeitenEintragCommand}" />
+
+            <Button Content="Ausgewählten Eintrag löschen"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Margin="0 10 10 0"
+                    Command="{Binding LoeschenEintragCommand}" />
+
+            <!-- Tabellenansicht umschalten -->
+            <CheckBox Content="Tabellenansicht"
+                      Margin="20,10,0,0"
+                      IsChecked="{Binding IstTabellenAnsicht, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <!-- Baumansicht -->
+        <TreeView Grid.Row="1"
+                  ItemsSource="{Binding KontoplanKnotenListe}"
+                  SelectedItemChanged="TreeView_SelectedItemChanged"
+                  Visibility="{Binding IstBaumAnsicht, Converter={StaticResource BoolToVis}}">
+            <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate ItemsSource="{Binding Kinder}">
+                    <TextBlock Text="{Binding AnzeigeText}" />
+                </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+
+        <!-- Tabellenansicht -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding KontenListeFlach}"
+                  Visibility="{Binding IstTabellenAnsicht, Converter={StaticResource BoolToVis}}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0"
+                  SelectionUnit="FullRow"
+                  materialDesign:DataGridAssist.CellPadding="8"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8">
+
+            <DataGrid.Resources>
+                <!-- rechte Ausrichtung für Zahlen -->
+                <Style x:Key="RightAlignedCell" TargetType="TextBlock">
+                    <Setter Property="TextAlignment" Value="Right"/>
+                    <Setter Property="Padding" Value="0,0,8,0"/>
+                </Style>
+            </DataGrid.Resources>
+
+            <DataGrid.Columns>
+
+                <!-- NEU: breite Icon-Spalte (ca. 3× Standard-Icon) -->
+                <DataGridTemplateColumn Header=" " Width="138" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button ToolTip="Transaktionen dieses Kontos anzeigen"
+                                    Click="OpenKontoTransaktionen_Click"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Padding="6">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="History" Width="24" Height="24" Margin="0,0,6,0"/>
+                                    <TextBlock VerticalAlignment="Center" Text="Transaktionen"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Bestehende Spalten belassen -->
+                <DataGridTextColumn Header="Nr."         Binding="{Binding Kontonummer}" Width="80"/>
+                <DataGridTextColumn Header="Art"         Binding="{Binding Art}" Width="120"/>
+                <DataGridTextColumn Header="Gruppe"      Binding="{Binding Gruppe}" Width="160"/>
+                <DataGridTextColumn Header="Untergruppe" Binding="{Binding Untergruppe}" Width="160"/>
+                <DataGridTextColumn Header="Detail"      Binding="{Binding Detail}" Width="*"/>
+
+                <!-- Budget / Ist (Gebucht) / Delta wie gehabt -->
+                <DataGridTextColumn Header="Budget"  Binding="{Binding Budgetwert, StringFormat={}{0:C}}" Width="110"
+                                    ElementStyle="{StaticResource RightAlignedCell}"/>
+                <DataGridTextColumn Header="Gebucht" Binding="{Binding Gebucht,    StringFormat={}{0:C}}" Width="110"
+                                    ElementStyle="{StaticResource RightAlignedCell}"/>
+                <DataGridTextColumn Header="Δ"       Binding="{Binding Differenz,  StringFormat={}{0:C}}" Width="110"
+                                    ElementStyle="{StaticResource RightAlignedCell}"/>
+
+            </DataGrid.Columns>
+        </DataGrid>
+
+    </Grid>
+</UserControl>

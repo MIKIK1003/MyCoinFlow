@@ -1,0 +1,126 @@
+﻿<Window x:Class="MyCoinFlow.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="MyCoinFlow – Anmeldung"
+        Height="520" Width="720" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{DynamicResource MaterialDesignPaper}">
+
+    <Grid Margin="24">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="3*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Linke Seite: Intro / Grafik -->
+        <Border Grid.Column="0" CornerRadius="1"
+                Background="{DynamicResource MaterialDesignCardBackground}">
+            <StackPanel Margin="24" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="piggybank" Width="72" Height="72"
+                                         Foreground="{DynamicResource PrimaryHueMidBrush}"/>
+                <TextBlock Text="MyCoinFlow" FontSize="28" FontWeight="Bold" Margin="0,12,0,4"/>
+                <TextBlock Text="Deine Smarte Übersicht"
+                           Opacity="1" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Rechte Seite: Mandant + Login + Erstbenutzer -->
+        <Border Grid.Column="1" CornerRadius="16" Padding="24"
+                Background="{DynamicResource MaterialDesignCardBackground}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- 0: Mandanten-Auswahl -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- 1: Login-Überschrift -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- 2: Login-Felder -->
+                        <RowDefinition Height="*"/>
+                        <!-- 3: Status -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- 4: Erstbenutzer -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 0) MANDANTEN-AUSWAHL -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                        <TextBlock Text="Datenbank (Mandant)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="DbCombo" Width="320" MinWidth="240"
+                                  Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
+                    </StackPanel>
+
+                    <!-- 1) LOGIN-ÜBERSCHRIFT -->
+                    <TextBlock Grid.Row="1" Text="Login" FontSize="20" FontWeight="SemiBold"/>
+
+                    <!-- 2) LOGIN-FELDER -->
+                    <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                        <StackPanel.Resources>
+                            <Style TargetType="FrameworkElement">
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                            </Style>
+                        </StackPanel.Resources>
+
+                        <TextBox x:Name="LoginUserBox"
+                                 materialDesign:HintAssist.Hint="Benutzername"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+
+                        <PasswordBox x:Name="LoginPwdBox"
+                                     materialDesign:HintAssist.Hint="Passwort"
+                                     Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+
+                        <Button Click="Login_Click"
+                                Style="{StaticResource MaterialDesignRaisedButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="LoginVariant" Margin="0,0,6,0"/>
+                                <TextBlock Text="Anmelden"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- 3) STATUS -->
+                    <StackPanel Grid.Row="3">
+                        <TextBlock x:Name="StatusText"
+                                   Foreground="Tomato"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- 4) ERSTBENUTZER -->
+                    <Expander Grid.Row="4" Header="Ersten Benutzer anlegen" x:Name="FirstUserExpander"
+                              IsExpanded="False" Margin="0,12,0,0">
+                        <StackPanel Margin="0,8,0,0">
+                            <StackPanel.Resources>
+                                <Style TargetType="FrameworkElement">
+                                    <Setter Property="Margin" Value="0,0,0,10"/>
+                                </Style>
+                            </StackPanel.Resources>
+
+                            <TextBox x:Name="NewUserBox"
+                                     materialDesign:HintAssist.Hint="Benutzername (3–32, A-Z, a-z, 0-9, ., _, -)"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+
+                            <PasswordBox x:Name="NewPwd1Box"
+                                         materialDesign:HintAssist.Hint="Passwort"
+                                         Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+
+                            <PasswordBox x:Name="NewPwd2Box"
+                                         materialDesign:HintAssist.Hint="Passwort wiederholen"
+                                         Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Click="CreateFirstUser_Click"
+                                        Style="{StaticResource MaterialDesignRaisedButton}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="AccountPlus" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Anlegen"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                </Grid>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

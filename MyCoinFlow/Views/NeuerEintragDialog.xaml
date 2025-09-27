@@ -1,0 +1,47 @@
+﻿<Window x:Class="MyCoinFlow.Views.NeuerEintragDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Neuer Kontoplan-Eintrag" Height="410" Width="400" WindowStartupLocation="CenterScreen">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <!-- Kontonummer -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Art -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Gruppe -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Untergruppe -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Detail -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Buttons -->
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Kontonummer:" Grid.Row="0" />
+        <TextBox x:Name="KontonummerBox" Grid.Row="1" />
+
+        <TextBlock Text="Art:" Grid.Row="2" Margin="0,10,0,0" />
+        <ComboBox x:Name="ArtComboBox" Grid.Row="3" DisplayMemberPath="Bezeichnung" SelectedIndex="0"/>
+
+        <TextBlock Text="Gruppe:" Grid.Row="4" Margin="0,10,0,0" />
+        <ComboBox x:Name="GruppeComboBox" Grid.Row="5" DisplayMemberPath="Bezeichnung" SelectedIndex="0"/>
+
+        <TextBlock Text="Untergruppe:" Grid.Row="6" Margin="0,10,0,0" />
+        <ComboBox x:Name="UntergruppeComboBox" Grid.Row="7" DisplayMemberPath="Bezeichnung" SelectedIndex="0"/>
+
+        <TextBlock Text="Detail:" Grid.Row="8" Margin="0,10,0,0" />
+        <TextBox x:Name="DetailBox" Grid.Row="9" />
+        
+        <StackPanel Orientation="Horizontal" Grid.Row="12" Margin="0,30,0,0" HorizontalAlignment="Right">
+            <Button Content="Speichern" Width="100" Margin="0,0,10,0" Click="Speichern_Click"/>
+            <Button Content="Abbrechen" Width="100" Click="Abbrechen_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

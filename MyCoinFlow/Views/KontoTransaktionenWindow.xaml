@@ -1,0 +1,156 @@
+﻿<Window x:Class="MyCoinFlow.Views.KontoTransaktionenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Transaktionen – Konto"
+        Height="700" Width="1200"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+
+    <DockPanel>
+
+        <!-- KOPF / FILTER -->
+        <Border DockPanel.Dock="Top" Padding="12" Background="{DynamicResource MaterialDesignCardBackground}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Betrag min/max -->
+                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Betrag"/>
+                    <TextBox Width="100" Margin="0,0,6,0" materialDesign:HintAssist.Hint="min"
+                             Text="{Binding FilterMinBetrag, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Width="100" materialDesign:HintAssist.Hint="max"
+                             Text="{Binding FilterMaxBetrag, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <!-- Datum von/bis -->
+                <StackPanel Orientation="Horizontal" Grid.Column="2">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Datum"/>
+                    <DatePicker Width="145" Margin="0,0,6,0"
+                                SelectedDate="{Binding FilterVon, UpdateSourceTrigger=PropertyChanged}"/>
+                    <DatePicker Width="145"
+                                SelectedDate="{Binding FilterBis, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <!-- Adresse -->
+                <StackPanel Orientation="Horizontal" Grid.Column="4">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Adresse"/>
+                    <ComboBox Width="220" IsEditable="True"
+                              ItemsSource="{Binding Adressen}"
+                              SelectedValuePath="Id" DisplayMemberPath="Name"
+                              SelectedValue="{Binding FilterAdresseId, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <!-- Geldinstitut -->
+                <StackPanel Orientation="Horizontal" Grid.Column="6">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Geldinstitut"/>
+                    <ComboBox Width="260"
+                              ItemsSource="{Binding Geldinstitute}"
+                              SelectedValuePath="Id" DisplayMemberPath="Name"
+                              SelectedValue="{Binding FilterGeldinstitutId, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <!-- Aktionen rechts -->
+                <StackPanel Orientation="Horizontal" Grid.Column="8" HorizontalAlignment="Right">
+                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,16,0"
+                               Text="{Binding SummaryText}"/>
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,8,0"
+                            ToolTip="Drucken (A4 Querformat)"
+                            Click="Print_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Printer" Width="20" Height="20" Margin="0,0,6,0"/>
+                            <TextBlock Text="Drucken"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Content="Anwenden" Margin="0,0,8,0"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ApplyFilterCommand}"/>
+                    <Button Content="Zurücksetzen" Margin="0,0,8,0"
+                            Command="{Binding ResetFilterCommand}"/>
+                    <Button Content="Schliessen" Click="Close_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- GRID -->
+        <DataGrid ItemsSource="{Binding Rows}" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                  Margin="12" RowHeaderWidth="0"
+                  SelectionUnit="FullRow"
+                  materialDesign:DataGridAssist.CellPadding="8"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8">
+
+            <DataGrid.Resources>
+                <!-- Einzeilig mit … -->
+                <Style x:Key="TrimLeft" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBody2TextBlock}">
+                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                </Style>
+                <Style x:Key="TrimRight" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBody2TextBlock}">
+                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                </Style>
+            </DataGrid.Resources>
+
+            <DataGrid.Columns>
+                <!-- 1: Geldinstitut -->
+                <DataGridTextColumn Header="Geldinstitut" Binding="{Binding GeldinstitutName}" Width="200">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimLeft}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <!-- 2: Datum -->
+                <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat={}{0:yyyy-MM-dd}}" Width="70">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimLeft}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <!-- 3/4: Einnahmen / Ausgaben -->
+                <DataGridTextColumn Header="Einnahmen" Binding="{Binding Einnahmen, StringFormat={}{0:N2}}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimRight}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Ausgaben" Binding="{Binding Ausgaben, StringFormat={}{0:N2}}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimRight}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <!-- 5: Adresse -->
+                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="240">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimLeft}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <!-- 6: Notiz -->
+                <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" Width="380">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimLeft}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <!-- 7: Budget-Saldo (Delta) -->
+                <DataGridTextColumn Header="Budget Δ" Binding="{Binding BudgetDelta, StringFormat={}{0:N2}}" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TrimRight}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

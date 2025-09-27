@@ -1,0 +1,246 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.BankImportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="1250">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <Style x:Key="IdHintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="CAMT"
+                    Padding="10,4"
+                    Margin="0,0,10,0"
+                    Command="{Binding OpenFileCommand}"/>
+
+            <Button Content="Leeren"
+                    Padding="10,4"
+                    Margin="0,0,10,0"
+                    Command="{Binding ClearCommand}"/>
+
+            <Button Content="Speichern"
+                    Padding="10,4"
+                    Margin="0,0,10,0"
+                    Command="{Binding SaveToDbCommand}"/>
+
+            <Button Content="Laden"
+                    Padding="10,4"
+                    Margin="0,0,10,0"
+                    Command="{Binding LoadPendingFromDbCommand}"/>
+
+            <Button Content="Bulk"
+                    Margin="0,0,10,0"
+                    Padding="10,4"
+                    ToolTip="Bucht alle aktuell vollständig zugeordneten Zeilen ohne Rückfrage"
+                    Command="{Binding BulkUebernehmenCommand}" />
+
+            
+            <CheckBox Content="Nur unvollständige anzeigen"
+                      Margin="12,0,0,0"
+                      IsChecked="{Binding OnlyIncomplete}"/>
+
+            <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
+                <Run Text="Quelle: "/>
+                <Run Text="{Binding FilePath}"/>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding ItemsView}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0"
+                  AlternationCount="2">
+
+            <DataGrid.Columns>
+
+                <!-- Status: vollständig => Bearbeiten (ZuordnungDialog öffnen) -->
+                <DataGridTemplateColumn Width="70" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button
+        ToolTip="Zuordnung bearbeiten"
+        Padding="0"
+        Width="26" Height="26"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Command="{Binding DataContext.BearbeitenCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+        CommandParameter="{Binding}">
+                                <materialDesign:PackIcon Kind="CheckCircle" Width="30" Height="30" Foreground="LimeGreen"/>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <!-- nur zeigen, wenn vollständig -->
+                                            <DataTrigger Binding="{Binding IstVollstaendig}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Einzeln buchen (ohne Dialog): nur sichtbar, wenn vollständig & StagingId vorhanden -->
+                <DataGridTemplateColumn Width="70" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button
+        ToolTip="Diese Buchung sofort übernehmen"
+        Padding="0"
+        Width="32" Height="32"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Command="{Binding DataContext.EinzelBuchenCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+        CommandParameter="{Binding}">
+                                <materialDesign:PackIcon Kind="PlayCircle" Width="30" Height="30" Foreground="DodgerBlue"/>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <!-- ausblenden, wenn nicht vollständig -->
+                                            <DataTrigger Binding="{Binding IstVollstaendig}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <!-- ausblenden, wenn noch keine StagingId -->
+                                            <DataTrigger Binding="{Binding StagingId}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Anlernen: nur sichtbar, wenn NICHT vollständig -->
+                <DataGridTemplateColumn Width="70" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button
+        ToolTip="Transaktion anlernen"
+        Padding="0"
+        Width="32" Height="32"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Command="{Binding DataContext.AnlernenCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+        CommandParameter="{Binding}">
+                                <!-- Falls 'InvoiceImport' bei dir nicht existiert,
+             nimm z.B. 'FileImportOutline' oder 'LightbulbQuestionOutline' -->
+                                <materialDesign:PackIcon Kind="InvoiceImport" Width="30" Height="30" Foreground="DarkOrange"/>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <!-- Wenn vollständig, ausblenden -->
+                                            <DataTrigger Binding="{Binding IstVollstaendig}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+
+                <!-- vorhandene Daten-Spalten -->
+                <DataGridTextColumn Header="#" Binding="{Binding StagingId}" Width="60"/>
+                <DataGridTextColumn Header="Buchung" Binding="{Binding BookingDate, StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
+                <DataGridTextColumn Header="Valuta"   Binding="{Binding ValueDate,   StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
+                <DataGridTextColumn Header="Betrag"   Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="110"/>
+                <DataGridTextColumn Header="Währung"  Binding="{Binding Currency}" Width="80"/>
+                <DataGridTextColumn Header="Richtung" Binding="{Binding Direction}" Width="90"/>
+                <DataGridTextColumn Header="Konto-IBAN" Binding="{Binding AccountIban}" Width="200"/>
+                <DataGridTextColumn Header="Gegenpartei" Binding="{Binding CounterpartyName}" Width="200"/>
+                <DataGridTextColumn Header="Gegen-IBAN"  Binding="{Binding CounterpartyIban}" Width="200"/>
+                <DataGridTextColumn Header="Text"     Binding="{Binding Text}" Width="*"/>
+                <DataGridTextColumn Header="ServiceRef" Binding="{Binding ServiceRef}" Width="160"/>
+
+                
+                
+                <!-- ====== Label-Spalten (Lesbar + Id klein) ====== -->
+
+                <DataGridTemplateColumn Header="Adresse" Width="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding AdresseLabel}" />
+                                <TextBlock Style="{StaticResource IdHintText}"
+                                           Text="{Binding VorschlagAdresseId, StringFormat=Id: {0}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Geldinstitut" Width="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding GeldinstitutLabel}" />
+                                <TextBlock Style="{StaticResource IdHintText}"
+                                           Text="{Binding VorschlagGeldinstitutId, StringFormat=Id: {0}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Konto (Nach)" Width="260">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding NachKontoLabel}" />
+                                <TextBlock Style="{StaticResource IdHintText}"
+                                           Text="{Binding VorschlagNachKontoId, StringFormat=Id: {0}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Konto (Von)" Width="260">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding VonKontoLabel}" />
+                                <TextBlock Style="{StaticResource IdHintText}"
+                                           Text="{Binding VorschlagVonKontoId, StringFormat=Id: {0}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Status -->
+        <DockPanel Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock DockPanel.Dock="Left" Text="{Binding StatusText}" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding Items.Count, StringFormat={}{0} Einträge}" />
+        </DockPanel>
+    </Grid>
+</UserControl>

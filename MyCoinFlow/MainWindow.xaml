@@ -1,0 +1,76 @@
+﻿<Window x:Class="MyCoinFlow.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:views="clr-namespace:MyCoinFlow.Views"
+        Title="MyCoinFlow" Height="900" Width="1800">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Linkes Menü -->
+        <StackPanel Grid.Column="0" Background="{DynamicResource MaterialDesignPaper}">
+
+            <StackPanel.Resources>
+        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
+            <Setter Property="Foreground" Value="#FF1976D2"/> <!-- hellblau -->
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+    </StackPanel.Resources>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="ViewDashboard"
+                Content="Dashboard"
+                Command="{Binding ShowDashboardCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="SwapHorizontal"
+                Content="Transaktionen"
+                Command="{Binding ShowTransactionsCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="FileTreeOutline"
+                Content="Kontenplan"
+                Command="{Binding ShowAccountsCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="BankOutline"
+                Content="Geldinstitute"
+                Command="{Binding ShowInstitutionsCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="AccountBoxOutline"
+                Content="Adressen"
+                Command="{Binding ShowAddressesCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="HandCoin"
+                Content="Budget"
+                Command="{Binding ShowBudgetsCommand}"
+                Margin="15"/>
+
+            <Button Style="{StaticResource NavIconButton}"
+                Tag="Cog"
+                Content="Admin"
+                Command="{Binding ShowAdminCommand}"
+                Margin="15"/>
+
+        </StackPanel>
+
+
+        <!-- Inhalt rechts -->
+        <ContentControl Grid.Column="1"
+                        Content="{Binding CurrentView}" />
+
+    </Grid>
+</Window>
+

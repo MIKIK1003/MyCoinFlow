@@ -1,0 +1,162 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="1100" d:DesignHeight="760">
+
+    <Grid Margin="16">
+        <!-- Header, 4-Felder-Grid, Fuß -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="ViewDashboard" Width="28" Height="28" Margin="0,0,8,0"/>
+                <TextBlock Text="Dashboard" Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <ComboBox Width="220"
+                          ItemsSource="{Binding GroupingOptions}"
+                          SelectedItem="{Binding SelectedGrouping}"
+                          DisplayMemberPath="Label"
+                          materialDesign:HintAssist.Hint="Gruppierung"
+                          Margin="0,0,8,0"/>
+                <Button Command="{Binding RefreshCommand}"
+                        Style="{StaticResource MaterialDesignFloatingActionMiniLightButton}">
+                    <materialDesign:PackIcon Kind="Refresh" Width="20" Height="20"/>
+                </Button>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- 4 Felder -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- (1) Budget vs. IST (Balken) -->
+            <materialDesign:Card Grid.Row="0" Grid.Column="0" Padding="12" Margin="0,0,8,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="{Binding ColumnChartTitle}"
+                               Style="{StaticResource MaterialDesignSubtitle1TextBlock}"
+                               Margin="0,0,0,8"/>
+                    <lvc:CartesianChart Grid.Row="1"
+                                        Series="{Binding ColumnSeries}"
+                                        XAxes="{Binding XAxes}"
+                                        YAxes="{Binding YAxes}"
+                                        LegendPosition="Bottom"/>
+                </Grid>
+            </materialDesign:Card>
+
+            <!-- (2) IST-Verteilung (Donut) -->
+            <materialDesign:Card Grid.Row="0" Grid.Column="1" Padding="12" Margin="8,0,0,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="IST‑Verteilung"
+                               Style="{StaticResource MaterialDesignSubtitle1TextBlock}"
+                               Margin="0,0,0,8"/>
+                    <lvc:PieChart Grid.Row="1"
+                                  Series="{Binding PieSeries}"
+                                  LegendPosition="Right"/>
+                </Grid>
+            </materialDesign:Card>
+
+            <!-- (3) KPIs: Offene Import-Zeilen -->
+            <materialDesign:Card Grid.Row="1" Grid.Column="0" Padding="12" Margin="0,8,8,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="ClipboardTextClock" Width="22" Height="22" Margin="0,0,8,0"/>
+                        <TextBlock Text="Offene Import‑Zeilen" Style="{StaticResource MaterialDesignSubtitle1TextBlock}" FontSize="48"/>
+                    </StackPanel>
+
+                    <!-- Zwei "Kacheln" nebeneinander -->
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- a) Kreditkarten-Staging -->
+                        <Border Grid.Column="0" CornerRadius="6" Padding="12"
+                                Background="{DynamicResource MaterialDesignCardBackground}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="CreditCardClockOutline" Width="70" Height="70" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Kreditkarte (offen)" Opacity="0.7" FontSize="36"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding OpenImportCount}" 
+                                           FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- b) Bank-Import-Items -->
+                        <Border Grid.Column="1" CornerRadius="6" Padding="12" Margin="8,0,0,0"
+                                Background="{DynamicResource MaterialDesignCardBackground}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="BankTransferIn" Width="80" Height="80" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Bank (offen)" Opacity="0.7" FontSize="36"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding BankImportItemCount}" 
+                                           FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </materialDesign:Card>
+
+            <!-- (4) Bestände der Geldinstitute (horizontal) -->
+            <materialDesign:Card Grid.Row="1" Grid.Column="1" Padding="12" Margin="8,8,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="Bestände der Geldinstitute"
+                               Style="{StaticResource MaterialDesignSubtitle1TextBlock}"
+                               Margin="0,0,0,8"/>
+                    <lvc:CartesianChart Grid.Row="1"
+                                        Series="{Binding BankSeries}"
+                                        XAxes="{Binding BankXAxes}"
+                                        YAxes="{Binding BankYAxes}"/>
+                </Grid>
+            </materialDesign:Card>
+        </Grid>
+
+        <!-- Fußzeile -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding ZeitraumLabel}"
+                   Opacity="0.7"
+                   HorizontalAlignment="Right"
+                   Margin="0,8,0,0"/>
+    </Grid>
+</UserControl>

@@ -1,0 +1,64 @@
+﻿<Window x:Class="MyCoinFlow.Views.InstitutionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Geldinstitut" Height="460" Width="520"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Name -->
+                <RowDefinition Height="Auto"/>
+                <!-- BIC -->
+                <RowDefinition Height="Auto"/>
+                <!-- IBAN -->
+                <RowDefinition Height="Auto"/>
+                <!-- Kontonummer -->
+                <RowDefinition Height="Auto"/>
+                <!-- Notiz -->
+                <RowDefinition Height="Auto"/>
+                <!-- Anfangsbestand (NEU) -->
+                <RowDefinition Height="Auto"/>
+                <!-- Anfangsdatum (NEU) -->
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Name*" Grid.Row="0" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
+            <TextBox x:Name="NameBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,8"/>
+
+            <TextBlock Text="BIC" Grid.Row="1" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
+            <TextBox x:Name="BicBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"/>
+
+            <TextBlock Text="IBAN" Grid.Row="2" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
+            <TextBox x:Name="IbanBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"/>
+
+            <TextBlock Text="Kontonummer" Grid.Row="3" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
+            <TextBox x:Name="KtoBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"/>
+
+            <TextBlock Text="Notiz" Grid.Row="4" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top"/>
+            <TextBox x:Name="NotizBox" Grid.Row="4" Grid.Column="1" Height="80" AcceptsReturn="True" TextWrapping="Wrap"/>
+
+            <!-- NEU: Anfangsbestand -->
+            <TextBlock Text="Anfangsbestand" Grid.Row="5" Grid.Column="0" Margin="0,10,10,8" VerticalAlignment="Center"/>
+            <TextBox x:Name="AnfangsbestandBox" Grid.Row="5" Grid.Column="1" Margin="0,10,0,8"
+                     ToolTip="Startsaldo dieses Geldinstituts (z. B. 1500,00)"/>
+
+            <!-- NEU: Anfangsdatum -->
+            <TextBlock Text="ab Datum" Grid.Row="6" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <DatePicker x:Name="AnfangsdatumPicker" Grid.Row="6" Grid.Column="1" />
+        </Grid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Abbrechen" IsCancel="True" Margin="0,0,10,0"/>
+            <Button Content="OK" IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
