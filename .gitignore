@@ -4,3 +4,5 @@ obj/
 *.user
 *.suo
 *.cache
+
+/_git_broken_*
