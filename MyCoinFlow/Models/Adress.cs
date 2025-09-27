@@ -10,7 +10,7 @@
         public string? Land { get; set; }
         public string? Typ { get; set; }     // z.B. Lieferant, Dienstleister, Kunde
         public string? IBAN { get; set; }    // Bankverbindung der Adresse
-        public string? Notiz { get; set; }
+        public string? Notiz { get; set; } // Freier Text
         public bool IstBudgetiert { get; set; }
         public int? StandardEinnahmenKontoId { get; set; }
         public int? DefaultKontoId { get; set; }
