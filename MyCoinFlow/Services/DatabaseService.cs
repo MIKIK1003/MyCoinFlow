@@ -2818,7 +2818,7 @@ WHERE Id = @Id";
             return false;
         }
 
-        public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId); // letzte Zeile
+        public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId);
 
 
 
