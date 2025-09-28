@@ -1131,20 +1131,19 @@ OUTER APPLY (
                 /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt): Richtung über Kontotyp ableiten */
                 WHEN t.NachKontoId IS NOT NULL THEN
                     CASE 
+                        /* Nur noch Text-Heuristik – KEINE hart codierten Nummernkreise mehr */
                         WHEN (
-                               (kp.Kontonummer BETWEEN 3000 AND 3999)
-                            OR (kp.Kontonummer BETWEEN 7000 AND 7999)
-                            OR UPPER(ISNULL(kp.Art,         '')) LIKE '%EINNAHM%'
-                            OR UPPER(ISNULL(kp.Art,         '')) LIKE '%ERTR%'
-                            OR UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%EINNAHM%'
-                            OR UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%ERTR%'
-                            OR UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%EINNAHM%'
-                            OR UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%ERTR%'
-                            OR UPPER(ISNULL(kp.Detail,      '')) LIKE '%EINNAHM%'
-                            OR UPPER(ISNULL(kp.Detail,      '')) LIKE '%ERTR%'
+                            UPPER(ISNULL(kp.Art,         '')) LIKE '%EINNAHM%' OR
+                            UPPER(ISNULL(kp.Art,         '')) LIKE '%ERTR%'   OR
+                            UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%EINNAHM%' OR
+                            UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%ERTR%'   OR
+                            UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%EINNAHM%' OR
+                            UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%ERTR%'   OR
+                            UPPER(ISNULL(kp.Detail,      '')) LIKE '%EINNAHM%' OR
+                            UPPER(ISNULL(kp.Detail,      '')) LIKE '%ERTR%'
                         )
-                        THEN  t.Betrag
-                        ELSE -t.Betrag
+                        THEN  t.Betrag   -- Einnahmekonto: Bank +
+                        ELSE -t.Betrag   -- Ausgabenkonto: Bank −
                     END
                 ELSE 0
             END
@@ -1157,7 +1156,6 @@ OUTER APPLY (
         AND (g.Anfangsdatum IS NULL OR t.Datum >= g.Anfangsdatum)
 ) s
 ORDER BY g.Name;";
-
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@bis", bis);
 
@@ -1181,6 +1179,7 @@ ORDER BY g.Name;";
 
             return list;
         }
+
 
 
 
@@ -2779,6 +2778,48 @@ WHERE bd.KontoId = @K
             var val = cmdB.ExecuteScalar();
             return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
         }
+
+        public bool IstEinnahmenKonto(int kontoId)
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+SELECT 
+    UPPER(ISNULL(Art,         '')) AS Art,
+    UPPER(ISNULL(Gruppe,      '')) AS Gruppe,
+    UPPER(ISNULL(Untergruppe, '')) AS Untergruppe,
+    UPPER(ISNULL(Detail,      '')) AS Detail
+FROM Kontenplan
+WHERE Id = @Id";
+
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", kontoId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return false;
+
+            // Textfelder zusammenziehen und grob normalisieren (Umlaute entfernen)
+            string text = $"{r["Art"]} {r["Gruppe"]} {r["Untergruppe"]} {r["Detail"]}";
+            string norm = text
+                .Replace('Ä', 'A').Replace('Ö', 'O').Replace('Ü', 'U')
+                .Replace('É', 'E').Replace('È', 'E').Replace('Ê', 'E');
+
+            // Einnahmen-Indikatoren (de/teilw. en). KEINE Nummern-Logik mehr!
+            string[] incomeKeys = {
+        "EINNAHM", "ERTRAG", "ERTRAEG", "ERLÖS", "ERLOS", "ERLOES",
+        "REVENUE", "INCOME"
+    };
+
+            foreach (var k in incomeKeys)
+                if (norm.Contains(k, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+            return false;
+        }
+
+        public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId);
+
 
 
 

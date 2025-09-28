@@ -1,89 +1,178 @@
 ﻿<Window x:Class="MyCoinFlow.Views.ZuordnungDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:MyCoinFlow.Views"
-        Title="Transaktion anlernen"
-        Height="650" Width="560"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Buchung zuordnen"
+        Height="680" Width="820"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
+
+    <!-- EINZIGES Resources-Block (ohne PackIcon-Style) -->
+    <Window.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="BigCombo" TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+
+        <Style x:Key="BigText" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignTextBox}">
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+    </Window.Resources>
+
     <DockPanel Margin="16">
-        <!-- Buttons unten -->
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Abbrechen" Width="110" Margin="0,0,8,0" IsCancel="True"/>
-            <Button Content="Speichern" Width="120" IsDefault="True" Click="Speichern_Click"/>
+
+        <!-- Footer -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Click="Abbrechen_Click" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,8,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="CloseCircleOutline" Margin="0,0,8,0"/>
+                    <TextBlock Text="Abbrechen"/>
+                </StackPanel>
+            </Button>
+            <Button Click="Speichern_Click" Style="{StaticResource MaterialDesignRaisedButton}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ContentSaveCheckOutline" Margin="0,0,8,0"/>
+                    <TextBlock Text="Übernehmen"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
 
-        <!-- Inhalt -->
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Orientation="Vertical" Margin="0,0,0,8">
+            <StackPanel Orientation="Vertical" >
 
-                <!-- Info -->
-                <TextBlock Text="Buchungsinformationen" FontSize="16" FontWeight="SemiBold" />
-                <StackPanel Orientation="Vertical" Margin="0,6,0,12">
-                    <TextBlock Text="{Binding BuchungInfo}" />
-                    <TextBlock Text="{Binding BuchungText}" TextWrapping="Wrap" Margin="0,2,0,0" />
-                </StackPanel>
+                <!-- Kopf: Buchungskurzinfo -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="{Binding BuchungInfo}" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding BuchungText}" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
 
-                <Separator/>
+                <!-- Regel-Preview -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Background="{DynamicResource MaterialDesignCardBackground}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <!-- Adresse -->
-                <TextBlock Text="Adresse" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,6"/>
-                <StackPanel Orientation="Vertical">
-                    <CheckBox x:Name="NeueAdresseCheck" Content="Neue Adresse anlegen" Margin="0,0,0,6"/>
+                        <!-- Blaue Icon-Preview (Blau direkt gesetzt) -->
+                        <materialDesign:PackIcon x:Name="TypIcon"
+                                                 Kind="BankTransfer"
+                                                 Width="36" Height="36"
+                                                 Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                                 VerticalAlignment="Center"/>
 
-                    <!-- bestehende Adresse -->
-                    <StackPanel Orientation="Vertical">
-                        <TextBlock Text="Bestehende Adresse" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="AdrBox"
-                                  DisplayMemberPath="Name"
-                                  SelectedValuePath="Id"
-                                  Height="32"
-                                  IsEnabled="{Binding IsChecked, ElementName=NeueAdresseCheck, Converter={x:Static views:BooleanNegationConverter.Instance}}"/>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock x:Name="TypText" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TypHint" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Adresse -->
+                    <StackPanel Grid.Column="0" Orientation="Vertical">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Adresse" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                                <CheckBox x:Name="NeueAdresseCheck" Content="Neue Adresse anlegen"
+                                          Checked="UiChanged" Unchecked="UiChanged"/>
+
+                                <!-- Bestehend -->
+                                <StackPanel Margin="0,8,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=NeueAdresseCheck}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock Text="Bestehende Adresse" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="AdrBox" Style="{StaticResource BigCombo}"
+                                              DisplayMemberPath="Name" SelectedValuePath="Id"
+                                              SelectionChanged="UiChanged"/>
+                                </StackPanel>
+
+                                <!-- Neu -->
+                                <StackPanel Margin="0,8,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=NeueAdresseCheck}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock Text="Name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="NeuNameBox" Style="{StaticResource BigText}" TextChanged="UiChanged"/>
+
+                                    <TextBlock Text="IBAN (optional)" Style="{StaticResource FieldLabel}" Margin="0,8,0,0"/>
+                                    <TextBox x:Name="NeuIbanBox" Style="{StaticResource BigText}" TextChanged="UiChanged"/>
+
+                                    <!-- Nur sinnvoll bei Einnahmen -->
+                                    <CheckBox x:Name="BudgetEinnahmenCheck"
+                                              Content="Adresse ist budgetierte Einnahme (Nach-Konto wird Standard-Einnahmenkonto)"
+                                              Margin="0,8,0,0"
+                                              Checked="UiChanged" Unchecked="UiChanged"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="Bank" Margin="0,0,8,0"
+                                                         Foreground="{DynamicResource PrimaryHueMidBrush}"/>
+                                <TextBlock Text="Geldinstitut" FontWeight="SemiBold"/>
+                                <TextBlock Text="  •  " Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <TextBlock x:Name="GiInfoText" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
-                    <!-- neue Adresse -->
-                    <StackPanel Orientation="Vertical" Margin="0,8,0,0">
-                        <TextBlock Text="Neue Adresse" Margin="0,0,0,4"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <TextBlock Text="Name" Width="90" VerticalAlignment="Center"/>
-                            <TextBox x:Name="NeuNameBox" Width="360"
-                                     IsEnabled="{Binding IsChecked, ElementName=NeueAdresseCheck}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="IBAN" Width="90" VerticalAlignment="Center"/>
-                            <TextBox x:Name="NeuIbanBox" Width="360"
-                                     IsEnabled="{Binding IsChecked, ElementName=NeueAdresseCheck}"/>
-                        </StackPanel>
+                    <!-- Konto -->
+                    <StackPanel Grid.Column="2" Orientation="Vertical">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Standardkonto" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Dieses Konto wird – je nach Regel – als Nach-Konto (Einnahme/Ausgabe) oder als Von-Konto (Refund) verwendet."
+                                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ComboBox x:Name="KontoBox" Style="{StaticResource BigCombo}"
+                                          DisplayMemberPath="Anzeige" SelectedValuePath="Id"
+                                          SelectionChanged="UiChanged"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </StackPanel>
-
-                <Separator Margin="0,8,0,8"/>
-
-                <!-- Standardkonto -->
-                <TextBlock Text="Standardkonto" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                <ComboBox x:Name="KontoBox"
-                          DisplayMemberPath="Anzeige"
-                          SelectedValuePath="Id"
-                          Height="32"/>
-
-                <Separator Margin="0,8,0,8"/>
-
-                <!-- Einnahmen-Budget-Option (nur für Adresse -> Bank sichtbar) -->
-                <CheckBox x:Name="BudgetEinnahmenCheck"
-                            Content="Standard-Einnahme Adresse-Bank (Standard-Einnahmenkonto)"
-                            Margin="0,8,0,2"
-                            Visibility="Collapsed"/>
-                <TextBlock x:Name="BudgetHinweisText"
-                            Text="Bei „Speichern“ wird dieses Konto als Standard-Einnahmenkonto der Adresse gesetzt."
-                            FontSize="11"
-                            Foreground="Gray"
-                            Margin="0,0,0,8"
-                            Visibility="Collapsed"/>
-
-                <!-- Geldinstitut (Anzeige) -->
-                <TextBlock Text="Geldinstitut / Kontoquelle" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                <TextBlock x:Name="GiInfoText" />
-
+                </Grid>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

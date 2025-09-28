@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Data;
+using System.Windows.Controls;
+using MaterialDesignThemes.Wpf;
 using MyCoinFlow.Import;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
-using System.Text.RegularExpressions;
-
 
 namespace MyCoinFlow.Views
 {
@@ -16,7 +16,7 @@ namespace MyCoinFlow.Views
         private readonly DatabaseService _db = new();
         private readonly BankImportItem _item;
 
-        // Rückgaben
+        // Rückgaben an den Aufrufer
         public int? SelectedAdresseId { get; private set; }
         public int? SelectedKontoId { get; private set; }
 
@@ -27,119 +27,193 @@ namespace MyCoinFlow.Views
             InitUi();
         }
 
+        // ------------ UI Init ------------
         private void InitUi()
         {
-            // Buchungsinfo
+            // 1) Kopf-Infos
             DataContext = new
             {
                 BuchungInfo = $"{_item.BookingDate:yyyy-MM-dd}  |  {_item.Amount:N2} {_item.Currency}  |  {(_item.Direction == KreditDebit.Debit ? "Ausgabe" : "Einnahme")}",
                 BuchungText = string.IsNullOrWhiteSpace(_item.Text) ? "(kein Buchungstext)" : _item.Text
             };
 
-            // Adressen laden
-            AdrBox.ItemsSource = _db.LadeAdressen().OrderBy(a => a.Name).ToList();
-            AdrBox.SelectedIndex = -1;
+            // 2) DropDowns füllen
+            AdrBox.ItemsSource = _db.LadeAdressen().OrderBy(a => a.Name).ToList();   // {Id, Name, ...}
+            KontoBox.ItemsSource = _db.LadeKontoLookup();                             // {Id, Anzeige}
 
-            // Konten laden
-            KontoBox.ItemsSource = _db.LadeKontoLookup(); // {Id, Anzeige}
-            if (KontoBox.Items.Count > 0) KontoBox.SelectedIndex = 0;
+            // 3) Geldinstitut-Info
+            GiInfoText.Text = !string.IsNullOrWhiteSpace(_item.AccountIban)
+                ? $"Konto-IBAN: {_item.AccountIban}"
+                : "unbekannt";
 
-            // Geldinstitut Info
-            string giText = "unbekannt";
-            if (!string.IsNullOrWhiteSpace(_item.AccountIban))
-                giText = $"Konto-IBAN: {_item.AccountIban}";
-            GiInfoText.Text = giText;
+            // 4) Vorbelegung: per Vorschlag/IBAN/Name
+            PreselectAdresseUndKonto();
 
-            // Defaults aus Gegenpartei (Name)
-            if (!string.IsNullOrWhiteSpace(_item.CounterpartyName))
-            {
-                var adrByName = ((IEnumerable<Adresse>)AdrBox.ItemsSource).FirstOrDefault(a =>
-                    string.Equals(a.Name?.Trim(), _item.CounterpartyName.Trim(), StringComparison.CurrentCultureIgnoreCase));
-                if (adrByName != null)
-                    AdrBox.SelectedValue = adrByName.Id;
-            }
+            // 5) Erste Regel-Preview zeigen
+            UpdateRulePreview();
+        }
 
-            // --- IBAN aus der Transaktion in die Maske übernehmen ---
-            if (!string.IsNullOrWhiteSpace(_item.CounterpartyIban))
-            {
-                var adrByIban = ((IEnumerable<Adresse>)AdrBox.ItemsSource).FirstOrDefault(a =>
-                    !string.IsNullOrWhiteSpace(a.IBAN) &&
-                    string.Equals(a.IBAN.Replace(" ", ""), _item.CounterpartyIban.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+        /// <summary>
+        /// Bei erkannten Buchungen ist "Neue Adresse anlegen" AUS. Nur ohne Treffer EIN.
+        /// </summary>
+        private void PreselectAdresseUndKonto()
+        {
+            bool istEinnahme = _item.Direction == KreditDebit.Credit;
+            bool adresseGefunden = false;
 
-                if (adrByIban != null)
-                {
-                    AdrBox.SelectedValue = adrByIban.Id;
-                    NeueAdresseCheck.IsChecked = false;
-                    NeuIbanBox.Text = "";
-                }
-                else
-                {
-                    if (string.IsNullOrWhiteSpace(NeuIbanBox.Text))
-                        NeuIbanBox.Text = _item.CounterpartyIban.Trim();
-                    if (AdrBox.SelectedValue == null)
-                        NeueAdresseCheck.IsChecked = true;
-                }
-            }
-
-            // --- VORBELEGUNG aus erkannten Vorschlägen ---
+            // 1) Direkt über Vorschlag (vom Erkenner)
             if (_item.VorschlagAdresseId.HasValue)
             {
                 AdrBox.SelectedValue = _item.VorschlagAdresseId.Value;
+                adresseGefunden = true;
+            }
+
+            // 2) Fallback: IBAN der Gegenpartei
+            if (!adresseGefunden && !string.IsNullOrWhiteSpace(_item.CounterpartyIban))
+            {
+                var adrByIban = (AdrBox.ItemsSource as IEnumerable<Adresse>)!
+                    .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a.IBAN) &&
+                                         string.Equals(a.IBAN.Replace(" ", ""),
+                                                       _item.CounterpartyIban.Replace(" ", ""),
+                                                       StringComparison.OrdinalIgnoreCase));
+                if (adrByIban != null)
+                {
+                    AdrBox.SelectedValue = adrByIban.Id;
+                    adresseGefunden = true;
+                }
+            }
+
+            // 3) Fallback: exakter Namensvergleich
+            if (!adresseGefunden && !string.IsNullOrWhiteSpace(_item.CounterpartyName))
+            {
+                var adrByName = (AdrBox.ItemsSource as IEnumerable<Adresse>)!
+                    .FirstOrDefault(a => string.Equals(a.Name?.Trim(),
+                                                       _item.CounterpartyName.Trim(),
+                                                       StringComparison.CurrentCultureIgnoreCase));
+                if (adrByName != null)
+                {
+                    AdrBox.SelectedValue = adrByName.Id;
+                    adresseGefunden = true;
+                }
+            }
+
+            // 4) Checkbox & Felder passend setzen
+            if (adresseGefunden)
+            {
                 NeueAdresseCheck.IsChecked = false;
                 NeuNameBox.Text = "";
                 NeuIbanBox.Text = "";
             }
-            else if (!string.IsNullOrWhiteSpace(_item.CounterpartyName))
+            else
             {
-                var adr = ((IEnumerable<Adresse>)AdrBox.ItemsSource).FirstOrDefault(a =>
-                    string.Equals(a.Name?.Trim(), _item.CounterpartyName.Trim(), StringComparison.CurrentCultureIgnoreCase));
-                if (adr != null) AdrBox.SelectedValue = adr.Id;
+                NeueAdresseCheck.IsChecked = true;
+                NeuNameBox.Text = string.IsNullOrWhiteSpace(_item.CounterpartyName) ? "" : _item.CounterpartyName.Trim();
+                NeuIbanBox.Text = string.IsNullOrWhiteSpace(_item.CounterpartyIban) ? "" : _item.CounterpartyIban.Trim();
             }
 
-            // ---- NEU: Budget-UI (sichtbar nur bei Einnahmen) + Konto-Vorwahl nach Richtung ----
-            var budgetCheck = this.FindName("BudgetEinnahmenCheck") as System.Windows.Controls.CheckBox;
-            var budgetHint = this.FindName("BudgetHinweisText") as System.Windows.Controls.TextBlock;
-            bool istEinnahme = _item.Direction == KreditDebit.Credit;
-
-            if (budgetCheck != null) budgetCheck.Visibility = istEinnahme ? Visibility.Visible : Visibility.Collapsed;
-            if (budgetHint != null) budgetHint.Visibility = istEinnahme ? Visibility.Visible : Visibility.Collapsed;
-
-            // Konto vorbelegen:
-            // 1) vorhandener Vorschlag
-            // 2) bei Einnahme: StandardEinnahmenKonto der Adresse
-            //    bei Ausgabe:  DefaultKonto der Adresse
+            // 5) Konto-Vorwahl
             int? presetKonto = _item.VorschlagNachKontoId;
 
-            if (_item.VorschlagAdresseId.HasValue)
+            if (AdrBox.SelectedValue is int adrIdSel)
             {
-                var adrSel = _db.LadeAdresseById(_item.VorschlagAdresseId.Value);
+                var adrSel = _db.LadeAdresseById(adrIdSel);
 
                 if (!presetKonto.HasValue)
                 {
-                    if (istEinnahme)
-                        presetKonto = adrSel?.StandardEinnahmenKontoId ?? presetKonto;
-                    else
-                        presetKonto = adrSel?.DefaultKontoId ?? presetKonto;
+                    if (istEinnahme && adrSel?.IstBudgetiert == true && adrSel.StandardEinnahmenKontoId.HasValue)
+                        presetKonto = adrSel.StandardEinnahmenKontoId.Value;
+                    else if (!istEinnahme && adrSel?.DefaultKontoId.HasValue == true)
+                        presetKonto = adrSel.DefaultKontoId.Value;
                 }
 
-                // Wenn Adresse bereits budgetiert ist: Checkbox setzen + Konto übernehmen
-                if (istEinnahme && adrSel?.IstBudgetiert == true && budgetCheck != null)
-                {
-                    budgetCheck.IsChecked = true;
-                    if (adrSel.StandardEinnahmenKontoId.HasValue && KontoBox.SelectedValue == null)
-                        KontoBox.SelectedValue = adrSel.StandardEinnahmenKontoId.Value;
-                }
+                // Einnahmen-Checkbox nur als visueller Hinweis setzen
+                if (istEinnahme && adrSel?.IstBudgetiert == true && BudgetEinnahmenCheck != null)
+                    BudgetEinnahmenCheck.IsChecked = true;
             }
 
             if (presetKonto.HasValue)
                 KontoBox.SelectedValue = presetKonto.Value;
         }
 
+        // ------------ Regel-Preview (nur Anzeige) ------------
+        private void UpdateRulePreview()
+        {
+            // Adresse bestimmen (bestehend)
+            Adresse? adr = null;
+            if (NeueAdresseCheck.IsChecked != true && AdrBox.SelectedValue is int adrId)
+            {
+                try { adr = _db.LadeAdresseById(adrId); } catch { adr = null; }
+            }
+
+            bool istUmbuchung = IstUmbuchungsAdresseName(adr?.Name);
+            bool istEinnahme = _item.Direction == KreditDebit.Credit;
+            bool budgetFlag = BudgetEinnahmenCheck?.IsChecked == true;
+
+            // Kontotext robust ermitteln
+            string kontoLabel = "(Konto auswählen)";
+            if (KontoBox?.SelectedItem != null)
+            {
+                var pi = KontoBox.SelectedItem.GetType().GetProperty("Anzeige");
+                kontoLabel = Convert.ToString(pi?.GetValue(KontoBox.SelectedItem)) ?? kontoLabel;
+            }
+
+            // Ableitung analog deiner Regeln:
+            PackIconKind icon;
+            string typText;
+            string hint;
+
+            if (!istEinnahme) // DBIT
+            {
+                if (istUmbuchung)
+                {
+                    icon = PackIconKind.SwapHorizontal;
+                    typText = "Umbuchung (Bank ↔ Bank)";
+                    hint = "Durchlaufkonto (DefaultKonto der Umbuchungs-Adresse) wird verwendet.";
+                }
+                else
+                {
+                    icon = PackIconKind.BankTransfer;
+                    typText = "Bank → Konto (Ausgabe)";
+                    hint = $"Ziel (Nach-Konto): {kontoLabel}";
+                }
+            }
+            else // CRDT
+            {
+                if (NeueAdresseCheck.IsChecked == true ? budgetFlag : (adr?.IstBudgetiert == true && adr.StandardEinnahmenKontoId.HasValue))
+                {
+                    icon = PackIconKind.AccountCash;
+                    typText = "Adresse → Bank (Einnahme)";
+                    hint = $"Nach-Konto (Standard-Einnahmenkonto): {kontoLabel}";
+                }
+                else
+                {
+                    icon = PackIconKind.Bank;
+                    typText = "Konto → Bank (Refund)";
+                    hint = $"Von-Konto (DefaultKonto der Adresse): {kontoLabel}";
+                }
+            }
+
+            TypIcon.Kind = icon;
+            TypText.Text = typText;
+            TypHint.Text = hint;
+        }
+
+        private static bool IstUmbuchungsAdresseName(string? name)
+            => !string.IsNullOrWhiteSpace(name) &&
+               name.Trim().StartsWith("Interne Umbuchung", StringComparison.CurrentCultureIgnoreCase);
+
+        // Events, die die Preview betreffen
+        private void UiChanged(object? sender, RoutedEventArgs e) => UpdateRulePreview();
+
+        // ------------ Buttons ------------
+        private void Abbrechen_Click(object sender, RoutedEventArgs e)
+            => DialogResult = false;
+
         private void Speichern_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                int? kontoId = KontoBox.SelectedValue as int?;
+                int? kontoId = GetSelectedIntOrNull(KontoBox?.SelectedValue);
                 if (kontoId == null)
                 {
                     MessageBox.Show("Bitte ein Standardkonto wählen.", "Anlernen",
@@ -148,7 +222,7 @@ namespace MyCoinFlow.Views
                 }
 
                 bool istEinnahme = _item.Direction == KreditDebit.Credit;
-                var budgetCheck = this.FindName("BudgetEinnahmenCheck") as System.Windows.Controls.CheckBox;
+                var budgetCheck = BudgetEinnahmenCheck;
 
                 // Adresse bestimmen oder neu anlegen
                 int? adrId = null;
@@ -165,34 +239,28 @@ namespace MyCoinFlow.Views
                     var ibanRaw = NeuIbanBox.Text?.Trim();
                     string? iban = string.IsNullOrWhiteSpace(ibanRaw) ? null : ibanRaw.Replace(" ", "").ToUpperInvariant();
 
-                    var adr = new Adresse
-                    {
-                        Name = name,
-                        IBAN = iban
-                    };
+                    var adrNeu = new Adresse { Name = name, IBAN = iban };
 
-                    // 2A) Neuanlage: je nach Fall Standard-Einnahmenkonto ODER DefaultKonto setzen
+                    // Neuanlage: je nach Fall Standard-Einnahmenkonto ODER DefaultKonto setzen
                     if (istEinnahme && budgetCheck?.IsChecked == true)
                     {
-                        // Echte Einnahmen-Adresse
-                        adr.IstBudgetiert = true;
-                        adr.StandardEinnahmenKontoId = kontoId;
-                        adr.DefaultKontoId = null;
+                        adrNeu.IstBudgetiert = true;
+                        adrNeu.StandardEinnahmenKontoId = kontoId;
+                        adrNeu.DefaultKontoId = null;
                     }
                     else
                     {
-                        // Normale Debit-Adresse (auch wenn diese Buchung eine Gutschrift ist → Refund)
-                        adr.IstBudgetiert = false;
-                        adr.StandardEinnahmenKontoId = null;
-                        adr.DefaultKontoId = kontoId;
+                        adrNeu.IstBudgetiert = false;
+                        adrNeu.StandardEinnahmenKontoId = null;
+                        adrNeu.DefaultKontoId = kontoId;
                     }
 
-                    adrId = _db.SpeichereAdresse(adr);
+                    adrId = _db.SpeichereAdresse(adrNeu);
                 }
                 else
                 {
                     // Bestehende Adresse
-                    adrId = AdrBox.SelectedValue as int?;
+                    adrId = GetSelectedIntOrNull(AdrBox?.SelectedValue);
                     if (adrId == null)
                     {
                         MessageBox.Show("Bitte eine bestehende Adresse wählen oder 'Neue Adresse anlegen' aktivieren.", "Anlernen",
@@ -202,18 +270,15 @@ namespace MyCoinFlow.Views
 
                     var adr = _db.LadeAdresseById(adrId.Value);
 
-                    // 2B) Bestehend: Budgetierte Einnahmen vs. Refund (DefaultKonto)
+                    // Bestehend: Budgetierte Einnahmen vs. Refund (DefaultKonto)
                     if (istEinnahme && budgetCheck?.IsChecked == true)
                     {
-                        // Echte Einnahmen-Adresse
                         adr.IstBudgetiert = true;
                         adr.StandardEinnahmenKontoId = kontoId;
-                        // DefaultKontoId bewusst NICHT anfassen
                         _db.AktualisiereAdresse(adr);
                     }
                     else
                     {
-                        // Refund / normale Debit-Adresse → DefaultKonto setzen/aktualisieren
                         if (adr.DefaultKontoId != kontoId)
                         {
                             adr.DefaultKontoId = kontoId;
@@ -228,9 +293,8 @@ namespace MyCoinFlow.Views
 
                 // Aliase automatisch anlegen
                 if (SelectedAdresseId.HasValue && !string.IsNullOrWhiteSpace(_item.CounterpartyName))
-                {
                     _db.SpeichereAdressAlias(SelectedAdresseId.Value, _item.CounterpartyName.Trim(), "Exact");
-                }
+
                 if (SelectedAdresseId.HasValue)
                 {
                     var cand = BuildAliasCandidate(_item.Text, _item.ServiceRef);
@@ -248,16 +312,14 @@ namespace MyCoinFlow.Views
             }
         }
 
-
-        // Stopwörter weglassen (Rauschen)
+        // ---------------- Alias-Helfer ----------------
         private static readonly HashSet<string> _aliasStop = new(StringComparer.OrdinalIgnoreCase)
-{
-    "RECHNUNG","REFERENZ","ZAHLUNG","GEBUEHR","KARTENZAHLUNG","BELASTUNG",
-    "GUTSCHRIFT","MITTEILUNG","VALUTA","SEPA","SWIFT","UETR","CHF","EUR","USD",
-    "VISA","MASTERCARD","TWINT","POSTFINANCE","UBS","CS","BANK","KONTO","IBAN"
-};
+        {
+            "RECHNUNG","REFERENZ","ZAHLUNG","GEBUEHR","KARTENZAHLUNG","BELASTUNG",
+            "GUTSCHRIFT","MITTEILUNG","VALUTA","SEPA","SWIFT","UETR","CHF","EUR","USD",
+            "VISA","MASTERCARD","TWINT","POSTFINANCE","UBS","CS","BANK","KONTO","IBAN"
+        };
 
-        // Baut einen stabilen, kurzen Contains-Alias aus Text/ServiceRef
         private static string? BuildAliasCandidate(string? text, string? serviceRef)
         {
             var src = !string.IsNullOrWhiteSpace(text) ? text! : (serviceRef ?? "");
@@ -274,14 +336,10 @@ namespace MyCoinFlow.Views
                              .ToList();
             if (words.Count == 0) return null;
 
-            // Kompakten Code bilden, z.B. EINK-TWIN-BRAC(K) … erste 3–4 Wörter, jeweils 4–6 Zeichen
-            var picks = words.Take(4)
-                             .Select(w => w.Length <= 5 ? w : w[..5])
-                             .ToList();
-
+            var picks = words.Take(4).Select(w => w.Length <= 5 ? w : w[..5]).ToList();
             var code = string.Join("-", picks);
 
-            // Fallback, falls zu kurz
+            // <-- FIX: Replace statt replace
             if (code.Replace("-", "").Length < 8)
             {
                 var fallback = words.OrderByDescending(w => w.Length).Take(2)
@@ -291,15 +349,11 @@ namespace MyCoinFlow.Views
 
             return code;
         }
-    }
 
-    // Kleiner Helfer für XAML-Binding (Negation) – wird in XAML als {x:Static views:BooleanNegationConverter.Instance} verwendet.
-    public sealed class BooleanNegationConverter : IValueConverter
-    {
-        public static readonly BooleanNegationConverter Instance = new BooleanNegationConverter();
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            => value is bool b ? !b : value;
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            => value is bool b ? !b : value;
+        private static int? GetSelectedIntOrNull(object? value)
+        {
+            if (value == null || value == DBNull.Value) return null;
+            try { return Convert.ToInt32(value); } catch { return null; }
+        }
     }
 }

@@ -3,98 +3,254 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Neue Buchung"
-        Height="600" Width="500"
+        Height="720" Width="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Loaded="Window_Loaded">
 
-    <!-- DockPanel = Layout mit fixem Bereich unten -->
-    <DockPanel Margin="16">
+    <!-- Grundtheme -->
+    <Window.Resources>
+        <!-- Headline-Stil -->
+        <Style x:Key="HeadlineText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
 
-        <!-- Buttons unten -->
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Abbrechen" Style="{StaticResource MaterialDesignRaisedButton}"
-                    Margin="0,0,10,0" Click="Abbrechen_Click"/>
-            <Button Content="Buchen" Style="{StaticResource MaterialDesignRaisedButton}"
-                    Click="Buchen_Click"/>
+        <!-- Label-Stil -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- Karten-Style für Radiobuttons -->
+        <Style x:Key="TypeRadioStyle" TargetType="RadioButton" BasedOn="{StaticResource MaterialDesignRadioButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border CornerRadius="12"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid Margin="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <materialDesign:PackIcon x:Name="Icon"
+                                                         Width="26" Height="26"
+                                                         Kind="{TemplateBinding Tag}"/>
+
+                                <TextBlock Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           Text="{TemplateBinding Content}"/>
+
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                                <Setter Property="BorderThickness" Value="1.5"/>
+                                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueLightBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignCardBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="MinWidth" Value="150"/>
+            <Setter Property="MinHeight" Value="56"/>
+        </Style>
+
+        <!-- Einheitlicher ComboBox-Stil -->
+        <Style x:Key="BigCombo" TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+
+        <!-- Einheitlicher TextBox-Stil -->
+        <Style x:Key="BigTextBox" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignTextBox}">
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel LastChildFill="True" Margin="16">
+
+        <!-- Footer: Aktionen -->
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0"
+                    materialDesign:ColorZoneAssist.Mode="PrimaryDark">
+            <Button Click="Abbrechen_Click"
+                    Margin="0,0,8,0"
+                    Style="{StaticResource MaterialDesignOutlinedButton}">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="CloseCircleOutline" Margin="0,0,8,0"/>
+                    <TextBlock Text="Abbrechen"/>
+                </StackPanel>
+            </Button>
+
+            <Button Click="Buchen_Click"
+                    Style="{StaticResource MaterialDesignRaisedButton}">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="ContentSaveCheckOutline" Margin="0,0,8,0"/>
+                    <TextBlock Text="Speichern"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
 
-        <!-- Scrollbarer Bereich oben -->
-        <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
-            <Grid Margin="0,0,0,10">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 0: Typ -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 1: Datum -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 2: Von-Konto -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 3: Nach-Konto -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 4: Geldinstitut -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 5: Betrag -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 6: Adresse -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- 7: Notiz -->
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="180"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <!-- Inhalt -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Orientation="Vertical" >
 
-                <!-- Typ -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Buchungstyp" Margin="0,0,12,8"/>
-                <ComboBox x:Name="TypBox" Grid.Row="0" Grid.Column="1" Height="36" Margin="0,0,0,8"
-                          SelectionChanged="TypBox_SelectionChanged">
-                    <ComboBoxItem Content="Bank → Konto" IsSelected="True"/>
-                    <ComboBoxItem Content="Konto → Konto"/>
-                    <ComboBoxItem Content="Konto → Bank"/>
-                    <ComboBoxItem Content="Adresse → Bank"/>
-                </ComboBox>
+                <!-- Header -->
+                <StackPanel Orientation="Vertical" Margin="0,0,0,12">
+                    <TextBlock Text="Buchung erfassen"
+                               Style="{StaticResource HeadlineText}"/>
+                    <TextBlock Text="Wähle zuerst den Buchungstyp. Felder werden automatisch aktiviert/deaktiviert."
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                </StackPanel>
 
-                <!-- Datum -->
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Datum" Margin="0,0,12,8"/>
-                <DatePicker x:Name="DatumBox" Grid.Row="1" Grid.Column="1" Height="36" Margin="0,0,0,8"/>
+                <!-- Typ-Auswahl -->
+                <Border CornerRadius="12" Padding="12" Margin="0,0,0,12"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- RadioButtons: Tag = Icon-Kind (MaterialDesign PackIcon), Content = Anzeigename -->
+                        <RadioButton x:Name="TypeBankToKonto"
+                                     GroupName="TxnType"
+                                     Style="{StaticResource TypeRadioStyle}"
+                                     Tag="BankTransfer"
+                                     Content="Bank → Konto"
+                                     Checked="TxnType_Checked"/>
+                        <RadioButton x:Name="TypeKontoToKonto"
+                                     GroupName="TxnType"
+                                     Style="{StaticResource TypeRadioStyle}"
+                                     Tag="SwapHorizontal"
+                                     Content="Konto → Konto"
+                                     Checked="TxnType_Checked"/>
+                        <RadioButton x:Name="TypeKontoToBank"
+                                     GroupName="TxnType"
+                                     Style="{StaticResource TypeRadioStyle}"
+                                     Tag="Bank"
+                                     Content="Konto → Bank"
+                                     Checked="TxnType_Checked"/>
+                        <RadioButton x:Name="TypeAdresseToBank"
+                                     GroupName="TxnType"
+                                     Style="{StaticResource TypeRadioStyle}"
+                                     Tag="AccountCash"
+                                     Content="Adresse → Bank"
+                                     Checked="TxnType_Checked"/>
+                    </StackPanel>
+                </Border>
 
-                <!-- Von-Konto -->
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Von-Konto" Margin="0,0,12,8"/>
-                <ComboBox x:Name="VonKontoBox" Grid.Row="2" Grid.Column="1" Height="36" Margin="0,0,0,8"
-                          DisplayMemberPath="Anzeige" SelectedValuePath="Id"/>
+                <!-- Formularkarte -->
+                <Border CornerRadius="12" Padding="16"
+                        Background="{DynamicResource MaterialDesignPaper}"
+                        BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1">
 
-                <!-- Nach-Konto -->
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Nach-Konto" Margin="0,0,12,8"/>
-                <ComboBox x:Name="NachKontoBox" Grid.Row="3" Grid.Column="1" Height="36" Margin="0,0,0,8"
-                          DisplayMemberPath="Anzeige" SelectedValuePath="Id"/>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <!-- Geldinstitut -->
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Geldinstitut" Margin="0,0,12,8"/>
-                <ComboBox x:Name="BankBox" Grid.Row="4" Grid.Column="1" Height="36" Margin="0,0,0,8"
-                          DisplayMemberPath="Name" SelectedValuePath="Id"/>
+                        <!-- Datum -->
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Datum" Style="{StaticResource FieldLabel}"/>
+                        <DatePicker x:Name="DatumBox"
+                                    Grid.Row="0" Grid.Column="1"
+                                    Margin="0,0,0,8"
+                                    materialDesign:HintAssist.Hint="Buchungsdatum"
+                                    SelectedDate="{x:Null}"/>
 
-                <!-- Betrag -->
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="Betrag" Margin="0,0,12,8"/>
-                <TextBox x:Name="BetragBox" Grid.Row="5" Grid.Column="1" Height="36"
-                         HorizontalContentAlignment="Right" Margin="0,0,0,8"/>
+                        <!-- Betrag -->
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Betrag" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="BetragBox"
+                                 Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                                 Style="{StaticResource BigTextBox}"
+                                 materialDesign:HintAssist.Hint="z. B. 125.50"
+                                 materialDesign:TextFieldAssist.HasClearButton="True"/>
 
-                <!-- Adresse -->
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Adresse" Margin="0,0,12,8"/>
-                <ComboBox x:Name="AdresseBox" Grid.Row="6" Grid.Column="1" Height="36" Margin="0,0,0,8"
-                          Width="300"
-                          DisplayMemberPath="Name"
-                          SelectedValuePath="Id"
-                          IsEditable="False"
-                          IsEnabled="True"/>
+                        <!-- Bank (Geldinstitut) -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Geldinstitut" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="BankBox"
+                                  Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                                  Style="{StaticResource BigCombo}"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Id"
+                                  materialDesign:HintAssist.Hint="Bankkonto wählen"/>
 
-                <!-- Notiz -->
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Notiz" Margin="0,0,12,8"/>
-                <TextBox x:Name="NotizBox" Grid.Row="7" Grid.Column="1" Height="100"
-                         TextWrapping="Wrap" AcceptsReturn="True"/>
-            </Grid>
+                        <!-- Von-Konto (Budgetkonto) -->
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Von-Konto" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="VonKontoBox"
+                                  Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+                                  Style="{StaticResource BigCombo}"
+                                  DisplayMemberPath="Anzeige"
+                                  SelectedValuePath="Id"
+                                  materialDesign:HintAssist.Hint="Budgetkonto (Quelle)"/>
+
+                        <!-- Nach-Konto (Budgetkonto) -->
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Nach-Konto" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="NachKontoBox"
+                                  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8"
+                                  Style="{StaticResource BigCombo}"
+                                  DisplayMemberPath="Anzeige"
+                                  SelectedValuePath="Id"
+                                  materialDesign:HintAssist.Hint="Budgetkonto (Ziel)"/>
+
+                        <!-- Adresse -->
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Adresse" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="AdresseBox"
+                                  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8"
+                                  Style="{StaticResource BigCombo}"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Id"
+                                  materialDesign:HintAssist.Hint="optional, z. B. Lieferant/Dienstleister"/>
+
+                        <!-- Notiz -->
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Notiz" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="NotizBox"
+                                 Grid.Row="6" Grid.Column="1" Margin="0,0,0,8"
+                                 Style="{StaticResource BigTextBox}"
+                                 materialDesign:HintAssist.Hint="freiwillig (wird gespeichert)"
+                                 TextWrapping="Wrap" AcceptsReturn="True" Height="84"/>
+
+                        <!-- Hinweise -->
+                        <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,8,0,0">
+                            <materialDesign:PackIcon Kind="InformationOutline" Margin="0,0,8,0"/>
+                            <TextBlock Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}">
+                                Felder werden je nach Buchungstyp aktiviert. 
+                                Beispiel: Bei „Bank → Konto“ wähle Bank und Nach-Konto.
+                            </TextBlock>
+                        </StackPanel>
+
+                    </Grid>
+                </Border>
+            </StackPanel>
         </ScrollViewer>
-
     </DockPanel>
 </Window>
