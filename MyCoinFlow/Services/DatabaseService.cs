@@ -1089,6 +1089,8 @@ WHEN NOT MATCHED THEN
 
         public List<GeldinstitutSaldo> LadeGeldinstituteMitSaldo(DateTime? abgrenzungsdatum)
         {
+            EnsureNumberRangeRulesTable();
+
             var list = new List<GeldinstitutSaldo>();
             using var c = new SqlConnection(_connectionString);
             c.Open();
@@ -1097,63 +1099,56 @@ WHEN NOT MATCHED THEN
 
             const string sql = @"
 SELECT
-    g.Id,
-    g.Name, 
-    g.BIC,  
-    g.IBAN,
-    g.KontoNummer,
-    g.Notiz,
-    g.Anfangsbestand,
-    g.Anfangsdatum,
+    g.Id, g.Name, g.BIC, g.IBAN, g.KontoNummer, g.Notiz,
+    g.Anfangsbestand, g.Anfangsdatum,
     ISNULL(s.Gebucht, 0) AS Gebucht,
     g.Anfangsbestand + ISNULL(s.Gebucht, 0) AS Schlussaldo
 FROM Geldinstitut g
 OUTER APPLY (
-    SELECT
-        SUM(
-            CASE
-                /* A) Bank-only Buchungen (NachKontoId NULL) */
-                WHEN t.NachKontoId IS NULL THEN
-                    CASE
-                        /* Umbuchungen eindeutig per ImportQuelle */
-                        WHEN t.ImportQuelle = N'CAMT-MIRROR' THEN  t.Betrag   -- Zielbank: Zugang
-                        WHEN t.ImportQuelle = N'CAMT-UMB'    THEN -t.Betrag   -- Quellbank: Abgang
-
-                        /* Sonstige Bank-only:
-                           - Einzahlung von Budgetkonto -> +Betrag
-                           - Adresse->Bank (ohne Budgetkonto) -> +Betrag
-                           - sonst 0 */
-                        WHEN t.VonKontoId IS NOT NULL THEN  t.Betrag
-                        WHEN t.VonKontoId IS NULL  AND t.AdresseId IS NOT NULL THEN t.Betrag
-                        ELSE 0
-                    END
-
-                /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt): Richtung über Kontotyp ableiten */
-                WHEN t.NachKontoId IS NOT NULL THEN
-                    CASE 
-                        /* Nur noch Text-Heuristik – KEINE hart codierten Nummernkreise mehr */
-                        WHEN (
-                            UPPER(ISNULL(kp.Art,         '')) LIKE '%EINNAHM%' OR
-                            UPPER(ISNULL(kp.Art,         '')) LIKE '%ERTR%'   OR
-                            UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%EINNAHM%' OR
-                            UPPER(ISNULL(kp.Gruppe,      '')) LIKE '%ERTR%'   OR
-                            UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%EINNAHM%' OR
-                            UPPER(ISNULL(kp.Untergruppe, '')) LIKE '%ERTR%'   OR
-                            UPPER(ISNULL(kp.Detail,      '')) LIKE '%EINNAHM%' OR
-                            UPPER(ISNULL(kp.Detail,      '')) LIKE '%ERTR%'
-                        )
-                        THEN  t.Betrag   -- Einnahmekonto: Bank +
-                        ELSE -t.Betrag   -- Ausgabenkonto: Bank −
-                    END
-                ELSE 0
-            END
-        ) AS Gebucht
+    SELECT SUM(
+        CASE
+            /* A) Bank-only Buchungen (NachKontoId NULL) */
+            WHEN t.NachKontoId IS NULL THEN
+                CASE
+                    WHEN t.ImportQuelle = N'CAMT-MIRROR' THEN  t.Betrag
+                    WHEN t.ImportQuelle = N'CAMT-UMB'    THEN -t.Betrag
+                    WHEN t.VonKontoId IS NOT NULL        THEN  t.Betrag
+                    WHEN t.VonKontoId IS NULL AND t.AdresseId IS NOT NULL THEN t.Betrag
+                    ELSE 0
+                END
+            /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt): Richtung über Regel → Fallback Text */
+            WHEN t.NachKontoId IS NOT NULL THEN
+                CASE 
+                    WHEN nr.Richtung = N'Einnahme' OR (
+                         nr.Richtung IS NULL AND (
+                           UPPER(ISNULL(kp.Art,'')) LIKE '%EINNAHM%' OR
+                           UPPER(ISNULL(kp.Art,'')) LIKE '%ERTR%'   OR
+                           UPPER(ISNULL(kp.Gruppe,'')) LIKE '%EINNAHM%' OR
+                           UPPER(ISNULL(kp.Gruppe,'')) LIKE '%ERTR%'   OR
+                           UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%EINNAHM%' OR
+                           UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%ERTR%'   OR
+                           UPPER(ISNULL(kp.Detail,'')) LIKE '%EINNAHM%' OR
+                           UPPER(ISNULL(kp.Detail,'')) LIKE '%ERTR%'
+                         )
+                    )
+                    THEN  t.Betrag   -- Einnahme: Bank +
+                    ELSE -t.Betrag   -- Ausgabe:  Bank −
+                END
+            ELSE 0
+        END
+    ) AS Gebucht
     FROM Transaktion t
     LEFT JOIN Kontenplan kp ON kp.Id = t.NachKontoId
-    WHERE 
-        t.GeldinstitutId = g.Id
-        AND t.Datum <= @bis
-        AND (g.Anfangsdatum IS NULL OR t.Datum >= g.Anfangsdatum)
+    OUTER APPLY (
+        SELECT TOP 1 Richtung
+        FROM NumberRangeRules
+        WHERE kp.Kontonummer IS NOT NULL
+          AND kp.Kontonummer BETWEEN RangeStart AND RangeEnd
+        ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC
+    ) nr
+    WHERE t.GeldinstitutId = g.Id
+      AND t.Datum <= @bis
+      AND (g.Anfangsdatum IS NULL OR t.Datum >= g.Anfangsdatum)
 ) s
 ORDER BY g.Name;";
             using var cmd = new SqlCommand(sql, c);
@@ -1179,6 +1174,10 @@ ORDER BY g.Name;";
 
             return list;
         }
+
+
+
+
 
 
 
@@ -1222,61 +1221,74 @@ ORDER BY g.Name;";
 
         public System.Collections.Generic.Dictionary<string, bool?> LadeArtFlagProLabel(string labelColumn)
         {
-            // Erlaubte Spaltennamen absichern (Vermeidung von SQL-Injection durch festen Whitelist-Vergleich)
             var col = (labelColumn ?? "").Trim();
             if (col != "Art" && col != "Gruppe" && col != "Untergruppe")
                 throw new ArgumentException("labelColumn muss 'Art', 'Gruppe' oder 'Untergruppe' sein.", nameof(labelColumn));
 
+            EnsureNumberRangeRulesTable();
+
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
 
-            // Heuristik:
-            //  - Einnahmen, wenn kp.Art (oder Verwandtes) auf Einnahme/Ertrag hindeutet ODER Kontonummer in typischen Ertragsbereichen (z. B. 3xxx, 7xxx)
-            //  - Ausgaben, wenn kp.Art auf Ausgabe/Aufwand hindeutet oder typische Aufwandsbereiche
-            //  - Unbekannt, wenn beides 0
+            // Regel zuerst, sonst Text-Heuristik (keine fixen 3xxx/7xxx/4xxx-6xxx mehr!)
             var sql = $@"
 SELECT 
-    COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)') AS Label,
-    SUM(CASE 
-            WHEN UPPER(ISNULL(kp.Art,'')) LIKE '%EINNAHM%' OR
-                 UPPER(ISNULL(kp.Art,'')) LIKE '%ERTR%'   OR
-                 UPPER(ISNULL(kp.Gruppe,'')) LIKE '%EINNAHM%' OR
-                 UPPER(ISNULL(kp.Gruppe,'')) LIKE '%ERTR%'   OR
-                 UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%EINNAHM%' OR
-                 UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%ERTR%'   OR
-                 UPPER(ISNULL(kp.Detail,'')) LIKE '%EINNAHM%' OR
-                 UPPER(ISNULL(kp.Detail,'')) LIKE '%ERTR%'   OR
-                 (kp.Kontonummer BETWEEN 3000 AND 3999) OR (kp.Kontonummer BETWEEN 7000 AND 7999)
-            THEN 1 ELSE 0 END) AS Ein,
-    SUM(CASE 
-            WHEN UPPER(ISNULL(kp.Art,'')) LIKE '%AUSGAB%' OR
-                 UPPER(ISNULL(kp.Art,'')) LIKE '%AUFW%'   OR
-                 UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUSGAB%' OR
-                 UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUFW%'   OR
-                 UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUSGAB%' OR
-                 UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUFW%'   OR
-                 UPPER(ISNULL(kp.Detail,'')) LIKE '%AUSGAB%' OR
-                 UPPER(ISNULL(kp.Detail,'')) LIKE '%AUFW%'   OR
-                 (kp.Kontonummer BETWEEN 4000 AND 6999)
-            THEN 1 ELSE 0 END) AS Aus
+  COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)') AS Label,
+  SUM(CASE 
+        WHEN nr.Richtung = N'Einnahme' OR (
+             nr.Richtung IS NULL AND (
+               UPPER(ISNULL(kp.Art,'')) LIKE '%EINNAHM%' OR
+               UPPER(ISNULL(kp.Art,'')) LIKE '%ERTR%'   OR
+               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%EINNAHM%' OR
+               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%ERTR%'   OR
+               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%EINNAHM%' OR
+               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%ERTR%'   OR
+               UPPER(ISNULL(kp.Detail,'')) LIKE '%EINNAHM%' OR
+               UPPER(ISNULL(kp.Detail,'')) LIKE '%ERTR%'
+             )
+        )
+      THEN 1 ELSE 0 END) AS Ein,
+  SUM(CASE 
+        WHEN nr.Richtung = N'Ausgabe' OR (
+             nr.Richtung IS NULL AND (
+               UPPER(ISNULL(kp.Art,'')) LIKE '%AUSGAB%' OR
+               UPPER(ISNULL(kp.Art,'')) LIKE '%AUFW%'   OR
+               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUSGAB%' OR
+               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUFW%'   OR
+               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUSGAB%' OR
+               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUFW%'   OR
+               UPPER(ISNULL(kp.Detail,'')) LIKE '%AUSGAB%' OR
+               UPPER(ISNULL(kp.Detail,'')) LIKE '%AUFW%'
+             )
+        )
+      THEN 1 ELSE 0 END) AS Aus
 FROM Kontenplan kp
-GROUP BY COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)');";
-
+OUTER APPLY (
+  SELECT TOP 1 Richtung
+  FROM NumberRangeRules
+  WHERE kp.Kontonummer IS NOT NULL
+    AND kp.Kontonummer BETWEEN RangeStart AND RangeEnd
+  ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC
+) nr
+GROUP BY COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)')
+ORDER BY Label";
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
-
-            var dict = new System.Collections.Generic.Dictionary<string, bool?>(System.StringComparer.OrdinalIgnoreCase);
             using var r = cmd.ExecuteReader();
+
+            var dict = new System.Collections.Generic.Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
             while (r.Read())
             {
                 var label = r.GetString(0);
                 var ein = r.IsDBNull(1) ? 0 : r.GetInt32(1);
                 var aus = r.IsDBNull(2) ? 0 : r.GetInt32(2);
-
-                bool? isIncome = (ein == 0 && aus == 0) ? (bool?)null : (ein >= aus);
-                dict[label] = isIncome;  // true = Einnahmen, false = Ausgaben, null = unbekannt
+                bool? flag = null; // null = unklar/gemischt
+                if (ein > 0 && aus == 0) flag = true;      // Einnahme
+                if (aus > 0 && ein == 0) flag = false;     // Ausgabe
+                dict[label] = flag;
             }
             return dict;
         }
+
 
 
         // ---------- TRANSAKTIONEN ----------
@@ -2781,38 +2793,34 @@ WHERE bd.KontoId = @K
 
         public bool IstEinnahmenKonto(int kontoId)
         {
+            // 1) Regel per Nummernblock prüfen
+            int? knr = HoleKontonummerByKontoId(kontoId);
+            if (knr.HasValue)
+            {
+                var regel = FindeRegelFuerKontonummer(knr.Value);
+                if (regel != null)
+                    return string.Equals(regel.Richtung, "Einnahme", StringComparison.OrdinalIgnoreCase);
+            }
+
+            // 2) Fallback: Text-Heuristik
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
-
             const string sql = @"
-SELECT 
-    UPPER(ISNULL(Art,         '')) AS Art,
-    UPPER(ISNULL(Gruppe,      '')) AS Gruppe,
-    UPPER(ISNULL(Untergruppe, '')) AS Untergruppe,
-    UPPER(ISNULL(Detail,      '')) AS Detail
+SELECT UPPER(ISNULL(Art,'')) AS Art,
+       UPPER(ISNULL(Gruppe,'')) AS Gruppe,
+       UPPER(ISNULL(Untergruppe,'')) AS Untergruppe,
+       UPPER(ISNULL(Detail,'')) AS Detail
 FROM Kontenplan
 WHERE Id = @Id";
-
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@Id", kontoId);
-
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return false;
 
-            // Textfelder zusammenziehen und grob normalisieren (Umlaute entfernen)
             string text = $"{r["Art"]} {r["Gruppe"]} {r["Untergruppe"]} {r["Detail"]}";
-            string norm = text
-                .Replace('Ä', 'A').Replace('Ö', 'O').Replace('Ü', 'U')
-                .Replace('É', 'E').Replace('È', 'E').Replace('Ê', 'E');
-
-            // Einnahmen-Indikatoren (de/teilw. en). KEINE Nummern-Logik mehr!
-            string[] incomeKeys = {
-        "EINNAHM", "ERTRAG", "ERTRAEG", "ERLÖS", "ERLOS", "ERLOES",
-        "REVENUE", "INCOME"
-    };
-
+            string[] incomeKeys = { "EINNAHM", "ERTRAG", "ERTRAEG", "ERLÖS", "ERLOS", "ERLOES", "REVENUE", "INCOME" };
             foreach (var k in incomeKeys)
-                if (norm.Contains(k, StringComparison.OrdinalIgnoreCase))
+                if (text.Contains(k, StringComparison.OrdinalIgnoreCase))
                     return true;
 
             return false;
@@ -2820,8 +2828,193 @@ WHERE Id = @Id";
 
         public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId);
 
+        public void EnsureNumberRangeRulesTable()
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+
+            // 1) Tabelle anlegen (falls nicht vorhanden)
+            const string createSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[NumberRangeRules]') AND type = N'U')
+BEGIN
+    CREATE TABLE [dbo].[NumberRangeRules](
+        [Id]             INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [RangeStart]     INT NOT NULL,
+        [RangeEnd]       INT NOT NULL,
+        [Richtung]       NVARCHAR(12) NOT NULL CHECK ([Richtung] IN (N'Ausgabe', N'Einnahme')),
+        [Bezeichnung]    NVARCHAR(64) NULL,
+        [IstBudgetkonto] BIT NOT NULL CONSTRAINT DF_NumberRangeRules_IstBudgetkonto DEFAULT(0),
+        CONSTRAINT CK_NumberRangeRules_Range CHECK ([RangeStart] <= [RangeEnd])
+    );
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_NumberRangeRules_Range' AND object_id = OBJECT_ID(N'dbo.NumberRangeRules'))
+        CREATE INDEX IX_NumberRangeRules_Range ON [dbo].[NumberRangeRules]([RangeStart],[RangeEnd]);
+END";
+            using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(createSql, c))
+                cmd.ExecuteNonQuery();
+
+            // 2) Prüfen, ob die Spalte Bezeichnung existiert
+            bool hasBezeichnung;
+            using (var chk = new Microsoft.Data.SqlClient.SqlCommand(
+                "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','Bezeichnung') IS NULL THEN 0 ELSE 1 END", c))
+            {
+                var v = chk.ExecuteScalar();
+                hasBezeichnung = v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+            }
+
+            // 3) Falls Spalte fehlt: erst ALTER, dann UPDATE als eigenes Kommando
+            if (!hasBezeichnung)
+            {
+                using (var alter = new Microsoft.Data.SqlClient.SqlCommand(
+                    "ALTER TABLE dbo.NumberRangeRules ADD [Bezeichnung] NVARCHAR(64) NULL;", c))
+                {
+                    alter.ExecuteNonQuery();
+                }
+
+                using (var fill = new Microsoft.Data.SqlClient.SqlCommand(@"
+UPDATE dbo.NumberRangeRules
+SET Bezeichnung = CASE WHEN Richtung = N'Einnahme' 
+                       THEN N'Einnahmen (Budgetiert)' 
+                       ELSE N'Ausgaben (Budgetiert)' END
+WHERE Bezeichnung IS NULL;", c))
+                {
+                    fill.ExecuteNonQuery();
+                }
+            }
+        }
 
 
+
+
+        public System.Collections.Generic.List<NumberRangeRule> LadeNummernRegeln()
+        {
+            EnsureNumberRangeRulesTable();
+            var list = new System.Collections.Generic.List<NumberRangeRule>();
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"SELECT Id, RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto
+                         FROM dbo.NumberRangeRules
+                         ORDER BY RangeStart, RangeEnd";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new NumberRangeRule
+                {
+                    Id = r.GetInt32(0),
+                    RangeStart = r.GetInt32(1),
+                    RangeEnd = r.GetInt32(2),
+                    Richtung = r.GetString(3),
+                    Bezeichnung = r.IsDBNull(4) ? null : r.GetString(4),
+                    IstBudgetkonto = r.GetBoolean(5)
+                });
+            }
+            return list;
+        }
+
+        public int SpeichereNummernRegel(NumberRangeRule rule)
+        {
+            EnsureNumberRangeRulesTable();
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"INSERT INTO dbo.NumberRangeRules (RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto)
+                         OUTPUT INSERTED.Id
+                         VALUES (@s, @e, @r, @b, @flag)";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@s", rule.RangeStart);
+            cmd.Parameters.AddWithValue("@e", rule.RangeEnd);
+            cmd.Parameters.AddWithValue("@r", rule.Richtung);
+            cmd.Parameters.AddWithValue("@b", (object?)rule.Bezeichnung ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@flag", rule.IstBudgetkonto);
+            return (int)cmd.ExecuteScalar();
+        }
+
+        public void AktualisiereNummernRegel(NumberRangeRule rule)
+        {
+            EnsureNumberRangeRulesTable();
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"UPDATE dbo.NumberRangeRules
+                         SET RangeStart=@s, RangeEnd=@e, Richtung=@r, Bezeichnung=@b, IstBudgetkonto=@flag
+                         WHERE Id=@id";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@s", rule.RangeStart);
+            cmd.Parameters.AddWithValue("@e", rule.RangeEnd);
+            cmd.Parameters.AddWithValue("@r", rule.Richtung);
+            cmd.Parameters.AddWithValue("@b", (object?)rule.Bezeichnung ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@flag", rule.IstBudgetkonto);
+            cmd.Parameters.AddWithValue("@id", rule.Id);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void LoescheNummernRegel(int id)
+        {
+            EnsureNumberRangeRulesTable();
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"DELETE FROM dbo.NumberRangeRules WHERE Id=@id";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+
+        public int? HoleKontonummerByKontoId(int kontoId)
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"SELECT Kontonummer FROM dbo.Kontenplan WHERE Id=@id";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", kontoId);
+            var v = cmd.ExecuteScalar();
+            if (v == null || v == DBNull.Value) return null;
+            return Convert.ToInt32(v);
+        }
+
+        public NumberRangeRule? FindeRegelFuerKontonummer(int kontonummer)
+        {
+            EnsureNumberRangeRulesTable();
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = @"
+SELECT TOP 1 Id, RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto
+FROM dbo.NumberRangeRules
+WHERE @nr BETWEEN RangeStart AND RangeEnd
+ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@nr", kontonummer);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            return new NumberRangeRule
+            {
+                Id = r.GetInt32(0),
+                RangeStart = r.GetInt32(1),
+                RangeEnd = r.GetInt32(2),
+                Richtung = r.GetString(3),
+                Bezeichnung = r.IsDBNull(4) ? null : r.GetString(4),
+                IstBudgetkonto = r.GetBoolean(5)
+            };
+        }
+
+        public bool NumberRangeRulesHasBezeichnung()
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            const string sql = "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','Bezeichnung') IS NULL THEN 0 ELSE 1 END";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+        }
+
+        public void AssertNumberRangeRulesSchema()
+        {
+            // 1) Erstellen/Erweitern versuchen
+            EnsureNumberRangeRulesTable();
+            // 2) Hart prüfen
+            if (!NumberRangeRulesHasBezeichnung())
+                throw new Exception("Spalte 'Bezeichnung' fehlt weiterhin in dbo.NumberRangeRules. " +
+                                    "Prüfe Datenbank/Connection und Rechte.");
+        }
 
     }
 }

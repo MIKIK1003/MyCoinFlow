@@ -1,7 +1,10 @@
-﻿namespace MyCoinFlow.Services
+﻿﻿namespace MyCoinFlow.Services
 {
     public sealed class DbCopyOptions
     {
+        // NEU
+        public bool CopyNummernkreise { get; set; } = true;
+
         public bool CopyKontenstruktur { get; set; } = true;
         public bool CopyAdressen { get; set; } = true;
         public bool CopyAliase { get; set; } = true;

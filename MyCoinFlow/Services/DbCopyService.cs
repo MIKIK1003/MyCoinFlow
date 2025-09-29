@@ -137,7 +137,7 @@ BEGIN
 END");
                 }
 
-                // Import-Schema & Mapping (nur wenn Tabellen existieren)
+                // Import-Schema & Mapping
                 if (opt.CopyImportSchemas)
                 {
                     await Exec(conn, tx, $@"
@@ -181,6 +181,40 @@ BEGIN
     SELECT Id, SchemaId, MasterHeader, SourceHeader, DefaultValue
     FROM   [{sourceDb}].dbo.ImportFieldMapping;
     SET IDENTITY_INSERT dbo.ImportFieldMapping OFF;
+END");
+                }
+
+                // NEU: Nummernkreise (NumberRangeRules)
+                if (opt.CopyNumberRanges)
+                {
+                    // Ziel-Tabelle sicherstellen (falls Template sie nicht enthält)
+                    await Exec(conn, tx, @"
+IF OBJECT_ID(N'dbo.NumberRangeRules','U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[NumberRangeRules](
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [RangeStart] INT NOT NULL,
+        [RangeEnd]   INT NOT NULL,
+        [Richtung]   NVARCHAR(12) NOT NULL CHECK ([Richtung] IN (N'Ausgabe', N'Einnahme')),
+        [Bezeichnung] NVARCHAR(64) NULL,
+        [IstBudgetkonto] BIT NOT NULL CONSTRAINT DF_NumberRangeRules_IstBudgetkonto DEFAULT(0),
+        CONSTRAINT CK_NumberRangeRules_Range CHECK ([RangeStart] <= [RangeEnd])
+    );
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_NumberRangeRules_Range' AND object_id = OBJECT_ID(N'dbo.NumberRangeRules'))
+        CREATE INDEX IX_NumberRangeRules_Range ON [dbo].[NumberRangeRules]([RangeStart],[RangeEnd]);
+END");
+
+                    // Kopieren (nur wenn Ziel leer ist)
+                    await Exec(conn, tx, $@"
+IF OBJECT_ID(N'[{sourceDb}].dbo.NumberRangeRules','U') IS NOT NULL
+AND OBJECT_ID(N'dbo.NumberRangeRules','U') IS NOT NULL
+AND NOT EXISTS(SELECT 1 FROM dbo.NumberRangeRules)
+BEGIN
+    SET IDENTITY_INSERT dbo.NumberRangeRules ON;
+    INSERT INTO dbo.NumberRangeRules (Id, RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto)
+    SELECT Id, RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto
+    FROM   [{sourceDb}].dbo.NumberRangeRules;
+    SET IDENTITY_INSERT dbo.NumberRangeRules OFF;
 END");
                 }
 

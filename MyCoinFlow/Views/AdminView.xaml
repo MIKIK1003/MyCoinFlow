@@ -25,30 +25,37 @@
                         </Style>
                     </ListBox.ItemContainerStyle>
 
+                    <ListBoxItem Tag="Nummernkreise">
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="FormatListNumbered" Width="20" Height="20" Margin="0,0,8,0"/>
+                            <TextBlock Text="Nummernkreise"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
                     <ListBoxItem Tag="Kontenplan">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ClipboardListOutline" Margin="0,0,8,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="ClipboardListOutline" Width="20" Height="20" Margin="0,0,8,0"/>
                             <TextBlock Text="Kontenplan"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Kreditkarten">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="CreditCardOutline" Margin="0,0,8,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="CreditCardOutline" Width="20" Height="20" Margin="0,0,8,0"/>
                             <TextBlock Text="Kreditkarten"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Mandanten">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="AccountMultiplePlusOutline" Margin="0,0,8,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="AccountMultiplePlusOutline" Width="20" Height="20" Margin="0,0,8,0"/>
                             <TextBlock Text="Mandanten"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Backup">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DatabaseArrowDown" Margin="0,0,8,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="DatabaseArrowDown" Width="20" Height="20" Margin="0,0,8,0"/>
                             <TextBlock Text="Backup"/>
                         </StackPanel>
                     </ListBoxItem>
@@ -58,6 +65,11 @@
 
         <!-- CONTENT -->
         <Grid Grid.Column="1" Margin="0,12,12,12">
+
+            <Grid x:Name="SecNummernkreise" Visibility="Collapsed">
+                <ContentControl x:Name="NumberRangesHost"/>
+            </Grid>
+
             <!-- KONTENPLAN -->
             <Grid x:Name="SecKontenplan" Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -220,6 +232,9 @@
                         <!-- Optionen -->
                         <TextBlock Text="Welche Daten kopieren?" FontWeight="SemiBold" Margin="0,12,0,8"/>
                         <WrapPanel>
+                            <!-- NEU -->
+                            <CheckBox x:Name="Copy_CbNummernkreise" Content="Nummernkreise" IsChecked="True" Margin="0,0,16,0"/>
+
                             <CheckBox x:Name="Copy_CbKonten"  Content="Kontenstruktur" IsChecked="True" Margin="0,0,16,0"/>
                             <CheckBox x:Name="Copy_CbAdressen" Content="Adressen" IsChecked="True" Margin="0,0,16,0"/>
                             <CheckBox x:Name="Copy_CbAliase"   Content="Aliase" IsChecked="True" Margin="0,0,16,0"/>
