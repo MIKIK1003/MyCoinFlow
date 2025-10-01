@@ -1355,16 +1355,43 @@ WHEN NOT MATCHED THEN
             cmd.ExecuteNonQuery();
         }
 
-
+        // DatabaseService.cs
+        // KOMPLETTE METHODE – 1:1 ERSETZEN
         public void LoescheGeldinstitut(int id)
         {
-            using var c = new SqlConnection(_connectionString);
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
-            const string sql = @"DELETE FROM Geldinstitut WHERE Id=@Id";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.ExecuteNonQuery();
+
+            // Prüfen, ob noch Verweise auf das Geldinstitut existieren (z. B. Transaktion)
+            var refs = GetReferencingCounts("dbo", "Geldinstitut", "Id", id);
+            if (refs.Count > 0)
+            {
+                ShowDeleteBlockedMessage("Geldinstitut", refs);
+                return; // ruhig zurück – kein Programmstop
+            }
+
+            // Keine Blocker → löschen
+            try
+            {
+                using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
+                    "DELETE FROM dbo.Geldinstitut WHERE Id=@Id", c);
+                cmd.Parameters.AddWithValue("@Id", id);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                // Falls im Rennen doch FK greift → freundlich abfangen
+                if (HandleSqlDeleteException(ex, "Geldinstitut")) return;
+
+                System.Windows.MessageBox.Show("Geldinstitut konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+                // kein throw → kein Programmstop
+            }
         }
+
+
 
         public List<GeldinstitutSaldo> LadeGeldinstituteMitSaldo(DateTime? abgrenzungsdatum)
         {
