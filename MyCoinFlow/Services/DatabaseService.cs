@@ -948,15 +948,118 @@ WHERE Id = @Id;";
         }
 
 
+        // --- REFERENZ-SCHUTZ: Zentrale Helpers --------------------------------------
+        private Dictionary<string, int> GetReferencingCounts(string schemaName, string tableName, string pkColumn, int id)
+        {
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+
+            // 1) Alle FKs finden, die auf (schema.table.pkColumn) zeigen
+            string fkQuery = @"
+SELECT 
+    schR.name  AS RefSchema,
+    tR.name    AS RefTable,
+    cR.name    AS RefColumn
+FROM sys.foreign_keys fk
+JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+JOIN sys.tables tP   ON fk.referenced_object_id = tP.object_id
+JOIN sys.columns cP ON cP.object_id = tP.object_id AND cP.column_id = fkc.referenced_column_id
+JOIN sys.tables tR   ON fk.parent_object_id = tR.object_id
+JOIN sys.columns cR ON cR.object_id = tR.object_id AND cR.column_id = fkc.parent_column_id
+JOIN sys.schemas schP ON schP.schema_id = tP.schema_id
+JOIN sys.schemas schR ON schR.schema_id = tR.schema_id
+WHERE schP.name = @pSchema AND tP.name = @pTable AND cP.name = @pPk;";
+
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(fkQuery, c);
+            cmd.Parameters.AddWithValue("@pSchema", schemaName);
+            cmd.Parameters.AddWithValue("@pTable", tableName);
+            cmd.Parameters.AddWithValue("@pPk", pkColumn);
+
+            var refs = new List<(string RefSchema, string RefTable, string RefColumn)>();
+            using (var r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                    refs.Add((r.GetString(0), r.GetString(1), r.GetString(2)));
+            }
+
+            // 2) Für jede referenzierende Tabelle zählen, wie viele Zeilen den PK-Wert benutzen
+            foreach (var (refSchema, refTable, refCol) in refs)
+            {
+                string countSql = $@"SELECT COUNT(*) FROM [{refSchema}].[{refTable}] WHERE [{refCol}] = @id;";
+                using var countCmd = new Microsoft.Data.SqlClient.SqlCommand(countSql, c);
+                countCmd.Parameters.AddWithValue("@id", id);
+                var v = countCmd.ExecuteScalar();
+                int cnt = (v == null || v == DBNull.Value) ? 0 : Convert.ToInt32(v);
+                if (cnt > 0) result[$"{refSchema}.{refTable}"] = cnt;
+            }
+
+            return result;
+        }
+
+        private bool ShowDeleteBlockedMessage(string objektBezeichnung, Dictionary<string, int> refs)
+        {
+            var lines = new List<string> { $"{objektBezeichnung} kann nicht gelöscht werden, weil noch Verweise existieren:" };
+            foreach (var kv in refs.OrderByDescending(x => x.Value).Take(6))
+                lines.Add($"• {kv.Key}: {kv.Value} Zeile(n)");
+            lines.Add("");
+            lines.Add("Bitte zuerst diese Verweise auflösen (z. B. Umbuchen oder löschen) und dann erneut versuchen.");
+
+            System.Windows.MessageBox.Show(string.Join(Environment.NewLine, lines),
+                "Löschen nicht möglich", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            return false;
+        }
+
+        // FK-/Delete-Fehler nutzerfreundlich anzeigen UND als Fehlschlag signalisieren
+        private bool HandleSqlDeleteException(Exception ex, string objektBezeichnung)
+        {
+            if (ex is SqlException sqlEx && sqlEx.Number == 547) // FK-Constraint
+            {
+                System.Windows.MessageBox.Show(
+                    $"{objektBezeichnung} kann nicht gelöscht werden, weil noch abhängige Daten existieren.\n\n" +
+                    "Bitte abhängige Datensätze zuerst entfernen oder umhängen.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return true; // handled → keine Exception weiterwerfen
+            }
+            return false;    // nicht behandelt → Aufrufer entscheidet
+
+        }
+
+
         public void LoescheAdresse(int id)
         {
             using var c = new SqlConnection(_connectionString);
             c.Open();
-            const string sql = @"DELETE FROM Adresse WHERE Id=@Id";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.ExecuteNonQuery();
+
+            // Preflight: referenzierende Zeilen?
+            var refs = GetReferencingCounts("dbo", "Adresse", "Id", id);
+            if (refs.Count > 0)
+            {
+                ShowDeleteBlockedMessage("Adresse", refs);
+                return; // ruhig zurück → kein Programmstop
+            }
+
+            try
+            {
+                using var cmd = new SqlCommand("DELETE FROM dbo.Adresse WHERE Id=@Id", c);
+                cmd.Parameters.AddWithValue("@Id", id);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Adresse")) return; // FK-Fehler freundlich abgefangen
+                System.Windows.MessageBox.Show("Adresse konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                // keine Exception weiterwerfen → kein Programmstop
+            }
+
         }
+
+
+
 
         // Liefert alle Aliase (Text -> Adresse)
         public List<AdressAlias> LadeAdressAliase()
@@ -3015,6 +3118,8 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
                 throw new Exception("Spalte 'Bezeichnung' fehlt weiterhin in dbo.NumberRangeRules. " +
                                     "Prüfe Datenbank/Connection und Rechte.");
         }
+
+
 
     }
 }

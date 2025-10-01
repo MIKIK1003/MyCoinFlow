@@ -96,20 +96,39 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
+        // AddressesViewModel.cs
+        // Vollständige Methode zum Ersetzen deiner bisherigen Lösch-Methode
         private void Loeschen()
         {
+            // 1) Auswahl defensiv prüfen
             if (AusgewaehlteAdresse == null) return;
 
-            var ok = MessageBox.Show($"Adresse „{AusgewaehlteAdresse.Name}“ wirklich löschen?",
-                                     "Löschen bestätigen",
-                                     MessageBoxButton.YesNo,
-                                     MessageBoxImage.Warning);
-            if (ok != MessageBoxResult.Yes) return;
+            // 2) Bestätigungsdialog
+            var ask = System.Windows.MessageBox.Show(
+                $"Adresse „{AusgewaehlteAdresse.Name}“ wirklich löschen?",
+                "Löschen bestätigen",
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Warning);
 
-            _db.LoescheAdresse(AusgewaehlteAdresse.Id);
-            Adressen.Remove(AusgewaehlteAdresse);
-            AusgewaehlteAdresse = null;
+            if (ask != System.Windows.MessageBoxResult.Yes) return;
+
+            // 3) Löschversuch (DatabaseService zeigt bei FK-Blockade bereits eine Benutzer-Meldung)
+            try
+            {
+                _db.LoescheAdresse(AusgewaehlteAdresse.Id);
+            }
+            catch
+            {
+                // Wichtig: NICHT crashen – DatabaseService hat die Ursache schon angezeigt.
+                // (Kein Remove() aus der ObservableCollection!)
+            }
+
+            // 4) Liste sofort korrekt anzeigen – exakt der gleiche Weg wie per Menü "Adressen"
+            var shell = System.Windows.Application.Current?.MainWindow?.DataContext as MyCoinFlow.ViewModels.MainViewModel;
+            if (shell?.ShowAddressesCommand?.CanExecute(null) == true)
+                shell.ShowAddressesCommand.Execute(null);
         }
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? n = null)
