@@ -193,22 +193,95 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-
-
         public void KontenplanEintragLoeschen(int id)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                string sql = "DELETE FROM Kontenplan WHERE Id = @Id";
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
 
-                using (SqlCommand command = new SqlCommand(sql, connection))
+            // 1) Preflight: Wer referenziert dbo.Kontenplan(Id)?
+            //    (nutzt die bereits bei Adresse eingeführten Helper: GetReferencingCounts / ShowDeleteBlockedMessage)
+            var refs = GetReferencingCounts("dbo", "Kontenplan", "Id", id);
+
+            // 1a) "Weiche" Verweise (Mappings) zählen
+            refs.TryGetValue("dbo.KategorieKontoMapping", out int mappingCount);
+            bool hasOtherRefs = refs.Any(kv =>
+                !kv.Key.Equals("dbo.KategorieKontoMapping", StringComparison.OrdinalIgnoreCase));
+
+            // 2) Falls Mappings existieren, optional mitlöschen
+            if (mappingCount > 0)
+            {
+                var infoWeitere = hasOtherRefs
+                    ? "\n\nHinweis: Es existieren weitere Verweise (z. B. Transaktionen/BudgetDetail). Diese werden NICHT automatisch gelöscht."
+                    : "";
+
+                var frage = mappingCount == 1
+                    ? $"Zu diesem Konto existiert 1 Mapping in KategorieKontoMapping.\n\nKonto zusammen mit diesem Mapping löschen?{infoWeitere}"
+                    : $"Zu diesem Konto existieren {mappingCount} Mappings in KategorieKontoMapping.\n\nKonto zusammen mit diesen Mappings löschen?{infoWeitere}";
+
+                var choice = System.Windows.MessageBox.Show(
+                    frage,
+                    "Konto & Mappings löschen",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question);
+
+                if (choice != System.Windows.MessageBoxResult.Yes)
+                    return; // Nutzer lehnt ab → ruhig zurück
+
+                // Mappings löschen
+                try
                 {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.ExecuteNonQuery();
+                    LoescheKategorieMappingsFuerKonto(id);
                 }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show("Kategorie-Mappings konnten nicht gelöscht werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
+
+                // Referenzen neu ermitteln
+                refs = GetReferencingCounts("dbo", "Kontenplan", "Id", id);
+            }
+
+            // 3) Harte Blocker verbleiben? (Transaktion.VonKontoId/NachKontoId, BudgetDetail.KontoId, …)
+            if (refs.Count > 0)
+            {
+                ShowDeleteBlockedMessage("Kontenplan-Eintrag", refs);
+                return;
+            }
+
+            // 4) Konto löschen
+            try
+            {
+                using var del = new SqlCommand("DELETE FROM dbo.Kontenplan WHERE Id = @Id", c);
+                del.Parameters.AddWithValue("@Id", id);
+                del.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                // FK-Fehler freundlich abfangen (falls Race-Condition o. ä.)
+                if (HandleSqlDeleteException(ex, "Kontenplan-Eintrag")) return;
+
+                System.Windows.MessageBox.Show("Kontenplan-Eintrag konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                // kein throw → kein Programmstop
             }
         }
+
+
+        // Löscht alle Kategorie→Konto-Mappings für ein Konto (weiche Verknüpfungen).
+        // Rückgabewert: Anzahl gelöschter Zeilen.
+        private int LoescheKategorieMappingsFuerKonto(int kontoId)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var cmd = new SqlCommand(
+                "DELETE FROM dbo.KategorieKontoMapping WHERE KontoId = @id;", c);
+            cmd.Parameters.AddWithValue("@id", kontoId);
+            return cmd.ExecuteNonQuery();
+        }
+
+
         public List<Budgetzeitraum> LadeBudgetzeitraeume()
         {
             List<Budgetzeitraum> zeitraeume = new List<Budgetzeitraum>();
@@ -1027,21 +1100,65 @@ WHERE schP.name = @pSchema AND tP.name = @pTable AND cP.name = @pPk;";
             return false;    // nicht behandelt → Aufrufer entscheidet
 
         }
-
-
         public void LoescheAdresse(int id)
         {
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
-            // Preflight: referenzierende Zeilen?
+            // Preflight: Welche Tabellen referenzieren dbo.Adresse(Id)?
+            // (nutzt den bereits eingefügten Helper GetReferencingCounts)
             var refs = GetReferencingCounts("dbo", "Adresse", "Id", id);
-            if (refs.Count > 0)
+
+            // Gibt es Aliase?
+            refs.TryGetValue("dbo.AdresseAlias", out int aliasCount);
+            bool hasOtherRefs = refs.Any(kv => !kv.Key.Equals("dbo.AdresseAlias", StringComparison.OrdinalIgnoreCase));
+
+            // Fall A: Aliase vorhanden
+            if (aliasCount > 0)
             {
-                ShowDeleteBlockedMessage("Adresse", refs);
-                return; // ruhig zurück → kein Programmstop
+                // Hinweistext je nach weiteren Verweisen
+                var infoWeitere = hasOtherRefs
+                    ? "\n\nHinweis: Es existieren weitere Verweise (z. B. Transaktionen). Diese werden NICHT automatisch gelöscht."
+                    : "";
+
+                var frage = aliasCount == 1
+                    ? $"Zu dieser Adresse existiert 1 Alias.\n\nAdresse zusammen mit diesem Alias löschen?{infoWeitere}"
+                    : $"Zu dieser Adresse existieren {aliasCount} Aliase.\n\nAdresse zusammen mit diesen Aliasen löschen?{infoWeitere}";
+
+                var choice = System.Windows.MessageBox.Show(
+                    frage,
+                    "Adresse & Aliase löschen",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question);
+
+                if (choice != System.Windows.MessageBoxResult.Yes)
+                    return; // Nutzer lehnt ab → ruhig zurück
+
+                // 1) Aliase löschen
+                try
+                {
+                    LoescheAdressAliase(id);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show("Aliase konnten nicht gelöscht werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
+
+                // 2) Referenzen neu ermitteln (Aliase sind weg)
+                refs = GetReferencingCounts("dbo", "Adresse", "Id", id);
             }
 
+            // Fall B: Es existieren (nach Alias-Löschung) noch andere Verweise → blockieren
+            if (refs.Count > 0)
+            {
+                // Freundliche Liste der verbleibenden Blocker
+                ShowDeleteBlockedMessage("Adresse", refs);
+                return;
+            }
+
+            // Fall C: Keine Blocker → Adresse löschen
             try
             {
                 using var cmd = new SqlCommand("DELETE FROM dbo.Adresse WHERE Id=@Id", c);
@@ -1050,16 +1167,14 @@ WHERE schP.name = @pSchema AND tP.name = @pTable AND cP.name = @pPk;";
             }
             catch (Exception ex)
             {
-                if (HandleSqlDeleteException(ex, "Adresse")) return; // FK-Fehler freundlich abgefangen
+                // FK 547 & Co. freundlich abfangen (falls sich zwischenzeitlich neue Verweise ergeben haben)
+                if (HandleSqlDeleteException(ex, "Adresse")) return;
+
                 System.Windows.MessageBox.Show("Adresse konnte nicht gelöscht werden:\n" + ex.Message,
                     "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                // keine Exception weiterwerfen → kein Programmstop
+                // Kein throw → kein Programmstop
             }
-
         }
-
-
-
 
         // Liefert alle Aliase (Text -> Adresse)
         public List<AdressAlias> LadeAdressAliase()
@@ -3117,6 +3232,17 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
             if (!NumberRangeRulesHasBezeichnung())
                 throw new Exception("Spalte 'Bezeichnung' fehlt weiterhin in dbo.NumberRangeRules. " +
                                     "Prüfe Datenbank/Connection und Rechte.");
+        }
+
+        // Löscht alle Aliase, die auf eine Adresse zeigen.
+        // Rückgabewert: Anzahl gelöschter Zeilen.
+        private int LoescheAdressAliase(int adresseId)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var cmd = new SqlCommand("DELETE FROM dbo.AdresseAlias WHERE AdresseId = @Id", c);
+            cmd.Parameters.AddWithValue("@Id", adresseId);
+            return cmd.ExecuteNonQuery();
         }
 
 

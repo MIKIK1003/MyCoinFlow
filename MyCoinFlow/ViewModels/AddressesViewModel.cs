@@ -100,10 +100,8 @@ namespace MyCoinFlow.ViewModels
         // Vollständige Methode zum Ersetzen deiner bisherigen Lösch-Methode
         private void Loeschen()
         {
-            // 1) Auswahl defensiv prüfen
             if (AusgewaehlteAdresse == null) return;
 
-            // 2) Bestätigungsdialog
             var ask = System.Windows.MessageBox.Show(
                 $"Adresse „{AusgewaehlteAdresse.Name}“ wirklich löschen?",
                 "Löschen bestätigen",
@@ -112,22 +110,44 @@ namespace MyCoinFlow.ViewModels
 
             if (ask != System.Windows.MessageBoxResult.Yes) return;
 
-            // 3) Löschversuch (DatabaseService zeigt bei FK-Blockade bereits eine Benutzer-Meldung)
+            var id = AusgewaehlteAdresse.Id;
+
+            // 1) Löschversuch (DB fängt FK-Blockaden benutzerfreundlich ab)
             try
             {
-                _db.LoescheAdresse(AusgewaehlteAdresse.Id);
+                _db.LoescheAdresse(id);
             }
             catch
             {
-                // Wichtig: NICHT crashen – DatabaseService hat die Ursache schon angezeigt.
-                // (Kein Remove() aus der ObservableCollection!)
+                // DB-Service hat bereits eine Meldung gezeigt; kein Abbruch hier.
             }
 
-            // 4) Liste sofort korrekt anzeigen – exakt der gleiche Weg wie per Menü "Adressen"
-            var shell = System.Windows.Application.Current?.MainWindow?.DataContext as MyCoinFlow.ViewModels.MainViewModel;
-            if (shell?.ShowAddressesCommand?.CanExecute(null) == true)
-                shell.ShowAddressesCommand.Execute(null);
+            // 2) Erfolg prüfen: existiert die Adresse noch?
+            //    HoleAdresse(id) → null, wenn gelöscht; sonst Objekt wenn noch vorhanden.
+            //    (Siehe DatabaseService.HoleAdresse) :contentReference[oaicite:0]{index=0}
+            var nochDa = _db.HoleAdresse(id);
+
+            if (nochDa == null)
+            {
+                // 3) Lokal aus der Liste entfernen (sofort sichtbar, kein Reload nötig)
+                object? victim = null;
+                foreach (var a in Adressen)
+                {
+                    if (a.Id == id) { victim = a; break; }
+                }
+                if (victim != null) Adressen.Remove((MyCoinFlow.Models.Adresse)victim);
+
+                AusgewaehlteAdresse = null;
+                // Falls du einen Command nutzt, CanExecute neu bewerten:
+                (LoeschenCommand as MyCoinFlow.Helpers.RelayCommand)?.RaiseCanExecuteChanged();
+            }
+            else
+            {
+                // 4) Nicht gelöscht (z. B. wegen Transaktionen) → nichts aus der Liste entfernen.
+                //    UI bleibt korrekt, da Datensatz weiterhin existiert.
+            }
         }
+
 
 
         public event PropertyChangedEventHandler? PropertyChanged;

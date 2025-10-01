@@ -177,25 +177,41 @@ namespace MyCoinFlow.ViewModels
 
         private void EintragLoeschen()
         {
-            if (AusgewaehlterKnoten?.OriginalEintrag == null)
-                return;
+            // 1) Auswahl prüfen
+            var kn = AusgewaehlterKnoten;
+            var eintrag = kn?.OriginalEintrag; // KontoplanEintrag hinter dem Knoten
+            if (eintrag == null) return;
 
-            var eintrag = AusgewaehlterKnoten.OriginalEintrag;
-
-            var result = MessageBox.Show(
-                $"Möchten Sie den Eintrag \"{eintrag.Detail ?? eintrag.Gruppe}\" wirklich löschen?",
+            // 2) Bestätigen
+            var label = $"{eintrag.Kontonummer} {eintrag.Detail}".Trim();
+            var ask = MessageBox.Show(
+                $"Konto „{label}“ wirklich löschen?",
                 "Löschen bestätigen",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
-            if (result == MessageBoxResult.Yes)
-            {
-                DatabaseService dbService = new DatabaseService();
-                dbService.KontenplanEintragLoeschen(eintrag.Id);
+            if (ask != MessageBoxResult.Yes) return;
 
-                LadeKontenplan();
+            // 3) Löschen (DatabaseService zeigt ggf. freundliche Blocker-Meldungen)
+            try
+            {
+                var db = new DatabaseService();
+                db.KontenplanEintragLoeschen(eintrag.Id);
             }
+            catch
+            {
+                // DatabaseService hat bereits eine Meldung gezeigt; kein Programmstop hier.
+            }
+
+            // 4) Liste sofort korrekt neu aufbauen (kein optimistisches Remove)
+            LadeKontenplan();
+
+            // 5) Auswahl & Commands refreshen
+            AusgewaehlterKnoten = null;
+            (BearbeitenEintragCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (LoeschenEintragCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
+
 
         // INotifyPropertyChanged Standard
         public event PropertyChangedEventHandler? PropertyChanged;
