@@ -103,24 +103,55 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
+        // BudgetsViewModel.cs
+        // Vollständige Methode zum Ersetzen
         private void ZeitraumLoeschen()
         {
-            if (AusgewaehlterZeitraum == null) return;
+            if (AusgewaehlterZeitraum == null)
+                return;
 
-            var result = MessageBox.Show(
-                $"Möchten Sie den Zeitraum \"{AusgewaehlterZeitraum.Bezeichnung}\" wirklich löschen?",
-                "Löschen bestätigen",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
+            // Spezialregel: Aktiven Zeitraum nie löschen
+            if (AusgewaehlterZeitraum.IstAktiv)
             {
-                DatabaseService dbService = new DatabaseService();
-                dbService.BudgetzeitraumLoeschen(AusgewaehlterZeitraum.Id);
-
-                LadeBudgetzeitraeume();
+                System.Windows.MessageBox.Show(
+                    "Der aktive Budgetzeitraum kann nicht gelöscht werden.\n\n" +
+                    "Bitte zuerst einen anderen Zeitraum aktivieren oder diesen deaktivieren.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
             }
+
+            // Bestätigung
+            var text = $"{AusgewaehlterZeitraum.Bezeichnung}  ({AusgewaehlterZeitraum.Startdatum:dd.MM.yyyy} – {AusgewaehlterZeitraum.Enddatum:dd.MM.yyyy})";
+            var result = System.Windows.MessageBox.Show(
+                $"Möchten Sie den Budgetzeitraum „{text}“ wirklich löschen?",
+                "Löschen bestätigen",
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Warning);
+
+            if (result != System.Windows.MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                var dbService = new MyCoinFlow.Services.DatabaseService();
+                dbService.BudgetzeitraumLoeschen(AusgewaehlterZeitraum.Id);
+            }
+            catch (System.Exception ex)
+            {
+                System.Windows.MessageBox.Show("Budgetzeitraum konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+                return;
+            }
+
+            // Liste neu laden (dein bestehender Mechanismus)
+            LadeBudgetzeitraeume();  // nutzt DatabaseService.LadeBudgetzeitraeume() im Hintergrund
+            AusgewaehlterZeitraum = null;
         }
+
 
         // NEU: Fenster zur Budgetwerterfassung öffnen
         private void BudgetwerteErfassen()

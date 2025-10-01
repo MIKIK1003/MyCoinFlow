@@ -488,21 +488,82 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
                 }
             }
         }
+
         public void BudgetzeitraumLoeschen(int id)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            connection.Open();
+
+            // 1) Aktiven Status abfragen
+            const string chkSql = "SELECT IstAktiv FROM dbo.Budgetzeitraum WHERE Id = @Id";
+            using (var chk = new Microsoft.Data.SqlClient.SqlCommand(chkSql, connection))
             {
-                connection.Open();
+                chk.Parameters.AddWithValue("@Id", id);
+                var v = chk.ExecuteScalar();
 
-                string sql = "DELETE FROM Budgetzeitraum WHERE Id = @Id";
-
-                using (SqlCommand command = new SqlCommand(sql, connection))
+                if (v == null || v == DBNull.Value)
                 {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.ExecuteNonQuery();
+                    System.Windows.MessageBox.Show("Der Budgetzeitraum wurde nicht gefunden.",
+                        "Löschen nicht möglich", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+
+                bool istAktiv = Convert.ToBoolean(v);
+
+                if (istAktiv)
+                {
+                    // Spezielle Regel: Aktiven Zeitraum nicht löschen
+                    System.Windows.MessageBox.Show(
+                        "Der aktive Budgetzeitraum kann nicht gelöscht werden.\n\n" +
+                        "Bitte zuerst einen anderen Zeitraum aktivieren oder diesen deaktivieren.",
+                        "Löschen nicht möglich",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                    return;
                 }
             }
+
+            // 2) Löschen (für inaktive Zeiträume)
+            try
+            {
+                const string delSql = "DELETE FROM dbo.Budgetzeitraum WHERE Id = @Id";
+                using var del = new Microsoft.Data.SqlClient.SqlCommand(delSql, connection);
+                del.Parameters.AddWithValue("@Id", id);
+                del.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                // Falls wider Erwarten FK-Blockaden existieren, freundlich abfangen
+                if (HandleSqlDeleteException(ex, "Budgetzeitraum")) return;
+
+                System.Windows.MessageBox.Show("Budgetzeitraum konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                // Kein throw → kein Programmstop
+            }
         }
+
+        public Budgetzeitraum? HoleBudgetzeitraum(int id)
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = "SELECT Id, Bezeichnung, Startdatum, Enddatum, IstAktiv FROM dbo.Budgetzeitraum WHERE Id = @Id";
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            return new Budgetzeitraum
+            {
+                Id = r.GetInt32(0),
+                Bezeichnung = r.GetString(1),
+                Startdatum = r.GetDateTime(2),
+                Enddatum = r.GetDateTime(3),
+                IstAktiv = r.GetBoolean(4)
+            };
+        }
+
 
         public void BudgetwertSpeichern(int zeitraumId, int kontoId, decimal wert)
         {
