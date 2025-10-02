@@ -3536,6 +3536,84 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
         }
 
 
+        // ---------------------------------------------
+        // NEU: Transaktionen nach Adresse laden (mit Filtern)
+        // ---------------------------------------------
+        public List<Transaktion> LadeTransaktionenByAdresse(
+            int adresseId,
+            DateTime? von = null,
+            DateTime? bis = null,
+            decimal? minBetrag = null,
+            decimal? maxBetrag = null,
+            int? kontoId = null,
+            int? geldinstitutId = null)
+        {
+            var result = new List<Transaktion>();
+
+            // Defensive Checks
+            if (adresseId <= 0)
+                return result;
+
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+
+            const string sql = @"
+SELECT 
+    t.Id, 
+    t.Datum, 
+    t.VonKontoId, 
+    t.NachKontoId, 
+    t.Betrag, 
+    t.Notiz,
+    t.AdresseId, 
+    a.Name AS AdresseName,
+    t.GeldinstitutId, 
+    g.Name AS BankName
+FROM Transaktion t
+LEFT JOIN Adresse a      ON a.Id = t.AdresseId
+LEFT JOIN Geldinstitut g ON g.Id = t.GeldinstitutId
+WHERE t.AdresseId = @adr
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (@minB IS NULL OR t.Betrag >= @minB)
+  AND (@maxB IS NULL OR t.Betrag <= @maxB)
+  AND (@kto IS NULL OR t.VonKontoId = @kto OR t.NachKontoId = @kto)
+  AND (@gi  IS NULL OR t.GeldinstitutId = @gi)
+ORDER BY t.Datum DESC, t.Id DESC;";
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@adr", adresseId);
+            cmd.Parameters.AddWithValue("@von", (object?)von?.Date ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bis", (object?)bis?.Date ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@minB", (object?)minBetrag ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@maxB", (object?)maxBetrag ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@kto", (object?)kontoId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@gi", (object?)geldinstitutId ?? DBNull.Value);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var t = new Transaktion
+                {
+                    Id = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    Betrag = r.GetDecimal(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
+                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
+                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
+                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                };
+
+                result.Add(t);
+            }
+
+            return result;
+        }
+
+
 
     }
 }

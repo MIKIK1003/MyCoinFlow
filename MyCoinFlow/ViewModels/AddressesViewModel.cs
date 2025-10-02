@@ -32,12 +32,16 @@ namespace MyCoinFlow.ViewModels
         public ICommand NeuCommand { get; }
         public ICommand BearbeitenCommand { get; }
         public ICommand LoeschenCommand { get; }
+        public ICommand ZeigeAdresseTransaktionenCommand { get; }
+
 
         public AddressesViewModel()
         {
             NeuCommand = new RelayCommand(_ => Neu());
             BearbeitenCommand = new RelayCommand(_ => Bearbeiten(), _ => AusgewaehlteAdresse != null);
             LoeschenCommand = new RelayCommand(_ => Loeschen(), _ => AusgewaehlteAdresse != null);
+            ZeigeAdresseTransaktionenCommand = new RelayCommand(p => ZeigeAdresseTransaktionen(p), _ => true);
+
             Lade();
         }
 
@@ -147,6 +151,18 @@ namespace MyCoinFlow.ViewModels
                 //    UI bleibt korrekt, da Datensatz weiterhin existiert.
             }
         }
+
+        private void ZeigeAdresseTransaktionen(object? parameter)
+        {
+            // Parameter aus der Zeile bevorzugen, sonst die aktuell ausgewählte Adresse
+            var adr = parameter as Adresse ?? AusgewaehlteAdresse;
+            if (adr == null) return;
+
+            var win = new MyCoinFlow.Views.AdresseTransaktionenWindow(adr.Id, adr.Name);
+            win.Owner = System.Windows.Application.Current?.MainWindow;
+            win.ShowDialog();
+        }
+
 
 
 
