@@ -40,7 +40,7 @@ namespace MyCoinFlow.Views
                     double wEin = 110;
                     double wAus = 110;
                     double wBank = 220;
-                    double wNotiz = 380;   // wird dynamisch reduziert, falls zu breit
+                    double wNotiz = 360;   // wird dynamisch reduziert, falls zu breit
 
                     // Dokument-Layout
                     var doc = new FlowDocument
