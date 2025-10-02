@@ -47,14 +47,33 @@
                   CanUserAddRows="False"
                   IsReadOnly="True">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Name"       Binding="{Binding Name}" Width="2*"/>
-                <DataGridTextColumn Header="IBAN"       Binding="{Binding IBAN}" Width="*"/>
-                <DataGridTextColumn Header="Typ"        Binding="{Binding Typ}" Width="*"/>
+                <DataGridTextColumn Header="Name"       Binding="{Binding Name}"    Width="2*"/>
+                <DataGridTextColumn Header="IBAN"       Binding="{Binding IBAN}"    Width="*"/>
+                <DataGridTextColumn Header="Typ"        Binding="{Binding Typ}"     Width="*"/>
                 <DataGridTextColumn Header="Straße"     Binding="{Binding Strasse}" Width="*"/>
-                <DataGridTextColumn Header="PLZ"        Binding="{Binding PLZ}" Width="Auto"/>
-                <DataGridTextColumn Header="Ort"        Binding="{Binding Ort}" Width="*"/>
-                <DataGridTextColumn Header="Land"       Binding="{Binding Land}" Width="Auto"/>
-                <DataGridTextColumn Header="Notiz"      Binding="{Binding Notiz}" Width="2*"/>
+                <DataGridTextColumn Header="PLZ"        Binding="{Binding PLZ}"     Width="Auto"/>
+                <DataGridTextColumn Header="Ort"        Binding="{Binding Ort}"     Width="*"/>
+                <DataGridTextColumn Header="Land"       Binding="{Binding Land}"    Width="Auto"/>
+                <DataGridTextColumn Header="Notiz"      Binding="{Binding Notiz}"   Width="2*"/>
+
+                <!-- NEU: Icon-Spalte ganz rechts -->
+                <DataGridTemplateColumn Header=""
+                                        Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button
+                                ToolTip="Transaktionen der Adresse anzeigen und drucken"
+                                Command="{Binding DataContext.ZeigeAdresseTransaktionenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource MaterialDesignToolButton}">
+                                <materialDesign:PackIcon Kind="FileDocumentMultipleOutline"
+                                                         Width="20" Height="20"
+                                                         Foreground="DodgerBlue"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- ENDE NEU -->
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

@@ -672,19 +672,7 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-        public void LoescheKontenArt(int id)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                string sql = "DELETE FROM KontenArt WHERE Id = @Id";
-                using (var command = new SqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
+        
 
         public List<KontenGruppe> LadeKontenGruppen()
         {
@@ -837,15 +825,238 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
         }
 
 
+        // --- ERSETZEN ---
+        public void LoescheKontenArt(int id)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            // Bezeichnung ermitteln
+            string? bez = null;
+            using (var get = new SqlCommand("SELECT Bezeichnung FROM dbo.KontenArt WHERE Id=@Id", c))
+            {
+                get.Parameters.AddWithValue("@Id", id);
+                var v = get.ExecuteScalar();
+                if (v == null || v == DBNull.Value)
+                {
+                    System.Windows.MessageBox.Show("Eintrag in KontenArt wurde nicht gefunden.",
+                        "Löschen nicht möglich", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+                bez = Convert.ToString(v);
+            }
+
+            // Verwendung im Kontenplan zählen
+            int used = 0;
+            using (var cnt = new SqlCommand("SELECT COUNT(*) FROM dbo.Kontenplan WHERE Art = @Bez", c))
+            {
+                cnt.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                used = Convert.ToInt32(cnt.ExecuteScalar() ?? 0);
+            }
+
+            if (used > 0)
+            {
+                var msg = used == 1
+                    ? "Diese Art wird in 1 Kontenplan-Zeile verwendet.\n\nArt in dieser Zeile auf (leer) setzen und den Stammdatensatz löschen?"
+                    : $"Diese Art wird in {used} Kontenplan-Zeilen verwendet.\n\nArt in diesen Zeilen auf (leer) setzen und den Stammdatensatz löschen?";
+
+                var ask = System.Windows.MessageBox.Show(msg, "Konten-Art löschen",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+                if (ask != System.Windows.MessageBoxResult.Yes) return;
+
+                using var tx = c.BeginTransaction();
+                try
+                {
+                    using (var upd = new SqlCommand("UPDATE dbo.Kontenplan SET Art = N'' WHERE Art = @Bez", c, tx))
+                    {
+                        upd.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                        upd.ExecuteNonQuery();
+                    }
+                    using (var del = new SqlCommand("DELETE FROM dbo.KontenArt WHERE Id=@Id", c, tx))
+                    {
+                        del.Parameters.AddWithValue("@Id", id);
+                        del.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+                catch (Exception ex)
+                {
+                    tx.Rollback();
+                    if (HandleSqlDeleteException(ex, "Konten-Art")) return;
+                    System.Windows.MessageBox.Show("Konten-Art konnte nicht gelöscht werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
+                return;
+            }
+
+            // Kein Gebrauch → direkt löschen
+            try
+            {
+                using var del = new SqlCommand("DELETE FROM dbo.KontenArt WHERE Id=@Id", c);
+                del.Parameters.AddWithValue("@Id", id);
+                del.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Konten-Art")) return;
+                System.Windows.MessageBox.Show("Konten-Art konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        // --- ERSETZEN ---
         public void LoescheKontenGruppe(int id)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-            string sql = "DELETE FROM KontenGruppe WHERE Id = @Id";
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@Id", id);
-            command.ExecuteNonQuery();
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            string? bez = null;
+            using (var get = new SqlCommand("SELECT Bezeichnung FROM dbo.KontenGruppe WHERE Id=@Id", c))
+            {
+                get.Parameters.AddWithValue("@Id", id);
+                var v = get.ExecuteScalar();
+                if (v == null || v == DBNull.Value)
+                {
+                    System.Windows.MessageBox.Show("Eintrag in KontenGruppe wurde nicht gefunden.",
+                        "Löschen nicht möglich", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+                bez = Convert.ToString(v);
+            }
+
+            int used = 0;
+            using (var cnt = new SqlCommand("SELECT COUNT(*) FROM dbo.Kontenplan WHERE Gruppe = @Bez", c))
+            {
+                cnt.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                used = Convert.ToInt32(cnt.ExecuteScalar() ?? 0);
+            }
+
+            if (used > 0)
+            {
+                var msg = used == 1
+                    ? "Diese Gruppe wird in 1 Kontenplan-Zeile verwendet.\n\nGruppe in dieser Zeile auf (leer) setzen und den Stammdatensatz löschen?"
+                    : $"Diese Gruppe wird in {used} Kontenplan-Zeilen verwendet.\n\nGruppe in diesen Zeilen auf (leer) setzen und den Stammdatensatz löschen?";
+
+                var ask = System.Windows.MessageBox.Show(msg, "Konten-Gruppe löschen",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+                if (ask != System.Windows.MessageBoxResult.Yes) return;
+
+                using var tx = c.BeginTransaction();
+                try
+                {
+                    using (var upd = new SqlCommand("UPDATE dbo.Kontenplan SET Gruppe = N'' WHERE Gruppe = @Bez", c, tx))
+                    {
+                        upd.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                        upd.ExecuteNonQuery();
+                    }
+                    using (var del = new SqlCommand("DELETE FROM dbo.KontenGruppe WHERE Id=@Id", c, tx))
+                    {
+                        del.Parameters.AddWithValue("@Id", id);
+                        del.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+                catch (Exception ex)
+                {
+                    tx.Rollback();
+                    if (HandleSqlDeleteException(ex, "Konten-Gruppe")) return;
+                    System.Windows.MessageBox.Show("Konten-Gruppe konnte nicht gelöscht werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
+                return;
+            }
+
+            try
+            {
+                using var del = new SqlCommand("DELETE FROM dbo.KontenGruppe WHERE Id=@Id", c);
+                del.Parameters.AddWithValue("@Id", id);
+                del.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Konten-Gruppe")) return;
+                System.Windows.MessageBox.Show("Konten-Gruppe konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
+
+        // --- ERSETZEN ---
+        public void LoescheKontenUnterGruppe(int id)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            string? bez = null;
+            using (var get = new SqlCommand("SELECT Bezeichnung FROM dbo.KontenUnterGruppe WHERE Id=@Id", c))
+            {
+                get.Parameters.AddWithValue("@Id", id);
+                var v = get.ExecuteScalar();
+                if (v == null || v == DBNull.Value)
+                {
+                    System.Windows.MessageBox.Show("Eintrag in KontenUnterGruppe wurde nicht gefunden.",
+                        "Löschen nicht möglich", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+                bez = Convert.ToString(v);
+            }
+
+            int used = 0;
+            using (var cnt = new SqlCommand("SELECT COUNT(*) FROM dbo.Kontenplan WHERE Untergruppe = @Bez", c))
+            {
+                cnt.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                used = Convert.ToInt32(cnt.ExecuteScalar() ?? 0);
+            }
+
+            if (used > 0)
+            {
+                var msg = used == 1
+                    ? "Diese Untergruppe wird in 1 Kontenplan-Zeile verwendet.\n\nUntergruppe in dieser Zeile auf (leer) setzen und den Stammdatensatz löschen?"
+                    : $"Diese Untergruppe wird in {used} Kontenplan-Zeilen verwendet.\n\nUntergruppe in diesen Zeilen auf (leer) setzen und den Stammdatensatz löschen?";
+
+                var ask = System.Windows.MessageBox.Show(msg, "Konten-Untergruppe löschen",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+                if (ask != System.Windows.MessageBoxResult.Yes) return;
+
+                using var tx = c.BeginTransaction();
+                try
+                {
+                    using (var upd = new SqlCommand("UPDATE dbo.Kontenplan SET Untergruppe = N'' WHERE Untergruppe = @Bez", c, tx))
+                    {
+                        upd.Parameters.AddWithValue("@Bez", bez ?? (object)DBNull.Value);
+                        upd.ExecuteNonQuery();
+                    }
+                    using (var del = new SqlCommand("DELETE FROM dbo.KontenUnterGruppe WHERE Id=@Id", c, tx))
+                    {
+                        del.Parameters.AddWithValue("@Id", id);
+                        del.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+                catch (Exception ex)
+                {
+                    tx.Rollback();
+                    if (HandleSqlDeleteException(ex, "Konten-Untergruppe")) return;
+                    System.Windows.MessageBox.Show("Konten-Untergruppe konnte nicht gelöscht werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
+                return;
+            }
+
+            try
+            {
+                using var del = new SqlCommand("DELETE FROM dbo.KontenUnterGruppe WHERE Id=@Id", c);
+                del.Parameters.AddWithValue("@Id", id);
+                del.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Konten-Untergruppe")) return;
+                System.Windows.MessageBox.Show("Konten-Untergruppe konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+
 
         public List<KontenUnterGruppe> LadeKontenUnterGruppen()
         {
@@ -902,16 +1113,7 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-
-        public void LoescheKontenUnterGruppe(int id)
-        {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-            string sql = "DELETE FROM KontenUnterGruppe WHERE Id = @Id";
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@Id", id);
-            command.ExecuteNonQuery();
-        }
+        
 
         // ADRESSEN
         public List<Adresse> LadeAdressen()
