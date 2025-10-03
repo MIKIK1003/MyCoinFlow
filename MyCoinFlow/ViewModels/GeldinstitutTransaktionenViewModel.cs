@@ -45,6 +45,19 @@ namespace MyCoinFlow.ViewModels
         public ICommand ApplyFilterCommand { get; }
         public ICommand ResetFilterCommand { get; }
 
+        // --- Summen (berechnet aus Rows; kein Extra-Code im Load nötig) ---
+        public decimal SummeEinnahmen => Rows.Sum(r => r.Einnahmen);
+        public decimal SummeAusgaben => Rows.Sum(r => r.Ausgaben);
+        public decimal Saldo => SummeEinnahmen - SummeAusgaben;
+
+        // Komfort: formatiert für die Anzeige
+        public string SummeEinnahmenText => SummeEinnahmen.ToString("N2");
+        public string SummeAusgabenText => SummeAusgaben.ToString("N2");
+        public string SaldoText => Saldo.ToString("N2");
+
+
+
+
         public string SummaryText
         {
             get

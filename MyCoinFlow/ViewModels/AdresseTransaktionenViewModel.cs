@@ -11,8 +11,7 @@ using MyCoinFlow.Services;
 namespace MyCoinFlow.ViewModels
 {
     /// <summary>
-    /// Zeigt Transaktionen zu einer Adresse – mit Filter, Summen und Spalten Einnahmen/Ausgaben.
-    /// Aufbau analog Konto-/Geldinstitut-Transaktionen.
+    /// Transaktionen zu einer Adresse mit Filtern, Summenzeile und getrennten Spalten Einnahmen/Ausgaben.
     /// </summary>
     public sealed class AdresseTransaktionenViewModel : INotifyPropertyChanged
     {
@@ -39,17 +38,18 @@ namespace MyCoinFlow.ViewModels
         private int? _filterGeldinstitutId;
         public int? FilterGeldinstitutId { get => _filterGeldinstitutId; set { _filterGeldinstitutId = value; OnPropertyChanged(); } }
 
-        // Auswahllisten (für Combos)
+        // Auswahllisten
         public ObservableCollection<KontoLookup> KontenLookup { get; } = new();
         public ObservableCollection<Geldinstitut> Geldinstitute { get; } = new();
 
-        // Datenzeilen für das Grid
+        // Grid-Zeilen
         public ObservableCollection<Row> Rows { get; } = new();
 
         // Commands
         public ICommand ApplyFilterCommand { get; }
         public ICommand ResetFilterCommand { get; }
 
+        // Zusammenfassung (alt – bleibt, falls irgendwo genutzt)
         public string SummaryText
         {
             get
@@ -57,14 +57,25 @@ namespace MyCoinFlow.ViewModels
                 var ein = Rows.Sum(r => r.Einnahmen);
                 var aus = Rows.Sum(r => r.Ausgaben);
                 var saldo = ein - aus;
-                return $"Einnahmen {ein:N2}   |   Ausgaben {aus:N2}   |   Saldo {saldo:N2}";
+                return $"Einnahmen {ein:N2}{Environment.NewLine}" +
+                       $"Ausgaben {aus:N2}{Environment.NewLine}" +
+                       $"Saldo {saldo:N2}";
             }
         }
 
-        // Konto-Anzeige ohne Klassifikation „[Art/Gruppe]“
+        // NEU: Summen einzeln (für links/rechts Layout)
+        public decimal SummeEinnahmen => Rows.Sum(r => r.Einnahmen);
+        public decimal SummeAusgaben => Rows.Sum(r => r.Ausgaben);
+        public decimal Saldo => SummeEinnahmen - SummeAusgaben;
+
+        public string SummeEinnahmenText => SummeEinnahmen.ToString("N2");
+        public string SummeAusgabenText => SummeAusgaben.ToString("N2");
+        public string SaldoText => Saldo.ToString("N2");
+
+        // Kontoanzeige ohne Klassifikation
         private System.Collections.Generic.Dictionary<int, string> _kontoLabel = new();
 
-        // Set aller Ertragskonten zur Bewertung von Ein/Aus (wie in GI-/Konto-VM)
+        // Ertragskonten-Set
         private readonly System.Collections.Generic.HashSet<int> _incomeAccounts;
 
         public AdresseTransaktionenViewModel(int adresseId, string adresseName)
@@ -81,11 +92,9 @@ namespace MyCoinFlow.ViewModels
                 Load();
             });
 
-            // Lookup-Listen laden
             foreach (var k in _db.LadeKontoLookup()) KontenLookup.Add(k);
             _kontoLabel = KontenLookup.ToDictionary(k => k.Id, k =>
             {
-                // "1234 Detail [Art/Gruppe/UG]" -> "1234 Detail"
                 var anzeige = k.Anzeige ?? "";
                 var idx = anzeige.IndexOf(" [", StringComparison.Ordinal);
                 return idx >= 0 ? anzeige[..idx].Trim() : anzeige.Trim();
@@ -104,8 +113,8 @@ namespace MyCoinFlow.ViewModels
             foreach (var k in _db.LadeKontenplan())
             {
                 bool isIncome =
-                       (k.Kontonummer >= 3000 && k.Kontonummer <= 3999)  // Ertragskonten
-                    || (k.Kontonummer >= 7000 && k.Kontonummer <= 7999)  // weitere Erträge
+                       (k.Kontonummer >= 3000 && k.Kontonummer <= 3999)
+                    || (k.Kontonummer >= 7000 && k.Kontonummer <= 7999)
                     || ContainsIncome(k.Art) || ContainsIncome(k.Gruppe)
                     || ContainsIncome(k.Untergruppe) || ContainsIncome(k.Detail);
 
@@ -130,51 +139,24 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var t in list.OrderByDescending(t => t.Datum).ThenByDescending(t => t.Id))
             {
-                // Kontoanzeige (VON bevorzugt, sonst NACH), Label ohne Klassifikation
                 string konto =
                       (t.VonKontoId.HasValue && _kontoLabel.TryGetValue(t.VonKontoId.Value, out var vLbl)) ? vLbl
                     : (t.NachKontoId.HasValue && _kontoLabel.TryGetValue(t.NachKontoId.Value, out var nLbl)) ? nLbl
                     : "Konto";
 
-                // --- Einnahmen/Ausgaben bestimmen ---
-                // Falls deine Transaktion ein Feld "DebitCredit" (DEBIT/CREDIT) besitzt, kannst du hier
-                // bevorzugt auswerten. Andernfalls verwenden wir analog Konto/Geldinstitut die Konto-Logik:
                 decimal einnahmen = 0m, ausgaben = 0m;
 
-                // Prefer explicit Debit/Credit if available:
-                // (Unkommentieren, falls dein Modell z.B. t.DebitCredit als string hat)
-                /*
-                if (!string.IsNullOrWhiteSpace(t.DebitCredit))
+                if (t.NachKontoId.HasValue)
                 {
-                    var dc = t.DebitCredit.Trim().ToUpperInvariant();
-                    if (dc == "CREDIT") einnahmen = Math.Abs(t.Betrag);
-                    else if (dc == "DEBIT") ausgaben = Math.Abs(t.Betrag);
-                    else // Fallback
-                    {
-                        if (t.NachKontoId.HasValue && _incomeAccounts.Contains(t.NachKontoId.Value))
-                            einnahmen = t.Betrag;
-                        else
-                            ausgaben = t.Betrag;
-                    }
+                    if (_incomeAccounts.Contains(t.NachKontoId.Value))
+                        einnahmen = t.Betrag;
+                    else
+                        ausgaben = t.Betrag;
                 }
                 else
-                */
                 {
-                    // Fallback (bewährt in deinen bestehenden Views):
-                    if (t.NachKontoId.HasValue)
-                    {
-                        // Zahlung Richtung Budget-Konto
-                        if (_incomeAccounts.Contains(t.NachKontoId.Value))
-                            einnahmen = t.Betrag;   // Ertragskonto → Einnahme
-                        else
-                            ausgaben = t.Betrag;    // Aufwand/sonst → Ausgabe
-                    }
-                    else
-                    {
-                        // Ohne NachKonto → i.d.R. Bank-only mit Adresse: als Einnahme behandeln
-                        if (t.VonKontoId.HasValue || t.GeldinstitutId.HasValue)
-                            einnahmen = t.Betrag;
-                    }
+                    if (t.VonKontoId.HasValue || t.GeldinstitutId.HasValue)
+                        einnahmen = t.Betrag;
                 }
 
                 Rows.Add(new Row
@@ -189,15 +171,20 @@ namespace MyCoinFlow.ViewModels
                 });
             }
 
+            // Summen aktualisieren
             OnPropertyChanged(nameof(SummaryText));
+            OnPropertyChanged(nameof(SummeEinnahmen));
+            OnPropertyChanged(nameof(SummeAusgaben));
+            OnPropertyChanged(nameof(Saldo));
+            OnPropertyChanged(nameof(SummeEinnahmenText));
+            OnPropertyChanged(nameof(SummeAusgabenText));
+            OnPropertyChanged(nameof(SaldoText));
         }
 
-        // --- INotifyPropertyChanged ---
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 
-        // --- Row für das Grid ---
         public sealed class Row
         {
             public int Id { get; set; }
