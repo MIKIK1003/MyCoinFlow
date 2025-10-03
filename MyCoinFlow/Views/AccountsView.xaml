@@ -16,20 +16,25 @@
 
         <!-- Buttons -->
         <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
-            <Button Content="Neuen Kontoplan-Eintrag hinzufügen"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Margin="0 10 10 0"
-                    Command="{Binding NeuerEintragCommand}" />
 
-            <Button Content="Ausgewählten Eintrag bearbeiten"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
+            <!-- übernommen: deine Icon-Buttons -->
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="invoicetextplus"
+                    Content="Neu"
                     Margin="0 10 10 0"
-                    Command="{Binding BearbeitenEintragCommand}" />
+                    Command="{Binding NeuerEintragCommand}"/>
 
-            <Button Content="Ausgewählten Eintrag löschen"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="invoicetextplus"
+                    Content="Bearbeiten"
                     Margin="0 10 10 0"
-                    Command="{Binding LoeschenEintragCommand}" />
+                    Command="{Binding BearbeitenEintragCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton.Danger}"
+                    Tag="invoicetextremove"
+                    Content="Löschen"
+                    Margin="0 10 10 0"
+                    Command="{Binding LoeschenEintragCommand}"/>
 
             <!-- Tabellenansicht umschalten -->
             <CheckBox Content="Tabellenansicht"
@@ -61,7 +66,8 @@
                   RowHeaderWidth="0"
                   SelectionUnit="FullRow"
                   materialDesign:DataGridAssist.CellPadding="8"
-                  materialDesign:DataGridAssist.ColumnHeaderPadding="8">
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                  RowHeight="40">
 
             <DataGrid.Resources>
                 <!-- rechte Ausrichtung für Zahlen -->
@@ -73,18 +79,20 @@
 
             <DataGrid.Columns>
 
-                <!-- NEU: breite Icon-Spalte (ca. 3× Standard-Icon) -->
-                <DataGridTemplateColumn Header=" " Width="138" IsReadOnly="True">
+                <!-- Icon-Spalte links: nur Icon, in Markenfarbe via DefaultIconStyle -->
+                <DataGridTemplateColumn Header="" Width="Auto" MinWidth="42" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Button ToolTip="Transaktionen dieses Kontos anzeigen"
                                     Click="OpenKontoTransaktionen_Click"
                                     Style="{StaticResource MaterialDesignFlatButton}"
-                                    Padding="6">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="History" Width="24" Height="24" Margin="0,0,6,0"/>
-                                    <TextBlock VerticalAlignment="Center" Text="Transaktionen"/>
-                                </StackPanel>
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center">
+                                <materialDesign:PackIcon
+                                    Kind="FileDocumentMultipleOutline"
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Width="24" Height="24"/>
                             </Button>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

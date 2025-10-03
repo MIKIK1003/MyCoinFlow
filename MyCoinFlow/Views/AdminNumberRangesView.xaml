@@ -11,71 +11,87 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
+        <!-- Toolbar (vereinheitlicht) -->
         <StackPanel Orientation="Horizontal">
-            <Button Click="Neu_Click" Margin="0,0,8,0" Style="{StaticResource MaterialDesignOutlinedButton}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlusCircleOutline" Margin="0,0,6,0"/>
-                    <TextBlock Text="Neu"/>
-                </StackPanel>
-            </Button>
-            <Button Click="Speichern_Click" Margin="0,0,8,0" Style="{StaticResource MaterialDesignRaisedButton}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ContentSaveCheckOutline" Margin="0,0,6,0"/>
-                    <TextBlock Text="Speichern"/>
-                </StackPanel>
-            </Button>
-            <Button Click="Loeschen_Click" Margin="0,0,8,0" Style="{StaticResource MaterialDesignOutlinedButton}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="TrashCanOutline" Margin="0,0,6,0"/>
-                    <TextBlock Text="Löschen"/>
-                </StackPanel>
-            </Button>
-            <Button Click="Reload_Click" Style="{StaticResource MaterialDesignOutlinedButton}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Refresh" Margin="0,0,6,0"/>
-                    <TextBlock Text="Neu laden"/>
-                </StackPanel>
-            </Button>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="PlusCircleOutline"
+                    Content="Neu"
+                    Margin="0,0,10,0"
+                    Click="Neu_Click"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="ContentSaveCheckOutline"
+                    Content="Speichern"
+                    Margin="0,0,10,0"
+                    Click="Speichern_Click"/>
+
+            <Button Style="{StaticResource IconTextButton.Danger}"
+                    Tag="TrashCanOutline"
+                    Content="Löschen"
+                    Margin="0,0,10,0"
+                    Click="Loeschen_Click"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Refresh"
+                    Content="Neu laden"
+                    Click="Reload_Click"/>
         </StackPanel>
+
+        <!-- Abstand -->
+        <Border Grid.Row="1"/>
 
         <!-- Grid -->
         <DataGrid x:Name="RulesGrid" Grid.Row="2"
-              AutoGenerateColumns="False"
-              CanUserAddRows="False"
-              CanUserDeleteRows="False"
-              SelectionMode="Single"
-              IsReadOnly="False"
-              materialDesign:DataGridAssist.CellPadding="12"
-              materialDesign:DataGridAssist.ColumnHeaderPadding="12">
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  SelectionMode="Single"
+                  IsReadOnly="False"
+                  materialDesign:DataGridAssist.CellPadding="12"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="12">
+
+            <DataGrid.Resources>
+                <!-- rechte Ausrichtung für Zahlen (optional, Standard wie in anderen Views) -->
+                <Style x:Key="RightAlignedCell" TargetType="TextBlock">
+                    <Setter Property="TextAlignment" Value="Right"/>
+                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                    <Setter Property="Padding" Value="0,0,8,0"/>
+                </Style>
+            </DataGrid.Resources>
+
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Von (Nr.)"
-                            Binding="{Binding RangeStart, UpdateSourceTrigger=PropertyChanged}"
-                            Width="120"/>
+                                    Binding="{Binding RangeStart, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="120"
+                                    ElementStyle="{StaticResource RightAlignedCell}"/>
                 <DataGridTextColumn Header="Bis (Nr.)"
-                            Binding="{Binding RangeEnd, UpdateSourceTrigger=PropertyChanged}"
-                            Width="120"/>
+                                    Binding="{Binding RangeEnd, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="120"
+                                    ElementStyle="{StaticResource RightAlignedCell}"/>
 
                 <DataGridComboBoxColumn Header="Richtung"
-                                SelectedItemBinding="{Binding Richtung, UpdateSourceTrigger=PropertyChanged}"
-                                Width="150"/>
+                                        SelectedItemBinding="{Binding Richtung, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="150"/>
 
-                <!-- NEU: Bezeichnung (nur Anzeige, feste Auswahl) -->
+                <!-- Bezeichnung (nur Anzeige, feste Auswahl) -->
                 <DataGridComboBoxColumn Header="Bezeichnung"
-                                SelectedItemBinding="{Binding Bezeichnung, UpdateSourceTrigger=PropertyChanged}"
-                                Width="260"/>
+                                        SelectedItemBinding="{Binding Bezeichnung, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="260"/>
 
                 <DataGridCheckBoxColumn Header="Ist Budgetkonto"
-                                Binding="{Binding IstBudgetkonto, UpdateSourceTrigger=PropertyChanged}"
-                                Width="160"/>
+                                        Binding="{Binding IstBudgetkonto, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="160"/>
             </DataGrid.Columns>
         </DataGrid>
 
         <!-- Hinweis -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
-            <materialDesign:PackIcon Kind="InformationOutline" Margin="0,0,8,0"/>
+            <materialDesign:PackIcon Kind="InformationOutline"
+                                     Style="{StaticResource DefaultIconStyle}"/>
             <TextBlock Text="Spezifischste Regel gewinnt (kleinster Bereich). Bezeichnung dient aktuell nur der Verständlichkeit."
-                 Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                       Margin="0,0,0,0"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
         </StackPanel>
     </Grid>
 </UserControl>

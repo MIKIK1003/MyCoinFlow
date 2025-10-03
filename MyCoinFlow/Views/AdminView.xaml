@@ -27,36 +27,41 @@
 
                     <ListBoxItem Tag="Nummernkreise">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="FormatListNumbered" Width="20" Height="20" Margin="0,0,8,0"/>
-                            <TextBlock Text="Nummernkreise"/>
+                            <materialDesign:PackIcon Kind="FormatListNumbered"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Nummernkreise" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Kontenplan">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="ClipboardListOutline" Width="20" Height="20" Margin="0,0,8,0"/>
-                            <TextBlock Text="Kontenplan"/>
+                            <materialDesign:PackIcon Kind="ClipboardListOutline"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Kontenplan" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Kreditkarten">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="CreditCardOutline" Width="20" Height="20" Margin="0,0,8,0"/>
-                            <TextBlock Text="Kreditkarten"/>
+                            <materialDesign:PackIcon Kind="CreditCardOutline"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Kreditkarten" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Mandanten">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="AccountMultiplePlusOutline" Width="20" Height="20" Margin="0,0,8,0"/>
-                            <TextBlock Text="Mandanten"/>
+                            <materialDesign:PackIcon Kind="AccountMultiplePlusOutline"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Mandanten" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Backup">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="DatabaseArrowDown" Width="20" Height="20" Margin="0,0,8,0"/>
-                            <TextBlock Text="Backup"/>
+                            <materialDesign:PackIcon Kind="DatabaseArrowDown"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Backup" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                 </ListBox>
@@ -81,19 +86,15 @@
                 <!-- Import/Export -->
                 <WrapPanel Grid.Row="0" Margin="0,0,0,8">
                     <Button Click="ImportExcel_Click"
-                            Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FileImport" Margin="0,0,6,0"/>
-                            <TextBlock Text="Kontenplan importieren (Excel)"/>
-                        </StackPanel>
-                    </Button>
+                            Style="{StaticResource IconTextButton}"
+                            Tag="FileImport"
+                            Content="Kontenplan importieren (Excel)"
+                            Margin="0,0,10,8"/>
                     <Button Click="ExportExcel_Click"
-                            Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FileExport" Margin="0,0,6,0"/>
-                            <TextBlock Text="Kontenplan exportieren (Excel)"/>
-                        </StackPanel>
-                    </Button>
+                            Style="{StaticResource IconTextButton}"
+                            Tag="FileExport"
+                            Content="Kontenplan exportieren (Excel)"
+                            Margin="0,0,10,8"/>
                 </WrapPanel>
 
                 <!-- 3 Spalten mit Hosts -->
@@ -144,12 +145,10 @@
 
                 <WrapPanel Grid.Row="0">
                     <Button Click="OpenCreditCardMapping_Click"
-                            Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Cog" Margin="0,0,6,0"/>
-                            <TextBlock Text="Mapping im Dialog öffnen"/>
-                        </StackPanel>
-                    </Button>
+                            Style="{StaticResource IconTextButton}"
+                            Tag="Cog"
+                            Content="Mapping im Dialog öffnen"
+                            Margin="0,0,10,8"/>
                 </WrapPanel>
 
                 <Border Grid.Row="1" Margin="0,8,0,0" Padding="8" CornerRadius="6"
@@ -180,15 +179,13 @@
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
                             <Button DockPanel.Dock="Right" Margin="8,0,0,0"
                                     Click="CreateEmptyTenant_Click"
-                                    Style="{StaticResource MaterialDesignRaisedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="DatabasePlus" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Anlegen (leer)"/>
-                                </StackPanel>
-                            </Button>
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="DatabasePlus"
+                                    Content="Anlegen (leer)"/>
                         </DockPanel>
                         <TextBlock x:Name="TenantCreateStatus"
-                                   Foreground="Tomato" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                   TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                     </StackPanel>
                 </Border>
 
@@ -232,9 +229,7 @@
                         <!-- Optionen -->
                         <TextBlock Text="Welche Daten kopieren?" FontWeight="SemiBold" Margin="0,12,0,8"/>
                         <WrapPanel>
-                            <!-- NEU -->
                             <CheckBox x:Name="Copy_CbNummernkreise" Content="Nummernkreise" IsChecked="True" Margin="0,0,16,0"/>
-
                             <CheckBox x:Name="Copy_CbKonten"  Content="Kontenstruktur" IsChecked="True" Margin="0,0,16,0"/>
                             <CheckBox x:Name="Copy_CbAdressen" Content="Adressen" IsChecked="True" Margin="0,0,16,0"/>
                             <CheckBox x:Name="Copy_CbAliase"   Content="Aliase" IsChecked="True" Margin="0,0,16,0"/>
@@ -246,16 +241,15 @@
 
                         <!-- Ausführen -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                            <Button Click="Copy_Run_Click" Style="{StaticResource MaterialDesignRaisedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="PlayCircle" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Ausführen"/>
-                                </StackPanel>
-                            </Button>
+                            <Button Click="Copy_Run_Click"
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="PlayCircle"
+                                    Content="Ausführen"/>
                         </StackPanel>
 
                         <TextBlock x:Name="Copy_StatusText"
-                                   Foreground="Tomato" TextWrapping="Wrap"/>
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -288,24 +282,19 @@
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
                             <Button DockPanel.Dock="Right" Margin="8,0,0,0"
                                     Click="Backup_Browse_Click"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="FolderSearchOutline" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Ziel wählen"/>
-                                </StackPanel>
-                            </Button>
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="FolderSearchOutline"
+                                    Content="Ziel wählen"/>
                         </DockPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Click="Backup_Run_Click"
-                                    Style="{StaticResource MaterialDesignRaisedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="DatabaseArrowDown" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Backup erstellen"/>
-                                </StackPanel>
-                            </Button>
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="DatabaseArrowDown"
+                                    Content="Backup erstellen"/>
                         </StackPanel>
                         <TextBlock x:Name="Backup_StatusText"
-                                   Foreground="Tomato" TextWrapping="Wrap"/>
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
 
                         <Separator Margin="0,12,0,12"/>
 
@@ -318,24 +307,19 @@
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
                             <Button DockPanel.Dock="Right" Margin="8,0,0,0"
                                     Click="Restore_BrowseBak_Click"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="FileSearchOutline" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Quelle wählen"/>
-                                </StackPanel>
-                            </Button>
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="FileSearchOutline"
+                                    Content="Quelle wählen"/>
                         </DockPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Click="Restore_Run_Click"
-                                    Style="{StaticResource MaterialDesignRaisedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="DatabaseRefresh" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Wiederherstellen"/>
-                                </StackPanel>
-                            </Button>
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="DatabaseRefresh"
+                                    Content="Wiederherstellen"/>
                         </StackPanel>
                         <TextBlock x:Name="Restore_StatusText"
-                                   Foreground="Tomato" TextWrapping="Wrap"/>
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                     </StackPanel>
                 </Border>
 

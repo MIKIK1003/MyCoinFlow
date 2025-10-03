@@ -11,28 +11,33 @@
                                              SecondaryColor="Lime" />
                 <!-- Material Design 2 Defaults -->
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
-                <!-- Kompatibilität für alte Styles -->
+                <!-- Kompatibilität -->
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.ObsoleteBrushes.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.ObsoleteStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- ========================================= -->
-            <!-- Global: einheitliche PackIcon-Darstellung -->
-            <!-- ========================================= -->
+            <!-- ======= Brand ======= -->
+            <SolidColorBrush x:Key="AppBrandBrush" Color="DarkGray"/>
+
+            <!-- ======= Globale PackIcon-Styles (Buttons, Grids, etc.) ======= -->
             <Style TargetType="materialDesign:PackIcon" x:Key="DefaultIconStyle">
                 <Setter Property="Width" Value="20"/>
                 <Setter Property="Height" Value="20"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Foreground" Value="{StaticResource AppBrandBrush}"/>
             </Style>
 
-            <!-- ===================================================== -->
-            <!-- Reusable: Button mit Icon (aus Button.Tag) + Text     -->
-            <!-- Basierend auf MaterialDesignRaisedButton              -->
-            <!-- Verwendung:                                           -->
-            <!--   <Button Style="{StaticResource IconTextButton}"     -->
-            <!--           Tag="TimerPlus" Content="Zeitraum hinzufügen" .../> -->
-            <!-- ===================================================== -->
+            <!-- Variante für Navigation (größer) -->
+            <Style x:Key="DefaultIconStyle.Nav" TargetType="materialDesign:PackIcon">
+                <Setter Property="Width" Value="35"/>
+                <Setter Property="Height" Value="35"/>
+                <Setter Property="Margin" Value="0,0,10,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Foreground" Value="{StaticResource AppBrandBrush}"/>
+            </Style>
+
+            <!-- ======= Button mit Icon + Text (Raised) ======= -->
             <Style x:Key="IconTextButton"
                    TargetType="Button"
                    BasedOn="{StaticResource MaterialDesignRaisedButton}">
@@ -41,9 +46,10 @@
                     <Setter.Value>
                         <DataTemplate>
                             <DockPanel LastChildFill="True" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Style="{StaticResource DefaultIconStyle}"
-                                                         Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"
-                                                         DockPanel.Dock="Left"/>
+                                <materialDesign:PackIcon
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"
+                                    DockPanel.Dock="Left"/>
                                 <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
                             </DockPanel>
                         </DataTemplate>
@@ -51,33 +57,29 @@
                 </Setter>
             </Style>
 
-            <!-- Variante für "gefährliche" Aktionen (z. B. Löschen) -->
+            <!-- Danger-Variante (Icon bewusst weiß auf Rot) -->
             <Style x:Key="IconTextButton.Danger"
                    TargetType="Button"
                    BasedOn="{StaticResource IconTextButton}">
                 <Setter Property="Background" Value="{DynamicResource MaterialDesignValidationErrorBrush}"/>
                 <Setter Property="Foreground" Value="White"/>
+                <Setter Property="ContentTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <DockPanel LastChildFill="True" VerticalAlignment="Center">
+                                <materialDesign:PackIcon
+                                    Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"
+                                    Foreground="White"
+                                    Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"
+                                    DockPanel.Dock="Left"/>
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
-            <!-- Optional: Mehr Platz rechts in allen DataGrid-Headern,
-                 damit Sortierpfeile (Adorner) nicht am Rand kleben. -->
-            <Style TargetType="DataGridColumnHeader">
-                <Setter Property="Padding" Value="8,0,20,0"/>
-                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
-                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-            </Style>
-
-
-            <!-- Einheitliche Icon-Optik -->
-            <Style x:Key="DefaultIconStyle.Nav" TargetType="materialDesign:PackIcon">
-                <Setter Property="Width" Value="35"/>
-                <Setter Property="Height" Value="35"/>
-                <Setter Property="Margin" Value="0,0,10,0"/>
-                <Setter Property="VerticalAlignment" Value="Center"/>
-            </Style>
-
-            <!-- Nav-Button: Icon links, Text rechts, linksbündig, Flat-Stil -->
+            <!-- ======= Navigation: Icon links, Text rechts, Flat ======= -->
             <Style x:Key="NavIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
                 <Setter Property="Padding" Value="15,0"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
@@ -88,17 +90,14 @@
                     <Setter.Value>
                         <DataTemplate>
                             <DockPanel LastChildFill="True" VerticalAlignment="Center">
-                                <!-- Icon-Name kommt aus Button.Tag -->
                                 <materialDesign:PackIcon DockPanel.Dock="Left"
-                                   Style="{StaticResource DefaultIconStyle.Nav}"
-                                   Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"/>
-                                <!-- Text kommt aus Button.Content -->
+                                    Style="{StaticResource DefaultIconStyle.Nav}"
+                                    Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"/>
                                 <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
                             </DockPanel>
                         </DataTemplate>
                     </Setter.Value>
                 </Setter>
-                <!-- Hover/Pressed Feedback -->
                 <Style.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
@@ -109,9 +108,19 @@
                     </Trigger>
                 </Style.Triggers>
             </Style>
-            
+
+            <!-- Optional: etwas mehr Platz in DataGrid-Headern -->
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Padding" Value="8,0,20,0"/>
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+
+            <!-- Globales Fenster-Icon -->
+            <Style TargetType="Window">
+                <Setter Property="Icon" Value="pack://application:,,,/Assets/Icons/piggybank.ico"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
-     
-    
 </Application>

@@ -7,70 +7,58 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- Linkes Menü -->
         <StackPanel Grid.Column="0" Background="{DynamicResource MaterialDesignPaper}">
-
-            <StackPanel.Resources>
-        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
-            <Setter Property="Foreground" Value="#FF1976D2"/> <!-- hellblau -->
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        </Style>
-    </StackPanel.Resources>
+            <!-- Buttons holen ihren Style global aus App.xaml: NavIconButton -->
+            <Button Style="{StaticResource NavIconButton}"
+                    Tag="ViewDashboard"
+                    Content="Dashboard"
+                    Command="{Binding ShowDashboardCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="ViewDashboard"
-                Content="Dashboard"
-                Command="{Binding ShowDashboardCommand}"
-                Margin="15"/>
+                    Tag="SwapHorizontal"
+                    Content="Transaktionen"
+                    Command="{Binding ShowTransactionsCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="SwapHorizontal"
-                Content="Transaktionen"
-                Command="{Binding ShowTransactionsCommand}"
-                Margin="15"/>
+                    Tag="FileTreeOutline"
+                    Content="Kontenplan"
+                    Command="{Binding ShowAccountsCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="FileTreeOutline"
-                Content="Kontenplan"
-                Command="{Binding ShowAccountsCommand}"
-                Margin="15"/>
+                    Tag="BankOutline"
+                    Content="Geldinstitute"
+                    Command="{Binding ShowInstitutionsCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="BankOutline"
-                Content="Geldinstitute"
-                Command="{Binding ShowInstitutionsCommand}"
-                Margin="15"/>
+                    Tag="AccountBoxOutline"
+                    Content="Adressen"
+                    Command="{Binding ShowAddressesCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="AccountBoxOutline"
-                Content="Adressen"
-                Command="{Binding ShowAddressesCommand}"
-                Margin="15"/>
+                    Tag="HandCoin"
+                    Content="Budget"
+                    Command="{Binding ShowBudgetsCommand}"
+                    Margin="15"/>
 
             <Button Style="{StaticResource NavIconButton}"
-                Tag="HandCoin"
-                Content="Budget"
-                Command="{Binding ShowBudgetsCommand}"
-                Margin="15"/>
-
-            <Button Style="{StaticResource NavIconButton}"
-                Tag="Cog"
-                Content="Admin"
-                Command="{Binding ShowAdminCommand}"
-                Margin="15"/>
-
+                    Tag="Cog"
+                    Content="Admin"
+                    Command="{Binding ShowAdminCommand}"
+                    Margin="15"/>
         </StackPanel>
-
 
         <!-- Inhalt rechts -->
         <ContentControl Grid.Column="1"
-                        Content="{Binding CurrentView}" />
-
+                        Content="{Binding CurrentView}"/>
     </Grid>
 </Window>
-

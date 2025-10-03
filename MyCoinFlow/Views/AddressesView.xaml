@@ -10,33 +10,24 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
+        <!-- Toolbar (vereinheitlicht) -->
         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="AccountPlus"
+                    Content="Neue Adresse"
                     Margin="0,0,10,0"
-                    Command="{Binding NeuCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="AccountPlus" Width="20" Height="20" Margin="0,0,8,0"/>
-                    <TextBlock Text="Neue Adresse"/>
-                </StackPanel>
-            </Button>
+                    Command="{Binding NeuCommand}"/>
 
-            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Pencil"
+                    Content="Bearbeiten"
                     Margin="0,0,10,0"
-                    Command="{Binding BearbeitenCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Pencil" Width="20" Height="20" Margin="0,0,8,0"/>
-                    <TextBlock Text="Bearbeiten"/>
-                </StackPanel>
-            </Button>
+                    Command="{Binding BearbeitenCommand}"/>
 
-            <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                    Command="{Binding LoeschenCommand}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="DeleteForever" Width="20" Height="20" Margin="0,0,8,0"/>
-                    <TextBlock Text="Löschen"/>
-                </StackPanel>
-            </Button>
+            <Button Style="{StaticResource IconTextButton.Danger}"
+                    Tag="DeleteForever"
+                    Content="Löschen"
+                    Command="{Binding LoeschenCommand}"/>
         </StackPanel>
 
         <!-- Tabelle -->
@@ -47,6 +38,27 @@
                   CanUserAddRows="False"
                   IsReadOnly="True">
             <DataGrid.Columns>
+
+                <!-- Icon-Spalte ganz rechts (Standard-Icon/Farbe via DefaultIconStyle) -->
+                <DataGridTemplateColumn Header="" Width="Auto" MinWidth="42" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button ToolTip="Transaktionen der Adresse anzeigen und drucken"
+                                    Command="{Binding DataContext.ZeigeAdresseTransaktionenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Padding="0"
+                                    HorizontalAlignment="Right">
+                                <materialDesign:PackIcon
+                                    Kind="FileDocumentMultipleOutline"
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Width="24" Height="24"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Daten-Spalten -->
                 <DataGridTextColumn Header="Name"       Binding="{Binding Name}"    Width="2*"/>
                 <DataGridTextColumn Header="IBAN"       Binding="{Binding IBAN}"    Width="*"/>
                 <DataGridTextColumn Header="Typ"        Binding="{Binding Typ}"     Width="*"/>
@@ -55,25 +67,6 @@
                 <DataGridTextColumn Header="Ort"        Binding="{Binding Ort}"     Width="*"/>
                 <DataGridTextColumn Header="Land"       Binding="{Binding Land}"    Width="Auto"/>
                 <DataGridTextColumn Header="Notiz"      Binding="{Binding Notiz}"   Width="2*"/>
-
-                <!-- NEU: Icon-Spalte ganz rechts -->
-                <DataGridTemplateColumn Header=""
-                                        Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Button
-                                ToolTip="Transaktionen der Adresse anzeigen und drucken"
-                                Command="{Binding DataContext.ZeigeAdresseTransaktionenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}"
-                                Style="{StaticResource MaterialDesignToolButton}">
-                                <materialDesign:PackIcon Kind="FileDocumentMultipleOutline"
-                                                         Width="20" Height="20"
-                                                         Foreground="DodgerBlue"/>
-                            </Button>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <!-- ENDE NEU -->
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

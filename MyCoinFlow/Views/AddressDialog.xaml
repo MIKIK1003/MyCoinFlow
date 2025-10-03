@@ -5,12 +5,14 @@
         Title="Adresse" Height="460" Width="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Formular -->
         <Grid Margin="0,0,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -53,41 +55,43 @@
             <TextBox x:Name="NotizBox" Grid.Row="7" Grid.Column="1" Height="80" AcceptsReturn="True" TextWrapping="Wrap"/>
         </Grid>
 
-        <!-- Footer-Bereich im Adress-Dialog -->
+        <!-- Footer -->
         <Grid Grid.Row="1" Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <!-- Zeile für Checkbox -->
                 <RowDefinition Height="Auto"/>
-                <!-- Zeile für ComboBox -->
                 <RowDefinition Height="Auto"/>
-                <!-- Zeile für Buttons -->
             </Grid.RowDefinitions>
 
             <!-- Checkbox -->
             <CheckBox x:Name="IstBudgetiertCheck"
-              Grid.Row="0"
-              Content="Reine Standard-Einnahmen Adresse->Bank mit Standard-Einnahmenkonto"
-              Margin="0,0,0,8"/>
+                      Grid.Row="0"
+                      Content="Reine Standard-Einnahmen Adresse->Bank mit Standard-Einnahmenkonto"
+                      Margin="0,0,0,8"/>
 
             <!-- Label + ComboBox -->
             <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,0,0,12">
                 <TextBlock Text="Standard-Einnahmenkonto (optional)" Margin="0,0,0,4"/>
                 <ComboBox x:Name="StandardEinnahmenKontoBox"
-                  DisplayMemberPath="Anzeige"
-                  SelectedValuePath="Id"
-                  IsEditable="False"
-                  MinWidth="280"/>
+                          DisplayMemberPath="Anzeige"
+                          SelectedValuePath="Id"
+                          IsEditable="False"
+                          MinWidth="280"/>
             </StackPanel>
 
             <!-- Buttons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Abbrechen" IsCancel="True" Margin="0,0,10,0"/>
-                <Button Content="OK" IsDefault="True" Click="Ok_Click"/>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" >
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Close"
+                        Content="Abbrechen"
+                        IsCancel="True"
+                        Margin="0,0,10,0"/>
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="CheckBold"
+                        Content="OK"
+                        IsDefault="True"
+                        Click="Ok_Click"/>
             </StackPanel>
         </Grid>
-
-
-
     </Grid>
 </Window>

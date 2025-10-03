@@ -73,22 +73,32 @@
                 </Style>
 
                 <!-- Schmaler Icon-Button -->
-                <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
-                    <Setter Property="Padding" Value="6"/>
-                    <Setter Property="MinWidth" Value="36"/>
-                    <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
+                <Style x:Key="IconButtonStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource MaterialDesignFlatButton}">
+                    <Setter Property="Padding" Value="4"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="ToolTipService.ShowDuration" Value="4000"/>
                 </Style>
+
             </DataGrid.Resources>
 
             <DataGrid.Columns>
-                <!-- NEU: Spalte 'Transaktionen anzeigen' -->
-                <DataGridTemplateColumn Header=" " Width="80" IsReadOnly="True">
+
+                <!-- Transaktionen anzeigen (rechts, nur Icon) -->
+                <DataGridTemplateColumn Header="" Width="Auto" MinWidth="42" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Button Style="{StaticResource IconButtonStyle}"
-                    Click="OpenTransaktionen_Click"
-                    ToolTip="Transaktionen dieses Geldinstituts anzeigen">
-                                <materialDesign:PackIcon Kind="History" Width="24" Height="24"/>
+                                Click="OpenTransaktionen_Click"
+                                ToolTip="Transaktionen dieses Geldinstituts anzeigen">
+                                <materialDesign:PackIcon
+                                Kind="FileDocumentMultipleOutline"
+                                Style="{StaticResource DefaultIconStyle}"
+                                Width="24" Height="24"/>
                             </Button>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
@@ -119,6 +129,8 @@
                                     Binding="{Binding Schlussaldo, StringFormat=F2}"
                                     ElementStyle="{StaticResource RightAlignedCell}"
                                     Width="*"/>
+                               
+                
             </DataGrid.Columns>
         </DataGrid>
     </Grid>
