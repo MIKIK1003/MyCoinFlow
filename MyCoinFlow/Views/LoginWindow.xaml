@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="MyCoinFlow – Anmeldung"
-        Height="520" Width="720" MinHeight="420"
+        Height="520" Width="735" MinHeight="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="{DynamicResource MaterialDesignPaper}">
@@ -14,113 +14,239 @@
             <ColumnDefinition Width="3*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Linke Seite: Intro / Grafik -->
-        <Border Grid.Column="0" CornerRadius="1"
-                Background="{DynamicResource MaterialDesignCardBackground}">
-            <StackPanel Margin="24" VerticalAlignment="Center">
-                <materialDesign:PackIcon Kind="piggybank" Width="72" Height="72"
-                                         Foreground="{DynamicResource PrimaryHueMidBrush}"/>
-                <TextBlock Text="MyCoinFlow" FontSize="28" FontWeight="Bold" Margin="0,12,0,4"/>
-                <TextBlock Text="Deine Smarte Übersicht"
-                           Opacity="1" TextWrapping="Wrap"/>
-            </StackPanel>
+        <!-- LINK: Hero-Panel mit Verlauf, Wasserzeichen & Glow -->
+        <Border x:Name="HeroPanel"
+                Grid.Column="0"
+                CornerRadius="16"
+                Padding="24">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#80673AB7" Offset="0.0"/>
+                    <GradientStop Color="#40673AB7" Offset="1.0"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.25" Direction="270"/>
+            </Border.Effect>
+            <Grid>
+                <!-- Pulsierender Glow hinter dem kleinen Piggy -->
+                <Ellipse x:Name="PiggyGlow"
+                         Width="160" Height="160"
+                         HorizontalAlignment="Left"
+                         VerticalAlignment="Center"
+                         Margin="-8,0,0,0"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#55673AB7" Offset="0.0"/>
+                            <GradientStop Color="#00673AB7" Offset="1.0"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="18"/>
+                    </Ellipse.Effect>
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <!-- Wasserzeichen -->
+                <materialDesign:PackIcon Kind="PiggyBank"
+                                         Opacity="0.08"
+                                         Width="220" Height="220"
+                                         HorizontalAlignment="Right"
+                                         VerticalAlignment="Bottom"
+                                         Margin="0,0,-20,-16"/>
+
+                <!-- Inhalt -->
+                <StackPanel VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="PiggyBank"
+                                             Width="64" Height="64"
+                                             Foreground="{StaticResource AppBrandBrush}"/>
+
+                    <!-- Titel (ohne Copyright-Zeichen) -->
+                    <TextBlock Text="MyCoinFlow"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Margin="0,8,0,4"/>
+
+                    <TextBlock Text="Deine smarte Übersicht"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <!-- Hersteller-Hinweis unten links -->
+                <TextBlock Text="made by brugilimSoft"
+                           FontSize="11"
+                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Bottom"
+                           Margin="4,0,0,4"/>
+            </Grid>
+            <Border.RenderTransform>
+                <TranslateTransform X="-20"/>
+            </Border.RenderTransform>
         </Border>
 
-        <!-- Rechte Seite: Mandant + Login + Erstbenutzer -->
-        <Border Grid.Column="1" CornerRadius="16" Padding="24"
+        <!-- RECHTS: Login-Karte (einheitliche Feldbreite 320 px, bündiger linker Start) -->
+        <Border x:Name="LoginCard"
+                Grid.Column="1"
+                CornerRadius="16"
+                Padding="24"
                 Background="{DynamicResource MaterialDesignCardBackground}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <!-- 0: Mandanten-Auswahl -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- 1: Login-Überschrift -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- 2: Login-Felder -->
-                        <RowDefinition Height="*"/>
-                        <!-- 3: Status -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- 4: Erstbenutzer -->
-                    </Grid.RowDefinitions>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.25" Direction="270"/>
+            </Border.Effect>
 
-                    <!-- 0) MANDANTEN-AUSWAHL -->
-                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                        <TextBlock Text="Datenbank (Mandant)" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="DbCombo" Width="320" MinWidth="240"
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <!-- Form-Container mit einheitlicher Breite & Abständen -->
+                <StackPanel HorizontalAlignment="Left">
+                    <StackPanel.Resources>
+                        <!-- Einheitlicher vertikaler Abstand (Grundabstand) -->
+                        <Style TargetType="FrameworkElement">
+                            <Setter Property="Margin" Value="0,0,0,12"/>
+                        </Style>
+                    </StackPanel.Resources>
+
+                    <!-- 0) Mandanten-Auswahl -->
+                    <StackPanel HorizontalAlignment="Left">
+                        <TextBlock Text="Datenbank (Mandant)" FontWeight="SemiBold"/>
+                        <ComboBox x:Name="DbCombo"
+                                  Width="350"
+                                  HorizontalAlignment="Left"
                                   Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
                     </StackPanel>
 
-                    <!-- 1) LOGIN-ÜBERSCHRIFT -->
-                    <TextBlock Grid.Row="1" Text="Login" FontSize="20" FontWeight="SemiBold"/>
+                    <!-- 1) Login-Überschrift (ohne Icon, bündig mit Feldern) -->
 
-                    <!-- 2) LOGIN-FELDER -->
-                    <StackPanel Grid.Row="2" Margin="0,8,0,0">
-                        <StackPanel.Resources>
-                            <Style TargetType="FrameworkElement">
-                                <Setter Property="Margin" Value="0,0,0,10"/>
-                            </Style>
-                        </StackPanel.Resources>
-
-                        <TextBox x:Name="LoginUserBox"
-                                 materialDesign:HintAssist.Hint="Benutzername"
-                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
-
-                        <PasswordBox x:Name="LoginPwdBox"
-                                     materialDesign:HintAssist.Hint="Passwort"
-                                     Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
-
-                        <Button Click="Login_Click"
-                                Style="{StaticResource MaterialDesignRaisedButton}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="LoginVariant" Margin="0,0,6,0"/>
-                                <TextBlock Text="Anmelden"/>
-                            </StackPanel>
-                        </Button>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                        <materialDesign:PackIcon Kind="ShieldLockOutline"
+                             Style="{StaticResource DefaultIconStyle}"
+                             Width="30" Height="30" Margin="0,0,5,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="Login" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,8"/>
                     </StackPanel>
 
-                    <!-- 3) STATUS -->
-                    <StackPanel Grid.Row="3">
-                        <TextBlock x:Name="StatusText"
-                                   Foreground="Tomato"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
+                    <!-- 2) Login-Felder (je 320 px, mehr Luft) -->
+                    <TextBox x:Name="LoginUserBox"
+                             Width="350"
+                             HorizontalAlignment="Left"
+                             materialDesign:HintAssist.Hint="Benutzername"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
 
-                    <!-- 4) ERSTBENUTZER -->
-                    <Expander Grid.Row="4" Header="Ersten Benutzer anlegen" x:Name="FirstUserExpander"
-                              IsExpanded="False" Margin="0,12,0,0">
-                        <StackPanel Margin="0,8,0,0">
+                    <PasswordBox x:Name="LoginPwdBox"
+                                 Width="350"
+                                 HorizontalAlignment="Left"
+                                 Margin="0,16,0,0" 
+                                 materialDesign:HintAssist.Hint="Passwort"
+                                 Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+
+                    <Button x:Name="LoginButton"
+                                IsDefault="True"
+                                Width="350"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource IconTextButton}"
+                                Tag="LoginVariant"
+                                Content="Anmelden"
+                                Margin="0,8,0,0"
+                                Click="Login_Click"/>
+
+
+                    <!-- 3) Status (auf Feldbreite begrenzt, zusätzliche Luft) -->
+                    <TextBlock x:Name="StatusText"
+                               Width="320"
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                    <!-- 4) Erstbenutzer (zusätzlicher Abstand oben) -->
+                    <Expander Header="Ersten Benutzer anlegen"
+                              x:Name="FirstUserExpander"
+                              IsExpanded="False"
+                              Margin="0,16,0,0">
+                        <StackPanel Margin="0,8,0,0" HorizontalAlignment="Left">
                             <StackPanel.Resources>
                                 <Style TargetType="FrameworkElement">
-                                    <Setter Property="Margin" Value="0,0,0,10"/>
+                                    <Setter Property="Margin" Value="0,0,0,12"/>
                                 </Style>
                             </StackPanel.Resources>
 
                             <TextBox x:Name="NewUserBox"
+                                     Width="350"
+                                     HorizontalAlignment="Left"
                                      materialDesign:HintAssist.Hint="Benutzername (3–32, A-Z, a-z, 0-9, ., _, -)"
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
 
                             <PasswordBox x:Name="NewPwd1Box"
+                                         Width="350"
+                                         HorizontalAlignment="Left"
                                          materialDesign:HintAssist.Hint="Passwort"
                                          Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
 
                             <PasswordBox x:Name="NewPwd2Box"
+                                         Width="350"
+                                         HorizontalAlignment="Left"
                                          materialDesign:HintAssist.Hint="Passwort wiederholen"
                                          Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
 
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Click="CreateFirstUser_Click"
-                                        Style="{StaticResource MaterialDesignRaisedButton}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="AccountPlus" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Anlegen"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
+                            <Button Click="CreateFirstUser_Click"
+                                    Width="350"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource IconTextButton}"
+                                    Tag="AccountPlus"
+                                    Content="Anlegen"/>
                         </StackPanel>
                     </Expander>
-                </Grid>
+                </StackPanel>
             </ScrollViewer>
+            <Border.RenderTransform>
+                <TranslateTransform X="20"/>
+            </Border.RenderTransform>
         </Border>
     </Grid>
+
+    <!-- Einblend-/Slide-Animation + Glow-Animation -->
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <!-- HeroPanel: rein sliden + Fade -->
+                    <DoubleAnimation Storyboard.TargetName="HeroPanel"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.35"/>
+                    <DoubleAnimation Storyboard.TargetName="HeroPanel"
+                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                     From="-20" To="0" Duration="0:0:0.35"/>
+
+                    <!-- LoginCard: leicht versetzt rein + Fade -->
+                    <DoubleAnimation Storyboard.TargetName="LoginCard"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" BeginTime="0:0:0.05" Duration="0:0:0.35"/>
+                    <DoubleAnimation Storyboard.TargetName="LoginCard"
+                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                     From="20" To="0" BeginTime="0:0:0.05" Duration="0:0:0.35"/>
+
+                    <!-- PiggyGlow: Puls-Opacity -->
+                    <DoubleAnimation Storyboard.TargetName="PiggyGlow"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0.00" To="0.35"
+                                     Duration="0:0:1.6"
+                                     AutoReverse="True"
+                                     RepeatBehavior="Forever"/>
+
+                    <!-- PiggyGlow: sanftes Atmen -->
+                    <DoubleAnimation Storyboard.TargetName="PiggyGlow"
+                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                     From="1.00" To="1.08"
+                                     Duration="0:0:1.6"
+                                     AutoReverse="True"
+                                     RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="PiggyGlow"
+                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                     From="1.00" To="1.08"
+                                     Duration="0:0:1.6"
+                                     AutoReverse="True"
+                                     RepeatBehavior="Forever"/>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
 </Window>

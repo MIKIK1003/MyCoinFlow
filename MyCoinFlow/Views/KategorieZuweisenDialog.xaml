@@ -1,38 +1,82 @@
 ﻿<Window x:Class="MyCoinFlow.Views.KategorieZuweisenDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Kategorie zuordnen"
-        Height="200" Width="520"
+        Height="250 " Width="520"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Background="{DynamicResource MaterialDesignPaper}">
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <!-- Formular -->
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <!-- Footer -->
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="150"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Händlerkategorie" Grid.Row="0" Grid.Column="0" Margin="0,0,10,10" VerticalAlignment="Center"/>
-        <TextBox x:Name="KategorieBox" Grid.Row="0" Grid.Column="1" IsReadOnly="True"/>
+        <!-- Formular -->
+        <Grid Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Kategorie -->
+                <RowDefinition Height="Auto"/>
+                <!-- Konto -->
+                <RowDefinition Height="Auto"/>
+                <!-- Checkbox -->
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Konto" Grid.Row="1" Grid.Column="0" Margin="0,0,10,10" VerticalAlignment="Center"/>
-        <ComboBox x:Name="KontoCombo"
-          Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
-          DisplayMemberPath="Anzeige"
-          SelectedValuePath="Id"/>
+            <!-- Händlerkategorie -->
+            <TextBlock Grid.Row="0" Grid.Column="0"
+                       Text="Händlerkategorie"
+                       Margin="0,0,10,10"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="KategorieBox"
+                     Grid.Row="0" Grid.Column="1"
+                     IsReadOnly="True"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     Margin="0,0,0,10"/>
 
+            <!-- Konto -->
+            <TextBlock Grid.Row="1" Grid.Column="0"
+                       Text="Konto"
+                       Margin="0,0,10,10"
+                       VerticalAlignment="Center"/>
+            <ComboBox x:Name="KontoCombo"
+                      Grid.Row="1" Grid.Column="1"
+                      Margin="0,0,0,10"
+                      DisplayMemberPath="Anzeige"
+                      SelectedValuePath="Id"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
 
-        <CheckBox x:Name="ChkSpeichern" Grid.Row="2" Grid.ColumnSpan="2"
-                  Content="Mapping dauerhaft speichern (später)"
-                  IsChecked="True"/>
+            <!-- Checkbox -->
+            <CheckBox x:Name="ChkSpeichern"
+                      Grid.Row="2" Grid.ColumnSpan="2"
+                      Content="Mapping dauerhaft speichern (später)"
+                      IsChecked="True"
+                      Margin="0,4,0,0"/>
+        </Grid>
 
-        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Abbrechen" IsCancel="True" Margin="0,0,10,0"/>
-            <Button Content="OK" IsDefault="True" Click="Ok_Click"/>
+        <!-- Footer-Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    IsCancel="True"
+                    Margin="0,0,10,0"/>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="CheckBold"
+                    Content="OK"
+                    IsDefault="True"
+                    Click="Ok_Click"/>
         </StackPanel>
     </Grid>
 </Window>

@@ -5,19 +5,25 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- Neu -->
             <RowDefinition Height="*"/>
+            <!-- Liste -->
             <RowDefinition Height="Auto"/>
+            <!-- Ändern -->
             <RowDefinition Height="Auto"/>
+            <!-- Löschen -->
         </Grid.RowDefinitions>
 
         <!-- Neu -->
-        <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
-            <TextBox Width="220"
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBox Width="260"
                      Text="{Binding NeueBezeichnung, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
                      materialDesign:HintAssist.Hint="Neue Bezeichnung"/>
-            <Button Content="Hinzufügen"
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="PlusCircleOutline"
+                    Content="Hinzufügen"
                     Command="{Binding HinzufuegenCommand}"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
                     Margin="10,0,0,0"/>
         </StackPanel>
 
@@ -28,20 +34,25 @@
                  DisplayMemberPath="Bezeichnung"/>
 
         <!-- Ändern -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0 10 0 0">
-            <TextBox Width="220"
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBox Width="260"
                      Text="{Binding BearbeiteteBezeichnung, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
                      materialDesign:HintAssist.Hint="Bezeichnung ändern"/>
-            <Button Content="Ändern"
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Pencil"
+                    Content="Ändern"
                     Command="{Binding BearbeitenCommand}"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
                     Margin="10,0,0,0"/>
         </StackPanel>
 
         <!-- Löschen -->
-        <Button Grid.Row="3" Content="Löschen"
+        <Button Grid.Row="3"
+                Style="{StaticResource IconTextButton.Danger}"
+                Tag="DeleteForever"
+                Content="Löschen"
                 Command="{Binding LoeschenCommand}"
-                Style="{StaticResource MaterialDesignRaisedButton}"
-                Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                Margin="0,10,0,0"
+                HorizontalAlignment="Left"/>
     </Grid>
 </UserControl>

@@ -207,5 +207,15 @@ namespace MyCoinFlow.Views
             var id = await cmd.ExecuteScalarAsync();
             return id != null && id != DBNull.Value;
         }
+
+        private void StackPanel_TimeChanged(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e)
+        {
+
+        }
+
+        private void StackPanel_TimeChanged_1(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e)
+        {
+
+        }
     }
 }

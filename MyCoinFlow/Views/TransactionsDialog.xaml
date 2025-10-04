@@ -48,7 +48,6 @@
                                            VerticalAlignment="Center"
                                            FontSize="14"
                                            Text="{TemplateBinding Content}"/>
-
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -90,28 +89,23 @@
 
     <DockPanel LastChildFill="True" Margin="16">
 
-        <!-- Footer: Aktionen -->
+        <!-- Footer: Aktionen (STANDARD) -->
         <StackPanel DockPanel.Dock="Bottom"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
-                    Margin="0,16,0,0"
-                    materialDesign:ColorZoneAssist.Mode="PrimaryDark">
-            <Button Click="Abbrechen_Click"
+                    Margin="0,16,0,0">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    IsCancel="True"
                     Margin="0,0,8,0"
-                    Style="{StaticResource MaterialDesignOutlinedButton}">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="CloseCircleOutline" Margin="0,0,8,0"/>
-                    <TextBlock Text="Abbrechen"/>
-                </StackPanel>
-            </Button>
+                    Click="Abbrechen_Click"/>
 
-            <Button Click="Buchen_Click"
-                    Style="{StaticResource MaterialDesignRaisedButton}">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="ContentSaveCheckOutline" Margin="0,0,8,0"/>
-                    <TextBlock Text="Speichern"/>
-                </StackPanel>
-            </Button>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="ContentSave"
+                    Content="Speichern"
+                    IsDefault="True"
+                    Click="Buchen_Click"/>
         </StackPanel>
 
         <!-- Inhalt -->
@@ -130,29 +124,32 @@
                 <Border CornerRadius="12" Padding="12" Margin="0,0,0,12"
                         Background="{DynamicResource MaterialDesignCardBackground}">
                     <StackPanel Orientation="Horizontal">
-                        <!-- RadioButtons: Tag = Icon-Kind (MaterialDesign PackIcon), Content = Anzeigename -->
+                        <!-- FIX: Tag typisiert via x:Static → korrektes Enum PackIconKind -->
                         <RadioButton x:Name="TypeBankToKonto"
                                      GroupName="TxnType"
                                      Style="{StaticResource TypeRadioStyle}"
-                                     Tag="BankTransfer"
+                                     Tag="{x:Static materialDesign:PackIconKind.BankTransfer}"
                                      Content="Bank → Konto"
                                      Checked="TxnType_Checked"/>
+
                         <RadioButton x:Name="TypeKontoToKonto"
                                      GroupName="TxnType"
                                      Style="{StaticResource TypeRadioStyle}"
-                                     Tag="SwapHorizontal"
+                                     Tag="{x:Static materialDesign:PackIconKind.SwapHorizontal}"
                                      Content="Konto → Konto"
                                      Checked="TxnType_Checked"/>
+
                         <RadioButton x:Name="TypeKontoToBank"
                                      GroupName="TxnType"
                                      Style="{StaticResource TypeRadioStyle}"
-                                     Tag="Bank"
+                                     Tag="{x:Static materialDesign:PackIconKind.Bank}"
                                      Content="Konto → Bank"
                                      Checked="TxnType_Checked"/>
+
                         <RadioButton x:Name="TypeAdresseToBank"
                                      GroupName="TxnType"
                                      Style="{StaticResource TypeRadioStyle}"
-                                     Tag="AccountCash"
+                                     Tag="{x:Static materialDesign:PackIconKind.AccountCash}"
                                      Content="Adresse → Bank"
                                      Checked="TxnType_Checked"/>
                     </StackPanel>

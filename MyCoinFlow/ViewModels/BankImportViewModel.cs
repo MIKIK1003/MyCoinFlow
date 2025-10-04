@@ -47,7 +47,7 @@ namespace MyCoinFlow.ViewModels
         }
 
         public string StatusText => string.IsNullOrWhiteSpace(FilePath)
-            ? "Quelle: (DB oder Datei)"
+            ? "Quelle: (DB oder Datei)  "
             : $"Datei: {Path.GetFileName(FilePath)}";
 
         private bool _onlyIncomplete;

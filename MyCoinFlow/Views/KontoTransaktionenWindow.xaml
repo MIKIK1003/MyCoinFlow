@@ -10,9 +10,9 @@
 
     <DockPanel>
 
-        <!-- Linke Seitenleiste: FIXE Breite -->
+        <!-- Linke Seitenleiste: Fix wie bei den anderen Fenstern -->
         <Border DockPanel.Dock="Left"
-                Width="360"
+                Width="320"
                 Background="{DynamicResource MaterialDesignCardBackground}"
                 BorderBrush="{DynamicResource MaterialDesignDivider}"
                 BorderThickness="0,0,1,0">
@@ -33,9 +33,11 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
                                  materialDesign:HintAssist.Hint="min"
                                  Text="{Binding FilterMinBetrag, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBox Grid.Column="2"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
                                  materialDesign:HintAssist.Hint="max"
                                  Text="{Binding FilterMaxBetrag, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
@@ -62,6 +64,7 @@
                               SelectedValuePath="Id"
                               DisplayMemberPath="Name"
                               SelectedValue="{Binding FilterAdresseId, UpdateSourceTrigger=PropertyChanged}"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
                               HorizontalAlignment="Stretch"/>
 
                     <!-- Geldinstitut -->
@@ -70,34 +73,35 @@
                               SelectedValuePath="Id"
                               DisplayMemberPath="Name"
                               SelectedValue="{Binding FilterGeldinstitutId, UpdateSourceTrigger=PropertyChanged}"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
                               HorizontalAlignment="Stretch"/>
 
                     <!-- Aktionen -->
                     <StackPanel Margin="0,16,0,0" Orientation="Vertical">
-                        <Button Content="Filter anwenden"
-                                Style="{StaticResource MaterialDesignRaisedButton}"
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Filter"
+                                Content="Filter anwenden"
                                 Command="{Binding ApplyFilterCommand}"/>
 
-                        <Button Content="Zurücksetzen"
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="FilterRemove"
+                                Content="Zurücksetzen"
                                 Margin="0,8,0,0"
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
                                 Command="{Binding ResetFilterCommand}"/>
 
                         <Separator Margin="0,8,0,8"/>
 
-                        <Button Click="Print_Click"
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Printer"
+                                Content="Drucken"
                                 ToolTip="Drucken (A4 Querformat)"
-                                Style="{StaticResource MaterialDesignRaisedButton}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Printer" Width="20" Height="20" Margin="0,0,6,0"/>
-                                <TextBlock Text="Drucken"/>
-                            </StackPanel>
-                        </Button>
+                                Click="Print_Click"/>
 
-                        <Button Content="Schließen"
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Close"
+                                Content="Schließen"
                                 Margin="0,8,0,0"
-                                Click="Close_Click"
-                                Style="{StaticResource MaterialDesignOutlinedButton}"/>
+                                Click="Close_Click"/>
                     </StackPanel>
 
                     <!-- Zusammenfassung (mit Unterlinie; inkl. Budget/Δ) -->
@@ -145,9 +149,8 @@
 
                             <!-- Budget -->
                             <TextBlock Grid.Row="4" Grid.Column="0" Text="Budget" Margin="0,8,12,0"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Budget, StringFormat={}{0:N2}}" 
-                               TextAlignment="Right" Margin="0,8,0,0"/>
-
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Budget, StringFormat={}{0:N2}}"
+                                       TextAlignment="Right" Margin="0,8,0,0"/>
 
                             <!-- Delta -->
                             <TextBlock Grid.Row="5" Grid.Column="0" Text="Δ (Budget − Ist)" Margin="0,0,12,0"/>

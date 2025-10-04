@@ -1,15 +1,21 @@
 ﻿<Window x:Class="MyCoinFlow.Views.InstitutionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Geldinstitut" Height="460" Width="520"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Geldinstitut"
+        Height="460" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource MaterialDesignPaper}">
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Margin="0,0,0,10">
+        <!-- Formular -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <!-- Name -->
@@ -22,43 +28,79 @@
                 <RowDefinition Height="Auto"/>
                 <!-- Notiz -->
                 <RowDefinition Height="Auto"/>
-                <!-- Anfangsbestand (NEU) -->
+                <!-- Anfangsbestand -->
                 <RowDefinition Height="Auto"/>
-                <!-- Anfangsdatum (NEU) -->
+                <!-- Anfangsdatum -->
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Name -->
             <TextBlock Text="Name*" Grid.Row="0" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
-            <TextBox x:Name="NameBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,8"/>
+            <TextBox x:Name="NameBox"
+                     Grid.Row="0" Grid.Column="1"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     Margin="0,0,0,8"/>
 
+            <!-- BIC -->
             <TextBlock Text="BIC" Grid.Row="1" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
-            <TextBox x:Name="BicBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"/>
+            <TextBox x:Name="BicBox"
+                     Grid.Row="1" Grid.Column="1"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     Margin="0,0,0,8"/>
 
+            <!-- IBAN -->
             <TextBlock Text="IBAN" Grid.Row="2" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
-            <TextBox x:Name="IbanBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"/>
+            <TextBox x:Name="IbanBox"
+                     Grid.Row="2" Grid.Column="1"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     Margin="0,0,0,8"/>
 
+            <!-- Kontonummer -->
             <TextBlock Text="Kontonummer" Grid.Row="3" Grid.Column="0" Margin="0,0,10,8" VerticalAlignment="Center"/>
-            <TextBox x:Name="KtoBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"/>
+            <TextBox x:Name="KtoBox"
+                     Grid.Row="3" Grid.Column="1"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     Margin="0,0,0,8"/>
 
+            <!-- Notiz -->
             <TextBlock Text="Notiz" Grid.Row="4" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top"/>
-            <TextBox x:Name="NotizBox" Grid.Row="4" Grid.Column="1" Height="80" AcceptsReturn="True" TextWrapping="Wrap"/>
+            <TextBox x:Name="NotizBox"
+                     Grid.Row="4" Grid.Column="1"
+                     Height="80"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
 
-            <!-- NEU: Anfangsbestand -->
+            <!-- Anfangsbestand -->
             <TextBlock Text="Anfangsbestand" Grid.Row="5" Grid.Column="0" Margin="0,10,10,8" VerticalAlignment="Center"/>
-            <TextBox x:Name="AnfangsbestandBox" Grid.Row="5" Grid.Column="1" Margin="0,10,0,8"
-                     ToolTip="Startsaldo dieses Geldinstituts (z. B. 1500,00)"/>
+            <TextBox x:Name="AnfangsbestandBox"
+                     Grid.Row="5" Grid.Column="1"
+                     Margin="0,10,0,8"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     HorizontalContentAlignment="Right"
+                     ToolTip="Startsaldo dieses Geldinstituts (z. B. 1500,00)"/>
 
-            <!-- NEU: Anfangsdatum -->
+            <!-- Anfangsdatum -->
             <TextBlock Text="ab Datum" Grid.Row="6" Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center"/>
-            <DatePicker x:Name="AnfangsdatumPicker" Grid.Row="6" Grid.Column="1" />
+            <DatePicker x:Name="AnfangsdatumPicker"
+                        Grid.Row="6" Grid.Column="1"/>
         </Grid>
 
+        <!-- Footer-Buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Abbrechen" IsCancel="True" Margin="0,0,10,0"/>
-            <Button Content="OK" IsDefault="True" Click="Ok_Click"/>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    IsCancel="True"
+                    Margin="0,0,10,0"/>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="CheckBold"
+                    Content="OK"
+                    IsDefault="True"
+                    Click="Ok_Click"/>
         </StackPanel>
     </Grid>
 </Window>

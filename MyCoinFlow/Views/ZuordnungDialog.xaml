@@ -34,20 +34,19 @@
 
     <DockPanel Margin="16">
 
-        <!-- Footer -->
+        <!-- Footer (Standard-Design) -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Click="Abbrechen_Click" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,8,0">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="CloseCircleOutline" Margin="0,0,8,0"/>
-                    <TextBlock Text="Abbrechen"/>
-                </StackPanel>
-            </Button>
-            <Button Click="Speichern_Click" Style="{StaticResource MaterialDesignRaisedButton}">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ContentSaveCheckOutline" Margin="0,0,8,0"/>
-                    <TextBlock Text="Übernehmen"/>
-                </StackPanel>
-            </Button>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    IsCancel="True"
+                    Margin="0,0,8,0"
+                    Click="Abbrechen_Click"/>
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="ContentSave"
+                    Content="Übernehmen"
+                    IsDefault="True"
+                    Click="Speichern_Click"/>
         </StackPanel>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -70,7 +69,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Blaue Icon-Preview (Blau direkt gesetzt) -->
+                        <!-- Blaue Icon-Preview -->
                         <materialDesign:PackIcon x:Name="TypIcon"
                                                  Kind="BankTransfer"
                                                  Width="36" Height="36"
