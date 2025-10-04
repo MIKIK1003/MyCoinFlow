@@ -91,6 +91,7 @@ namespace MyCoinFlow.Views
             EnsureKontenHosts();
             EnsureCreditCardMappingInline();
             AttachNumberRangesView();
+            EnsureUpdatesHost(); // NEU
 
             await LoadCopyCombosAsync();
             SetBackupDefaultPath();
@@ -116,6 +117,7 @@ namespace MyCoinFlow.Views
             SetVis("SecKontenplan", string.Equals(key, "Kontenplan", StringComparison.OrdinalIgnoreCase));
             SetVis("SecKreditkarten", string.Equals(key, "Kreditkarten", StringComparison.OrdinalIgnoreCase));
             SetVis("SecMandanten", string.Equals(key, "Mandanten", StringComparison.OrdinalIgnoreCase));
+            SetVis("SecUpdate", string.Equals(key, "Update", StringComparison.OrdinalIgnoreCase)); // NEU
             SetVis("SecBackup", string.Equals(key, "Backup", StringComparison.OrdinalIgnoreCase));
         }
 
@@ -255,7 +257,22 @@ namespace MyCoinFlow.Views
             }
         }
 
-
+        // ===== NEU: Updates-Host =====
+        private void EnsureUpdatesHost()
+        {
+            try
+            {
+                SetHostIfEmpty("UpdatesHost", () =>
+                {
+                    // direkte Instanzierung (kein <local:...> im XAML)
+                    return new MyCoinFlow.Views.Admin.AdminUpdatesControl();
+                });
+            }
+            catch
+            {
+                // still – Tab bleibt leer, falls Control (noch) nicht vorhanden
+            }
+        }
 
         // ===== Mandanten: neue leere DB =====
         private async void CreateEmptyTenant_Click(object sender, RoutedEventArgs e)

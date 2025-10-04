@@ -57,6 +57,15 @@
                         </StackPanel>
                     </ListBoxItem>
 
+                    <!-- NEU: Update -->
+                    <ListBoxItem Tag="Update">
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="Update"
+                                                     Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Update" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
                     <ListBoxItem Tag="Backup">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
                             <materialDesign:PackIcon Kind="DatabaseArrowDown"
@@ -252,6 +261,17 @@
                                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                     </StackPanel>
                 </Border>
+            </Grid>
+
+            <!-- NEU: UPDATE -->
+            <Grid x:Name="SecUpdate" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Host für AdminUpdatesControl -->
+                <ContentControl x:Name="UpdatesHost" Grid.Row="1" Margin="0,16,0,0"/>
             </Grid>
 
             <!-- BACKUP -->
