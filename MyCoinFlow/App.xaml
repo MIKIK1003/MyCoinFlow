@@ -17,7 +17,7 @@
             </ResourceDictionary.MergedDictionaries>
 
             <!-- ======= Brand ======= -->
-            <SolidColorBrush x:Key="AppBrandBrush" Color="DarkGray"/>
+            <SolidColorBrush x:Key="AppBrandBrush" Color="Coral"/>
 
             <!-- ======= Globale PackIcon-Styles (Buttons, Grids, etc.) ======= -->
             <Style TargetType="materialDesign:PackIcon" x:Key="DefaultIconStyle">

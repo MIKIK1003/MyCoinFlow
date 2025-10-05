@@ -55,14 +55,68 @@ namespace MyCoinFlow.Services.Update
 
         public async Task<AppVersionInfo?> TryFetchLatestAsync(CancellationToken ct = default)
         {
-            var url = OneDriveSharedLinkHelper.EnsureDirectDownload(AppReleaseConfig.VersionFeedUrl);
-            using var resp = await _http.GetAsync(url, ct);
-            resp.EnsureSuccessStatusCode();
+            // 0) Lokaler Test zuerst
+            var local = MyCoinFlow.Services.Update.AppReleaseConfig.LocalVersionJsonPath;
+            if (!string.IsNullOrWhiteSpace(local) && File.Exists(local))
+            {
+                var rawLocal = await File.ReadAllTextAsync(local, ct);
+                return JsonSerializer.Deserialize<AppVersionInfo>(rawLocal);
+            }
 
-            await using var s = await resp.Content.ReadAsStreamAsync(ct);
-            var info = await JsonSerializer.DeserializeAsync<AppVersionInfo>(s, cancellationToken: ct);
-            return info;
+            // 1) Versuch: deinen Link minimal vorbereiten
+            var url1 = OneDriveSharedLinkHelper.EnsureDirectDownload(AppReleaseConfig.VersionFeedUrl);
+            using (var resp1 = await _http.GetAsync(url1, ct))
+            {
+                var final1 = resp1.RequestMessage?.RequestUri;
+
+                if (resp1.IsSuccessStatusCode)
+                {
+                    var raw1 = await resp1.Content.ReadAsStringAsync(ct);
+                    var isHtml1 = !string.IsNullOrWhiteSpace(raw1) && raw1.TrimStart().StartsWith("<");
+                    if (!isHtml1)
+                        return JsonSerializer.Deserialize<AppVersionInfo>(raw1);
+                    // bei HTML -> weiter zu Versuch 2
+                }
+
+                // 2) Versuch: finale Redirect-URL in einen Download-Link umschreiben
+                var fallbackUrl = final1 != null
+                    ? OneDriveSharedLinkHelper.RewriteFromFinalUri(final1)
+                    : OneDriveSharedLinkHelper.EnsureDirectDownload(AppReleaseConfig.VersionFeedUrl);
+
+                using (var resp2 = await _http.GetAsync(fallbackUrl, ct))
+                {
+                    var raw2 = await resp2.Content.ReadAsStringAsync(ct);
+                    var ok2 = resp2.IsSuccessStatusCode && !(raw2?.TrimStart().StartsWith("<") ?? false);
+                    if (ok2)
+                        return JsonSerializer.Deserialize<AppVersionInfo>(raw2);
+
+                    // 3) Fallback: OneDrive Shares API mit dem Original-Share-Link (funktioniert für 1drv.ms & Co.)
+                    var apiUrl = OneDriveSharedLinkHelper.BuildSharesApiContentUrl(AppReleaseConfig.VersionFeedUrl);
+                    using var resp3 = await _http.GetAsync(apiUrl, ct);
+                    if (!resp3.IsSuccessStatusCode)
+                    {
+                        var final3 = resp3.RequestMessage?.RequestUri?.ToString() ?? apiUrl;
+                        throw new InvalidOperationException(
+                            $"Abruf fehlgeschlagen: {(int)resp3.StatusCode} {resp3.ReasonPhrase}\nURL: {final3}");
+                    }
+
+                    var raw3 = await resp3.Content.ReadAsStringAsync(ct);
+                    if (!string.IsNullOrWhiteSpace(raw3) && raw3.TrimStart().StartsWith("<"))
+                    {
+                        var final3 = resp3.RequestMessage?.RequestUri?.ToString() ?? apiUrl;
+                        throw new InvalidOperationException(
+                            "Der Link zur version.json liefert HTML statt JSON (auch per Shares API).\n" +
+                            $"URL: {final3}\nBitte einen direkten Datei-Link verwenden.");
+                    }
+
+                    return JsonSerializer.Deserialize<AppVersionInfo>(raw3);
+                }
+            }
         }
+
+
+
+
 
         public static bool IsNewer(Version current, string candidate)
         {
