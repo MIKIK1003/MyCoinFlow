@@ -49,7 +49,8 @@ namespace MyCoinFlow.Views.Admin
                     : _latest.Notes;
 
                 var isNewer = UpdateService.IsNewer(_update.GetCurrentVersion(), _latest.Version);
-                UpdateButton.IsEnabled = isNewer && !string.IsNullOrWhiteSpace(_latest.FileUrl);
+                UpdateButton.IsEnabled = isNewer && HasDownloadSource(_latest);
+
 
                 if (!isNewer)
                 {
@@ -106,16 +107,24 @@ namespace MyCoinFlow.Views.Admin
                 MessageBox.Show("Bitte zuerst „Nach Updates suchen“.", "Update", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            if (string.IsNullOrWhiteSpace(_latest.FileUrl))
+
+            // Quelle bestimmen: Online (fileUrl) oder lokale EXE im OneDrive-Update-Ordner
+            bool hasUrl = !string.IsNullOrWhiteSpace(_latest.FileUrl);
+            string? localSetup = OneDriveLocalResolver.TryGetSetupLocalPath(AppReleaseConfig.DefaultSetupFileName);
+            bool hasLocal = !string.IsNullOrWhiteSpace(localSetup) && File.Exists(localSetup);
+
+            if (!hasUrl && !hasLocal)
             {
-                MessageBox.Show("Kein Download-Link in der version.json.", "Update", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    "Keine Setup-Quelle gefunden.\n\nLegen Sie „MyCoinFlow-Setup.exe“ nach OneDrive\\(Documents|Dokumente)\\MyCoinFlowUpdate\noder tragen Sie einen fileUrl in der version.json ein.",
+                    "Update", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
+            var srcText = hasLocal ? $"lokal: {localSetup}" : "Online (fileUrl)";
             var confirm = MessageBox.Show(
-                "Vor dem Update wird empfohlen, ein Datenbank-Backup zu erstellen.\n\nMöchten Sie das Update jetzt installieren?",
-                "Update bestätigen",
-                MessageBoxButton.YesNo, MessageBoxImage.Question);
+                $"Vor dem Update wird empfohlen, ein Datenbank-Backup zu erstellen.\n\nQuelle: {srcText}\n\nUpdate jetzt installieren?",
+                "Update bestätigen", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -130,12 +139,12 @@ namespace MyCoinFlow.Views.Admin
                     DownloadProgress.Value = p * 100.0;
                 });
 
+                // Wenn fileUrl leer ist, liefert DownloadSetupAsync automatisch die lokale EXE aus dem OneDrive-Ordner
                 var cts = new CancellationTokenSource();
-                var setupPath = await _update.DownloadSetupAsync(_latest.FileUrl, progress, cts.Token);
-                if (setupPath == null || !File.Exists(setupPath))
-                    throw new InvalidOperationException("Setup konnte nicht heruntergeladen werden.");
+                var setupPath = await _update.DownloadSetupAsync(hasUrl ? _latest.FileUrl : string.Empty, progress, cts.Token);
+                if (string.IsNullOrWhiteSpace(setupPath) || !File.Exists(setupPath))
+                    throw new InvalidOperationException("Setup-Datei konnte nicht bereitgestellt werden.");
 
-                // Starten & App schließen
                 UpdateService.StartPassiveInstallerAndExit(setupPath);
             }
             catch (Exception ex)
@@ -149,5 +158,16 @@ namespace MyCoinFlow.Views.Admin
                 DownloadProgress.Value = 0;
             }
         }
+
+
+        private bool HasDownloadSource(AppVersionInfo v)
+        {
+            if (!string.IsNullOrWhiteSpace(v.FileUrl)) return true;
+
+            // Lokales Setup in OneDrive\...\MyCoinFlowUpdate?
+            var local = OneDriveLocalResolver.TryGetSetupLocalPath(AppReleaseConfig.DefaultSetupFileName);
+            return local != null && File.Exists(local);
+        }
+
     }
 }

@@ -1,0 +1,52 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <!-- Pfad zu deinem publish-Output (falls nötig anpassen – absolut ist am sichersten) -->
+    <PublishDir>C:\Dev\MyCoinFlow\MyCoinFlow\bin\Release\net9.0-windows\win-x64\publish</PublishDir>
+    <OutputName>MyCoinFlow</OutputName>
+    <OutputType>Package</OutputType>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+    <!-- Standard-Toolpfad für heat/candle/light -->
+    <WixToolPath Condition=" '$(WixToolPath)' == '' ">$([System.Environment]::GetFolderPath(SpecialFolder.ProgramFilesX86))\WiX Toolset v3.14\bin</WixToolPath>
+    <!-- Mehrere mögliche Orte für Wix.targets (egal welcher greift) -->
+    <WixTargets1>$(WixTargetsPath)</WixTargets1>
+    <WixTargets2>$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargets2>
+    <WixTargets3>$(ProgramFiles(x86))\WiX Toolset v3.14\bin\Wix.targets</WixTargets3>
+    <WixTargets4>$(ProgramFiles(x86))\WiX Toolset v3.14\SDK\wix.targets</WixTargets4>
+    <DefineConstants>
+			PublishDir=$(PublishDir);
+			Manufacturer=Stegmann Software;
+			ProductName=MyCoinFlow;
+		</DefineConstants>
+    <ProjectGuid>{ffb2f10d-8464-4e90-a546-0595cee2cb9d}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+    <None Include="Variables.wxi" />
+    <!-- wird vor dem Build generiert -->
+    <Compile Include="HarvestedFiles.wxs" Condition="Exists('HarvestedFiles.wxs')" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="HeatWin64.xslt" />
+  </ItemGroup>
+  <!-- WiX-Targets importieren (erster Pfad, der existiert, gewinnt) -->
+  <Import Project="$(WixTargets1)" Condition="Exists('$(WixTargets1)')" />
+  <Import Project="$(WixTargets2)" Condition="Exists('$(WixTargets2)')" />
+  <Import Project="$(WixTargets3)" Condition="Exists('$(WixTargets3)')" />
+  <Import Project="$(WixTargets4)" Condition="Exists('$(WixTargets4)')" />
+  <!-- Sicherstellen, dass mindestens ein Import geklappt hat -->
+  <Target Name="EnsureWixTargets" BeforeTargets="Build;Rebuild;Clean">
+    <Error Condition=" !Exists('$(WixTargets1)') AND !Exists('$(WixTargets2)') AND !Exists('$(WixTargets3)') AND !Exists('$(WixTargets4)') " Text="Wix.targets wurde nicht gefunden. Bitte WiX Toolset v3.14 (Build Tools) + VS-Erweiterung installieren." />
+  </Target>
+  <!-- Vor jedem Build: publish-Ordner „harvesten“ (Dateiliste erzeugen) -->
+  <Target Name="BeforeBuild" DependsOnTargets="EnsureWixTargets">
+    <Error Condition=" !Exists('$(WixToolPath)\heat.exe') " Text="heat.exe nicht gefunden unter '$(WixToolPath)'. Bitte WiX Toolset v3.14 installieren oder WixToolPath anpassen." />
+    <Error Condition=" !Exists('$(PublishDir)') " Text="PublishDir nicht gefunden: $(PublishDir). Bitte erst 'dotnet publish' ausführen oder Pfad anpassen." />
+    <Message Text="Harvesting $(PublishDir) ..." Importance="high" />
+    <Exec Command="&quot;$(WixToolPath)\heat.exe&quot; dir &quot;$(PublishDir)&quot; -cg MyCoinFlow.Harvested -dr INSTALLFOLDER -gg -scom -sreg -sfrag -srd -var var.PublishDir -platform x64 -t &quot;$(ProjectDir)HeatWin64.xslt&quot; -out &quot;$(ProjectDir)HarvestedFiles.wxs&quot;" />
+
+
+  </Target>
+</Project>

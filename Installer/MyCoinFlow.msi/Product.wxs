@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<?include Variables.wxi ?>
+
+	<Product Id="*"
+			 Name="$(var.ProductName)"
+			 Manufacturer="$(var.Manufacturer)"
+			 Version="$(var.ProductVersion)"
+			 Language="1031"
+			 UpgradeCode="$(var.UpgradeCode)">
+
+		<Package InstallerVersion="500"
+         Compressed="yes"
+         InstallScope="perMachine"
+         Platform="x64" />
+
+
+		<!-- Upgrade-Logik: neuere Version blockiert Downgrade -->
+		<MajorUpgrade AllowDowngrades="no"
+					  Schedule="afterInstallInitialize"
+					  DowngradeErrorMessage="Eine neuere Version von $(var.ProductName) ist bereits installiert." />
+
+		<MediaTemplate EmbedCab="yes" />
+
+		<!-- Feature: alle geharvesteten Dateien in INSTALLFOLDER -->
+		<Feature Id="Complete" Title="$(var.ProductName)" Level="1" Absent="disallow">
+			<ComponentGroupRef Id="MyCoinFlow.Harvested" />
+		</Feature>
+
+		<!-- Zielverzeichnisse: C:\Program Files\MyCoinFlow -->
+		<Directory Id="TARGETDIR" Name="SourceDir">
+			<Directory Id="ProgramFiles64Folder">
+				<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+			</Directory>
+		</Directory>
+
+	</Product>
+</Wix>

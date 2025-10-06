@@ -10,16 +10,42 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "MyCoinFlow.msi", "Installer\MyCoinFlow.msi\MyCoinFlow.msi.wixproj", "{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}"
+EndProject
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "MyCoinFlow.Bundle", "MyCoinFlow.Bundle\MyCoinFlow.Bundle\MyCoinFlow.Bundle.wixproj", "{EA61A310-F888-4C77-80E1-6A3EF327FF38}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Debug|x86.Build.0 = Debug|Any CPU
 		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Release|x86.ActiveCfg = Release|Any CPU
+		{006CDF60-8310-47A0-A458-89BAE3C4254E}.Release|x86.Build.0 = Release|Any CPU
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Debug|Any CPU.Build.0 = Debug|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Debug|x86.ActiveCfg = Debug|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Debug|x86.Build.0 = Debug|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Release|Any CPU.ActiveCfg = Release|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Release|Any CPU.Build.0 = Release|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Release|x86.ActiveCfg = Release|x86
+		{FFB2F10D-8464-4E90-A546-0595CEE2CB9D}.Release|x86.Build.0 = Release|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Debug|Any CPU.Build.0 = Debug|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Debug|x86.ActiveCfg = Debug|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Debug|x86.Build.0 = Debug|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Release|Any CPU.ActiveCfg = Release|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Release|Any CPU.Build.0 = Release|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Release|x86.ActiveCfg = Release|x86
+		{EA61A310-F888-4C77-80E1-6A3EF327FF38}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

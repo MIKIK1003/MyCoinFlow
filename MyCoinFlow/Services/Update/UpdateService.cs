@@ -139,8 +139,32 @@ namespace MyCoinFlow.Services.Update
             Directory.CreateDirectory(AppReleaseConfig.LocalDownloadFolder);
             var target = Path.Combine(AppReleaseConfig.LocalDownloadFolder, AppReleaseConfig.DefaultSetupFileName);
 
-            var url = OneDriveSharedLinkHelper.EnsureDirectDownload(fileUrl);
-            using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            // (A) Wenn fileUrl leer ist: versuche lokale Setup-Datei im OneDrive-Update-Ordner
+            if (string.IsNullOrWhiteSpace(fileUrl))
+            {
+                var local = OneDriveLocalResolver.TryGetSetupLocalPath(AppReleaseConfig.DefaultSetupFileName);
+                if (local == null)
+                    throw new InvalidOperationException("Keine Setup-Quelle angegeben und keine lokale Setup-Datei gefunden.");
+                File.Copy(local, target, overwrite: true);
+                return target;
+            }
+
+            // (B) Wenn fileUrl ein lokaler Pfad ist (oder file://)
+            if (Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri) && uri.IsFile)
+            {
+                var src = uri.LocalPath;
+                if (!File.Exists(src)) throw new FileNotFoundException("Lokale Setup-Datei nicht gefunden.", src);
+                File.Copy(src, target, overwrite: true);
+                return target;
+            }
+            if (File.Exists(fileUrl)) // plain Pfad
+            {
+                File.Copy(fileUrl, target, overwrite: true);
+                return target;
+            }
+
+            // (C) HTTP/HTTPS – wie gehabt herunterladen
+            using var resp = await _http.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, ct);
             resp.EnsureSuccessStatusCode();
 
             var total = resp.Content.Headers.ContentLength ?? -1L;
@@ -160,6 +184,7 @@ namespace MyCoinFlow.Services.Update
 
             return target;
         }
+
 
         public static void StartPassiveInstallerAndExit(string setupFullPath, string? postArgs = null)
         {
