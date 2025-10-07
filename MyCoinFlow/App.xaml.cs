@@ -36,7 +36,58 @@ namespace MyCoinFlow
             var login = new LoginWindow();
             login.Show();
 
+            RegisterGlobalExceptionHandlers(); // NEU
+
             base.OnStartup(e);
         }
+
+        // NEU
+        private void RegisterGlobalExceptionHandlers()
+        {
+            // WPF-UI
+            this.DispatcherUnhandledException += (s, e) =>
+            {
+                try
+                {
+                    var msg = $"Unerwarteter Fehler (UI): {e.Exception.GetType().Name}\n{e.Exception.Message}";
+                    System.Windows.MessageBox.Show(msg, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                    try { System.IO.File.AppendAllText(GetLogPath(), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UI: {e.Exception}\r\n"); } catch { }
+                }
+                finally { e.Handled = true; } // App NICHT beenden
+            };
+
+            // Background-Tasks
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                try
+                {
+                    try { System.IO.File.AppendAllText(GetLogPath(), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Task: {e.Exception}\r\n"); } catch { }
+                }
+                finally { e.SetObserved(); }
+            };
+
+            // Nicht-UI
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                try
+                {
+                    var ex = e.ExceptionObject as Exception;
+                    var msg = ex == null ? "Unbekannter Fehler (AppDomain)." : $"Unerwarteter Fehler (AppDomain): {ex.GetType().Name}\n{ex.Message}";
+                    System.Windows.MessageBox.Show(msg, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                    try { System.IO.File.AppendAllText(GetLogPath(), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] AppDomain: {ex}\r\n"); } catch { }
+                }
+                catch { /* last resort */ }
+            };
+
+            static string GetLogPath()
+            {
+                var dir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "MyCoinFlow");
+                System.IO.Directory.CreateDirectory(dir);
+                return System.IO.Path.Combine(dir, "error.log");
+            }
+        }
+
     }
 }

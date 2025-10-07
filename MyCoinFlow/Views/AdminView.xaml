@@ -68,7 +68,7 @@
 
                     <ListBoxItem Tag="Backup">
                         <StackPanel Orientation="Horizontal" Margin="8,4">
-                            <materialDesign:PackIcon Kind="DatabaseArrowDown"
+                            <materialDesign:PackIcon Kind="Database"
                                                      Style="{StaticResource DefaultIconStyle.Nav}"/>
                             <TextBlock Text="Backup" VerticalAlignment="Center"/>
                         </StackPanel>

@@ -14,25 +14,25 @@
         <!-- Toolbar (vereinheitlicht) -->
         <StackPanel Orientation="Horizontal">
             <Button Style="{StaticResource IconTextButton}"
-                    Tag="PlusCircleOutline"
+                    Tag="archiveplus"
                     Content="Neu"
                     Margin="0,0,10,0"
                     Click="Neu_Click"/>
 
             <Button Style="{StaticResource IconTextButton}"
-                    Tag="ContentSaveCheckOutline"
+                    Tag="archiveedit"
                     Content="Speichern"
                     Margin="0,0,10,0"
                     Click="Speichern_Click"/>
 
             <Button Style="{StaticResource IconTextButton.Danger}"
-                    Tag="TrashCanOutline"
+                    Tag="archiveminus"
                     Content="Löschen"
                     Margin="0,0,10,0"
                     Click="Loeschen_Click"/>
 
             <Button Style="{StaticResource IconTextButton}"
-                    Tag="Refresh"
+                    Tag="archiverefresh"
                     Content="Neu laden"
                     Click="Reload_Click"/>
         </StackPanel>

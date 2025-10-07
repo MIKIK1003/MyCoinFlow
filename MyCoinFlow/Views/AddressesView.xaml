@@ -13,19 +13,19 @@
         <!-- Toolbar (vereinheitlicht) -->
         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
             <Button Style="{StaticResource IconTextButton}"
-                    Tag="AccountPlus"
+                    Tag="Accountboxplusoutline"
                     Content="Neue Adresse"
                     Margin="0,0,10,0"
                     Command="{Binding NeuCommand}"/>
 
             <Button Style="{StaticResource IconTextButton}"
-                    Tag="Pencil"
+                    Tag="accountboxeditoutline"
                     Content="Bearbeiten"
                     Margin="0,0,10,0"
                     Command="{Binding BearbeitenCommand}"/>
 
             <Button Style="{StaticResource IconTextButton.Danger}"
-                    Tag="DeleteForever"
+                    Tag="accountboxminusoutline"
                     Content="Löschen"
                     Command="{Binding LoeschenCommand}"/>
         </StackPanel>

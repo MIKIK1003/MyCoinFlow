@@ -66,40 +66,87 @@ namespace MyCoinFlow.ViewModels
 
         private void Neu()
         {
-            var dlg = new InstitutionDialog();
-            if (dlg.ShowDialog() == true && dlg.Ergebnis != null)
+            try
             {
-                var id = _db.SpeichereGeldinstitut(dlg.Ergebnis);
+                var dlg = new InstitutionDialog();
 
-                // Nach Neuanlage neu laden, damit Gebucht/Schlussaldo berechnet sind
-                Lade();
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dlg.ShowDialog() == true && dlg.Ergebnis != null)
+                {
+                    var id = _db.SpeichereGeldinstitut(dlg.Ergebnis);
+                    Lade();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Dialogfehler (Geldinstitut neu): {ex.Message}", "Geldinstitute",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void Bearbeiten()
         {
-            if (AusgewaehltesInstitut == null) return;
-
-            var kopie = new Geldinstitut
+            try
             {
-                Id = AusgewaehltesInstitut.Id,
-                Name = AusgewaehltesInstitut.Name,
-                BIC = AusgewaehltesInstitut.BIC,
-                IBAN = AusgewaehltesInstitut.IBAN,
-                KontoNummer = AusgewaehltesInstitut.KontoNummer,
-                Notiz = AusgewaehltesInstitut.Notiz,
-                Anfangsbestand = AusgewaehltesInstitut.Anfangsbestand,
-                Anfangsdatum = AusgewaehltesInstitut.Anfangsdatum
-            };
+                if (AusgewaehltesInstitut == null) return;
 
-            var dlg = new InstitutionDialog(kopie);
-            if (dlg.ShowDialog() == true && dlg.Ergebnis != null)
+                var kopie = new Geldinstitut
+                {
+                    Id = AusgewaehltesInstitut.Id,
+                    Name = AusgewaehltesInstitut.Name,
+                    BIC = AusgewaehltesInstitut.BIC,
+                    IBAN = AusgewaehltesInstitut.IBAN,
+                    KontoNummer = AusgewaehltesInstitut.KontoNummer,
+                    Notiz = AusgewaehltesInstitut.Notiz,
+                    Anfangsbestand = AusgewaehltesInstitut.Anfangsbestand,
+                    Anfangsdatum = AusgewaehltesInstitut.Anfangsdatum
+                };
+
+                var dlg = new InstitutionDialog(kopie);
+
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dlg.ShowDialog() == true && dlg.Ergebnis != null)
+                {
+                    _db.AktualisiereGeldinstitut(dlg.Ergebnis);
+                    Lade();
+                }
+            }
+            catch (Exception ex)
             {
-                _db.AktualisiereGeldinstitut(dlg.Ergebnis);
-                // Neu laden, damit die berechneten Spalten stimmen
-                Lade();
+                MessageBox.Show($"Dialogfehler (Geldinstitut bearbeiten): {ex.Message}", "Geldinstitute",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void Loeschen()
         {

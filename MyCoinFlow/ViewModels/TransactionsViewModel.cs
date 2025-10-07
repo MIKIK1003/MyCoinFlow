@@ -50,31 +50,83 @@ namespace MyCoinFlow.ViewModels
             LadeListe();
         }
 
+
         private void NeueBuchung()
         {
-            var dlg = new TransactionsDialog { Owner = Application.Current.MainWindow };
-            if (dlg.ShowDialog() == true) LadeListe();
+            try
+            {
+                var dlg = new TransactionsDialog();
+
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dlg.ShowDialog() == true)
+                    LadeListe();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Dialogfehler (Neue Buchung): {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Bearbeiten()
         {
-            if (AusgewaehlteTransaktion == null) return;
-
-            var t = new Transaktion
+            try
             {
-                Id = AusgewaehlteTransaktion.Id,
-                Datum = AusgewaehlteTransaktion.Datum,
-                VonKontoId = AusgewaehlteTransaktion.VonKontoId,
-                NachKontoId = AusgewaehlteTransaktion.NachKontoId,
-                Betrag = AusgewaehlteTransaktion.Betrag,
-                AdresseId = AusgewaehlteTransaktion.AdresseId,
-                GeldinstitutId = AusgewaehlteTransaktion.GeldinstitutId,
-                Notiz = AusgewaehlteTransaktion.Notiz
-            };
+                if (AusgewaehlteTransaktion == null) return;
 
-            var dlg = new TransactionsDialog(t) { Owner = Application.Current.MainWindow };
-            if (dlg.ShowDialog() == true) LadeListe();
+                var t = new Transaktion
+                {
+                    Id = AusgewaehlteTransaktion.Id,
+                    Datum = AusgewaehlteTransaktion.Datum,
+                    VonKontoId = AusgewaehlteTransaktion.VonKontoId,
+                    NachKontoId = AusgewaehlteTransaktion.NachKontoId,
+                    Betrag = AusgewaehlteTransaktion.Betrag,
+                    AdresseId = AusgewaehlteTransaktion.AdresseId,
+                    GeldinstitutId = AusgewaehlteTransaktion.GeldinstitutId,
+                    Notiz = AusgewaehlteTransaktion.Notiz
+                };
+
+                var dlg = new TransactionsDialog(t);
+
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dlg.ShowDialog() == true)
+                    LadeListe();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Dialogfehler (Bearbeiten): {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
 
         private void Loeschen()
         {
@@ -132,18 +184,39 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-        // NEU: Bankimport-Fenster öffnen, hostet die vorhandene BankImportView
         private void OpenBankImport()
         {
-            var wnd = new BankImportWindow
+            try
             {
-                Owner = Application.Current.MainWindow
-            };
-            wnd.ShowDialog();
+                var wnd = new BankImportWindow();
 
-            // Optional: Nach Schließen neu laden, falls später „Übernehmen…“ Buchungen erzeugt.
-            // LadeListe();
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, wnd))
+                    wnd.Owner = owner;
+                else
+                    wnd.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                wnd.ShowDialog();
+
+                // Wenn notwendig: Liste neu laden
+                // LadeListe();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Fensterfehler (Bankimport): {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? n = null)

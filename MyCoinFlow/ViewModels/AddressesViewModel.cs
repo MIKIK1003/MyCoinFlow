@@ -154,15 +154,39 @@ namespace MyCoinFlow.ViewModels
 
         private void ZeigeAdresseTransaktionen(object? parameter)
         {
-            // Parameter aus der Zeile bevorzugen, sonst die aktuell ausgewählte Adresse
-            var adr = parameter as Adresse ?? AusgewaehlteAdresse;
-            if (adr == null) return;
+            try
+            {
+                var adr = parameter as Adresse ?? AusgewaehlteAdresse;
+                if (adr == null) return;
 
-            var win = new MyCoinFlow.Views.AdresseTransaktionenWindow(adr.Id, adr.Name);
-            win.Owner = System.Windows.Application.Current?.MainWindow;
-            win.ShowDialog();
+                // Fenster erzeugen – OHNE Owner-Zuweisung
+                var win = new MyCoinFlow.Views.AdresseTransaktionenWindow(adr.Id, adr.Name)
+                {
+                    // Immer zentriert am Bildschirm; vermeidet Owner-Probleme in MSI/EXE
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen
+                };
+
+                win.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Fenster konnte nicht geöffnet werden:\n{ex.Message}",
+                    "Adresse – Transaktionen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                try
+                {
+                    var dir = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MyCoinFlow");
+                    System.IO.Directory.CreateDirectory(dir);
+                    System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "error.log"),
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] AdresseTransaktionenWindow: {ex}\r\n");
+                }
+                catch { /* ignore */ }
+            }
         }
-
 
 
 

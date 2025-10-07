@@ -29,12 +29,12 @@
                         Margin="0,0,10,0"
                         Command="{Binding NeuCommand}"/>
                 <Button Style="{StaticResource IconTextButton}"
-                        Tag="Pencil"
+                        Tag="bank"
                         Content="Bearbeiten"
                         Margin="0,0,10,0"
                         Command="{Binding BearbeitenCommand}"/>
                 <Button Style="{StaticResource IconTextButton.Danger}"
-                        Tag="DeleteForever"
+                        Tag="bankremove"
                         Content="Löschen"
                         Command="{Binding LoeschenCommand}"/>
             </StackPanel>

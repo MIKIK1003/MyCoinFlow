@@ -142,7 +142,7 @@ namespace MyCoinFlow.Views
 
         private void ImportExcel_Click(object sender, RoutedEventArgs e)
         {
-            // Öffnet vorhandenen Dialog per Reflection (kein Compile-Hardlink)
+            // Öffnet vorhandenen Dialog per Reflection – mit robustem Owner-Handling
             try
             {
                 var t = Type.GetType("MyCoinFlow.Views.KontenplanImportDialog", throwOnError: false);
@@ -152,10 +152,37 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                var dlg = Activator.CreateInstance(t) as Window;
-                if (dlg != null)
+                // Owner ermitteln: aktives Fenster > MainWindow; niemals auf sich selbst
+                Window? ResolveOwner(Window? dialogToOpen)
                 {
-                    dlg.Owner = Application.Current.MainWindow;
+                    try
+                    {
+                        var active = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
+                        var owner = active ?? Application.Current?.MainWindow;
+
+                        if (owner != null && dialogToOpen != null && !ReferenceEquals(owner, dialogToOpen))
+                            return owner;
+                    }
+                    catch { /* ignore */ }
+
+                    return null; // -> CenterScreen verwenden
+                }
+
+                if (typeof(Window).IsAssignableFrom(t))
+                {
+                    var dlg = Activator.CreateInstance(t) as Window;
+                    if (dlg == null)
+                    {
+                        MessageBox.Show("Import-Dialog konnte nicht erzeugt werden.", "Import", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+
+                    var owner = ResolveOwner(dlg);
+                    if (owner != null)
+                        dlg.Owner = owner;
+                    else
+                        dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
                     dlg.ShowDialog();
                 }
                 else
@@ -168,10 +195,20 @@ namespace MyCoinFlow.Views
                             Title = "Kontenplan importieren",
                             Content = fe,
                             SizeToContent = SizeToContent.WidthAndHeight,
-                            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                            Owner = Application.Current.MainWindow
+                            WindowStartupLocation = WindowStartupLocation.CenterOwner
                         };
+
+                        var owner = ResolveOwner(host);
+                        if (owner != null)
+                            host.Owner = owner;
+                        else
+                            host.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
                         host.ShowDialog();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Import-UI konnte nicht instanziert werden.", "Import", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
@@ -180,6 +217,7 @@ namespace MyCoinFlow.Views
                 MessageBox.Show("Import fehlgeschlagen:\n" + ex.Message, "Import", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void ExportExcel_Click(object sender, RoutedEventArgs e)
         {

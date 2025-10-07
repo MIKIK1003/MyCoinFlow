@@ -140,40 +140,88 @@ namespace MyCoinFlow.ViewModels
 
         private void NeuenEintragHinzufuegen()
         {
-            var dialog = new MyCoinFlow.Views.NeuerEintragDialog(); // ohne Eintrag!
-            if (dialog.ShowDialog() == true)
+            try
             {
-                DatabaseService dbService = new DatabaseService();
-                dbService.NeuenKontoplanEintragSpeichern(dialog.Kontonummer, dialog.Art, dialog.Gruppe, dialog.Untergruppe, dialog.Detail);
+                var dialog = new MyCoinFlow.Views.NeuerEintragDialog();
 
-                LadeKontenplan();
+                // Owner robust ermitteln
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dialog))
+                    dialog.Owner = owner;
+                else
+                    dialog.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dialog.ShowDialog() == true)
+                {
+                    DatabaseService dbService = new DatabaseService();
+                    dbService.NeuenKontoplanEintragSpeichern(dialog.Kontonummer, dialog.Art, dialog.Gruppe, dialog.Untergruppe, dialog.Detail);
+                    LadeKontenplan();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Dialogfehler (Neuer Eintrag): {ex.Message}", "Kontenplan",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void EintragBearbeiten()
         {
-            if (AusgewaehlterKnoten?.OriginalEintrag == null)
-                return;
-
-            var eintrag = AusgewaehlterKnoten.OriginalEintrag;
-
-            var dialog = new MyCoinFlow.Views.NeuerEintragDialog(eintrag); // zu bearbeitender Eintrag
-
-            // Felder vorausfüllen
-            dialog.KontonummerBox.Text = eintrag.Kontonummer.ToString();
-            dialog.ArtComboBox.Text = eintrag.Art;
-            dialog.GruppeComboBox.Text = eintrag.Gruppe;
-            dialog.UntergruppeComboBox.Text = eintrag.Untergruppe;
-            dialog.DetailBox.Text = eintrag.Detail;
-
-            if (dialog.ShowDialog() == true)
+            try
             {
-                DatabaseService dbService = new DatabaseService();
-                dbService.KontenplanEintragAktualisieren(eintrag.Id, dialog.Kontonummer, dialog.Art, dialog.Gruppe, dialog.Untergruppe, dialog.Detail);
+                if (AusgewaehlterKnoten?.OriginalEintrag == null)
+                    return;
 
-                LadeKontenplan();
+                var eintrag = AusgewaehlterKnoten.OriginalEintrag;
+                var dialog = new MyCoinFlow.Views.NeuerEintragDialog(eintrag)
+                {
+                    // Vorbefüllung (wie bisher)
+                };
+                dialog.KontonummerBox.Text = eintrag.Kontonummer.ToString();
+                dialog.ArtComboBox.Text = eintrag.Art;
+                dialog.GruppeComboBox.Text = eintrag.Gruppe;
+                dialog.UntergruppeComboBox.Text = eintrag.Untergruppe;
+                dialog.DetailBox.Text = eintrag.Detail;
+
+                // Owner robust ermitteln
+                System.Windows.Window? owner = null;
+                try
+                {
+                    owner = System.Windows.Application.Current?.Windows
+                                .OfType<System.Windows.Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? System.Windows.Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && !ReferenceEquals(owner, dialog))
+                    dialog.Owner = owner;
+                else
+                    dialog.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+
+                if (dialog.ShowDialog() == true)
+                {
+                    DatabaseService dbService = new DatabaseService();
+                    dbService.KontenplanEintragAktualisieren(eintrag.Id, dialog.Kontonummer, dialog.Art, dialog.Gruppe, dialog.Untergruppe, dialog.Detail);
+                    LadeKontenplan();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Dialogfehler (Bearbeiten): {ex.Message}", "Kontenplan",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void EintragLoeschen()
         {
