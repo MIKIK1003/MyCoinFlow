@@ -146,28 +146,19 @@
             </Grid>
 
             <!-- KREDITKARTEN -->
+            <!-- KREDITKARTEN -->
             <Grid x:Name="SecKreditkarten" Visibility="Collapsed">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <WrapPanel Grid.Row="0">
-                    <Button Click="OpenCreditCardMapping_Click"
-                            Style="{StaticResource IconTextButton}"
-                            Tag="Cog"
-                            Content="Mapping im Dialog öffnen"
-                            Margin="0,0,10,8"/>
-                </WrapPanel>
-
-                <Border Grid.Row="1" Margin="0,8,0,0" Padding="8" CornerRadius="6"
-                        Background="{DynamicResource MaterialDesignCardBackground}">
-                    <StackPanel>
-                        <TextBlock Text="Mapping (inline)" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <ContentControl x:Name="CreditCardImportMappingHost"/>
-                    </StackPanel>
+                <!-- Nur noch der Editor, keine alte Toolbar darüber -->
+                <Border Grid.Row="0" Padding="8" CornerRadius="6"
+            Background="{DynamicResource MaterialDesignCardBackground}">
+                    <ContentControl x:Name="CreditCardImportMappingHost"/>
                 </Border>
             </Grid>
+
 
             <!-- MANDANTEN -->
             <Grid x:Name="SecMandanten" Visibility="Collapsed">

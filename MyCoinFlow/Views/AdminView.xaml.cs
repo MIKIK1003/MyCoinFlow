@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MyCoinFlow.Models;          // <— für ImportSchema
+
 
 namespace MyCoinFlow.Views
 {
@@ -19,6 +21,8 @@ namespace MyCoinFlow.Views
         private readonly DbProvisioner _prov = new();
         private readonly DbBackupService _backup = new();
         private readonly DbRestoreService _restore = new();
+        private readonly DatabaseService _dbSvc = new();   // für ImportSchema-Operationen
+
 
         private const string MasterCs = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
 
@@ -46,6 +50,32 @@ namespace MyCoinFlow.Views
             }
             return null;
         }
+
+        private async Task LoadCreditCardSchemasAsync()
+        {
+            try
+            {
+                // alle Schemas, Master ausblenden (nur benutzerdefinierte sind löschbar)
+                var all = _dbSvc.ImportSchemasGetAll();  // liefert Id, Name, IsMaster
+                var list = all.Where(s => !s.IsMaster)
+                              .OrderBy(s => s.Name)
+                              .ToList();
+
+                var cb = El<ComboBox>("CC_SchemaCombo");
+                if (cb != null)
+                {
+                    cb.ItemsSource = list;
+                    if (cb.Items.Count > 0 && cb.SelectedItem == null)
+                        cb.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Schemas konnten nicht geladen werden:\n" + ex.Message,
+                                "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
 
         private FrameworkElement? TryCreateView(string fullTypeName)
         {
@@ -93,6 +123,9 @@ namespace MyCoinFlow.Views
             AttachNumberRangesView();
             EnsureUpdatesHost(); // NEU
 
+            await LoadCreditCardSchemasAsync();
+
+
             await LoadCopyCombosAsync();
             SetBackupDefaultPath();
         }
@@ -113,13 +146,24 @@ namespace MyCoinFlow.Views
                 if (g != null) g.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            SetVis("SecNummernkreise", string.Equals(key, "Nummernkreise", StringComparison.OrdinalIgnoreCase));
-            SetVis("SecKontenplan", string.Equals(key, "Kontenplan", StringComparison.OrdinalIgnoreCase));
-            SetVis("SecKreditkarten", string.Equals(key, "Kreditkarten", StringComparison.OrdinalIgnoreCase));
-            SetVis("SecMandanten", string.Equals(key, "Mandanten", StringComparison.OrdinalIgnoreCase));
-            SetVis("SecUpdate", string.Equals(key, "Update", StringComparison.OrdinalIgnoreCase)); // NEU
-            SetVis("SecBackup", string.Equals(key, "Backup", StringComparison.OrdinalIgnoreCase));
+            bool isNum = string.Equals(key, "Nummernkreise", StringComparison.OrdinalIgnoreCase);
+            bool isKonten = string.Equals(key, "Kontenplan", StringComparison.OrdinalIgnoreCase);
+            bool isKredit = string.Equals(key, "Kreditkarten", StringComparison.OrdinalIgnoreCase);
+            bool isMand = string.Equals(key, "Mandanten", StringComparison.OrdinalIgnoreCase);
+            bool isUpdate = string.Equals(key, "Update", StringComparison.OrdinalIgnoreCase);
+            bool isBackup = string.Equals(key, "Backup", StringComparison.OrdinalIgnoreCase);
+
+            SetVis("SecNummernkreise", isNum);
+            SetVis("SecKontenplan", isKonten);
+            SetVis("SecKreditkarten", isKredit);
+            SetVis("SecMandanten", isMand);
+            SetVis("SecUpdate", isUpdate);
+            SetVis("SecBackup", isBackup);
+
+            // >>> Neu: Kreditkarten-Host beim Umschalten immer sicher befüllen
+            if (isKredit) EnsureCreditCardMappingInline();
         }
+
 
         // ===== Nummernkreise-Host =====
         private void AttachNumberRangesView()
@@ -254,23 +298,73 @@ namespace MyCoinFlow.Views
             }
         }
 
-        // ===== Kreditkarten-Mapping (Dialog + inline, ohne Compile-Abhängigkeit) =====
+
+        private async void CC_SchemaRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadCreditCardSchemasAsync();
+        }
+
+        private async void CC_SchemaDelete_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var cb = El<ComboBox>("CC_SchemaCombo");
+                if (cb?.SelectedItem is not ImportSchema sel)
+                {
+                    MessageBox.Show("Bitte zuerst ein Schema wählen.", "Löschen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // Sicherheitsnetz: Master-Schema nie löschen
+                if (sel.IsMaster)
+                {
+                    MessageBox.Show("Das Master-Schema kann nicht gelöscht werden.", "Löschen", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var ask = MessageBox.Show(
+                    $"Schema „{sel.Name}“ wirklich löschen?",
+                    "Löschen bestätigen",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (ask != MessageBoxResult.Yes) return;
+
+                // Löschen – FieldMappings werden dank FK CASCADE automatisch entfernt (siehe DatabaseService)
+                _dbSvc.ImportSchemaDelete(sel.Id);  // erledigt das sauber in der DB. :contentReference[oaicite:0]{index=0}
+
+                // UI refresh
+                await LoadCreditCardSchemasAsync();
+                MessageBox.Show("Schema wurde gelöscht.", "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Löschen fehlgeschlagen:\n" + ex.Message, "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void EnsureCreditCardMappingInline()
         {
             try
             {
-                var host = El<ContentControl>("CreditCardImportMappingHost");
-                if (host == null || host.Content != null) return;
+                // Host sicher finden (Name oder case-insensitive)
+                var host = El<ContentControl>("CreditCardImportMappingHost")
+                           ?? FindByNameCaseInsensitive<ContentControl>(this, "CreditCardImportMappingHost");
+                if (host == null) return;
 
-                // Direkt instanzieren – View setzt ihren DataContext selbst (siehe .xaml.cs)
-                host.Content = new CreditCardImportMappingView();
+                // Immer frisch befüllen (falls alte View hing, räumen wir auf)
+                host.Content = null;
+                host.Content = new CreditCardImportMappingView(); // neue schlanke View
+
+                // Tipp: falls du den alten Löschen-Button irgendwo noch hast, hier wegblenden:
+                // (nicht nötig, weil wir nur noch die neue View laden)
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kreditkarten-Mapping (inline) konnte nicht geladen werden:\n" + ex.Message,
+                MessageBox.Show("Kreditkarten-Editor konnte nicht geladen werden:\n" + ex,
                                 "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void OpenCreditCardMapping_Click(object sender, RoutedEventArgs e)
         {

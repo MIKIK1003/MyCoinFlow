@@ -1624,23 +1624,26 @@ OUTER APPLY (
                     WHEN t.VonKontoId IS NULL AND t.AdresseId IS NOT NULL THEN t.Betrag
                     ELSE 0
                 END
-            /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt): Richtung über Regel → Fallback Text */
+
+            /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt):
+                   - Einnahme: Bank +
+                   - Ausgabe: Bank −
+                   - Neutral: keine harte Vorgabe → Heuristik wie früher bei NULL */
             WHEN t.NachKontoId IS NOT NULL THEN
                 CASE 
-                    WHEN nr.Richtung = N'Einnahme' OR (
-                         nr.Richtung IS NULL AND (
-                           UPPER(ISNULL(kp.Art,'')) LIKE '%EINNAHM%' OR
-                           UPPER(ISNULL(kp.Art,'')) LIKE '%ERTR%'   OR
-                           UPPER(ISNULL(kp.Gruppe,'')) LIKE '%EINNAHM%' OR
-                           UPPER(ISNULL(kp.Gruppe,'')) LIKE '%ERTR%'   OR
-                           UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%EINNAHM%' OR
-                           UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%ERTR%'   OR
-                           UPPER(ISNULL(kp.Detail,'')) LIKE '%EINNAHM%' OR
-                           UPPER(ISNULL(kp.Detail,'')) LIKE '%ERTR%'
-                         )
-                    )
-                    THEN  t.Betrag   -- Einnahme: Bank +
-                    ELSE -t.Betrag   -- Ausgabe:  Bank −
+                    WHEN nr.Richtung = N'Einnahme'
+                         OR ((nr.Richtung IS NULL OR nr.Richtung = N'Neutral') AND (
+                               UPPER(ISNULL(kp.Art,''))        LIKE '%EINNAHM%' OR
+                               UPPER(ISNULL(kp.Art,''))        LIKE '%ERTR%'   OR
+                               UPPER(ISNULL(kp.Gruppe,''))     LIKE '%EINNAHM%' OR
+                               UPPER(ISNULL(kp.Gruppe,''))     LIKE '%ERTR%'   OR
+                               UPPER(ISNULL(kp.Untergruppe,''))LIKE '%EINNAHM%' OR
+                               UPPER(ISNULL(kp.Untergruppe,''))LIKE '%ERTR%'   OR
+                               UPPER(ISNULL(kp.Detail,''))     LIKE '%EINNAHM%' OR
+                               UPPER(ISNULL(kp.Detail,''))     LIKE '%ERTR%'
+                         ))
+                    THEN  t.Betrag   -- Einnahme/Heuristik: Bank +
+                    ELSE -t.Betrag   -- Ausgabe (oder Heuristik negativ): Bank −
                 END
             ELSE 0
         END
@@ -1682,13 +1685,6 @@ ORDER BY g.Name;";
 
             return list;
         }
-
-
-
-
-
-
-
 
 
         public int CountCreditCardStaging()
@@ -3341,7 +3337,7 @@ WHERE Id = @Id";
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
 
-            // 1) Tabelle anlegen (falls nicht vorhanden)
+            // 1) Tabelle anlegen (falls nicht vorhanden) – unverändert bis auf expliziten Constraint-Namen
             const string createSql = @"
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[NumberRangeRules]') AND type = N'U')
 BEGIN
@@ -3349,18 +3345,16 @@ BEGIN
         [Id]             INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [RangeStart]     INT NOT NULL,
         [RangeEnd]       INT NOT NULL,
-        [Richtung]       NVARCHAR(12) NOT NULL CHECK ([Richtung] IN (N'Ausgabe', N'Einnahme')),
+        [Richtung]       NVARCHAR(12) NOT NULL,
         [Bezeichnung]    NVARCHAR(64) NULL,
         [IstBudgetkonto] BIT NOT NULL CONSTRAINT DF_NumberRangeRules_IstBudgetkonto DEFAULT(0),
         CONSTRAINT CK_NumberRangeRules_Range CHECK ([RangeStart] <= [RangeEnd])
     );
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_NumberRangeRules_Range' AND object_id = OBJECT_ID(N'dbo.NumberRangeRules'))
-        CREATE INDEX IX_NumberRangeRules_Range ON [dbo].[NumberRangeRules]([RangeStart],[RangeEnd]);
 END";
             using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(createSql, c))
                 cmd.ExecuteNonQuery();
 
-            // 2) Prüfen, ob die Spalte Bezeichnung existiert
+            // 2) Sicherstellen: Spalte Bezeichnung existiert
             bool hasBezeichnung;
             using (var chk = new Microsoft.Data.SqlClient.SqlCommand(
                 "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','Bezeichnung') IS NULL THEN 0 ELSE 1 END", c))
@@ -3368,8 +3362,6 @@ END";
                 var v = chk.ExecuteScalar();
                 hasBezeichnung = v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
             }
-
-            // 3) Falls Spalte fehlt: erst ALTER, dann UPDATE als eigenes Kommando
             if (!hasBezeichnung)
             {
                 using (var alter = new Microsoft.Data.SqlClient.SqlCommand(
@@ -3377,7 +3369,6 @@ END";
                 {
                     alter.ExecuteNonQuery();
                 }
-
                 using (var fill = new Microsoft.Data.SqlClient.SqlCommand(@"
 UPDATE dbo.NumberRangeRules
 SET Bezeichnung = CASE WHEN Richtung = N'Einnahme' 
@@ -3387,6 +3378,46 @@ WHERE Bezeichnung IS NULL;", c))
                 {
                     fill.ExecuteNonQuery();
                 }
+            }
+
+            // 3) **WICHTIG**: CHECK-Constraint für Richtung auf (Ausgabe, Einnahme, Neutral) bringen
+            EnsureNumberRangeRulesAllowNeutral(c);
+        }
+
+        /// <summary>
+        /// Sucht vorhandene CHECK-Constraints auf dbo.NumberRangeRules.Richtung,
+        /// droppt sie und legt einen sauberen Constraint mit 'Neutral' neu an (idempotent).
+        /// </summary>
+        private static void EnsureNumberRangeRulesAllowNeutral(Microsoft.Data.SqlClient.SqlConnection c)
+        {
+            // alle CHECK-Constraints der Tabelle ermitteln
+            var names = new List<string>();
+            using (var q = new Microsoft.Data.SqlClient.SqlCommand(@"
+SELECT cc.name
+FROM sys.check_constraints cc
+JOIN sys.tables t ON cc.parent_object_id = t.object_id
+WHERE t.name = N'NumberRangeRules' AND OBJECT_DEFINITION(cc.object_id) LIKE N'%Richtung%';", c))
+            {
+                using var r = q.ExecuteReader();
+                while (r.Read()) names.Add(r.GetString(0));
+            }
+
+            // vorhandene Richtungs-Checks entfernen (Name ist systemgeneriert, daher dynamisch droppen)
+            foreach (var n in names)
+            {
+                using var drop = new Microsoft.Data.SqlClient.SqlCommand(
+                    $"ALTER TABLE dbo.NumberRangeRules DROP CONSTRAINT [{n}];", c);
+                drop.ExecuteNonQuery();
+            }
+
+            // neuen, klar benannten Constraint mit Neutral anlegen
+            using (var add = new Microsoft.Data.SqlClient.SqlCommand(@"
+ALTER TABLE dbo.NumberRangeRules WITH CHECK
+ADD CONSTRAINT CK_NumberRangeRules_Richtung_Allowed
+CHECK ([Richtung] IN (N'Ausgabe', N'Einnahme', N'Neutral'));
+ALTER TABLE dbo.NumberRangeRules CHECK CONSTRAINT CK_NumberRangeRules_Richtung_Allowed;", c))
+            {
+                add.ExecuteNonQuery();
             }
         }
 
@@ -3613,6 +3644,61 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             return result;
         }
 
+        // Sorgt dafür, dass es genau EIN Master-Schema gibt (Name = "Master").
+        // Legt es nur an, wenn es fehlt. Mehrfach-Aufruf ist unkritisch.
+        public int EnsureImportMasterSchemaExists()
+        {
+            const string selectSql = @"SELECT Id FROM ImportSchema WHERE Name = @name";
+            const string insertSql = @"INSERT INTO ImportSchema (Name, IsMaster)
+                               VALUES (@name, 1);
+                               SELECT CAST(SCOPE_IDENTITY() AS INT);";
+            try
+            {
+                using var conn = CreateConnection(); // wie in deinen anderen DB-Methoden
+                conn.Open();
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = selectSql;
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@name";
+                    p.Value = "Master";
+                    cmd.Parameters.Add(p);
+
+                    var idObj = cmd.ExecuteScalar();
+                    if (idObj != null && idObj != DBNull.Value)
+                        return Convert.ToInt32(idObj);
+                }
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = insertSql;
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@name";
+                    p.Value = "Master";
+                    cmd.Parameters.Add(p);
+                    var newIdObj = cmd.ExecuteScalar();
+                    return Convert.ToInt32(newIdObj);
+                }
+            }
+            catch
+            {
+                // Falls parallel bereits angelegt: erneut abfragen (idempotent)
+                using var conn2 = CreateConnection();
+                conn2.Open();
+                using var cmd2 = conn2.CreateCommand();
+                cmd2.CommandText = selectSql;
+                var p2 = cmd2.CreateParameter();
+                p2.ParameterName = "@name";
+                p2.Value = "Master";
+                cmd2.Parameters.Add(p2);
+                var idObj2 = cmd2.ExecuteScalar();
+                if (idObj2 != null && idObj2 != DBNull.Value)
+                    return Convert.ToInt32(idObj2);
+
+                throw;
+            }
+        }
 
 
     }

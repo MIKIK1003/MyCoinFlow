@@ -133,10 +133,9 @@ namespace MyCoinFlow.ViewModels
             ZeilenView = CollectionViewSource.GetDefaultView(Zeilen);
             ZeilenView.Filter = ZeilenFilter;
 
-            // WICHTIG: Beim Öffnen KEINE Zeilen laden – nur die Batchliste
+            // Beim Öffnen keine Zeilen laden – nur die Batchliste
             LadeBatches();
         }
-
 
         // ================== UI-Aktionen ==================
 
@@ -149,24 +148,25 @@ namespace MyCoinFlow.ViewModels
 
             try
             {
-                var rows = _db.LeseCreditCardExcel(AusgewaehlteDatei);
+                // GUARD: Master-Schema sicherstellen (idempotent, verhindert Duplicate-Key)
+                _db.EnsureImportMasterSchemaExists();
 
-                // 1) Batch anlegen (merkt Verrechnungskonto/Institut zum Zeitpunkt des Imports)
+                var rows = _db.LeseCreditCardExcel(AusgewaehlteDatei);  // <- unverändert :contentReference[oaicite:3]{index=3}
+
+                // 1) Batch anlegen
                 CurrentBatchId = _db.CreateCcBatch(System.IO.Path.GetFileName(AusgewaehlteDatei),
                                                    AusgleichsKontoId, AusgewaehltesGeldinstitutId);
 
-                LadeBatches();                    // Batch-Liste neu aufbauen
+                LadeBatches();
                 AusgewaehlterBatch = Batches.FirstOrDefault(b => b.Id == CurrentBatchId);
-                BatchLaden();                     // neuen Batch sofort anzeigen (oder Zeile entfernen, wenn du manuell laden willst)
+                BatchLaden();
 
-
-                // 2) Zeilen ins Staging schreiben (inkl. MappingKey, ImportHash, Autokonto per Mapping)
+                // 2) Staging schreiben (inkl. Mapping/Autokonto)
                 var (ins, skip, dup) = _db.SaveExcelRowsToStaging(CurrentBatchId.Value, rows);
 
                 // 3) Staging laden & anzeigen
                 ReloadStaging();
 
-                // optional Info
                 MessageBox.Show($"Importiert: {ins}\nÜbersprungen (keine Belastung): {skip}\nDuplikate: {dup}",
                     "Excel-Import", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -193,12 +193,10 @@ namespace MyCoinFlow.ViewModels
                 var key = _db.BaueMappingSchluessel(row.Beschreibung, row.Haendler, row.Kategorie);
 
                 if (dlg.MappingDauerhaftSpeichern)
-                    _db.UpsertKategorieMapping(key, kontoId);  // einziges Mapping-System
+                    _db.UpsertKategorieMapping(key, kontoId);
 
-                // Staging aktualisieren (diese Zeile + optional alle mit gleichem Key)
                 _db.UpdateCcStagingZuordnung(row.Id, key, kontoId, applyToSameKey: dlg.MappingDauerhaftSpeichern);
 
-                // GUI neu laden
                 ReloadStaging();
             }
         }
@@ -227,14 +225,15 @@ namespace MyCoinFlow.ViewModels
                 $"Verbucht: {inserted}\nIgnoriert: {skipped}\nDuplikate: {duplicates}",
                 "Kreditkarten-Import", MessageBoxButton.OK, MessageBoxImage.Information);
 
-            // Saldo & Liste aktualisieren
             UpdateAbrechnungssumme();
             ReloadStaging();
         }
 
         public ICommand BatchVerwerfenCommand { get; }
         public ICommand ZeileLoeschenCommand { get; }
-                
+        public ICommand BatchesNeuLadenCommand { get; }
+        public ICommand BatchLadenCommand { get; }
+
         private void BatchVerwerfen()
         {
             if (!CurrentBatchId.HasValue) return;
@@ -258,7 +257,6 @@ namespace MyCoinFlow.ViewModels
 
             LadeBatches();
             AusgewaehlterBatch = null;
-
         }
 
         private void ZeileLoeschen(CreditCardImportRow? row)
@@ -284,16 +282,12 @@ namespace MyCoinFlow.ViewModels
             set => SetProperty(ref _ausgewaehlterBatch, value);
         }
 
-        public ICommand BatchesNeuLadenCommand { get; }
-        public ICommand BatchLadenCommand { get; }
-
         private void LadeBatches()
         {
             Batches.Clear();
             foreach (var b in _db.LadeCcBatches(nurMitOffenen: true))
                 Batches.Add(b);
 
-            // Buttons neu bewerten
             (BatchLadenCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (BatchVerwerfenCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
@@ -305,8 +299,6 @@ namespace MyCoinFlow.ViewModels
             ReloadStaging();
             UpdateAbrechnungssumme();
         }
-
-
 
         // ================== Helfer ==================
 
@@ -358,13 +350,11 @@ namespace MyCoinFlow.ViewModels
         private void ReloadStaging()
         {
             Zeilen.Clear();
-            var list = _db.LadeCcStaging(CurrentBatchId); // nur aktueller Batch
+            var list = _db.LadeCcStaging(CurrentBatchId);
             foreach (var r in list) Zeilen.Add(r);
 
             ZeilenView?.Refresh();
             Recompute();
         }
-
-
     }
 }

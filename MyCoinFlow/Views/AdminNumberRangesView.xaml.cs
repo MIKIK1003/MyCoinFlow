@@ -15,7 +15,7 @@ namespace MyCoinFlow.Views
         private readonly ObservableCollection<NumberRangeRule> _rules = new();
 
         // Dropdown-Optionen zentral
-        private static readonly string[] _richtungOptions = { "Ausgabe", "Einnahme" };
+        private static readonly string[] _richtungOptions = { "Ausgabe", "Einnahme", "Neutral" };
         private static readonly string[] _bezeichnungOptions =
         {
             "Einnahmen (Budgetiert)",
@@ -44,7 +44,6 @@ namespace MyCoinFlow.Views
             SetComboItemsSources();   // Combo-Options setzen
             Reload();                 // Lädt Liste; intern ruft LadeNummernRegeln() nochmals Ensure auf
         }
-
 
         private void SetComboItemsSources()
         {
@@ -82,15 +81,19 @@ namespace MyCoinFlow.Views
             _rules.Clear();
             foreach (var r in _db.LadeNummernRegeln())
             {
-                // Defensive Normalisierung
+                // Defensive Normalisierung (Richtung)
                 if (!_richtungOptions.Contains(r.Richtung, StringComparer.OrdinalIgnoreCase))
                     r.Richtung = "Ausgabe";
 
+                // Bezeichnung sinnvoll vorbelegen (kein Vorzeichen-Zwang bei Neutral)
                 if (string.IsNullOrWhiteSpace(r.Bezeichnung) || !_bezeichnungOptions.Contains(r.Bezeichnung))
                 {
-                    r.Bezeichnung = r.Richtung.Equals("Einnahme", StringComparison.OrdinalIgnoreCase)
-                        ? "Einnahmen (Budgetiert)"
-                        : "Ausgaben (Budgetiert)";
+                    if (r.Richtung.Equals("Einnahme", StringComparison.OrdinalIgnoreCase))
+                        r.Bezeichnung = "Einnahmen (Budgetiert)";
+                    else if (r.Richtung.Equals("Ausgabe", StringComparison.OrdinalIgnoreCase))
+                        r.Bezeichnung = "Ausgaben (Budgetiert)";
+                    else // Neutral
+                        r.Bezeichnung = "Durchlaufkonten (nicht budgetiert)";
                 }
 
                 _rules.Add(r);
@@ -100,6 +103,7 @@ namespace MyCoinFlow.Views
 
         private void Neu_Click(object sender, RoutedEventArgs e)
         {
+            // Default belassen (Ausgabe) – Nutzer kann auf Neutral umstellen.
             var neu = new NumberRangeRule
             {
                 RangeStart = 0,
@@ -118,7 +122,7 @@ namespace MyCoinFlow.Views
             RulesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             RulesGrid.CommitEdit(DataGridEditingUnit.Row, true);
 
-            // Validierung
+            // Validierung (mit Neutral)
             foreach (var r in _rules)
             {
                 if (r.RangeStart < 0 || r.RangeEnd < 0)
@@ -131,9 +135,9 @@ namespace MyCoinFlow.Views
                     MessageBox.Show("Von (Nr.) muss ≤ Bis (Nr.) sein.", "Nummernkreise", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
-                if (!_richtungOptions.Contains(r.Richtung))
+                if (!_richtungOptions.Contains(r.Richtung, StringComparer.OrdinalIgnoreCase))
                 {
-                    MessageBox.Show("Richtung muss 'Ausgabe' oder 'Einnahme' sein.", "Nummernkreise", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Richtung muss „Einnahme“, „Neutral“ oder „Ausgabe“ sein.", "Nummernkreise", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
                 if (string.IsNullOrWhiteSpace(r.Bezeichnung) || !_bezeichnungOptions.Contains(r.Bezeichnung))
