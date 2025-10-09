@@ -73,6 +73,15 @@
                             <TextBlock Text="Backup" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
+
+                    <ListBoxItem Tag="Pfade">
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="FolderAccount"
+                                 Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Verzeichnisse" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
                 </ListBox>
             </StackPanel>
         </Border>
@@ -83,6 +92,12 @@
             <Grid x:Name="SecNummernkreise" Visibility="Collapsed">
                 <ContentControl x:Name="NumberRangesHost"/>
             </Grid>
+
+            <!-- ===== Sektion: Pfade ===== -->
+            <Grid x:Name="SecPfade" Visibility="Collapsed">
+                <ContentControl x:Name="PathsHost"/>
+            </Grid>
+
 
             <!-- KONTENPLAN -->
             <Grid x:Name="SecKontenplan" Visibility="Collapsed">

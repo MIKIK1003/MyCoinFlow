@@ -3700,6 +3700,190 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             }
         }
 
+        // ---------------------------------------------
+        // SCHRITT 1a – ATTACHMENTS & APP-SETTINGS SCHEMA
+        // ---------------------------------------------
+
+        /// <summary>
+        /// Führt alle idempotenten Checks aus, um die für Anhänge benötigten DB-Objekte bereitzustellen.
+        /// Diese Methode kannst du beim App-Start einmalig aufrufen (z. B. in deiner bestehenden Init-Kaskade).
+        /// Sie verändert keine bestehenden Tabellen.
+        /// </summary>
+        public void EnsureAttachmentsSchema()
+        {
+            EnsureAppSettingsTable();
+            EnsureAttachmentsTable();
+        }
+
+        /// <summary>
+        /// Legt eine sehr einfache Key/Value-Tabelle an, falls nicht vorhanden:
+        /// AppSetting (Key NVARCHAR(64) PK, Value NVARCHAR(512) NULL)
+        /// </summary>
+        private void EnsureAppSettingsTable()
+        {
+            using (var conn = CreateConnection())
+            {
+                conn.Open();
+
+                // Tabelle anlegen, falls nicht vorhanden
+                var sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AppSetting' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.AppSetting
+    (
+        [Key]   NVARCHAR(64)  NOT NULL CONSTRAINT PK_AppSetting PRIMARY KEY,
+        [Value] NVARCHAR(512) NULL
+    );
+END;
+";
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = sql;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Setzt (insert/update) ein AppSetting. Wenn value == null, wird der Eintrag gelöscht.
+        /// </summary>
+        public void SetAppSetting(string key, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key darf nicht leer sein.", nameof(key));
+
+            using (var conn = CreateConnection())
+            {
+                conn.Open();
+
+                if (value == null)
+                {
+                    var del = "DELETE FROM dbo.AppSetting WHERE [Key] = @k;";
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = del;
+                        var p = cmd.CreateParameter();
+                        p.ParameterName = "@k";
+                        p.Value = key;
+                        cmd.Parameters.Add(p);
+                        cmd.ExecuteNonQuery();
+                    }
+                    return;
+                }
+
+                var upsert = @"
+MERGE dbo.AppSetting AS target
+USING (SELECT @k AS [Key], @v AS [Value]) AS src
+ON target.[Key] = src.[Key]
+WHEN MATCHED THEN UPDATE SET [Value] = src.[Value]
+WHEN NOT MATCHED THEN INSERT ([Key],[Value]) VALUES (src.[Key], src.[Value]);
+";
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = upsert;
+
+                    var p1 = cmd.CreateParameter();
+                    p1.ParameterName = "@k";
+                    p1.Value = key;
+                    cmd.Parameters.Add(p1);
+
+                    var p2 = cmd.CreateParameter();
+                    p2.ParameterName = "@v";
+                    p2.Value = (object)value ?? DBNull.Value;
+                    cmd.Parameters.Add(p2);
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Liest ein AppSetting. Gibt null zurück, wenn Key nicht existiert.
+        /// </summary>
+        public string? GetAppSetting(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key darf nicht leer sein.", nameof(key));
+
+            using (var conn = CreateConnection())
+            {
+                conn.Open();
+                var sel = "SELECT [Value] FROM dbo.AppSetting WHERE [Key] = @k;";
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = sel;
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@k";
+                    p.Value = key;
+                    cmd.Parameters.Add(p);
+
+                    var obj = cmd.ExecuteScalar();
+                    if (obj == null || obj == DBNull.Value) return null;
+                    return Convert.ToString(obj);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Legt die Attachment-Tabelle an, falls nicht vorhanden:
+        /// Attachment (Id, TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, ImportedAtUtc, OcrStatus)
+        /// </summary>
+        private void EnsureAttachmentsTable()
+        {
+            using (var conn = CreateConnection())
+            {
+                conn.Open();
+
+                // 1) Tabelle anlegen (idempotent)
+                var createSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Attachment' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.Attachment
+    (
+        Id             INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Attachment PRIMARY KEY,
+        TransaktionId  INT NOT NULL,
+        FileName       NVARCHAR(260) NOT NULL, -- gespeicherter Dateiname im Zielordner
+        OriginalName   NVARCHAR(260) NULL,     -- Quellname beim Import
+        FolderRel      NVARCHAR(128) NOT NULL, -- z. B. '2025\10'
+        SizeBytes      BIGINT NULL,
+        ImportedAtUtc  DATETIME2 NOT NULL CONSTRAINT DF_Attachment_ImportedAt DEFAULT SYSUTCDATETIME(),
+        OcrStatus      NVARCHAR(16) NULL       -- 'Text' | 'Image' | 'OCR' | 'Error'
+    );
+
+    -- optionaler FK (ohne CASCADE, damit Löschen von Transaktionen nicht blockiert,
+    -- sondern app-seitig gesteuert werden kann):
+    -- ALTER TABLE dbo.Attachment
+    -- ADD CONSTRAINT FK_Attachment_Transaktion
+    -- FOREIGN KEY (TransaktionId) REFERENCES dbo.Transaktion(Id);
+END;
+";
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = createSql;
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 2) Sinnvolle Indizes (idempotent)
+                var indexSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Attachment_TransaktionId' AND object_id = OBJECT_ID('dbo.Attachment'))
+BEGIN
+    CREATE INDEX IX_Attachment_TransaktionId ON dbo.Attachment(TransaktionId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Attachment_FolderRel' AND object_id = OBJECT_ID('dbo.Attachment'))
+BEGIN
+    CREATE INDEX IX_Attachment_FolderRel ON dbo.Attachment(FolderRel);
+END;
+";
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = indexSql;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
 
     }
 }

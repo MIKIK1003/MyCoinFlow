@@ -101,7 +101,6 @@ namespace MyCoinFlow.Views
         // ===== Loaded / Navigation =====
         private async void AdminView_Loaded(object sender, RoutedEventArgs e)
         {
-            // Nummernkreis-Tabelle idempotent sicherstellen (schadet nicht, dauert ms)
             try { new DatabaseService().EnsureNumberRangeRulesTable(); } catch { /* still */ }
 
             var nav = El<ListBox>("NavList");
@@ -110,25 +109,24 @@ namespace MyCoinFlow.Views
                 nav.SelectionChanged -= NavList_SelectionChanged;
                 nav.SelectionChanged += NavList_SelectionChanged;
 
-                // Start immer "Kontenplan" – unabhängig von der Reihenfolge
                 var start = nav.Items.OfType<ListBoxItem>()
                     .FirstOrDefault(i => string.Equals(i.Tag as string, "Kontenplan", StringComparison.OrdinalIgnoreCase));
                 nav.SelectedItem = start ?? nav.Items.OfType<ListBoxItem>().FirstOrDefault();
             }
             ShowSection("Kontenplan");
 
-            // Hosts füllen (ohne <local:...> in XAML)
+            // Hosts füllen (ohne <local:...> im XAML)
             EnsureKontenHosts();
             EnsureCreditCardMappingInline();
             AttachNumberRangesView();
-            EnsureUpdatesHost(); // NEU
+            EnsureUpdatesHost();
+            EnsurePathsHost(); // << NEU
 
             await LoadCreditCardSchemasAsync();
-
-
             await LoadCopyCombosAsync();
             SetBackupDefaultPath();
         }
+
 
         private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -152,6 +150,7 @@ namespace MyCoinFlow.Views
             bool isMand = string.Equals(key, "Mandanten", StringComparison.OrdinalIgnoreCase);
             bool isUpdate = string.Equals(key, "Update", StringComparison.OrdinalIgnoreCase);
             bool isBackup = string.Equals(key, "Backup", StringComparison.OrdinalIgnoreCase);
+            bool isPfade = string.Equals(key, "Pfade", StringComparison.OrdinalIgnoreCase);
 
             SetVis("SecNummernkreise", isNum);
             SetVis("SecKontenplan", isKonten);
@@ -159,10 +158,12 @@ namespace MyCoinFlow.Views
             SetVis("SecMandanten", isMand);
             SetVis("SecUpdate", isUpdate);
             SetVis("SecBackup", isBackup);
+            SetVis("SecPfade", isPfade);
 
-            // >>> Neu: Kreditkarten-Host beim Umschalten immer sicher befüllen
             if (isKredit) EnsureCreditCardMappingInline();
+            if (isPfade) EnsurePathsHost();
         }
+
 
 
         // ===== Nummernkreise-Host =====
@@ -607,5 +608,21 @@ ORDER BY name;";
                 SetText("Restore_StatusText", "Restore-Fehler: " + ex.Message);
             }
         }
+        private void EnsurePathsHost()
+        {
+            try
+            {
+                SetHostIfEmpty("PathsHost", () =>
+                {
+                    // direkte Instanzierung (kein <local:...> im XAML)
+                    return new MyCoinFlow.Views.AdminPathsView();
+                });
+            }
+            catch
+            {
+                // still – Tab bleibt leer, falls Control (noch) nicht vorhanden
+            }
+        }
+
     }
 }
