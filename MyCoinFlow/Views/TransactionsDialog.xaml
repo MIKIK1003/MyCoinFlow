@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Neue Buchung"
-        Height="720" Width="720"
+        Height="800" Width="770"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Loaded="Window_Loaded">
@@ -122,38 +122,55 @@
 
                 <!-- Typ-Auswahl -->
                 <Border CornerRadius="12" Padding="12" Margin="0,0,0,12"
-                        Background="{DynamicResource MaterialDesignCardBackground}">
-                    <StackPanel Orientation="Horizontal">
-                        <!-- FIX: Tag typisiert via x:Static → korrektes Enum PackIconKind -->
-                        <RadioButton x:Name="TypeBankToKonto"
-                                     GroupName="TxnType"
-                                     Style="{StaticResource TypeRadioStyle}"
-                                     Tag="{x:Static materialDesign:PackIconKind.BankTransfer}"
-                                     Content="Bank → Konto"
-                                     Checked="TxnType_Checked"/>
+        Background="{DynamicResource MaterialDesignCardBackground}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- Radios -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- Checkbox darunter -->
+                        </Grid.RowDefinitions>
 
-                        <RadioButton x:Name="TypeKontoToKonto"
-                                     GroupName="TxnType"
-                                     Style="{StaticResource TypeRadioStyle}"
-                                     Tag="{x:Static materialDesign:PackIconKind.SwapHorizontal}"
-                                     Content="Konto → Konto"
-                                     Checked="TxnType_Checked"/>
+                        <!-- Zeile 1: Radio-Buttons -->
+                        <StackPanel Orientation="Horizontal" Grid.Row="0">
+                            <RadioButton x:Name="TypeBankToKonto"
+                   GroupName="TxnType"
+                   Style="{StaticResource TypeRadioStyle}"
+                   Tag="{x:Static materialDesign:PackIconKind.BankTransferOut}"
+                   Content="Bank → Konto"
+                   Checked="TxnType_Checked"/>
+                            <RadioButton x:Name="TypeKontoToKonto"
+                   GroupName="TxnType"
+                   Style="{StaticResource TypeRadioStyle}"
+                   Tag="{x:Static materialDesign:PackIconKind.SwapHorizontal}"
+                   Content="Konto → Konto"
+                   Checked="TxnType_Checked"/>
+                            <RadioButton x:Name="TypeKontoToBank"
+                   GroupName="TxnType"
+                   Style="{StaticResource TypeRadioStyle}"
+                   Tag="{x:Static materialDesign:PackIconKind.BankTransferIn}"
+                   Content="Konto → Bank"
+                   Checked="TxnType_Checked"/>
+                            <RadioButton x:Name="TypeAdresseToBank"
+                   GroupName="TxnType"
+                   Style="{StaticResource TypeRadioStyle}"
+                   Tag="{x:Static materialDesign:PackIconKind.AccountCash}"
+                   Content="Adresse → Bank"
+                   Checked="TxnType_Checked"/>
+                        </StackPanel>
 
-                        <RadioButton x:Name="TypeKontoToBank"
-                                     GroupName="TxnType"
-                                     Style="{StaticResource TypeRadioStyle}"
-                                     Tag="{x:Static materialDesign:PackIconKind.Bank}"
-                                     Content="Konto → Bank"
-                                     Checked="TxnType_Checked"/>
+                        <!-- Zeile 2: Haken – aktiv nutzbar -->
+                        <CheckBox x:Name="BudgetEinnahmeBox"
+                          Grid.Row="1"
+                            Content="Budgetierte Einnahme"
+                            Margin="4,10,0,0"
+                            HorizontalAlignment="Left"
+                            Checked="BudgetCheck_Changed"
+                            Unchecked="BudgetCheck_Changed"/>
 
-                        <RadioButton x:Name="TypeAdresseToBank"
-                                     GroupName="TxnType"
-                                     Style="{StaticResource TypeRadioStyle}"
-                                     Tag="{x:Static materialDesign:PackIconKind.AccountCash}"
-                                     Content="Adresse → Bank"
-                                     Checked="TxnType_Checked"/>
-                    </StackPanel>
+                    </Grid>
                 </Border>
+
 
                 <!-- Formularkarte -->
                 <Border CornerRadius="12" Padding="16"
