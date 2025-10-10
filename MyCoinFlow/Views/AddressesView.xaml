@@ -39,7 +39,7 @@
                   IsReadOnly="True">
             <DataGrid.Columns>
 
-                <!-- Icon-Spalte ganz rechts (Standard-Icon/Farbe via DefaultIconStyle) -->
+                <!-- Icon-Spalte ganz links (Standard-Icon/Farbe via DefaultIconStyle) -->
                 <DataGridTemplateColumn Header="" Width="Auto" MinWidth="42" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>

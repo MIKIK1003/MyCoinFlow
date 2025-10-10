@@ -3884,6 +3884,164 @@ END;
             }
         }
 
+        // ================== ATTACHMENTS: SETTINGS & QUERIES ==================
+
+        /// <summary>
+        /// Liefert Root-Pfad und Max-MB aus AppSetting.
+        /// Fallbacks: Root = %USERPROFILE%\Dokumente\MyCoinFlow\Attachments; MaxMb = 20.
+        /// </summary>
+        public (string Root, int MaxMb) GetAttachmentSettings()
+        {
+            string? root = GetAppSetting("AttachmentRoot");
+            string? max = GetAppSetting("AttachmentMaxMB");
+
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                var doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                root = Path.Combine(doc, "MyCoinFlow", "Attachments");
+            }
+
+            int maxMb = 20;
+            if (!string.IsNullOrWhiteSpace(max) && int.TryParse(max, out var parsed) && parsed >= 1 && parsed <= 1024)
+                maxMb = parsed;
+
+            return (root, maxMb);
+        }
+
+        /// <summary>
+        /// Liest den ImportHash aus Transaktion, falls vorhanden; sonst null.
+        /// </summary>
+        public string? GetImportHashForTransaktion(int transaktionId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT ImportHash FROM dbo.Transaktion WHERE Id=@id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+            var obj = cmd.ExecuteScalar();
+            if (obj == null || obj == DBNull.Value) return null;
+            return Convert.ToString(obj);
+        }
+
+        /// <summary>
+        /// True, wenn zu einer Transaktion mindestens ein Attachment existiert.
+        /// </summary>
+        public bool HasAttachments(int transaktionId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.Attachment WHERE TransaktionId=@id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        /// <summary>
+        /// Legt einen Attachment-Datensatz an. Gibt die neue Id zurück.
+        /// </summary>
+        public int SaveAttachment(int transaktionId, string fileName, string? originalName, string folderRel, long? sizeBytes, string? ocrStatus)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"
+INSERT INTO dbo.Attachment (TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, OcrStatus)
+VALUES (@t, @f, @o, @folder, @sz, @ocr);
+SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@t", transaktionId);
+            cmd.Parameters.AddWithValue("@f", fileName);
+            cmd.Parameters.AddWithValue("@o", (object?)originalName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@folder", folderRel);
+            cmd.Parameters.AddWithValue("@sz", (object?)sizeBytes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ocr", (object?)ocrStatus ?? DBNull.Value);
+
+            var idObj = cmd.ExecuteScalar();
+            return (idObj is int i) ? i : Convert.ToInt32(idObj);
+        }
+
+        /// <summary>
+        /// Liefert alle Attachments zu einer Transaktion (Id, FileName, FolderRel).
+        /// </summary>
+        public List<(int Id, string FileName, string FolderRel)> LoadAttachmentsByTransaktionId(int transaktionId)
+        {
+            var list = new List<(int Id, string FileName, string FolderRel)>();
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT Id, FileName, FolderRel FROM dbo.Attachment WHERE TransaktionId=@id ORDER BY Id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((r.GetInt32(0), r.GetString(1), r.GetString(2)));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Liefert detaillierte Attachmentdaten je Transaktion (für Tooltip/Dialog).
+        /// </summary>
+        public List<(int Id, string FileName, string FolderRel, string? OcrStatus, long? SizeBytes, string? OriginalName)>
+            LoadAttachmentDetailsByTransaktionId(int transaktionId)
+        {
+            var list = new List<(int, string, string, string?, long?, string?)>();
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"
+SELECT Id, FileName, FolderRel, OcrStatus, SizeBytes, OriginalName
+FROM dbo.Attachment
+WHERE TransaktionId=@id
+ORDER BY Id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((
+                    r.GetInt32(0),
+                    r.GetString(1),
+                    r.GetString(2),
+                    r.IsDBNull(3) ? null : r.GetString(3),
+                    r.IsDBNull(4) ? (long?)null : r.GetInt64(4),
+                    r.IsDBNull(5) ? null : r.GetString(5)
+                ));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Load by Id – minimal für Delete / Open.
+        /// </summary>
+        public (int Id, int TransaktionId, string FileName, string FolderRel)? GetAttachmentById(int attachmentId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT Id, TransaktionId, FileName, FolderRel FROM dbo.Attachment WHERE Id=@id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                return (r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetString(3));
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Löscht einen Attachment-Datensatz.
+        /// </summary>
+        public void DeleteAttachment(int attachmentId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"DELETE FROM dbo.Attachment WHERE Id=@id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.ExecuteNonQuery();
+        }
+
 
     }
 }

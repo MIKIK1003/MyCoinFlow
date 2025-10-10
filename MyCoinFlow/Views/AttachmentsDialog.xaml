@@ -1,0 +1,56 @@
+﻿<Window x:Class="MyCoinFlow.Views.AttachmentsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Anhänge verwalten"
+        Height="420" Width="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Anhänge zur Transaktion"
+                   FontSize="16"
+                   Margin="0,0,0,12"
+                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+        <DataGrid x:Name="GridFiles" Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  Margin="0,0,0,12">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
+                <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="120"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="120"/>
+                <DataGridTemplateColumn Header="" Width="140" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource IconTextButton}"
+                                        Tag="FileEye"
+                                        Content="Öffnen"
+                                        Margin="0,0,8,0"
+                                        Click="Open_Click"/>
+                                <Button Style="{StaticResource IconTextButton.Danger}"
+                                        Tag="Delete"
+                                        Content="Löschen"
+                                        Click="Delete_Click"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}" Tag="Close" Content="Schließen" IsDefault="True" Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

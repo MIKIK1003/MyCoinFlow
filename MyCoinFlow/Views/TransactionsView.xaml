@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="MyCoinFlow.Views.TransactionsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -32,14 +33,13 @@
                     Content="Bankimport…"
                     Margin="20 10 0 0"
                     Command="{Binding OpenBankImportCommand}"/>
-            
+
             <!-- NEU: Kreditkarten-Import öffnen -->
             <Button Style="{StaticResource IconTextButton}"
                     Tag="creditcard"
                     Content="Kreditkarten"
                     Margin="10 10 0 0"
                     Click="OpenCreditCardImport_Click"/>
-
         </StackPanel>
 
         <!-- Liste -->
@@ -50,6 +50,84 @@
                   CanUserAddRows="False"
                   IsReadOnly="True">
             <DataGrid.Columns>
+
+
+                <!-- Aktionen (PDF) -->
+                <DataGridTemplateColumn Header="" Width="200" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                <!-- PDF Anhängen) -->
+                                <Button ToolTip="PDF Anhängen"
+                                    Command="{Binding DataContext.AttachPdfCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding Id}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Padding="0"
+                                    HorizontalAlignment="Right">
+                                <materialDesign:PackIcon
+                                    Kind="FilePlusOutline"
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Width="24" Height="24"/>
+                                </Button>
+
+                                <!-- Öffnen (Icon wechselt zwischen PDF / Dots je nach HasAttachments) -->
+                                <Button ToolTip="PDF Öffnen"
+                                    ToolTipService.ToolTip="{Binding AttachmentsTooltip}"
+                                    IsEnabled="{Binding HasAttachments}"
+                                    Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding Id}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Padding="0"
+                                    HorizontalAlignment="Right"
+                                    Content="{Binding}">
+                                <Button.ContentTemplate>
+                        <DataTemplate>
+                                <Grid>
+                                <!-- Standard: kein Anhang -> Dots sichtbar, PDF versteckt -->
+                                <materialDesign:PackIcon x:Name="IconPdf"
+                                    Kind="FilePdfBox"
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Width="24" Height="24"
+                                    Visibility="Collapsed"/>
+                                <materialDesign:PackIcon x:Name="IconEmpty"
+                                    Kind="DotsHorizontal"
+                                         Style="{StaticResource DefaultIconStyle}"
+                                         Width="24" Height="24"
+                                         Visibility="Visible"/>
+                                </Grid>
+                                <!-- Umschalten nur mit DataTemplate-Triggers (kein Style/Setter-Konflikt) -->
+                                <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding HasAttachments}" Value="True">
+                                <Setter TargetName="IconPdf"   Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="IconEmpty" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                </DataTemplate.Triggers>
+                        </DataTemplate>
+                               </Button.ContentTemplate>
+                               </Button>
+
+                                <!-- NEU: Anhänge verwalten… (Dialog) -->
+                                <Button ToolTip="Anhänge Verwalten"
+                                    Command="{Binding DataContext.ManageAttachmentsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding Id}"
+                                    Style="{StaticResource MaterialDesignFlatButton}"
+                                    Padding="0"
+                                    HorizontalAlignment="Right">
+                                <materialDesign:PackIcon
+                                    Kind="dotsvertical"
+                                    Style="{StaticResource DefaultIconStyle}"
+                                    Width="24" Height="24"/>
+                                </Button>
+
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+
+
+
                 <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
                 <DataGridTextColumn Header="Von"   Binding="{Binding VonAnzeige}" Width="*"/>
                 <DataGridTextColumn Header="Nach"  Binding="{Binding NachAnzeige}" Width="*"/>
@@ -64,6 +142,10 @@
                 <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="*"/>
                 <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" Width="*"/>
                 <DataGridTextColumn Header="Notiz"   Binding="{Binding Notiz}" Width="2*"/>
+
+                
+
+
             </DataGrid.Columns>
         </DataGrid>
     </Grid>
