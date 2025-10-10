@@ -38,6 +38,10 @@ namespace MyCoinFlow.ViewModels
         public int? NachKontoId { get; set; }
         public int? AdresseId { get; set; }
         public int? GeldinstitutId { get; set; }
+
+        public int AttachmentCount { get; set; }
+        public bool HasMultipleAttachments => AttachmentCount > 1;
+
     }
 
     public class TransactionsViewModel : INotifyPropertyChanged
@@ -195,6 +199,7 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var t in list)
             {
+                // Von/Nach lesbar aufbereiten (Fallbacks wie gehabt)
                 string von = t.VonKontoId.HasValue
                     ? (kontoMap.TryGetValue(t.VonKontoId.Value, out var vk) ? vk : $"Konto #{t.VonKontoId}")
                     : (t.BankName ?? "Bank");
@@ -203,7 +208,7 @@ namespace MyCoinFlow.ViewModels
                     ? (kontoMap.TryGetValue(t.NachKontoId.Value, out var nk) ? nk : $"Konto #{t.NachKontoId}")
                     : (t.BankName ?? "Bank");
 
-                // --- NEU: Details einmal laden -> für HasAttachments + Tooltip nutzen
+                // --- NEU: Attach-Details genau 1x laden und für Zähler + Tooltip nutzen
                 var details = _db.LoadAttachmentDetailsByTransaktionId(t.Id);
 
                 string? tooltip = null;
@@ -219,24 +224,29 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = t.Id,
                     Datum = t.Datum,
+
                     VonAnzeige = von,
                     NachAnzeige = nach,
                     Betrag = t.Betrag,
+
                     AdresseName = t.AdresseName,
                     BankName = t.BankName,
                     Notiz = t.Notiz,
-                    // IDs für Bearbeiten/Löschen
+
+                    // IDs für Bearbeiten/Löschen (wie gehabt, falls vorhanden)
                     VonKontoId = t.VonKontoId,
                     NachKontoId = t.NachKontoId,
                     AdresseId = t.AdresseId,
                     GeldinstitutId = t.GeldinstitutId,
 
-                    // --- Anhänge
-                    HasAttachments = details.Count > 0,
-                    AttachmentsTooltip = tooltip
+                    // --- NEU: Anhänge
+                    AttachmentCount = details.Count,         // Zähler
+                    HasAttachments = details.Count > 0,     // Flag
+                    AttachmentsTooltip = tooltip                // Kurzliste für Tooltip
                 });
             }
         }
+
 
 
         private void OpenBankImport()
@@ -326,7 +336,7 @@ namespace MyCoinFlow.ViewModels
                 var details = _db.LoadAttachmentDetailsByTransaktionId(id);
                 if (details.Count == 0)
                 {
-                    MessageBox.Show("Zu dieser Buchung sind keine Anhänge vorhanden.", "PDF öffnen",
+                    MessageBox.Show("Zu dieser Buchung sind keine Anhänge vorhanden.", "Anhänge öffnen",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
@@ -355,8 +365,8 @@ namespace MyCoinFlow.ViewModels
                     return;
                 }
 
-                // Mehrere Anhänge: nur diese Transaktion zeigen (Dialog)
-                var dlg = new MyCoinFlow.Views.AttachmentsDialog(id)
+                // Mehrere Anhänge: Dialog im Open-Only-Modus (keine Lösch-Buttons)
+                var dlg = new MyCoinFlow.Views.AttachmentsDialog(id, allowDelete: false)
                 {
                     Owner = System.Windows.Application.Current?.Windows?.OfType<System.Windows.Window>()?.FirstOrDefault(w => w.IsActive)
                             ?? System.Windows.Application.Current?.MainWindow
@@ -365,7 +375,7 @@ namespace MyCoinFlow.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Öffnen fehlgeschlagen: " + ex.Message, "PDF öffnen",
+                MessageBox.Show("Öffnen fehlgeschlagen: " + ex.Message, "Anhänge öffnen",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

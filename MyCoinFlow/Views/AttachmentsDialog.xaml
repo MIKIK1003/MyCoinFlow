@@ -7,6 +7,11 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False">
+    <Window.Resources>
+        <!-- Für Sichtbarkeit des Lösch-Buttons je nach AllowDelete -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -29,22 +34,36 @@
                 <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
                 <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="120"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="120"/>
-                <DataGridTemplateColumn Header="" Width="140" IsReadOnly="True">
+                <DataGridTemplateColumn Header="" Width="200" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Style="{StaticResource IconTextButton}"
-                                        Tag="FileEye"
-                                        Content="Öffnen"
-                                        Margin="0,0,8,0"
-                                        Click="Open_Click"/>
+                                <!-- ÖFFNEN: nur sichtbar, wenn AllowDelete == false (also NICHT aus "Verwalten" geöffnet) -->
+                                <Button x:Name="OpenBtn"
+                    Style="{StaticResource IconTextButton}"
+                    Tag="FileEye"
+                    Content="Öffnen"
+                    Margin="0,0,8,0"
+                    Click="Open_Click"/>
+
+                                <!-- LÖSCHEN: bleibt wie bisher an AllowDelete gebunden -->
                                 <Button Style="{StaticResource IconTextButton.Danger}"
-                                        Tag="Delete"
-                                        Content="Löschen"
-                                        Click="Delete_Click"/>
+                    Tag="Delete"
+                    Content="Löschen"
+                    Visibility="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete, Converter={StaticResource BoolToVis}}"
+                    Click="Delete_Click"/>
                             </StackPanel>
+
+                            <!-- NEU: OpenBtn ausblenden, wenn AllowDelete == true (drei Punkte / Verwalten) -->
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete}"
+                         Value="True">
+                                    <Setter TargetName="OpenBtn" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
