@@ -78,7 +78,7 @@
                         <StackPanel Orientation="Horizontal" Margin="8,4">
                             <materialDesign:PackIcon Kind="folderarrowupdown"
                                  Style="{StaticResource DefaultIconStyle.Nav}"/>
-                            <TextBlock Text="Verzeichnisse" VerticalAlignment="Center"/>
+                            <TextBlock Text="Dateianhänge und OCR" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
 

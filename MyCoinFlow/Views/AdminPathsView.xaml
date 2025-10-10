@@ -3,61 +3,218 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              Margin="16">
-    <Grid>
-        <!-- Korrekt: Definitions als Elemente, nicht als Attribute -->
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Überschrift -->
+                <RowDefinition Height="Auto"/>
+                <!-- Attach Root -->
+                <RowDefinition Height="Auto"/>
+                <!-- Max MB -->
+                <RowDefinition Height="Auto"/>
+                <!-- Aktionen -->
+                <RowDefinition Height="24"/>
+                <!-- Spacer -->
+                <RowDefinition Height="Auto"/>
+                <!-- OCR Überschrift -->
+                <RowDefinition Height="Auto"/>
+                <!-- Tesseract Pfad -->
+                <RowDefinition Height="Auto"/>
+                <!-- Sprachen -->
+                <RowDefinition Height="Auto"/>
+                <!-- OCR Aktionen -->
+                <RowDefinition Height="24"/>
+                <!-- Spacer -->
+                <RowDefinition Height="Auto"/>
+                <!-- DB Überschrift -->
+                <RowDefinition Height="Auto"/>
+                <!-- DB Grid 1 -->
+                <RowDefinition Height="Auto"/>
+                <!-- DB Grid 2 -->
+                <RowDefinition Height="Auto"/>
+                <!-- DB Aktionen -->
+                <RowDefinition Height="Auto"/>
+                <!-- Status -->
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <!-- Überschrift -->
-        <TextBlock Grid.ColumnSpan="2"
-                   Text="Verzeichnisse"
-                   FontSize="18"
-                   Margin="0,0,0,12"
-                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+            <!-- Überschrift -->
+            <TextBlock Grid.ColumnSpan="2"
+                       Text="Verzeichnisse"
+                       FontSize="18"
+                       Margin="0,0,0,12"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
 
-        <!-- Attachments-Root -->
-        <TextBlock Grid.Row="1" Text="Attachments-Root" VerticalAlignment="Center"
-                   Margin="0,0,12,0"
-                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
-        <DockPanel Grid.Row="1" Grid.Column="1">
-            <TextBox x:Name="AttachRootBox"
+            <!-- Attachments-Root -->
+            <TextBlock Grid.Row="1" Text="Attachments-Root" VerticalAlignment="Center"
+                       Margin="0,0,12,0"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+            <DockPanel Grid.Row="1" Grid.Column="1">
+                <TextBox x:Name="AttachRootBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="z. B. %USERPROFILE%\Dokumente\MyCoinFlow\Attachments"
+                         MinWidth="420"
+                         VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- Max Größe (MB) -->
+            <TextBlock Grid.Row="2" Text="Max. Dateigröße (MB)" VerticalAlignment="Center"
+                       Margin="0,12,12,0"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+            <TextBox x:Name="MaxMbBox"
+                     Grid.Row="2" Grid.Column="1"
+                     Margin="0,12,0,0"
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                     materialDesign:HintAssist.Hint="z. B. %USERPROFILE%\Dokumente\MyCoinFlow\Attachments"
-                     MinWidth="420"
-                     VerticalAlignment="Center" />
-        </DockPanel>
+                     materialDesign:HintAssist.Hint="Standard: 20"
+                     Width="140" />
 
-        <!-- Max Größe (MB) -->
-        <TextBlock Grid.Row="2" Text="Max. Dateigröße (MB)" VerticalAlignment="Center"
-                   Margin="0,12,12,0"
-                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
-        <TextBox x:Name="MaxMbBox"
-                 Grid.Row="2" Grid.Column="1"
-                 Margin="0,12,0,0"
-                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                 materialDesign:HintAssist.Hint="Standard: 20"
-                 Width="140" />
+            <!-- Aktionen -->
+            <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,8">
+                <Button Style="{StaticResource IconTextButton}" Tag="FolderPlus"  Content="Ordner erstellen"   Click="CreateFolder_Click"  Margin="0,0,8,0"/>
+                <Button Style="{StaticResource IconTextButton}" Tag="FolderOpen"  Content="Im Explorer öffnen" Click="OpenInExplorer_Click" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource IconTextButton}" Tag="ContentSave" Content="Speichern"          Click="Save_Click"/>
+            </StackPanel>
 
-        <!-- Aktionen (Spacing entfernt, kompatibel über Margins) -->
-        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,8">
-            <Button Style="{StaticResource IconTextButton}" Tag="FolderPlus"  Content="Ordner erstellen"   Click="CreateFolder_Click"  Margin="0,0,8,0"/>
-            <Button Style="{StaticResource IconTextButton}" Tag="FolderOpen"  Content="Im Explorer öffnen" Click="OpenInExplorer_Click" Margin="0,0,8,0"/>
-            <Button Style="{StaticResource IconTextButton}" Tag="ContentSave" Content="Speichern"          Click="Save_Click"/>
-        </StackPanel>
+            <!-- Spacer -->
+            <Border Grid.Row="4" Grid.ColumnSpan="2" Height="1" Background="{DynamicResource MaterialDesignDivider}"/>
 
-        <!-- Status -->
-        <TextBlock x:Name="StatusText"
-                   Grid.Row="4" Grid.ColumnSpan="2"
-                   Text=""
-                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
-    </Grid>
+            <!-- OCR Überschrift -->
+            <TextBlock Grid.Row="5" Grid.ColumnSpan="2"
+                       Text="OCR"
+                       FontSize="18"
+                       Margin="0,12,0,12"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+
+            <!-- Tesseract Pfad -->
+            <TextBlock Grid.Row="6" Text="Tesseract (tesseract.exe)" VerticalAlignment="Center"
+                       Margin="0,0,12,0"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+            <DockPanel Grid.Row="6" Grid.Column="1">
+                <TextBox x:Name="TessPathBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="z. B. C:\Programme\MyCoinFlow\OCR\tesseract.exe"
+                         MinWidth="420"
+                         VerticalAlignment="Center" />
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="FileFind"
+                        Content="Durchsuchen…"
+                        Margin="8,0,0,0"
+                        Click="BrowseTesseract_Click"/>
+            </DockPanel>
+
+            <!-- Sprachen -->
+            <TextBlock Grid.Row="7" Text="Sprachen (langs)" VerticalAlignment="Center"
+                       Margin="0,12,12,0"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+            <TextBox x:Name="LangsBox"
+                     Grid.Row="7" Grid.Column="1"
+                     Margin="0,12,0,0"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="deu+eng"
+                     Width="140" />
+
+            <!-- OCR Aktionen -->
+            <StackPanel Grid.Row="8" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,8">
+                <Button Style="{StaticResource IconTextButton}" Tag="ContentSave" Content="OCR-Einstellungen speichern" Click="SaveOcr_Click"/>
+            </StackPanel>
+
+            <!-- Spacer -->
+            <Border Grid.Row="9" Grid.ColumnSpan="2" Height="1" Background="{DynamicResource MaterialDesignDivider}"/>
+
+            <!-- DB Überschrift -->
+            <TextBlock Grid.Row="10" Grid.ColumnSpan="2"
+                       Text="Datenbank"
+                       FontSize="18"
+                       Margin="0,12,0,12"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+
+            <!-- DB Grid 1 -->
+            <Grid Grid.Row="11" Grid.ColumnSpan="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Name -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" VerticalAlignment="Center"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbNameText" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center"
+               TextTrimming="CharacterEllipsis"/>
+
+                <!-- Daten-Dateigröße -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Daten-Dateigröße" VerticalAlignment="Center"
+               Margin="0,6,0,0"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbSizeText" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,6,0,0"/>
+
+                <!-- Limit -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Limit (Express)" VerticalAlignment="Center"
+               Margin="0,6,0,0"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbLimitText" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="0,6,0,0"/>
+
+                <!-- Auslastung -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Auslastung" VerticalAlignment="Center"
+               Margin="0,6,0,0"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,6,0,0">
+                    <ProgressBar x:Name="DbUsageBar" Height="8" Minimum="0" Maximum="100"/>
+                    <TextBlock x:Name="DbUsageText" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+
+
+            <!-- DB Grid 2 -->
+            <Grid Grid.Row="12" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Anhänge (Dateien) -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Anhänge (Dateien)" VerticalAlignment="Center"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbAttachCountText" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center"/>
+
+                <!-- Index-Einträge -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Index-Einträge" VerticalAlignment="Center"
+               Margin="0,6,0,0"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbAttachTextCountText" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,6,0,0"/>
+
+                <!-- Textsumme (MB) -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Textsumme (MB)" VerticalAlignment="Center"
+               Margin="0,6,0,0"
+               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <TextBlock x:Name="DbTextBytesText" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="0,6,0,0"/>
+            </Grid>
+
+
+            <!-- DB Aktionen -->
+            <StackPanel Grid.Row="13" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,8">
+                <Button Style="{StaticResource IconTextButton}" Tag="Refresh" Content="Aktualisieren" Click="RefreshDbStats_Click"/>
+            </StackPanel>
+
+            <!-- Status -->
+            <TextBlock x:Name="StatusText"
+                       Grid.Row="14" Grid.ColumnSpan="2"
+                       Text=""
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -24,12 +24,15 @@ namespace MyCoinFlow.Services
             if (string.IsNullOrWhiteSpace(sourceFilePath)) throw new ArgumentException("Dateipfad fehlt.", nameof(sourceFilePath));
             if (!File.Exists(sourceFilePath)) throw new FileNotFoundException("Quelldatei nicht gefunden.", sourceFilePath);
 
+            // NEU: Schema immer sicherstellen (Attachment + AttachmentText + AppSettings)
+            _db.EnsureAttachmentsSchema();
+
             var ext = Path.GetExtension(sourceFilePath)?.ToLowerInvariant();
             var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".jpg", ".jpeg", ".png" };
             if (string.IsNullOrWhiteSpace(ext) || !allowed.Contains(ext))
                 throw new InvalidOperationException("Nur PDF/JPG/PNG sind erlaubt.");
 
-            // Settings laden
+            // Settings
             var (root, maxMb) = _db.GetAttachmentSettings();
             if (string.IsNullOrWhiteSpace(root))
             {
@@ -37,31 +40,30 @@ namespace MyCoinFlow.Services
                 root = Path.Combine(doc, "MyCoinFlow", "Attachments");
             }
 
-            // Größe prüfen
+            // Größe
             var fi = new FileInfo(sourceFilePath);
             long limitBytes = (long)Math.Max(1, maxMb) * 1024L * 1024L;
             if (fi.Length > limitBytes)
                 throw new InvalidOperationException($"Datei ist größer als das Limit von {maxMb} MB.");
 
-            // Ordnerstruktur: <root>\YYYY\MM
+            // Zielordner <root>\YYYY\MM
             var now = DateTime.Now;
             var folderRel = Path.Combine(now.ToString("yyyy"), now.ToString("MM"));
             var targetDir = Path.Combine(root, folderRel);
             Directory.CreateDirectory(targetDir);
 
-            // Dateiname: TX-{Id}-H{Hash12}{ext}  (Endung bleibt erhalten)
+            // Dateiname TX-{Id}-H{Hash12}{ext}
             var hash = _db.GetImportHashForTransaktion(transaktionId);
             string hash12 = !string.IsNullOrWhiteSpace(hash)
                 ? (hash.Length <= 12 ? hash : hash.Substring(hash.Length - 12))
                 : "D" + now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
 
             string baseNameNoExt = $"TX-{transaktionId}-H{hash12}";
-            string baseName = baseNameNoExt + ext;              // <- Endung aus Quelle
+            string baseName = baseNameNoExt + ext;
             string targetPath = Path.Combine(targetDir, baseName);
 
             if (File.Exists(targetPath))
             {
-                // Bei Kollision: -2, -3, ...
                 int n = 2;
                 while (true)
                 {
@@ -71,23 +73,54 @@ namespace MyCoinFlow.Services
                 }
             }
 
-            // Move (nicht kopieren)
+            // Verschieben
             File.Move(sourceFilePath, targetPath);
 
-            // DB-Eintrag – Bilder als "Image" markieren, PDF vorerst ohne Status
-            string? ocrStatus = (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase)) ? null : "Image";
-
-            _db.SaveAttachment(
+            // DB: Attachment anlegen -> Id zurück
+            int attachmentId = _db.SaveAttachment(
                 transaktionId: transaktionId,
                 fileName: Path.GetFileName(targetPath),
                 originalName: Path.GetFileName(sourceFilePath),
                 folderRel: folderRel.Replace('/', '\\'),
                 sizeBytes: fi.Length,
-                ocrStatus: ocrStatus
+                ocrStatus: null // setzen wir gleich passend
             );
+
+            try
+            {
+                if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ocr = new OcrService();
+                    // Text extrahieren (ohne OCR) – bei textbasierten PDFs liefert das Inhalt
+                    var text = ocr.ExtractTextFromPdf_NoOcr(targetPath);
+
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        // Erst Status setzen, dann Text upserten (Reihenfolge robust, falls Text sehr lang ist)
+                        _db.UpdateAttachmentOcrStatus(attachmentId, "Text");
+                        _db.UpsertAttachmentText(attachmentId, text, "pdf");
+                    }
+                    else
+                    {
+                        _db.UpdateAttachmentOcrStatus(attachmentId, "Image"); // vermutlich Scan-PDF
+                    }
+                }
+                else
+                {
+                    // Bilder markieren wir vorerst als "Image" (OCR folgt später)
+                    _db.UpdateAttachmentOcrStatus(attachmentId, "Image");
+                }
+            }
+            catch
+            {
+                // Index-/Erkennungsfehler nicht durchreichen; OcrStatus bleibt wie gesetzt oder null.
+                // Ein "Index aktualisieren"-Lauf kann das später nachziehen.
+            }
 
             return targetPath;
         }
+
+
 
 
         /// <summary>

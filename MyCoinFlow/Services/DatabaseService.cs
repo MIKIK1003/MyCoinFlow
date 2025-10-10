@@ -3701,19 +3701,84 @@ ORDER BY t.Datum DESC, t.Id DESC;";
         }
 
         // ---------------------------------------------
-        // SCHRITT 1a – ATTACHMENTS & APP-SETTINGS SCHEMA
+        // SCHRITT A – Schema-Erweiterung OCR/Textindex
         // ---------------------------------------------
 
         /// <summary>
-        /// Führt alle idempotenten Checks aus, um die für Anhänge benötigten DB-Objekte bereitzustellen.
-        /// Diese Methode kannst du beim App-Start einmalig aufrufen (z. B. in deiner bestehenden Init-Kaskade).
-        /// Sie verändert keine bestehenden Tabellen.
+        /// Führt alle idempotenten Checks aus, um die für Anhänge/OCR benötigten DB-Objekte bereitzustellen.
         /// </summary>
         public void EnsureAttachmentsSchema()
         {
             EnsureAppSettingsTable();
             EnsureAttachmentsTable();
+            EnsureAttachmentTextTable(); // NEU: Textindex pro Attachment
         }
+
+        /// <summary>
+        /// Legt die AttachmentText-Tabelle an, falls nicht vorhanden:
+        /// AttachmentText (AttachmentId PK/FK, Text NVARCHAR(MAX), Lang NVARCHAR(16), ExtractedAtUtc DATETIME2)
+        /// </summary>
+        private void EnsureAttachmentTextTable()
+        {
+            using var conn = CreateConnection();
+            conn.Open();
+
+            var sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AttachmentText' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.AttachmentText
+    (
+        AttachmentId   INT NOT NULL CONSTRAINT PK_AttachmentText PRIMARY KEY,
+        [Text]         NVARCHAR(MAX) NULL,
+        [Lang]         NVARCHAR(16) NULL,
+        ExtractedAtUtc DATETIME2 NOT NULL CONSTRAINT DF_AttachmentText_Extracted DEFAULT SYSUTCDATETIME()
+    );
+
+    -- optionaler FK
+    -- ALTER TABLE dbo.AttachmentText
+    -- ADD CONSTRAINT FK_AttachmentText_Attachment
+    -- FOREIGN KEY (AttachmentId) REFERENCES dbo.Attachment(Id) ON DELETE CASCADE;
+END;
+";
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Liefert Tesseract-Pfad (exe) und Languages (Default: deu+eng), aus AppSettings.
+        /// </summary>
+        public (string TesseractExe, string Languages) GetOcrSettings()
+        {
+            string exe = GetAppSetting("TesseractExePath") ?? "";
+            string langs = GetAppSetting("TesseractLanguages") ?? "deu+eng";
+            return (exe, langs);
+        }
+
+        /// <summary>
+        /// Legt oder aktualisiert den Textindex für ein Attachment.
+        /// </summary>
+        public void UpsertAttachmentText(int attachmentId, string? text, string? lang)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+MERGE dbo.AttachmentText AS target
+USING (SELECT @id AS AttachmentId) AS src
+ON (target.AttachmentId = src.AttachmentId)
+WHEN MATCHED THEN
+    UPDATE SET [Text] = @t, [Lang] = @l, ExtractedAtUtc = SYSUTCDATETIME()
+WHEN NOT MATCHED THEN
+    INSERT (AttachmentId, [Text], [Lang]) VALUES (@id, @t, @l);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@t", (object?)text ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@l", (object?)lang ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
 
         /// <summary>
         /// Legt eine sehr einfache Key/Value-Tabelle an, falls nicht vorhanden:
@@ -4040,6 +4105,80 @@ ORDER BY Id";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@id", attachmentId);
             cmd.ExecuteNonQuery();
+        }
+        /// <summary>
+        /// Setzt den OCR-Status eines Attachments (z. B. "Text", "Image", "OCR", "Error").
+        /// </summary>
+        public void UpdateAttachmentOcrStatus(int attachmentId, string? status)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET OcrStatus = @s WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@s", (object?)status ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+        /// <summary>
+        /// Liefert Kennzahlen zur aktuellen DB: Name, Daten-Dateigröße (MB, ohne Log),
+        /// Express-Max (MB), sowie Counts/Bytes für Attachments/Index.
+        /// </summary>
+        public (string DatabaseName, double DataSizeMB, double DataMaxMB, int AttachmentCount, int AttachmentTextCount, long AttachmentTextBytes)
+            GetDatabaseStats()
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            string dbName = "Unbekannt";
+            double dataMb = 0;
+            double maxMb = 10240; // SQL Express/LocalDB: 10 GB Daten-Limit
+            int attachCount = 0;
+            int attachTextCount = 0;
+            long attachTextBytes = 0;
+
+            // DB-Name
+            using (var cmd = new SqlCommand("SELECT DB_NAME();", c))
+            {
+                var obj = cmd.ExecuteScalar();
+                if (obj != null && obj != DBNull.Value) dbName = Convert.ToString(obj) ?? dbName;
+            }
+
+            // Daten-Dateigröße (nur ROWS, ohne Log)
+            const string sizeSql = @"
+SELECT CAST(SUM(size) * 8.0 / 1024.0 AS FLOAT) AS DataSizeMB
+FROM sys.database_files
+WHERE type_desc = 'ROWS';";
+            using (var cmd = new SqlCommand(sizeSql, c))
+            {
+                var obj = cmd.ExecuteScalar();
+                if (obj != null && obj != DBNull.Value) dataMb = Convert.ToDouble(obj);
+            }
+
+            // Sicherstellen, dass Tabellen existieren (idempotent, billig)
+            try { EnsureAttachmentsSchema(); } catch { /* still */ }
+
+            // Counts
+            try
+            {
+                using var cmd1 = new SqlCommand("SELECT COUNT(*) FROM dbo.Attachment;", c);
+                var o1 = cmd1.ExecuteScalar();
+                attachCount = (o1 == null || o1 == DBNull.Value) ? 0 : Convert.ToInt32(o1);
+            }
+            catch { /* Tabelle evtl. nicht vorhanden */ }
+
+            try
+            {
+                using var cmd2 = new SqlCommand("SELECT COUNT(*), SUM(DATALENGTH([Text])) FROM dbo.AttachmentText;", c);
+                using var r = cmd2.ExecuteReader();
+                if (r.Read())
+                {
+                    attachTextCount = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+                    attachTextBytes = r.IsDBNull(1) ? 0L : Convert.ToInt64(r.GetValue(1));
+                }
+            }
+            catch { /* Tabelle evtl. nicht vorhanden */ }
+
+            return (dbName, dataMb, maxMb, attachCount, attachTextCount, attachTextBytes);
         }
 
 

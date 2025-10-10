@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using MyCoinFlow.Services;
 
 namespace MyCoinFlow.Views
@@ -13,15 +15,21 @@ namespace MyCoinFlow.Views
 
         private const string KeyRoot = "AttachmentRoot";
         private const string KeyMax = "AttachmentMaxMB";
+        private const string KeyTessExe = "TesseractExePath";
+        private const string KeyTessLang = "TesseractLanguages";
 
         public AdminPathsView()
         {
             InitializeComponent();
 
-            // Sicherstellen, dass Schema vorhanden ist (idempotent, dauert ms)
-            try { _db.EnsureAttachmentsSchema(); } catch { /* still */ }
+            try
+            {
+                _db.EnsureAttachmentsSchema(); // AppSetting + Attachment + AttachmentText
+            }
+            catch { /* still */ }
 
             LoadSettings();
+            LoadDbStats();
         }
 
         private void LoadSettings()
@@ -38,6 +46,17 @@ namespace MyCoinFlow.Views
 
                 var max = _db.GetAppSetting(KeyMax);
                 MaxMbBox.Text = string.IsNullOrWhiteSpace(max) ? "20" : max.Trim();
+
+                var appBase = AppDomain.CurrentDomain.BaseDirectory?.TrimEnd(Path.DirectorySeparatorChar) ?? "";
+                var defaultTess = string.IsNullOrWhiteSpace(appBase)
+                    ? @"C:\Programme\MyCoinFlow\OCR\tesseract.exe"
+                    : Path.Combine(appBase, "OCR", "tesseract.exe");
+
+                var tess = _db.GetAppSetting(KeyTessExe);
+                TessPathBox.Text = string.IsNullOrWhiteSpace(tess) ? defaultTess : tess.Trim();
+
+                var langs = _db.GetAppSetting(KeyTessLang);
+                LangsBox.Text = string.IsNullOrWhiteSpace(langs) ? "deu+eng" : langs.Trim();
 
                 Status("Einstellungen geladen.");
             }
@@ -58,7 +77,6 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // Verzeichnis bei Bedarf anlegen
                 try { Directory.CreateDirectory(root); } catch { /* später erneut prüfen */ }
                 if (!Directory.Exists(root))
                 {
@@ -66,7 +84,6 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // Max MB prüfen (Zahl, 1..1024)
                 var mbTxt = (MaxMbBox.Text ?? "").Trim();
                 if (!int.TryParse(mbTxt, out var mb) || mb < 1 || mb > 1024)
                 {
@@ -75,13 +92,85 @@ namespace MyCoinFlow.Views
                 }
 
                 _db.SetAppSetting(KeyRoot, root);
-                _db.SetAppSetting(KeyMax, mb.ToString());
+                _db.SetAppSetting(KeyMax, mb.ToString(CultureInfo.InvariantCulture));
 
-                Status("Gespeichert.");
+                Status("Verzeichnis-Einstellungen gespeichert.");
             }
             catch (Exception ex)
             {
                 Status("Speichern fehlgeschlagen: " + ex.Message);
+            }
+        }
+
+        private void SaveOcr_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var exe = (TessPathBox.Text ?? "").Trim();
+                var langs = (LangsBox.Text ?? "").Trim();
+
+                if (string.IsNullOrWhiteSpace(exe))
+                {
+                    Status("Bitte Pfad zu tesseract.exe angeben.");
+                    return;
+                }
+                if (!exe.EndsWith("tesseract.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(exe))
+                {
+                    Status("tesseract.exe wurde am angegebenen Pfad nicht gefunden.");
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(langs))
+                {
+                    langs = "deu+eng";
+                }
+
+                _db.SetAppSetting(KeyTessExe, exe);
+                _db.SetAppSetting(KeyTessLang, langs);
+
+                Status("OCR-Einstellungen gespeichert.");
+            }
+            catch (Exception ex)
+            {
+                Status("Speichern fehlgeschlagen: " + ex.Message);
+            }
+        }
+
+        private void BrowseTesseract_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dlg = new OpenFileDialog
+                {
+                    Filter = "tesseract.exe|tesseract.exe|Alle Dateien|*.*",
+                    Title = "tesseract.exe auswählen",
+                    CheckFileExists = true
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    TessPathBox.Text = dlg.FileName;
+                }
+            }
+            catch (Exception ex)
+            {
+                Status("Auswahl fehlgeschlagen: " + ex.Message);
+            }
+        }
+
+        private void OpenInExplorer_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var root = (AttachRootBox.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                {
+                    Status("Ordner nicht gefunden.");
+                    return;
+                }
+                Process.Start(new ProcessStartInfo("explorer.exe", $"\"{root}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Status("Explorer konnte nicht geöffnet werden: " + ex.Message);
             }
         }
 
@@ -104,21 +193,32 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void OpenInExplorer_Click(object? sender, RoutedEventArgs e)
+        private void RefreshDbStats_Click(object sender, RoutedEventArgs e) => LoadDbStats();
+
+        private void LoadDbStats()
         {
             try
             {
-                var root = (AttachRootBox.Text ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-                {
-                    Status("Ordner nicht gefunden.");
-                    return;
-                }
-                Process.Start(new ProcessStartInfo("explorer.exe", $"\"{root}\"") { UseShellExecute = true });
+                var s = _db.GetDatabaseStats(); // holt Name, Größe, Limits, Counts
+
+                DbNameText.Text = s.DatabaseName;
+                DbSizeText.Text = $"{s.DataSizeMB:N2} MB";
+                DbLimitText.Text = $"{s.DataMaxMB:N0} MB";
+
+                double pct = s.DataMaxMB > 0 ? (s.DataSizeMB / s.DataMaxMB) * 100.0 : 0.0;
+                if (pct < 0) pct = 0;
+                if (pct > 100) pct = 100;
+
+                DbUsageBar.Value = pct;
+                DbUsageText.Text = $"{pct:N1}% genutzt";
+
+                DbAttachCountText.Text = s.AttachmentCount.ToString("N0", CultureInfo.CurrentCulture);
+                DbAttachTextCountText.Text = s.AttachmentTextCount.ToString("N0", CultureInfo.CurrentCulture);
+                DbTextBytesText.Text = $"{(s.AttachmentTextBytes / (1024.0 * 1024.0)):N2} MB";
             }
             catch (Exception ex)
             {
-                Status("Explorer konnte nicht geöffnet werden: " + ex.Message);
+                Status("DB-Status konnte nicht geladen werden: " + ex.Message);
             }
         }
 
