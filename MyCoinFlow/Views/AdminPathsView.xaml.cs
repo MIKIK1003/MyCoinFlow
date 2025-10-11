@@ -222,6 +222,39 @@ namespace MyCoinFlow.Views
             }
         }
 
+        private async void Reindex_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var btn = sender as Button;
+                if (btn != null) btn.IsEnabled = false;
+                Status("Index: starte…");
+
+                var svc = new OcrService();
+
+                // Fortschritt live in die Statuszeile
+                var progress = new Progress<(int done, int total, int withText, int images, int errors, int skipped)>(p =>
+                {
+                    Status($"Index: {p.done}/{p.total} – Text:{p.withText}, Bild-OCR:{p.images}, Fehler:{p.errors}, übersprungen:{p.skipped}");
+                });
+
+                var result = await svc.IndexMissingAsync(progress);
+
+                Status($"Index fertig: {result.done}/{result.total} – Text:{result.withText}, Bild-OCR:{result.images}, Fehler:{result.errors}, übersprungen:{result.skipped}");
+                LoadDbStats(); // Counts aktualisieren
+            }
+            catch (Exception ex)
+            {
+                Status("Index fehlgeschlagen: " + ex.Message);
+            }
+            finally
+            {
+                if (BtnReindex != null) BtnReindex.IsEnabled = true;
+            }
+        }
+
+
+
         private void Status(string text) => StatusText.Text = text ?? "";
     }
 }

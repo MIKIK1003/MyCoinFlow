@@ -1,16 +1,17 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows;
-using System.Windows.Input;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.Win32; // für OpenFileDialog
 using MyCoinFlow.Helpers;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using MyCoinFlow.Views;
-using Microsoft.Win32; // für OpenFileDialog
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
 
 
 
@@ -41,6 +42,9 @@ namespace MyCoinFlow.ViewModels
 
         public int AttachmentCount { get; set; }
         public bool HasMultipleAttachments => AttachmentCount > 1;
+        public string? SearchHitInfo { get; set; } // „Treffer in: …“
+
+
 
     }
 
@@ -69,10 +73,47 @@ namespace MyCoinFlow.ViewModels
         public ICommand AttachPdfCommand { get; }
         public ICommand OpenAttachmentCommand { get; }
         public ICommand ManageAttachmentsCommand { get; }
-
-
-        // NEU: Bankimport öffnen
         public ICommand OpenBankImportCommand { get; }
+
+        private string? _searchText;
+
+        private DateTime? _filterVon;
+        public DateTime? FilterVon
+        {
+            get => _filterVon;
+            set { if (_filterVon != value) { _filterVon = value; OnPropertyChanged(); } }
+        }
+
+        private DateTime? _filterBis;
+        public DateTime? FilterBis
+        {
+            get => _filterBis;
+            set { if (_filterBis != value) { _filterBis = value; OnPropertyChanged(); } }
+        }
+
+        private string? _filterAdresse;
+        public string? FilterAdresse
+        {
+            get => _filterAdresse;
+            set { if (_filterAdresse != value) { _filterAdresse = value; OnPropertyChanged(); } }
+        }
+
+
+        public string? SearchText
+        {
+            get => _searchText;
+            set
+            {
+                if (_searchText == value) return;
+                _searchText = value;
+                OnPropertyChanged();
+                (ClearSearchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        public ICommand ApplySearchCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+
 
         public TransactionsViewModel()
         {
@@ -82,11 +123,18 @@ namespace MyCoinFlow.ViewModels
             AttachPdfCommand = new RelayCommand(p => AttachPdfFromRow(p), _ => true);
             OpenAttachmentCommand = new RelayCommand(p => OpenAttachmentFromRow(p), _ => true);
             ManageAttachmentsCommand = new RelayCommand(p => ManageAttachmentsFromRow(p), _ => true);
-
-
-
-            // NEU
             OpenBankImportCommand = new RelayCommand(_ => OpenBankImport());
+            ApplySearchCommand = new RelayCommand(_ => LadeListe(), _ => true);
+
+            ClearSearchCommand = new RelayCommand(_ =>
+            {
+                SearchText = string.Empty;
+                FilterVon = null;
+                FilterBis = null;
+                FilterAdresse = string.Empty;
+                LadeListe();
+            },
+                _ => !string.IsNullOrWhiteSpace(SearchText) || FilterVon.HasValue || FilterBis.HasValue || !string.IsNullOrWhiteSpace(FilterAdresse));
 
             LadeListe();
         }
@@ -187,7 +235,7 @@ namespace MyCoinFlow.ViewModels
         {
             Transaktionen.Clear();
 
-            // Kontobezeichnungen cachen
+            // Kontonamen cachen
             var kontoMap = new Dictionary<int, string>();
             foreach (var k in _db.LadeKontenplan())
             {
@@ -195,11 +243,14 @@ namespace MyCoinFlow.ViewModels
                 kontoMap[k.Id] = $"{k.Kontonummer:D4}{unter}  {k.Detail}";
             }
 
-            var list = _db.LadeTransaktionen();
+            var term = (SearchText ?? string.Empty).Trim();
+            var list = _db.SucheTransaktionen(term, FilterVon, FilterBis, FilterAdresse);
+
+            // Tokens nur für Treffer-Hinweis (optional)
+            var tokens = term.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var t in list)
             {
-                // Von/Nach lesbar aufbereiten (Fallbacks wie gehabt)
                 string von = t.VonKontoId.HasValue
                     ? (kontoMap.TryGetValue(t.VonKontoId.Value, out var vk) ? vk : $"Konto #{t.VonKontoId}")
                     : (t.BankName ?? "Bank");
@@ -208,7 +259,6 @@ namespace MyCoinFlow.ViewModels
                     ? (kontoMap.TryGetValue(t.NachKontoId.Value, out var nk) ? nk : $"Konto #{t.NachKontoId}")
                     : (t.BankName ?? "Bank");
 
-                // --- NEU: Attach-Details genau 1x laden und für Zähler + Tooltip nutzen
                 var details = _db.LoadAttachmentDetailsByTransaktionId(t.Id);
 
                 string? tooltip = null;
@@ -216,33 +266,48 @@ namespace MyCoinFlow.ViewModels
                 {
                     var names = details.Select(d => d.FileName).Take(3).ToList();
                     tooltip = string.Join("\n", names);
-                    if (details.Count > names.Count)
-                        tooltip += $"\n… (+{details.Count - names.Count})";
+                    if (details.Count > names.Count) tooltip += $"\n… (+{details.Count - names.Count})";
+                }
+
+                // Trefferhinweis (nur wenn gesucht wurde)
+                string? hitInfo = null;
+                if (tokens.Length > 0)
+                {
+                    bool noteHit = !string.IsNullOrWhiteSpace(t.Notiz) && tokens.Any(tok => t.Notiz!.IndexOf(tok, StringComparison.CurrentCultureIgnoreCase) >= 0);
+                    bool adrHit = !string.IsNullOrWhiteSpace(t.AdresseName) && tokens.Any(tok => t.AdresseName!.IndexOf(tok, StringComparison.CurrentCultureIgnoreCase) >= 0);
+                    bool bankHit = !string.IsNullOrWhiteSpace(t.BankName) && tokens.Any(tok => t.BankName!.IndexOf(tok, StringComparison.CurrentCultureIgnoreCase) >= 0);
+
+                    var (total, fileHits, textHits) = _db.GetAttachmentHitCountsForTokens(t.Id, tokens);
+                    var parts = new List<string>(5);
+                    if (fileHits > 0) parts.Add($"Datei({fileHits})");
+                    if (textHits > 0) parts.Add($"OCR({textHits})");
+                    if (noteHit) parts.Add("Notiz");
+                    if (adrHit) parts.Add("Adresse");
+                    if (bankHit) parts.Add("Bank");
+                    if (parts.Count > 0) hitInfo = "Treffer in: " + string.Join(", ", parts);
                 }
 
                 Transaktionen.Add(new TransaktionRowExt
                 {
                     Id = t.Id,
                     Datum = t.Datum,
-
                     VonAnzeige = von,
                     NachAnzeige = nach,
                     Betrag = t.Betrag,
-
                     AdresseName = t.AdresseName,
                     BankName = t.BankName,
                     Notiz = t.Notiz,
 
-                    // IDs für Bearbeiten/Löschen (wie gehabt, falls vorhanden)
                     VonKontoId = t.VonKontoId,
                     NachKontoId = t.NachKontoId,
                     AdresseId = t.AdresseId,
                     GeldinstitutId = t.GeldinstitutId,
 
-                    // --- NEU: Anhänge
-                    AttachmentCount = details.Count,         // Zähler
-                    HasAttachments = details.Count > 0,     // Flag
-                    AttachmentsTooltip = tooltip                // Kurzliste für Tooltip
+                    AttachmentCount = details.Count,
+                    HasAttachments = details.Count > 0,
+                    AttachmentsTooltip = tooltip,
+
+                    SearchHitInfo = hitInfo
                 });
             }
         }

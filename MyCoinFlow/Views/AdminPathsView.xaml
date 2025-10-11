@@ -119,8 +119,14 @@
 
             <!-- OCR Aktionen -->
             <StackPanel Grid.Row="8" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,8">
-                <Button Style="{StaticResource IconTextButton}" Tag="ContentSave" Content="OCR-Einstellungen speichern" Click="SaveOcr_Click"/>
+                <Button Style="{StaticResource IconTextButton}" Tag="ContentSave" Content="OCR-Einstellungen speichern" Click="SaveOcr_Click" Margin="0,0,8,0"/>
+                <!-- NEU: Index aktualisieren -->
+                <Button x:Name="BtnReindex"
+            Style="{StaticResource IconTextButton}" Tag="Magnify"
+            Content="Index aktualisieren"
+            Click="Reindex_Click"/>
             </StackPanel>
+
 
             <!-- Spacer -->
             <Border Grid.Row="9" Grid.ColumnSpan="2" Height="1" Background="{DynamicResource MaterialDesignDivider}"/>

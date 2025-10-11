@@ -4095,17 +4095,40 @@ ORDER BY Id";
         }
 
         /// <summary>
-        /// Löscht einen Attachment-Datensatz.
+        /// Löscht einen Attachment-Datensatz inkl. zugehörigem Textindex (AttachmentText) in einer Transaktion.
         /// </summary>
         public void DeleteAttachment(int attachmentId)
         {
             using var c = CreateConnection();
             c.Open();
-            const string sql = @"DELETE FROM dbo.Attachment WHERE Id=@id";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@id", attachmentId);
-            cmd.ExecuteNonQuery();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // Textindex zuerst entfernen (falls vorhanden)
+                using (var cmdTxt = new SqlCommand("DELETE FROM dbo.AttachmentText WHERE AttachmentId = @id;", c, tx))
+                {
+                    cmdTxt.Parameters.AddWithValue("@id", attachmentId);
+                    cmdTxt.ExecuteNonQuery();
+                }
+
+                // Attachment löschen
+                using (var cmdAtt = new SqlCommand("DELETE FROM dbo.Attachment WHERE Id = @id;", c, tx))
+                {
+                    cmdAtt.Parameters.AddWithValue("@id", attachmentId);
+                    cmdAtt.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { /* ignore */ }
+                throw;
+            }
         }
+
+
         /// <summary>
         /// Setzt den OCR-Status eines Attachments (z. B. "Text", "Image", "OCR", "Error").
         /// </summary>
@@ -4180,6 +4203,163 @@ WHERE type_desc = 'ROWS';";
 
             return (dbName, dataMb, maxMb, attachCount, attachTextCount, attachTextBytes);
         }
+        /// <summary>
+        /// Liefert Attachments, die (noch) keinen Textindex haben:
+        /// AttachmentText fehlt oder ist leer. Rückgabe: (Id, FileName, FolderRel, OcrStatus)
+        /// </summary>
+        public List<(int Id, string FileName, string FolderRel, string? OcrStatus)> LoadAttachmentsNeedingIndex()
+        {
+            var list = new List<(int, string, string, string?)>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT a.Id, a.FileName, a.FolderRel, a.OcrStatus
+FROM dbo.Attachment a
+LEFT JOIN dbo.AttachmentText t ON t.AttachmentId = a.Id
+WHERE t.AttachmentId IS NULL OR t.[Text] IS NULL OR LTRIM(RTRIM(t.[Text])) = '' 
+ORDER BY a.Id";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((r.GetInt32(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3)));
+            }
+            return list;
+        }
+
+        public List<Transaktion> SucheTransaktionen(string? term, DateTime? vonDatum, DateTime? bisDatum, string? addressTerm)
+        {
+            var tokens = (term ?? string.Empty)
+                .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => t.Length > 0)
+                .ToArray();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            var sb = new System.Text.StringBuilder(@"
+SELECT DISTINCT
+       t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+       t.Betrag, t.Notiz,
+       t.AdresseId, a.Name AS AdresseName,
+       t.GeldinstitutId, g.Name AS BankName
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a        ON t.AdresseId      = a.Id
+LEFT JOIN dbo.Geldinstitut g   ON t.GeldinstitutId = g.Id
+LEFT JOIN dbo.Attachment att   ON att.TransaktionId = t.Id
+LEFT JOIN dbo.AttachmentText at ON at.AttachmentId  = att.Id
+WHERE 1=1
+");
+
+            if (vonDatum.HasValue) sb.AppendLine("  AND t.Datum >= @von");
+            if (bisDatum.HasValue) sb.AppendLine("  AND t.Datum <= @bis");
+            if (!string.IsNullOrWhiteSpace(addressTerm))
+                sb.AppendLine("  AND a.Name LIKE @addr COLLATE Latin1_General_CI_AI");
+
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                sb.Append(@"
+  AND (
+       t.Notiz      LIKE @q" + i + @" COLLATE Latin1_General_CI_AI
+    OR a.Name       LIKE @q" + i + @" COLLATE Latin1_General_CI_AI
+    OR g.Name       LIKE @q" + i + @" COLLATE Latin1_General_CI_AI
+    OR att.FileName LIKE @q" + i + @" COLLATE Latin1_General_CI_AI
+    OR at.[Text]    LIKE @q" + i + @" COLLATE Latin1_General_CI_AI
+  )");
+            }
+
+            sb.AppendLine("\nORDER BY t.Datum DESC;");
+
+            using var cmd = new SqlCommand(sb.ToString(), c);
+            if (vonDatum.HasValue) cmd.Parameters.AddWithValue("@von", vonDatum.Value.Date);
+            if (bisDatum.HasValue) cmd.Parameters.AddWithValue("@bis", bisDatum.Value.Date);
+            if (!string.IsNullOrWhiteSpace(addressTerm)) cmd.Parameters.AddWithValue("@addr", "%" + addressTerm.Trim() + "%");
+            for (int i = 0; i < tokens.Length; i++)
+                cmd.Parameters.AddWithValue("@q" + i, "%" + tokens[i] + "%");
+
+            var list = new List<Transaktion>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new Transaktion
+                {
+                    Id = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    Betrag = r.GetDecimal(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
+                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
+                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
+                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                });
+            }
+            return list;
+        }
+
+
+        /// <summary>
+        /// Liefert (TotalAttachments, FileNameHits, OcrTextHits) für eine Transaktion,
+        /// wobei ein Attachment als Treffer zählt, wenn es bei mind. EINEM Token matched.
+        /// </summary>
+        public (int total, int fileHits, int textHits)
+            GetAttachmentHitCountsForTokens(int transaktionId, IEnumerable<string> tokens)
+        {
+            var toks = (tokens ?? Array.Empty<string>())
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Dynamisch OR-Bedingungen je Token aufbauen
+            var sb = new System.Text.StringBuilder(@"
+SELECT 
+  COUNT(DISTINCT att.Id) AS Total,
+  SUM(CASE WHEN (");
+            if (toks.Length == 0) sb.Append("1=0");
+            for (int i = 0; i < toks.Length; i++)
+            {
+                if (i > 0) sb.Append(" OR ");
+                sb.Append("att.FileName LIKE @f" + i + " COLLATE Latin1_General_CI_AI");
+            }
+            sb.Append(@") THEN 1 ELSE 0 END) AS FileHits,
+  SUM(CASE WHEN (");
+            if (toks.Length == 0) sb.Append("1=0");
+            for (int i = 0; i < toks.Length; i++)
+            {
+                if (i > 0) sb.Append(" OR ");
+                sb.Append("at.[Text] LIKE @t" + i + " COLLATE Latin1_General_CI_AI");
+            }
+            sb.Append(@") THEN 1 ELSE 0 END) AS TextHits
+FROM dbo.Attachment att
+LEFT JOIN dbo.AttachmentText at ON at.AttachmentId = att.Id
+WHERE att.TransaktionId = @id;");
+
+            using var cmd = new SqlCommand(sb.ToString(), c);
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+            for (int i = 0; i < toks.Length; i++)
+                cmd.Parameters.AddWithValue("@f" + i, "%" + toks[i] + "%");
+            for (int i = 0; i < toks.Length; i++)
+                cmd.Parameters.AddWithValue("@t" + i, "%" + toks[i] + "%");
+
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                int total = r.IsDBNull(0) ? 0 : Convert.ToInt32(r.GetValue(0));
+                int fileHits = r.IsDBNull(1) ? 0 : Convert.ToInt32(r.GetValue(1));
+                int textHits = r.IsDBNull(2) ? 0 : Convert.ToInt32(r.GetValue(2));
+                return (total, fileHits, textHits);
+            }
+            return (0, 0, 0);
+        }
+
 
 
     }

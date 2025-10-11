@@ -51,7 +51,7 @@
                 <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="*" />
                 <DataGridTextColumn Header="Startdatum" Binding="{Binding Startdatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
                 <DataGridTextColumn Header="Enddatum" Binding="{Binding Enddatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
-                <DataGridCheckBoxColumn Header="Aktiv" Binding="{Binding IstAktiv}" Width="Auto" />
+                <DataGridCheckBoxColumn Header="Aktiv" Binding="{Binding IstAktiv}" Width="200" />
                 
             </DataGrid.Columns>
         </DataGrid>

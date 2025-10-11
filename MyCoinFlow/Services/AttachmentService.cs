@@ -90,9 +90,8 @@ namespace MyCoinFlow.Services
             {
                 if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
                 {
-                    var ocr = new OcrService();
-                    // Text extrahieren (ohne OCR) – bei textbasierten PDFs liefert das Inhalt
-                    var text = ocr.ExtractTextFromPdf_NoOcr(targetPath);
+                    var text = OcrService.ExtractTextFromPdf_NoOcr(targetPath);
+
 
                     if (!string.IsNullOrWhiteSpace(text))
                     {
