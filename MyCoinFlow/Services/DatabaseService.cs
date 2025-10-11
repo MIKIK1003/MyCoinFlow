@@ -4360,6 +4360,47 @@ WHERE att.TransaktionId = @id;");
             return (0, 0, 0);
         }
 
+        public bool KontoHatBuchungenImZeitraumByKontonummer(int kontonummer, DateTime? von, DateTime? bis)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP(1) 1
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Kontenplan kv ON kv.Id = t.VonKontoId
+LEFT JOIN dbo.Kontenplan kn ON kn.Id = t.NachKontoId
+WHERE (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (kv.Kontonummer = @knr OR kn.Kontonummer = @knr);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@knr", kontonummer);
+            cmd.Parameters.AddWithValue("@von", (object?)von ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bis", (object?)bis ?? DBNull.Value);
+            var o = cmd.ExecuteScalar();
+            return o != null && o != DBNull.Value;
+        }
+
+        public bool KontoHatBuchungenImZeitraumByKontoId(int kontoId, DateTime? von, DateTime? bis)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP(1) 1
+FROM dbo.Transaktion t
+WHERE (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (t.VonKontoId = @id OR t.NachKontoId = @id);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", kontoId);
+            cmd.Parameters.AddWithValue("@von", (object?)von ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bis", (object?)bis ?? DBNull.Value);
+            var o = cmd.ExecuteScalar();
+            return o != null && o != DBNull.Value;
+        }
 
 
     }

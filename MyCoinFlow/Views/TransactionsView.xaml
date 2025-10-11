@@ -1,246 +1,266 @@
 ﻿<UserControl x:Class="MyCoinFlow.Views.TransactionsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- Toolbar -->
-            <RowDefinition Height="Auto"/>
-            <!-- Filterzeile -->
-            <RowDefinition Height="*"/>
-            <!-- DataGrid -->
-        </Grid.RowDefinitions>
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
+        <!-- ============ SIDEBAR LINKS: Filter & Aktionen ============ -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-        <!-- Toolbar neu: links CRUD, zentriert Suche (höher), rechts Import -->
-        <Grid Grid.Row="0" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <!-- links: Buchung/Bearbeiten/Löschen -->
-                <ColumnDefinition Width="*"/>
-                <!-- Mitte: Suche -->
-                <ColumnDefinition Width="Auto"/>
-                <!-- rechts: Bankimport/Kreditkarten -->
-            </Grid.ColumnDefinitions>
+                    <!-- Überschrift -->
+                    <TextBlock Text="Filter und Aktionen"
+                               FontSize="18" Margin="0,0,0,12"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-            <!-- LINKS: Hauptaktionen -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="invoiceplus" Content="Buchung"
-                Margin="0,0,8,0" MinHeight="40"
-                Command="{Binding NeuBuchungCommand}"/>
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="invoiceedit" Content="Bearbeiten"
-                Margin="0,0,8,0" MinHeight="40"
-                Command="{Binding BearbeitenCommand}"/>
-                <Button Style="{StaticResource IconTextButton.Danger}"
-                Tag="invoiceremove" Content="Löschen"
-                Margin="0,0,0,0" MinHeight="40"
-                Command="{Binding LoeschenCommand}"/>
-            </StackPanel>
+                    <!-- Suche -->
+                    <TextBlock Text="Suche" Margin="0,0,0,4"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-            <!-- MITTE: Suche (größer, dicht am Button) -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBox Width="380" MinHeight="40"
-                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                 materialDesign:HintAssist.Hint="Suchen (Text, Datei, Notiz, OCR)"
-                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                 Margin="0,0,8,0">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="Magnify" Content="Suchen"
-                Margin="0,0,8,0" MinHeight="40"
-                Command="{Binding ApplySearchCommand}"/>
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="CloseCircle" Content="Leeren"
-                MinHeight="40"
-                Command="{Binding ClearSearchCommand}"/>
-            </StackPanel>
+                    <TextBox MinHeight="40"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Suchen (Text, Datei, Notiz, OCR)"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
 
-            <!-- RECHTS: Importe -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="fileimport" Content="Bankimport…"
-                Margin="0,0,8,0" MinHeight="40"
-                Command="{Binding OpenBankImportCommand}"/>
-                <Button Style="{StaticResource IconTextButton}"
-                Tag="creditcard" Content="Kreditkarten"
-                MinHeight="40"
-                Click="OpenCreditCardImport_Click"/>
-            </StackPanel>
+                    <!-- Datum -->
+                    <TextBlock Text="Datum" Margin="0,16,0,4"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="von" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                            <DatePicker SelectedDate="{Binding FilterVon}" MinHeight="36">
+                                <!-- ENTER im DatePicker ist unzuverlässig; wir triggern auf Datum-Änderung -->
+                                <i:Interaction.Triggers>
+                                    <i:EventTrigger EventName="SelectedDateChanged">
+                                        <i:InvokeCommandAction Command="{Binding ApplySearchCommand}" />
+                                    </i:EventTrigger>
+                                </i:Interaction.Triggers>
+                                <DatePicker.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
+                                </DatePicker.InputBindings>
+                            </DatePicker>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="bis" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                            <DatePicker SelectedDate="{Binding FilterBis}" MinHeight="36">
+                                <i:Interaction.Triggers>
+                                    <i:EventTrigger EventName="SelectedDateChanged">
+                                        <i:InvokeCommandAction Command="{Binding ApplySearchCommand}" />
+                                    </i:EventTrigger>
+                                </i:Interaction.Triggers>
+                                <DatePicker.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
+                                </DatePicker.InputBindings>
+                            </DatePicker>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Adresse -->
+                    <TextBlock Text="Adresse" Margin="0,16,0,4"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                    <TextBox MinHeight="36"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Name enthält…"
+                             Text="{Binding FilterAdresse, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+
+                    <!-- Suche-Aktionen -->
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,8">
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Magnify"
+                                Content="Suchen"
+                                MinHeight="40"
+                                Margin="0,0,8,0"
+                                IsDefault="True"
+                                Command="{Binding ApplySearchCommand}" Width="109"/>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="CloseCircle"
+                                Content="Leeren"
+                                MinHeight="40"
+                                Command="{Binding ClearSearchCommand}" Width="109"/>
+                    </StackPanel>
+
+                    <!-- Aktionen -->
+                    <TextBlock Text="Aktionen" Margin="0,20,0,8"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                    <StackPanel>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="invoiceplus" Content="Buchung"
+                                MinHeight="40" Margin="0,0,0,8"
+                                Command="{Binding NeuBuchungCommand}"/>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="invoiceedit" Content="Bearbeiten"
+                                MinHeight="40" Margin="0,0,0,8"
+                                Command="{Binding BearbeitenCommand}"/>
+                        <Button Style="{StaticResource IconTextButton.Danger}"
+                                Tag="invoiceremove" Content="Löschen"
+                                MinHeight="40" Margin="0,0,0,16"
+                                Command="{Binding LoeschenCommand}"/>
+
+                        <TextBlock Text="Import" Margin="0,20,0,8"
+                                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="fileimport" Content="Bankimport…"
+                                MinHeight="40" Margin="0,0,0,8"
+                                Command="{Binding OpenBankImportCommand}"/>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="creditcard" Content="Kreditkarten"
+                                MinHeight="40"
+                                Click="OpenCreditCardImport_Click"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ============ RECHTS: Liste ============ -->
+        <Grid Grid.Column="1">
+            <DataGrid ItemsSource="{Binding Transaktionen}"
+                      SelectedItem="{Binding AusgewaehlteTransaktion}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True">
+
+                <!-- Treffer-Hinweis als Tooltip pro Zeile -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="ToolTip" Value="{Binding SearchHitInfo}"/>
+                    </Style>
+                </DataGrid.RowStyle>
+
+                <DataGrid.Columns>
+
+                    <!-- Aktionen (PDF) – links als erste Spalte -->
+                    <DataGridTemplateColumn Header="" Width="200" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                    <!-- PDF Anhängen -->
+                                    <Button ToolTip="PDF Anhängen"
+                                            Command="{Binding DataContext.AttachPdfCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding Id}"
+                                            Style="{StaticResource MaterialDesignFlatButton}"
+                                            Padding="0"
+                                            HorizontalAlignment="Right">
+                                        <materialDesign:PackIcon
+                                            Kind="FilePlusOutline"
+                                            Style="{StaticResource DefaultIconStyle}"
+                                            Width="24" Height="24"/>
+                                    </Button>
+
+                                    <!-- Öffnen (Icon wechselt / Badge ab 2) -->
+                                    <Button ToolTip="PDF Öffnen"
+                                            ToolTipService.ToolTip="{Binding AttachmentsTooltip}"
+                                            IsEnabled="{Binding HasAttachments}"
+                                            Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding Id}"
+                                            Style="{StaticResource MaterialDesignFlatButton}"
+                                            Padding="0"
+                                            HorizontalAlignment="Right"
+                                            Content="{Binding}">
+                                        <Button.ContentTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <materialDesign:PackIcon x:Name="IconPdf"
+                                                                             Kind="filedocumentcheckoutline"
+                                                                             Style="{StaticResource DefaultIconStyle}"
+                                                                             Width="24" Height="24"
+                                                                             Visibility="Collapsed"/>
+                                                    <materialDesign:PackIcon x:Name="IconEmpty"
+                                                                             Kind="DotsVertical"
+                                                                             Style="{StaticResource DefaultIconStyle}"
+                                                                             Width="24" Height="24"
+                                                                             Visibility="Visible"/>
+                                                    <Border x:Name="Badge"
+                                                            Background="{DynamicResource PrimaryHueMidBrush}"
+                                                            CornerRadius="8"
+                                                            Width="16" Height="16"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                            Margin="-4,-4,0,0"
+                                                            Visibility="Collapsed">
+                                                        <TextBlock Text="{Binding AttachmentCount}"
+                                                                   Foreground="White"
+                                                                   FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding HasAttachments}" Value="True">
+                                                        <Setter TargetName="IconPdf"   Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="IconEmpty" Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding HasMultipleAttachments}" Value="True">
+                                                        <Setter TargetName="Badge" Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </Button.ContentTemplate>
+                                    </Button>
+
+                                    <!-- Anhänge verwalten … -->
+                                    <Button ToolTip="Anhänge Verwalten"
+                                            Command="{Binding DataContext.ManageAttachmentsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding Id}"
+                                            Style="{StaticResource MaterialDesignFlatButton}"
+                                            Padding="0"
+                                            HorizontalAlignment="Right">
+                                        <materialDesign:PackIcon
+                                            Kind="dotsvertical"
+                                            Style="{StaticResource DefaultIconStyle}"
+                                            Width="24" Height="24"/>
+                                    </Button>
+
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Daten-Spalten -->
+                    <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
+                    <DataGridTextColumn Header="Von"   Binding="{Binding VonAnzeige}" Width="*"/>
+                    <DataGridTextColumn Header="Nach"  Binding="{Binding NachAnzeige}" Width="*"/>
+                    <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:C2}}" Width="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                                <Setter Property="TextAlignment" Value="Right"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Adresse"      Binding="{Binding AdresseName}" Width="*"/>
+                    <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}"    Width="*"/>
+                    <DataGridTextColumn Header="Notiz"        Binding="{Binding Notiz}"      Width="2*"/>
+
+                </DataGrid.Columns>
+            </DataGrid>
         </Grid>
-
-        <!-- Filter: Datum & Adresse -->
-        <Grid Grid.Row="1" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="160"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="160"/>
-                <ColumnDefinition Width="24"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="260"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <TextBlock Grid.Column="0" Text="Von" VerticalAlignment="Center"
-               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" Margin="0,0,8,0"/>
-            <DatePicker Grid.Column="1" SelectedDate="{Binding FilterVon}" MinHeight="36" Margin="0,0,0,0"/>
-
-            <TextBlock Grid.Column="3" Text="Bis" VerticalAlignment="Center"
-               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" Margin="0,0,8,0"/>
-            <DatePicker Grid.Column="4" SelectedDate="{Binding FilterBis}" MinHeight="36"/>
-
-            <TextBlock Grid.Column="6" Text="Adresse" VerticalAlignment="Center"
-               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" Margin="0,0,8,0"/>
-            <TextBox Grid.Column="7" MinHeight="36" Width="260"
-             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-             materialDesign:HintAssist.Hint="Name enthält…"
-             Text="{Binding FilterAdresse, UpdateSourceTrigger=PropertyChanged}"/>
-        </Grid>
-
-
-
-        <!-- Liste -->
-        <DataGrid Grid.Row="2"
-                  ItemsSource="{Binding Transaktionen}"
-                  SelectedItem="{Binding AusgewaehlteTransaktion}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  IsReadOnly="True">
-
-            <!-- >>> HIER einfügen: direkt vor <DataGrid.Columns> <<< -->
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <!-- zeigt den Treffer-Hinweis aus dem ViewModel (SearchHitInfo) als Tooltip -->
-                    <Setter Property="ToolTip" Value="{Binding SearchHitInfo}"/>
-                </Style>
-            </DataGrid.RowStyle>
-
-            <DataGrid.Columns>
-                <!-- Aktionen (PDF) -->
-                <DataGridTemplateColumn Header="" Width="200" IsReadOnly="True">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-
-                                <!-- PDF Anhängen) -->
-                                <Button ToolTip="PDF Anhängen"
-                                    Command="{Binding DataContext.AttachPdfCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                    CommandParameter="{Binding Id}"
-                                    Style="{StaticResource MaterialDesignFlatButton}"
-                                    Padding="0"
-                                    HorizontalAlignment="Right">
-                                <materialDesign:PackIcon
-                                    Kind="FilePlusOutline"
-                                    Style="{StaticResource DefaultIconStyle}"
-                                    Width="24" Height="24"/>
-                                </Button>
-
-                                <!-- Öffnen (Icon zeigt PDF bei ≥1 Anhang; Dots bei 0; Badge ab 2) -->
-                                <Button ToolTip="PDF Öffnen"
-                                        ToolTipService.ToolTip="{Binding AttachmentsTooltip}"
-                                        IsEnabled="{Binding HasAttachments}"
-                                        Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                        CommandParameter="{Binding Id}"
-                                        Style="{StaticResource MaterialDesignFlatButton}"
-                                        Padding="0"
-                                        HorizontalAlignment="Right"
-                                        Content="{Binding}">
-                                    <Button.ContentTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <!-- PDF-Icon (standardmäßig aus) -->
-                                                <materialDesign:PackIcon x:Name="IconPdf"
-                                         Kind="filedocumentcheckoutline"
-                                         Style="{StaticResource DefaultIconStyle}"
-                                         Width="24" Height="24"
-                                         Visibility="Collapsed"/>
-                                                <!-- Dots-Icon (sichtbar, wenn keine Anhänge) -->
-                                                <materialDesign:PackIcon x:Name="IconEmpty"
-                                         Kind="DotsVertical"
-                                         Style="{StaticResource DefaultIconStyle}"
-                                         Width="24" Height="24"
-                                         Visibility="Visible"/>
-                                                <!-- Badge (sichtbar ab 2 Anhängen) -->
-                                                <Border x:Name="Badge"
-                        Background="{DynamicResource PrimaryHueMidBrush}"
-                        CornerRadius="8"
-                        Width="16" Height="16"
-                        HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Margin="-4,-4,0,0"
-                        Visibility="Collapsed">
-                                                    <TextBlock Text="{Binding AttachmentCount}"
-                               Foreground="White"
-                               FontSize="10"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                                                </Border>
-                                            </Grid>
-
-                                            <!-- Umschalten rein über DataTemplate-Triggers -->
-                                            <DataTemplate.Triggers>
-                                                <!-- Ab 1 Anhang: PDF-Icon ein, Dots aus -->
-                                                <DataTrigger Binding="{Binding HasAttachments}" Value="True">
-                                                    <Setter TargetName="IconPdf"   Property="Visibility" Value="Visible"/>
-                                                    <Setter TargetName="IconEmpty" Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <!-- Ab 2 Anhängen: Badge ein -->
-                                                <DataTrigger Binding="{Binding HasMultipleAttachments}" Value="True">
-                                                    <Setter TargetName="Badge" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </Button.ContentTemplate>
-                                </Button>
-
-
-                                <!-- NEU: Anhänge verwalten… (Dialog) -->
-                                <Button ToolTip="Anhänge Verwalten"
-                                    Command="{Binding DataContext.ManageAttachmentsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                    CommandParameter="{Binding Id}"
-                                    Style="{StaticResource MaterialDesignFlatButton}"
-                                    Padding="0"
-                                    HorizontalAlignment="Right">
-                                <materialDesign:PackIcon
-                                    Kind="dotsvertical"
-                                    Style="{StaticResource DefaultIconStyle}"
-                                    Width="24" Height="24"/>
-                                </Button>
-
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
-
-
-
-                <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
-                <DataGridTextColumn Header="Von"   Binding="{Binding VonAnzeige}" Width="*"/>
-                <DataGridTextColumn Header="Nach"  Binding="{Binding NachAnzeige}" Width="*"/>
-                <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:C2}}" Width="120">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="HorizontalAlignment" Value="Right"/>
-                            <Setter Property="TextAlignment" Value="Right"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
-                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="*"/>
-                <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" Width="*"/>
-                <DataGridTextColumn Header="Notiz"   Binding="{Binding Notiz}" Width="2*"/>
-
-                
-
-
-            </DataGrid.Columns>
-        </DataGrid>
     </Grid>
 </UserControl>
