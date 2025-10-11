@@ -3,58 +3,91 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
+    <!-- Sidebar | Divider | Tabelle -->
     <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <!-- Buttons -->
-            <RowDefinition Height="*" />
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <!-- Sidebar -->
+            <ColumnDefinition Width="16"/>
+            <!-- Divider -->
+            <ColumnDefinition Width="*"/>
             <!-- Tabelle -->
-        </Grid.RowDefinitions>
+        </Grid.ColumnDefinitions>
 
-        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0 0 0 10">
+        <!-- ================== SIDEBAR ================== -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <StackPanel>
+                <TextBlock Text="Aktionen"
+                           FontSize="18" Margin="0,0,0,12"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-            <Button Style="{StaticResource IconTextButton}"
-                Tag="TimerPlus"
-                Content="Zeitraum hinzufügen"
-                Margin="0 10 10 0"
-                Command="{Binding NeuerZeitraumCommand}"/>
+                <!-- 1) Zeitraum hinzufügen -->
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="TimerPlus"
+                        Content="Zeitraum hinzufügen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding NeuerZeitraumCommand}"/>
 
-            <Button Style="{StaticResource IconTextButton}"
-                Tag="TimerEdit"
-                Content="Zeitraum bearbeiten"
-                Margin="0 10 10 0"
-                Command="{Binding BearbeitenZeitraumCommand}"/>
+                <!-- 2) Zeitraum bearbeiten -->
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="TimerEdit"
+                        Content="Zeitraum bearbeiten"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding BearbeitenZeitraumCommand}"/>
 
-            <Button Style="{StaticResource IconTextButton.Danger}"
-                Tag="TimerMinus"
-                Content="Zeitraum löschen"
-                Margin="0 10 10 0"
-                Command="{Binding LoeschenEintragCommand}"/>
+                <!-- 3) Zeitraum löschen -->
+                <Button Style="{StaticResource IconTextButton.Danger}"
+                        Tag="TimerMinus"
+                        Content="Zeitraum löschen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding LoeschenEintragCommand}"/>
 
-            <Button Style="{StaticResource IconTextButton}"
-                Tag="HandCoin"
-                Content="Budget erfassen"
-                Margin="0 10 10 0"
-                Command="{Binding BudgetwerteErfassenCommand}"/>
+                <!-- 4) Budget erfassen -->
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="HandCoin"
+                        Content="Budget erfassen"
+                        MinHeight="40"
+                        Command="{Binding BudgetwerteErfassenCommand}"/>
+            </StackPanel>
+        </Border>
 
-        </StackPanel>
+        <!-- Divider -->
+        <Border Grid.Column="1"
+                Background="{DynamicResource MaterialDesignDivider}"/>
 
-        <DataGrid Grid.Row="1"
-              ItemsSource="{Binding Budgetzeitraeume}"
-              SelectedItem="{Binding AusgewaehlterZeitraum}"
-              AutoGenerateColumns="False"
-              CanUserAddRows="False"
-              Margin="0,10,0,0"
-              IsReadOnly="True">
+        <!-- ================== TABELLE (unverändert, nur Farben) ================== -->
+        <Grid Grid.Column="2">
+            <DataGrid ItemsSource="{Binding Budgetzeitraeume}"
+                      SelectedItem="{Binding AusgewaehlterZeitraum}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True"
+                      materialDesign:DataGridAssist.CellPadding="8"
+                      materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                      RowHeaderWidth="0"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="{x:Null}">
 
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="*" />
-                <DataGridTextColumn Header="Startdatum" Binding="{Binding Startdatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
-                <DataGridTextColumn Header="Enddatum" Binding="{Binding Enddatum, StringFormat=dd.MM.yyyy}" Width="Auto" />
-                <DataGridCheckBoxColumn Header="Aktiv" Binding="{Binding IstAktiv}" Width="200" />
-                
-            </DataGrid.Columns>
-        </DataGrid>
+                <!-- Header-Farbe wie Sidebar -->
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Bezeichnung"
+                                        Binding="{Binding Bezeichnung}" Width="*"/>
+                    <DataGridTextColumn Header="Startdatum"
+                                        Binding="{Binding Startdatum, StringFormat=dd.MM.yyyy}" Width="Auto"/>
+                    <DataGridTextColumn Header="Enddatum"
+                                        Binding="{Binding Enddatum, StringFormat=dd.MM.yyyy}" Width="Auto"/>
+                    <DataGridCheckBoxColumn Header="Aktiv"
+                                            Binding="{Binding IstAktiv}" Width="200"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
     </Grid>
-
 </UserControl>

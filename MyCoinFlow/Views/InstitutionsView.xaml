@@ -5,60 +5,67 @@
              MinWidth="1100">
 
     <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- Kopf -->
-            <RowDefinition Height="*"/>
-            <!-- Tabelle -->
-        </Grid.RowDefinitions>
+        <!-- Sidebar links + Tabelle rechts -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- KOPF: Links Buttons, rechts Abgrenzungsdatum -->
-        <Grid Grid.Row="0" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <!-- Buttons -->
-                <ColumnDefinition Width="Auto"/>
-                <!-- Datum -->
-            </Grid.ColumnDefinitions>
+        <!-- ================== SIDEBAR LINKS ================== -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-            <!-- Buttons links (vereinheitlicht) -->
-            <StackPanel Orientation="Horizontal">
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="BankPlus"
-                        Content="Neues Geldinstitut"
-                        Margin="0,0,10,0"
-                        Command="{Binding NeuCommand}"/>
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="bank"
-                        Content="Bearbeiten"
-                        Margin="0,0,10,0"
-                        Command="{Binding BearbeitenCommand}"/>
-                <Button Style="{StaticResource IconTextButton.Danger}"
-                        Tag="bankremove"
-                        Content="Löschen"
-                        Command="{Binding LoeschenCommand}"/>
-            </StackPanel>
+                    <TextBlock Text="Filter und Aktionen"
+                               FontSize="18" Margin="0,0,0,12"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-            <!-- Abgrenzungsdatum rechts -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Abgrenzungsdatum:" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <DatePicker SelectedDate="{Binding Abgrenzungsdatum}" Width="160"/>
-            </StackPanel>
-        </Grid>
+                    <!-- Buttons (wie bisher) -->
+                    <StackPanel Orientation="Vertical">
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="BankPlus"
+                                Content="Neues Geldinstitut"
+                                Margin="0,0,0,8"
+                                Command="{Binding NeuCommand}"/>
 
-        <!-- TABELLE -->
-        <DataGrid Grid.Row="1"
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="bank"
+                                Content="Bearbeiten"
+                                Margin="0,0,0,8"
+                                Command="{Binding BearbeitenCommand}"/>
+
+                        <Button Style="{StaticResource IconTextButton.Danger}"
+                                Tag="bankremove"
+                                Content="Löschen"
+                                Command="{Binding LoeschenCommand}"/>
+                    </StackPanel>
+
+                    <!-- Abgrenzungsdatum -->
+                    <TextBlock Text="Abgrenzungsdatum" Margin="0,16,0,4"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                    <DatePicker SelectedDate="{Binding Abgrenzungsdatum}" Width="160" MinHeight="36"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ================== TABELLE RECHTS (UNVERÄNDERT) ================== -->
+        <DataGrid Grid.Column="1"
                   x:Name="InstituteGrid"
                   ItemsSource="{Binding Institute}"
                   SelectedItem="{Binding AusgewaehltesInstitut}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   IsReadOnly="True"
+                  Background="White"
+                  RowBackground="White"
                   MouseDoubleClick="InstituteGrid_MouseDoubleClick"
                   FrozenColumnCount="1"
                   materialDesign:DataGridAssist.CellPadding="8"
                   materialDesign:DataGridAssist.ColumnHeaderPadding="8"
                   RowHeaderWidth="0">
+            
 
             <DataGrid.Resources>
                 <!-- Rechtsbündige Zahlen -->
@@ -117,5 +124,6 @@
 
             </DataGrid.Columns>
         </DataGrid>
+
     </Grid>
 </UserControl>

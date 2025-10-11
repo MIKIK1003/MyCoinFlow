@@ -1,64 +1,134 @@
-﻿<!-- Benutzersteuerelement für die Adressverwaltung -->
-<UserControl x:Class="MyCoinFlow.Views.AddressesView"
+﻿<UserControl x:Class="MyCoinFlow.Views.AddressesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <!-- Sidebar links + Tabelle rechts -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Toolbar (vereinheitlicht) -->
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <Button Style="{StaticResource IconTextButton}"
-                    Tag="Accountboxplusoutline"
-                    Content="Neue Adresse"
-                    Margin="0,0,10,0"
-                    Command="{Binding NeuCommand}"/>
+        <!-- ============ SIDEBAR LINKS ============ -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-            <Button Style="{StaticResource IconTextButton}"
-                    Tag="accountboxeditoutline"
-                    Content="Bearbeiten"
-                    Margin="0,0,10,0"
-                    Command="{Binding BearbeitenCommand}"/>
+                    <TextBlock Text="Filter und Aktionen"
+                               FontSize="18" Margin="0,0,0,12"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-            <Button Style="{StaticResource IconTextButton.Danger}"
-                    Tag="accountboxminusoutline"
-                    Content="Löschen"
-                    Command="{Binding LoeschenCommand}"/>
-        </StackPanel>
+                    <!-- Suche -->
+                    <TextBlock Text="Suche" Margin="0,0,0,4"
+           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
 
-        <!-- Tabelle -->
-        <DataGrid Grid.Row="1"
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Eingabefeld (volle Breite) -->
+                        <TextBox x:Name="SearchBox"
+             Grid.Row="0"
+             MinHeight="40"
+             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+             materialDesign:HintAssist.Hint="Name, PLZ/Ort, IBAN, Notiz…"
+             KeyDown="SearchBox_KeyDown"/>
+
+                        <!-- Buttons unten -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Style="{StaticResource IconTextButton}"
+                Tag="Magnify" Content="Suchen"
+                MinHeight="40" Margin="0,0,8,0"
+                Click="ApplySearch_Click" Width="109"/>
+                            <Button Style="{StaticResource IconTextButton}"
+                Tag="CloseCircle" Content="Leeren"
+                MinHeight="40"
+                Click="ClearSearch_Click" Width="109"/>
+                        </StackPanel>
+                    </Grid>
+
+
+
+                    <!-- Aktionen -->
+                    <TextBlock Text="Aktionen Adressen" Margin="0,20,0,8"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                    <StackPanel>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Accountboxplusoutline"
+                                Content="Neue Adresse"
+                                MinHeight="40" Margin="0,0,0,8"
+                                Command="{Binding NeuCommand}"/>
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="accountboxeditoutline"
+                                Content="Bearbeiten"
+                                MinHeight="40" Margin="0,0,0,8"
+                                Command="{Binding BearbeitenCommand}"/>
+                        <Button Style="{StaticResource IconTextButton.Danger}"
+                                Tag="accountremove"
+                                Content="Löschen"
+                                MinHeight="40"
+                                Command="{Binding LoeschenCommand}"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ============ TABELLE RECHTS (UNVERÄNDERT) ============ -->
+        <DataGrid Grid.Column="1"
+                  x:Name="AddressesGrid"
                   ItemsSource="{Binding Adressen}"
                   SelectedItem="{Binding AusgewaehlteAdresse}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
-                  IsReadOnly="True">
+                  IsReadOnly="True"
+                  RowHeaderWidth="0"
+                  FrozenColumnCount="1"
+                  materialDesign:DataGridAssist.CellPadding="8"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                  RowHeight="40"
+                  Background="White"
+                  RowBackground="White"
+                  AlternatingRowBackground="{x:Null}">
+            <!-- Header-Farbe wie Sidebar -->
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+
+            <DataGrid.Resources>
+                <Style x:Key="RightAlignedCell" TargetType="TextBlock">
+                    <Setter Property="TextAlignment" Value="Right"/>
+                    <Setter Property="Padding" Value="0,0,8,0"/>
+                </Style>
+            </DataGrid.Resources>
+
             <DataGrid.Columns>
 
-                <!-- Icon-Spalte ganz links (Standard-Icon/Farbe via DefaultIconStyle) -->
-                <DataGridTemplateColumn Header="" Width="Auto" MinWidth="42" IsReadOnly="True">
+                <!-- Transaktionen (Icon links) -->
+                <DataGridTemplateColumn Header="" Width="52" MinWidth="52" MaxWidth="52" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Button ToolTip="Transaktionen der Adresse anzeigen und drucken"
-                                    Command="{Binding DataContext.ZeigeAdresseTransaktionenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Command="{Binding DataContext.ZeigeAdresseTransaktionenCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                     CommandParameter="{Binding}"
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Padding="0"
-                                    HorizontalAlignment="Right">
-                                <materialDesign:PackIcon
-                                    Kind="FileDocumentMultipleOutline"
-                                    Style="{StaticResource DefaultIconStyle}"
-                                    Width="24" Height="24"/>
+                                    HorizontalAlignment="Left">
+                                <materialDesign:PackIcon Kind="FileDocumentMultipleOutline"
+                                                         Style="{StaticResource DefaultIconStyle}"
+                                                         Width="24" Height="24"/>
                             </Button>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <!-- Daten-Spalten -->
+                <!-- Daten-Spalten – exakt wie zuvor -->
                 <DataGridTextColumn Header="Name"       Binding="{Binding Name}"    Width="2*"/>
                 <DataGridTextColumn Header="IBAN"       Binding="{Binding IBAN}"    Width="*"/>
                 <DataGridTextColumn Header="Typ"        Binding="{Binding Typ}"     Width="*"/>

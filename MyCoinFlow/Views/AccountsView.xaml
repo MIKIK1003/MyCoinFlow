@@ -114,11 +114,13 @@
                         <Button Style="{StaticResource IconTextButton}"
                                 Tag="invoicetextedit" Content="Bearbeiten"
                                 MinHeight="40" Margin="0,0,0,8"
-                                Command="{Binding BearbeitenEintragCommand}"/>
+                                Command="{Binding BearbeitenEintragCommand}"
+                                CommandParameter="{Binding SelectedItem, ElementName=AccountsGrid}"/>
                         <Button Style="{StaticResource IconTextButton.Danger}"
                                 Tag="invoicetextremove" Content="Löschen"
                                 MinHeight="40"
-                                Command="{Binding LoeschenEintragCommand}"/>
+                                Command="{Binding LoeschenEintragCommand}"
+                                CommandParameter="{Binding SelectedItem, ElementName=AccountsGrid}"/>
                     </StackPanel>
 
                 </StackPanel>
@@ -153,9 +155,19 @@
                       RowHeaderWidth="0"
                       SelectionUnit="FullRow"
                       SelectionChanged="AccountsGrid_SelectionChanged"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="{x:Null}"
                       materialDesign:DataGridAssist.CellPadding="8"
                       materialDesign:DataGridAssist.ColumnHeaderPadding="8"
                       RowHeight="40">
+
+                <!-- Header-Farbe wie Sidebar -->
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
 
                 <DataGrid.Resources>
                     <Style x:Key="RightAlignedCell" TargetType="TextBlock">
