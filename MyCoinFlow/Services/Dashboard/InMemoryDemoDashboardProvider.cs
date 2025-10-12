@@ -1,39 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MyCoinFlow.Services.Dashboard
+namespace MyCoinFlow.Services
 {
-    public sealed class InMemoryDemoDashboardProvider : IDashboardDataProvider, IWithPeriodInfo
+    // Nur für Design/Notfälle – gibt fixe Demo-Daten zurück.
+    public sealed class InMemoryDemoDashboardProvider : IDashboardDataProvider
     {
-        private readonly Random _rnd = new();
-
-        public string PeriodInfo { get; private set; } = "Zeitraum: aktiv (Demo)";
-
-        public Task<DashboardData> LoadAsync(GroupingDimension dimension, CancellationToken ct = default)
+        public Task<DashboardData> LoadAsync(
+            GroupingDimension dimension,
+            IReadOnlyList<NumberRange> ranges,
+            CancellationToken ct = default)
         {
-            // Einfache, stabile Demo-Daten – damit die UI sofort funktioniert.
-            // Labels orientieren sich an Art/Gruppe/Untergruppe.
-            var labels = dimension switch
+            var d = new DashboardData
             {
-                GroupingDimension.KontenArt => new[] { "Einnahmen", "Ausgaben" },
-                GroupingDimension.KontenGruppe => new[] { "Wohnen", "Mobilität", "Essen", "Freizeit", "Sonstiges" },
-                _ => new[] { "Miete", "Strom", "ÖV", "Auto", "Restaurant", "Supermarkt" }
+                Points = new List<DashboardPoint>
+                {
+                    new DashboardPoint { Label = "A", Budget = 1200m, Ist = 900m },
+                    new DashboardPoint { Label = "B", Budget = 800m,  Ist = 950m },
+                    new DashboardPoint { Label = "C", Budget = 300m,  Ist = 200m }
+                }
             };
-
-            // Budget als „Plan“, IST mit kleiner Streuung – negative IST vermeiden (Vergleich Budget vs Betrag in Beträgen > 0).
-            var points = new List<DashboardPoint>();
-            foreach (var label in labels)
-            {
-                var budget = Math.Round((decimal)_rnd.Next(200, 1600), 2);
-                var ist = Math.Round(budget * (decimal)(0.8 + _rnd.NextDouble() * 0.6), 2);
-                points.Add(new DashboardPoint { Label = label, Budget = budget, Ist = ist });
-            }
-
-            PeriodInfo = "Zeitraum: aktiv (Demo)";
-            return Task.FromResult(new DashboardData { Points = points });
+            return Task.FromResult(d);
         }
     }
 }

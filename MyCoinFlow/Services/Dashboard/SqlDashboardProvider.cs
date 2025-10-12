@@ -1,180 +1,108 @@
-﻿using System;
+﻿using Microsoft.Data.SqlClient;
+using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 
-namespace MyCoinFlow.Services.Dashboard
+namespace MyCoinFlow.Services
 {
-    /// <summary>
-    /// Liefert Dashboard-Daten (Budget & IST) gruppiert nach Art/Gruppe/Untergruppe aus deiner SQL-DB.
-    /// </summary>
-    public sealed class SqlDashboardProvider : IDashboardDataProvider, IWithPeriodInfo
+    public sealed class SqlDashboardProvider : IDashboardDataProvider
     {
-        private readonly Func<SqlConnection> _connectionFactory;
+        private readonly Func<SqlConnection> _createConnection;
 
-        public SqlDashboardProvider(Func<SqlConnection> connectionFactory)
-            => _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        // Gib hier deine Connection-Factory rein (z. B. new DatabaseService().CreateConnection)
+        public SqlDashboardProvider(Func<SqlConnection> createConnection)
+            => _createConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
 
-        public string PeriodInfo { get; private set; } = "Zeitraum: unbekannt";
-
-        public async Task<DashboardData> LoadAsync(GroupingDimension dimension, CancellationToken ct = default)
+        public async Task<DashboardData> LoadAsync(
+            GroupingDimension dimension,
+            IReadOnlyList<NumberRange> ranges,
+            CancellationToken ct = default)
         {
-            using var con = _connectionFactory();
-            await con.OpenAsync(ct).ConfigureAwait(false);
+            using var con = _createConnection();
+            await con.OpenAsync(ct);
 
-            // 1) Aktiver Zeitraum, sonst jüngster, sonst aktuelles Jahr
-            var period = await GetActiveOrLatestPeriodAsync(con, ct).ConfigureAwait(false);
-            DateTime startIncl = period?.Start ?? new DateTime(DateTime.Today.Year, 1, 1);
-            DateTime endIncl = period?.Ende ?? DateTime.Today;
-            DateTime endExcl = endIncl.Date.AddDays(1);
-
-            PeriodInfo = period is null
-                ? $"Zeitraum: {startIncl:dd.MM.yyyy}–{endIncl:dd.MM.yyyy} (kein aktiver Budgetzeitraum)"
-                : $"Zeitraum: {period!.Start:dd.MM.yyyy}–{period!.Ende:dd.MM.yyyy} (aktiv)";
-
-            // 2) Spalte in Kontenplan je Dimension
-            var labelColumn = dimension switch
+            string keyExpr = dimension switch
             {
-                GroupingDimension.KontenArt => "Art",
-                GroupingDimension.KontenGruppe => "Gruppe",
-                GroupingDimension.KontenUnterGruppe => "Untergruppe",
-                _ => throw new ArgumentOutOfRangeException(nameof(dimension))
+                GroupingDimension.Art => "ISNULL(k.Art, N'(ohne)')",
+                GroupingDimension.Gruppe => "ISNULL(k.Gruppe, N'(ohne)')",
+                GroupingDimension.Untergruppe => "ISNULL(k.Untergruppe, N'(ohne)')",
+                _ => "ISNULL(k.Art, N'(ohne)')"
             };
 
-            // 3) Budget je Label (nur wenn Zeitraum vorhanden)
-            var budgetByLabel = period?.Id is int zId
-                ? await LoadBudgetByLabelAsync(con, zId, labelColumn, ct).ConfigureAwait(false)
-                : new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-
-            // 4) IST je Label (Summe Transaktion.Betrag für NachKontoId im Zeitraum)
-            var istByLabel = await LoadIstByLabelAsync(con, startIncl, endExcl, labelColumn, ct).ConfigureAwait(false);
-
-            // 5) Vereinen & Punkte
-            var labels = new SortedSet<string>(budgetByLabel.Keys, StringComparer.OrdinalIgnoreCase);
-            labels.UnionWith(istByLabel.Keys);
-
-            var points = new List<DashboardPoint>(labels.Count);
-            foreach (var l in labels)
+            // Range-Filter dynamisch
+            string rangeWhere = "";
+            if (ranges != null && ranges.Count > 0)
             {
-                budgetByLabel.TryGetValue(l, out var b);
-                istByLabel.TryGetValue(l, out var i);
-                points.Add(new DashboardPoint
+                var parts = new List<string>();
+                for (int i = 0; i < ranges.Count; i++)
+                    parts.Add($"(k.Kontonummer BETWEEN @v{i} AND @b{i})");
+                rangeWhere = " AND (" + string.Join(" OR ", parts) + ")";
+            }
+            else
+            {
+                // Wenn "Keine" gewählt -> keine Daten zurück
+                rangeWhere = " AND 1=0";
+            }
+
+            string sql = $@"
+WITH Aktiver AS (
+    SELECT TOP(1) Id, Startdatum, Enddatum
+    FROM Budgetzeitraum
+    WHERE IstAktiv = 1
+)
+SELECT 
+    Label = {keyExpr},
+    Budget = SUM(ISNULL(bd.Budgetwert, 0)),
+    Ist    = SUM(ISNULL(agg.Gebucht, 0))
+FROM Kontenplan k
+LEFT JOIN Aktiver bz ON 1=1
+LEFT JOIN BudgetDetail bd
+    ON bz.Id IS NOT NULL AND bd.ZeitraumId = bz.Id AND bd.KontoId = k.Id
+OUTER APPLY (
+    SELECT SUM(x.Wert) AS Gebucht
+    FROM (
+        SELECT SUM(t.Betrag) AS Wert
+        FROM Transaktion t
+        WHERE t.NachKontoId = k.Id
+          AND (bz.Id IS NULL OR (t.Datum >= bz.Startdatum AND t.Datum <= bz.Enddatum))
+        UNION ALL
+        SELECT SUM(-t.Betrag) AS Wert
+        FROM Transaktion t
+        WHERE t.VonKontoId = k.Id
+          AND (bz.Id IS NULL OR (t.Datum >= bz.Startdatum AND t.Datum <= bz.Enddatum))
+    ) x
+) agg
+WHERE 1=1 {rangeWhere}
+GROUP BY {keyExpr}
+ORDER BY Label;";
+
+            using var cmd = new SqlCommand(sql, con) { CommandType = CommandType.Text };
+
+            if (ranges != null)
+            {
+                for (int i = 0; i < ranges.Count; i++)
                 {
-                    Label = string.IsNullOrWhiteSpace(l) ? "(ohne Zuordnung)" : l,
-                    Budget = Math.Round(b, 2, MidpointRounding.AwayFromZero),
-                    Ist = Math.Round(i, 2, MidpointRounding.AwayFromZero)
+                    cmd.Parameters.AddWithValue($"@v{i}", ranges[i].Von);
+                    cmd.Parameters.AddWithValue($"@b{i}", ranges[i].Bis);
+                }
+            }
+
+            var data = new DashboardData();
+
+            using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                data.Points.Add(new DashboardPoint
+                {
+                    Label = r.GetString(0),
+                    Budget = r.IsDBNull(1) ? 0m : r.GetDecimal(1),
+                    Ist = r.IsDBNull(2) ? 0m : r.GetDecimal(2)
                 });
             }
 
-            return new DashboardData { Points = points };
-        }
-
-        // ---------------- SQL-Hilfen ----------------
-
-        private sealed class PeriodRow
-        {
-            public int Id { get; init; }
-            public DateTime Start { get; init; }
-            public DateTime Ende { get; init; }
-        }
-
-        private static async Task<PeriodRow?> GetActiveOrLatestPeriodAsync(SqlConnection con, CancellationToken ct)
-        {
-            const string sqlActive = @"
-SELECT TOP (1) Id, Startdatum, Enddatum
-FROM Budgetzeitraum
-WHERE IstAktiv = 1
-ORDER BY Startdatum DESC;";
-            await using (var cmd = new SqlCommand(sqlActive, con))
-            await using (var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
-            {
-                if (await r.ReadAsync(ct).ConfigureAwait(false))
-                {
-                    return new PeriodRow
-                    {
-                        Id = r.GetInt32(0),
-                        Start = r.GetDateTime(1).Date,
-                        Ende = r.GetDateTime(2).Date
-                    };
-                }
-            }
-
-            const string sqlLatest = @"
-SELECT TOP (1) Id, Startdatum, Enddatum
-FROM Budgetzeitraum
-ORDER BY Startdatum DESC;";
-            await using (var cmd = new SqlCommand(sqlLatest, con))
-            await using (var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
-            {
-                if (await r.ReadAsync(ct).ConfigureAwait(false))
-                {
-                    return new PeriodRow
-                    {
-                        Id = r.GetInt32(0),
-                        Start = r.GetDateTime(1).Date,
-                        Ende = r.GetDateTime(2).Date
-                    };
-                }
-            }
-
-            return null;
-        }
-
-        private static async Task<Dictionary<string, decimal>> LoadBudgetByLabelAsync(
-            SqlConnection con, int zeitraumId, string labelColumn, CancellationToken ct)
-        {
-            const string tpl = @"
-SELECT 
-    COALESCE(NULLIF(kp.{0}, ''), '(ohne Zuordnung)') AS Label,
-    SUM(CAST(bd.Budgetwert AS decimal(18,2)))       AS Budget
-FROM BudgetDetail bd
-JOIN Kontenplan   kp ON kp.Id = bd.KontoId
-WHERE bd.ZeitraumId = @z
-GROUP BY COALESCE(NULLIF(kp.{0}, ''), '(ohne Zuordnung)')
-ORDER BY Label;";
-            var sql = string.Format(CultureInfo.InvariantCulture, tpl, labelColumn);
-
-            var dict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            await using var cmd = new SqlCommand(sql, con);
-            cmd.Parameters.Add(new SqlParameter("@z", SqlDbType.Int) { Value = zeitraumId });
-
-            await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-            while (await r.ReadAsync(ct).ConfigureAwait(false))
-            {
-                dict[r.GetString(0)] = r.IsDBNull(1) ? 0m : r.GetDecimal(1);
-            }
-            return dict;
-        }
-
-        private static async Task<Dictionary<string, decimal>> LoadIstByLabelAsync(
-            SqlConnection con, DateTime startIncl, DateTime endExcl, string labelColumn, CancellationToken ct)
-        {
-            const string tpl = @"
-SELECT 
-    COALESCE(NULLIF(kp.{0}, ''), '(ohne Zuordnung)') AS Label,
-    SUM(CAST(t.Betrag AS decimal(18,2)))            AS Ist
-FROM Transaktion t
-JOIN Kontenplan  kp ON kp.Id = t.NachKontoId
-WHERE t.Datum >= @s
-  AND t.Datum <  @e
-GROUP BY COALESCE(NULLIF(kp.{0}, ''), '(ohne Zuordnung)')
-ORDER BY Label;";
-            var sql = string.Format(CultureInfo.InvariantCulture, tpl, labelColumn);
-
-            var dict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            await using var cmd = new SqlCommand(sql, con);
-            cmd.Parameters.Add(new SqlParameter("@s", SqlDbType.DateTime2) { Value = startIncl });
-            cmd.Parameters.Add(new SqlParameter("@e", SqlDbType.DateTime2) { Value = endExcl });
-
-            await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-            while (await r.ReadAsync(ct).ConfigureAwait(false))
-            {
-                dict[r.GetString(0)] = r.IsDBNull(1) ? 0m : r.GetDecimal(1);
-            }
-            return dict;
+            return data;
         }
     }
 }

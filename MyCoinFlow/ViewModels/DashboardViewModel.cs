@@ -1,308 +1,282 @@
-﻿using System;
+﻿using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using LiveChartsCore.Measure;
+using SkiaSharp;
+using MyCoinFlow.Services;
+using MyCoinFlow.Helpers;
+using MyCoinFlow.Models;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Input;
-using LiveChartsCore;                    // ISeries, Axis
-using LiveChartsCore.SkiaSharpView;      // ColumnSeries<double>, PieSeries<double>, RowSeries<double>, Axis
-using MyCoinFlow.Services.Dashboard;
-using MyCoinFlow.Services;               // DatabaseService
-using MyCoinFlow.Models;                 // für GeldinstitutSaldo
-using LiveChartsCore.Measure;                  // DataLabelsPosition
-using LiveChartsCore.SkiaSharpView.Painting;   // SolidColorPaint
-using SkiaSharp;                               // SKColors
-
-
 
 namespace MyCoinFlow.ViewModels
 {
-    public sealed class DashboardViewModel : BaseViewModel
+    public class DashboardViewModel : INotifyPropertyChanged
     {
-        private readonly IDashboardDataProvider _provider;
-        private readonly CancellationTokenSource _cts = new();
+        private readonly DatabaseService _db = new();
 
-        public DashboardViewModel(IDashboardDataProvider provider)
+        #region ctor + init
+        public DashboardViewModel()
         {
-            _provider = provider ?? throw new ArgumentNullException(nameof(provider));
-
+            // Gruppierungsvorgaben (einfach gehalten)
             GroupingOptions = new ObservableCollection<GroupingOption>
             {
-                new("Kontenart",          GroupingDimension.KontenArt),
-                new("Kontengruppe",       GroupingDimension.KontenGruppe),
-                new("Kontenuntergruppe",  GroupingDimension.KontenUnterGruppe)
+                new GroupingOption { Id = "Art", Label = "Art" },
+                new GroupingOption { Id = "Gruppe", Label = "Gruppe" },
+                new GroupingOption { Id = "Untergruppe", Label = "Untergruppe" }
             };
-            _selectedGrouping = GroupingOptions.First();
+            SelectedGrouping = GroupingOptions.First();
 
-            RefreshCommand = new MyCoinFlow.Helpers.RelayCommand(_ => _ = LoadAsync());
+            // Commands
+            RefreshCommand = new RelayCommand(_ => Apply());
+            SelectAllRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = true; OnPropertyChanged(nameof(NumberRanges)); });
+            SelectNoneRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = false; OnPropertyChanged(nameof(NumberRanges)); });
+            ApplyFiltersCommand = new RelayCommand(_ => Apply());
+
+            // Achsen default
+            XAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
+            YAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
+
+            BankYAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
+            BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
+
+            ColumnSeries = Array.Empty<ISeries>();
+            PieSeries = Array.Empty<ISeries>();
+            BankSeries = Array.Empty<ISeries>();
+
+            LoadNumberRanges(); // dynamisch aus DB
+            Apply();            // initial berechnen
         }
+        #endregion
 
-        #region Bindings: Gruppierung, KPIs, Charts
+        #region sidebar state
+        public ObservableCollection<RangeFilterItem> NumberRanges { get; } = new();
+
+        private bool _showPercent;
+        public bool ShowPercent
+        {
+            get => _showPercent;
+            set { _showPercent = value; OnPropertyChanged(nameof(ShowPercent)); }
+        }
 
         public ObservableCollection<GroupingOption> GroupingOptions { get; }
         private GroupingOption _selectedGrouping;
         public GroupingOption SelectedGrouping
         {
             get => _selectedGrouping;
-            set
-            {
-                if (_selectedGrouping == value) return;
-                _selectedGrouping = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ColumnChartTitle));
-                _ = LoadAsync();
-            }
+            set { _selectedGrouping = value; OnPropertyChanged(nameof(SelectedGrouping)); }
         }
-
-        // KPIs
-        private int _openImportCount;
-        public int OpenImportCount { get => _openImportCount; private set { _openImportCount = value; OnPropertyChanged(); } }
-
-        private int _bankImportItemCount;
-        public int BankImportItemCount { get => _bankImportItemCount; private set { _bankImportItemCount = value; OnPropertyChanged(); } }
-
-        // Budget/IST Summen
-        private decimal _budgetGesamt;
-        public decimal BudgetGesamt
-        {
-            get => _budgetGesamt;
-            private set { _budgetGesamt = value; OnPropertyChanged(); OnPropertyChanged(nameof(Differenz)); }
-        }
-
-        private decimal _istGesamt;
-        public decimal IstGesamt
-        {
-            get => _istGesamt;
-            private set { _istGesamt = value; OnPropertyChanged(); OnPropertyChanged(nameof(Differenz)); }
-        }
-
-        public decimal Differenz => BudgetGesamt - IstGesamt;
-
-        private string _zeitraumLabel = "Zeitraum: (aktiv)";
-        public string ZeitraumLabel { get => _zeitraumLabel; private set { _zeitraumLabel = value; OnPropertyChanged(); } }
-
-        public string ColumnChartTitle => $"Budget vs. IST nach {SelectedGrouping.Label}";
-
-        // Charts: Budget vs IST, Pie
-        public ObservableCollection<ISeries> ColumnSeries { get; } = new();
-        public ObservableCollection<ISeries> PieSeries { get; } = new();
-
-        private Axis[] _xAxes = new[] { new Axis { Labels = Array.Empty<string>(), LabelsRotation = 0 } };
-        public Axis[] XAxes { get => _xAxes; private set { _xAxes = value; OnPropertyChanged(); } }
-
-        private Axis[] _yAxes = new[] { new Axis { Labeler = v => v.ToString("N2") } };
-        public Axis[] YAxes { get => _yAxes; private set { _yAxes = value; OnPropertyChanged(); } }
-
-        // Chart: Bank-Bestände (horizontal)
-        public ObservableCollection<ISeries> BankSeries { get; } = new();
-        private Axis[] _bankXAxes = new[] { new Axis { Labeler = v => v.ToString("N2") } }; // numerisch (Saldo)
-        public Axis[] BankXAxes { get => _bankXAxes; private set { _bankXAxes = value; OnPropertyChanged(); } }
-
-        private Axis[] _bankYAxes = new[] { new Axis { Labels = Array.Empty<string>() } };   // Institutsnamen
-        public Axis[] BankYAxes { get => _bankYAxes; private set { _bankYAxes = value; OnPropertyChanged(); } }
 
         public ICommand RefreshCommand { get; }
-
+        public ICommand SelectAllRangesCommand { get; }
+        public ICommand SelectNoneRangesCommand { get; }
+        public ICommand ApplyFiltersCommand { get; }
         #endregion
 
-        #region Lifecycle
+        #region charts + kpis bindables
+        private string _columnChartTitle = "Budget vs. IST";
+        public string ColumnChartTitle { get => _columnChartTitle; set { _columnChartTitle = value; OnPropertyChanged(nameof(ColumnChartTitle)); } }
 
-        public Task InitializeAsync() => LoadAsync();
+        public IEnumerable<ISeries> ColumnSeries { get; private set; }
+        public IEnumerable<ISeries> PieSeries { get; private set; }
+        public IEnumerable<ISeries> BankSeries { get; private set; }
 
-        private bool _isBusy;
-        private async Task LoadAsync()
+        public List<Axis> XAxes { get; private set; }
+        public List<Axis> YAxes { get; private set; }
+        public List<Axis> BankXAxes { get; private set; }
+        public List<Axis> BankYAxes { get; private set; }
+
+        private string _zeitraumLabel = "";
+        public string ZeitraumLabel { get => _zeitraumLabel; set { _zeitraumLabel = value; OnPropertyChanged(nameof(ZeitraumLabel)); } }
+
+        private int _openImportCount;
+        public int OpenImportCount { get => _openImportCount; set { _openImportCount = value; OnPropertyChanged(nameof(OpenImportCount)); } }
+
+        private int _bankImportItemCount;
+        public int BankImportItemCount { get => _bankImportItemCount; set { _bankImportItemCount = value; OnPropertyChanged(nameof(BankImportItemCount)); } }
+        #endregion
+
+        #region loading + building
+        private void LoadNumberRanges()
         {
-            if (_isBusy) return;
-            _isBusy = true;
+            NumberRanges.Clear();
             try
             {
-                // 1) Budget/IST-Daten vom Provider (gruppiert)
-                var data = await _provider.LoadAsync(SelectedGrouping.Dimension, _cts.Token);
-
-                BudgetGesamt = data.Points?.Sum(p => p.Budget) ?? 0m;
-                IstGesamt = data.Points?.Sum(p => p.Ist) ?? 0m;
-                ZeitraumLabel = (_provider as IWithPeriodInfo)?.PeriodInfo ?? "Zeitraum: aktiv";
-
-                BuildBudgetIstCharts(data);
-
-                // 2) KPIs + Bankbestände direkt aus DatabaseService (einfach & robust)
-                LoadKpisAndBanks();
-
-                OnPropertyChanged(nameof(ColumnChartTitle));
+                foreach (var r in _db.LadeNummernRegeln())
+                {
+                    NumberRanges.Add(new RangeFilterItem
+                    {
+                        Id = r.Id,
+                        From = r.RangeStart,
+                        To = r.RangeEnd,
+                        Direction = r.Richtung ?? "",
+                        Display = Sanitize(r.Bezeichnung) ?? $"{r.RangeStart}–{r.RangeEnd}",
+                        IsSelected = true
+                    });
+                }
             }
-            catch (OperationCanceledException) { /* ignore */ }
-            catch (Exception ex)
+            catch
             {
-                ColumnSeries.Clear();
-                PieSeries.Clear();
-                BankSeries.Clear();
-                ZeitraumLabel = $"Fehler beim Laden: {ex.Message}";
-                BudgetGesamt = IstGesamt = 0m;
-                OpenImportCount = BankImportItemCount = 0;
+                // wenn Tabelle fehlt o.ä. → einfach leer lassen
             }
-            finally { _isBusy = false; }
         }
 
-        #endregion
-
-        #region Build UI Models
-
-        private void BuildBudgetIstCharts(DashboardData data)
+        private static string? Sanitize(string? s)
         {
-            var points = data?.Points ?? Array.Empty<DashboardPoint>();
+            if (string.IsNullOrWhiteSpace(s)) return s;
+            var txt = s.Trim();
+            var idx = txt.IndexOf('(');
+            if (idx > 0) txt = txt.Substring(0, idx).Trim();
+            return txt;
+        }
 
-            // 1) Art-Mapping je Label laden (aus Kontenplan)
-            var db = new DatabaseService();
-            var labelColumn = SelectedGrouping.Dimension switch
+        private IEnumerable<KontoplanEintrag> FilterKontenByRanges(IEnumerable<KontoplanEintrag> src)
+        {
+            var activeRanges = NumberRanges.Where(n => n.IsSelected).ToList();
+            if (activeRanges.Count == 0) return src; // keine Auswahl -> alles
+            return src.Where(k =>
             {
-                GroupingDimension.KontenArt => "Art",
-                GroupingDimension.KontenGruppe => "Gruppe",
-                GroupingDimension.KontenUnterGruppe => "Untergruppe",
-                _ => "Art"
-            };
-            var artMap = db.LadeArtFlagProLabel(labelColumn); // label -> true(Einnahmen)/false(Ausgaben)/null
+                var nr = k.Kontonummer;
+                foreach (var r in activeRanges)
+                    if (nr >= r.From && nr <= r.To) return true;
+                return false;
+            });
+        }
 
-            // 2) Reihenfolge: Einnahmen (0) -> Ausgaben (1); innerhalb: Budget DESC
-            int OrderKey(string? lbl)
+        private void Apply()
+        {
+            // aktive Zeitraum-Beschriftung
+            try
             {
-                if (lbl == null) return 1; // sicherheitshalber
-                if (artMap.TryGetValue(lbl, out var inc))
-                    return inc == true ? 0 : 1;  // null wird wie Ausgaben einsortiert
-                return 1;
+                var zList = _db.LadeBudgetzeitraeume();
+                var active = zList.FirstOrDefault(z => z.IstAktiv);
+                ZeitraumLabel = active != null
+                    ? $"Zeitraum: {active.Bezeichnung} ({active.Startdatum:d} – {active.Enddatum:d})"
+                    : "Zeitraum: (kein aktiver Zeitraum)";
             }
+            catch { ZeitraumLabel = ""; }
 
-            var ordered = points
-                .OrderBy(p => OrderKey(p.Label))
-                .ThenByDescending(p => p.Budget)
+            BuildKpis();
+            BuildCharts();
+            BuildBanks();
+        }
+
+        private void BuildKpis()
+        {
+            try { OpenImportCount = _db.CountCreditCardStaging(); } catch { OpenImportCount = 0; }
+            try { BankImportItemCount = _db.CountBankImportItem(); } catch { BankImportItemCount = 0; }
+        }
+
+        private void BuildCharts()
+        {
+            List<KontoplanEintrag> all;
+            try { all = _db.LadeKontenplan(); }
+            catch { all = new List<KontoplanEintrag>(); }
+
+            var filtered = FilterKontenByRanges(all).ToList();
+
+            // Gruppierungsschlüssel
+            Func<KontoplanEintrag, string> keySel = SelectedGrouping?.Id switch
+            {
+                "Gruppe" => k => string.IsNullOrWhiteSpace(k.Gruppe) ? "—" : k.Gruppe,
+                "Untergruppe" => k => string.IsNullOrWhiteSpace(k.Untergruppe) ? "—" : k.Untergruppe,
+                _ => k => string.IsNullOrWhiteSpace(k.Art) ? "—" : k.Art
+            };
+            ColumnChartTitle = $"{SelectedGrouping?.Label ?? "Art"} – Budget vs. IST";
+
+            var groups = filtered
+                .GroupBy(keySel)
+                .Select(g => new
+                {
+                    Key = g.Key,
+                    Budget = g.Sum(x => x.Budgetwert ?? 0m),
+                    Ist = g.Sum(x => x.Gebucht)
+                })
+                .OrderByDescending(x => Math.Abs(x.Budget))
                 .ToList();
 
-            // 3) Labels & Werte (vier Arrays für 4 Serien)
-            var labels = ordered.Select(p => p.Label ?? string.Empty).ToArray();
-            var n = labels.Length;
+            var labels = groups.Select(g => g.Key).ToArray();
+            var budgetVals = groups.Select(g => (double)g.Budget).ToArray();
+            var istVals = groups.Select(g => (double)g.Ist).ToArray();
 
-            var budgetInc = new double[n];
-            var istInc = new double[n];
-            var budgetExp = new double[n];
-            var istExp = new double[n];
+            XAxes = new List<Axis> { new Axis { Labels = labels } };
+            YAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
 
-            for (int i = 0; i < n; i++)
+            ColumnSeries = new ISeries[]
             {
-                var p = ordered[i];
-                var isIncome = artMap.TryGetValue(p.Label ?? string.Empty, out var inc) && inc == true;
-
-                if (isIncome)
-                {
-                    budgetInc[i] = (double)p.Budget;
-                    istInc[i] = (double)p.Ist;
-                }
-                else
-                {
-                    budgetExp[i] = (double)p.Budget;
-                    istExp[i] = (double)p.Ist;
-                }
-            }
-
-            // 4) Achsen (X = Labels)
-            XAxes = new[]
-            {
-                new LiveChartsCore.SkiaSharpView.Axis
-             {
-            Labels = labels,
-            LabelsRotation = labels.Any(l => !string.IsNullOrEmpty(l) && l.Length > 12) ? 15 : 0
-             }
+                new ColumnSeries<double> { Name = "Budget", Values = budgetVals },
+                new ColumnSeries<double> { Name = "IST",    Values = istVals }
             };
+            OnPropertyChanged(nameof(XAxes));
+            OnPropertyChanged(nameof(YAxes));
+            OnPropertyChanged(nameof(ColumnSeries));
 
-            // 5) Serien setzen – Farben je Art und Serie
-            //    Einnahmen: Grün; Ausgaben: Orange/Rot
-            ColumnSeries.Clear();
-
-            ColumnSeries.Add(new LiveChartsCore.SkiaSharpView.ColumnSeries<double>
+            // Pie: Verteilung der IST-Werte (Beträge absolut)
+            var slices = groups.Select(g => new { g.Key, Val = Math.Abs(g.Ist) }).Where(x => x.Val > 0).ToList();
+            var total = slices.Sum(s => s.Val);
+            var pie = new List<ISeries>();
+            foreach (var s in slices)
             {
-                Name = "Budget (Einnahmen)",
-                Values = budgetInc,
-                Fill = new SolidColorPaint(SKColors.SeaGreen)
-            });
-
-            ColumnSeries.Add(new LiveChartsCore.SkiaSharpView.ColumnSeries<double>
-            {
-                Name = "IST (Einnahmen)",
-                Values = istInc,
-                Fill = new SolidColorPaint(SKColors.MediumSeaGreen)
-            });
-
-            ColumnSeries.Add(new LiveChartsCore.SkiaSharpView.ColumnSeries<double>
-            {
-                Name = "Budget (Ausgaben)",
-                Values = budgetExp,
-                Fill = new SolidColorPaint(SKColors.OrangeRed)
-            });
-
-            ColumnSeries.Add(new LiveChartsCore.SkiaSharpView.ColumnSeries<double>
-            {
-                Name = "IST (Ausgaben)",
-                Values = istExp,
-                Fill = new SolidColorPaint(SKColors.Tomato)
-            });
-
-            // 6) Pie-Chart (IST-Verteilung) lassen wir unverändert – optional könntest du dort
-            //    die Slices ebenfalls je Art einfärben; sag Bescheid, wenn du das möchtest.
-            PieSeries.Clear();
-            foreach (var p in points.Where(x => x.Ist != 0m))
-            {
-                PieSeries.Add(new LiveChartsCore.SkiaSharpView.PieSeries<double>
+                string title = s.Key;
+                if (ShowPercent && total > 0)
                 {
-                    Name = p.Label,
-                    Values = new[] { (double)p.Ist },
-                    Pushout = 0
-                });
+                    var pct = s.Val / total;
+                    title = $"{s.Key} ({pct:P0})";
+                }
+                pie.Add(new PieSeries<double> { Name = title, Values = new[] { (double)s.Val }, InnerRadius = 50 });
             }
+            PieSeries = pie;
+            OnPropertyChanged(nameof(PieSeries));
         }
 
-
-
-        private void LoadKpisAndBanks()
+        private void BuildBanks()
         {
-            var db = new DatabaseService();
+            List<GeldinstitutSaldo> banks;
+            try { banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today); }
+            catch { banks = new List<GeldinstitutSaldo>(); }
 
-            // KPIs
-            OpenImportCount = db.CountCreditCardStaging();
-            BankImportItemCount = db.CountBankImportItem();
+            var labels = banks.Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"#{b.Id}" : b.Name).ToArray();
+            var vals = banks.Select(b => (double)b.Schlussaldo).ToArray();
 
-            // Bank-Bestände (per heutigem Datum)
-            var banks = db.LadeGeldinstituteMitSaldo(DateTime.Today);
-            if (banks == null) banks = new System.Collections.Generic.List<GeldinstitutSaldo>();
+            BankYAxes = new List<Axis> { new Axis { Labels = labels } };
+            BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
+            BankSeries = new ISeries[] { new RowSeries<double> { Name = "Saldo", Values = vals } };
 
-            // Labels + Werte
-            var labels = banks.Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"ID {b.Id}" : b.Name).ToArray();
-            var values = banks.Select(b => (double)b.Schlussaldo).ToArray();
-
-            // Achsen: Y = Banknamen, X = Betrag
-            BankYAxes = new[] { new LiveChartsCore.SkiaSharpView.Axis { Labels = labels } };
-            BankXAxes = new[] { new LiveChartsCore.SkiaSharpView.Axis { Labeler = v => v.ToString("N2") } };
-
-            // Serie (horizontale Balken) + Werte INSIDE (Data Labels)
-            BankSeries.Clear();
-            BankSeries.Add(new LiveChartsCore.SkiaSharpView.RowSeries<double>
-            {
-                Name = "Saldo",
-                Values = values,
-
-                // Data Labels (im Balken)
-                DataLabelsPaint = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(SkiaSharp.SKColors.White),
-                DataLabelsSize = 13,
-                DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Middle,
-                DataLabelsFormatter = point => point.Model.ToString("N2")   // <- hier: Model statt PrimaryValue
-            });
+            OnPropertyChanged(nameof(BankYAxes));
+            OnPropertyChanged(nameof(BankXAxes));
+            OnPropertyChanged(nameof(BankSeries));
         }
-
-
-
         #endregion
 
-        #region Helper
+        #region INotifyPropertyChanged
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        #endregion
 
-        public sealed record GroupingOption(string Label, GroupingDimension Dimension);
+        #region helper types
+        public sealed class GroupingOption
+        {
+            public string Id { get; set; } = "";
+            public string Label { get; set; } = "";
+            public override string ToString() => Label;
+        }
 
+        public sealed class RangeFilterItem : INotifyPropertyChanged
+        {
+            public int Id { get; set; }
+            public int From { get; set; }
+            public int To { get; set; }
+            public string Direction { get; set; } = "";
+            public string Display { get; set; } = "";
+            private bool _isSelected;
+            public bool IsSelected { get => _isSelected; set { _isSelected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } }
+            public event PropertyChangedEventHandler? PropertyChanged;
+        }
         #endregion
     }
 }

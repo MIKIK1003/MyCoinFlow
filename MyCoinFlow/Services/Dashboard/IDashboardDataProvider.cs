@@ -1,32 +1,45 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MyCoinFlow.Services.Dashboard
+namespace MyCoinFlow.Services
 {
-    public enum GroupingDimension { KontenArt, KontenGruppe, KontenUnterGruppe }
+    public enum GroupingDimension
+    {
+        Art = 0,
+        Gruppe = 1,
+        Untergruppe = 2
+    }
+
+    public readonly record struct NumberRange(int Von, int Bis);
 
     public sealed class DashboardPoint
     {
-        public string Label { get; init; } = "";
-        public decimal Budget { get; init; }
-        public decimal Ist { get; init; }
+        public string Label { get; set; } = "";
+        public decimal Budget { get; set; }
+        public decimal Ist { get; set; }
+
+        // optional (nicht für die Anzeige nötig, aber nützlich)
+        public string? Art { get; set; }
+        public string? Gruppe { get; set; }
+        public string? Untergruppe { get; set; }
+        public int? Kontonummer { get; set; }
+        public int KontoId { get; set; }
     }
 
-    public class DashboardData
+    public sealed class DashboardData
     {
-        public IReadOnlyList<DashboardPoint> Points { get; init; } = [];
-        public static DashboardData Empty { get; } = new() { Points = [] };
-    }
-
-    /// <summary>Optional: Zeitraumtext für die UI.</summary>
-    public interface IWithPeriodInfo
-    {
-        string PeriodInfo { get; }
+        public List<DashboardPoint> Points { get; set; } = new();
+        public decimal BudgetTotal => Points.Sum(p => p.Budget);
+        public decimal IstTotal => Points.Sum(p => p.Ist);
     }
 
     public interface IDashboardDataProvider
     {
-        Task<DashboardData> LoadAsync(GroupingDimension dimension, CancellationToken ct = default);
+        Task<DashboardData> LoadAsync(
+            GroupingDimension dimension,
+            IReadOnlyList<NumberRange> ranges,
+            CancellationToken ct = default);
     }
 }
