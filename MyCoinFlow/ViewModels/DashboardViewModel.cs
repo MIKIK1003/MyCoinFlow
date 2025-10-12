@@ -137,7 +137,11 @@ namespace MyCoinFlow.ViewModels
         private IEnumerable<KontoplanEintrag> FilterKontenByRanges(IEnumerable<KontoplanEintrag> src)
         {
             var activeRanges = NumberRanges.Where(n => n.IsSelected).ToList();
-            if (activeRanges.Count == 0) return src; // keine Auswahl -> alles
+
+            // WICHTIG: Keine Auswahl => LEER (vorher: "alles")
+            if (activeRanges.Count == 0)
+                return Enumerable.Empty<KontoplanEintrag>();
+
             return src.Where(k =>
             {
                 var nr = k.Kontonummer;
@@ -146,6 +150,7 @@ namespace MyCoinFlow.ViewModels
                 return false;
             });
         }
+
 
         private void Apply()
         {

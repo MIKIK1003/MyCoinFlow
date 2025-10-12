@@ -12,7 +12,7 @@
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="250" />
+            <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -176,15 +176,15 @@
 
                 <!-- Buttons: Alle / Keine / Anwenden (IconTextButton wie in AddressesView) -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal">
-                    <Button Style="{StaticResource IconTextButton}" Tag="check-all" Content="Alle"
+                    <Button Style="{StaticResource IconTextButton}" Tag="checkboxmultiplemarked" Content="Alle"
                             MinHeight="40" Margin="0,0,8,8"
-                            Command="{Binding SelectAllRangesCommand}"/>
-                    <Button Style="{StaticResource IconTextButton}" Tag="close" Content="Keine"
+                            Command="{Binding SelectAllRangesCommand}" Width="90"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="checkboxmultipleblank" Content="Keine"
                             MinHeight="40" Margin="0,0,8,8"
-                            Command="{Binding SelectNoneRangesCommand}"/>
-                    <Button Style="{StaticResource IconTextButton}" Tag="refresh" Content="Anwenden"
+                            Command="{Binding SelectNoneRangesCommand}" Width="90"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="flagcheckered" Content="Los"
                             MinHeight="40" Margin="0,0,0,8"
-                            Command="{Binding ApplyFiltersCommand}"/>
+                            Command="{Binding ApplyFiltersCommand}" Width="90"/>
                 </StackPanel>
 
                 <!-- Dynamische Nummernkreise -->

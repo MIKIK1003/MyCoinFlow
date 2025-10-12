@@ -9,14 +9,14 @@
     <ApplicationIcon>Assets\Icons\piggybank.ico</ApplicationIcon>
 
     <!-- sichtbare Produktversion -->
-    <Version>1.0.4</Version>
+    <Version>1.1.0</Version>
 
     <!-- Assembly-/Datei-Versionen (4-teilig) -->
-    <AssemblyVersion>1.0.4.0</AssemblyVersion>
-    <FileVersion>1.0.4.0</FileVersion>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
 
     <!-- von UpdateService ausgelesen -->
-    <InformationalVersion>1.0.4</InformationalVersion>
+    <InformationalVersion>1.0.5</InformationalVersion>
 
 
 
