@@ -236,20 +236,36 @@ namespace MyCoinFlow.ViewModels
         private void BuildBanks()
         {
             List<GeldinstitutSaldo> banks;
-            try { banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today); }
+            try { banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today); } // aus DB berechnet
             catch { banks = new List<GeldinstitutSaldo>(); }
 
-            var labels = banks.Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"#{b.Id}" : b.Name).ToArray();
-            var vals = banks.Select(b => (double)b.Schlussaldo).ToArray();
+            // Achsenbeschriftungen: nur Namen links, Beträge als DataLabels IM Balken
+            var labels = banks.Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"ID {b.Id}" : b.Name).ToArray();
+            var values = banks.Select(b => (double)b.Schlussaldo).ToArray();
 
             BankYAxes = new List<Axis> { new Axis { Labels = labels } };
             BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
-            BankSeries = new ISeries[] { new RowSeries<double> { Name = "Saldo", Values = vals } };
+
+            // Eine Row‑Serie mit DataLabels in der Mitte des Balkens
+            BankSeries = new ISeries[]
+            {
+        new RowSeries<double>
+        {
+            Name = "Saldo",
+            Values = values,
+            // Labels im Balken; "Model" = double‑Wert des Punktes
+            DataLabelsPaint = new SolidColorPaint(SKColors.White),
+            DataLabelsSize = 13,
+            DataLabelsPosition = DataLabelsPosition.Middle,
+            DataLabelsFormatter = p => p.Model.ToString("N2")
+        }
+            };
 
             OnPropertyChanged(nameof(BankYAxes));
             OnPropertyChanged(nameof(BankXAxes));
             OnPropertyChanged(nameof(BankSeries));
         }
+
         #endregion
 
         #region INotifyPropertyChanged

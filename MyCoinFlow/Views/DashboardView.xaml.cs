@@ -1,4 +1,5 @@
-﻿using System.Windows.Controls;
+﻿using System.Windows;
+using System.Windows.Controls;
 
 namespace MyCoinFlow.Views
 {
@@ -9,6 +10,17 @@ namespace MyCoinFlow.Views
             InitializeComponent();
             if (DataContext == null)
                 DataContext = new MyCoinFlow.ViewModels.DashboardViewModel();
+        }
+
+        private void PrintDashboard_Click(object sender, RoutedEventArgs e)
+        {
+            // Druckt den linken Dashboard‑Bereich (PrintScope)
+            var dlg = new PrintDialog();
+            if (dlg.ShowDialog() == true)
+            {
+                // Hinweis: skaliert NICHT automatisch auf Seite – bei Bedarf später Feintuning.
+                dlg.PrintVisual(PrintScope, "MyCoinFlow Dashboard");
+            }
         }
     }
 }

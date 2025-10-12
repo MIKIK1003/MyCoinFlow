@@ -42,7 +42,7 @@
         </DockPanel>
 
         <!-- Hauptbereich links: 4 Karten -->
-        <Grid Grid.Row="1" Grid.Column="0">
+        <Grid x:Name="PrintScope" Grid.Row="1" Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
@@ -71,7 +71,7 @@
                 </Grid>
             </materialDesign:Card>
 
-            <!-- (2) IST-Verteilung (Kreis/Donut) -->
+            <!-- (2) IST‑Verteilung (Kreis/Donut) -->
             <materialDesign:Card Grid.Row="0" Grid.Column="1" Padding="12" Margin="8,0,0,8">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -88,7 +88,7 @@
                 </Grid>
             </materialDesign:Card>
 
-            <!-- (3) KPIs: Offene Import-Zeilen -->
+            <!-- (3) KPIs: Offene Import‑Zeilen -->
             <materialDesign:Card Grid.Row="1" Grid.Column="0" Padding="12" Margin="0,8,8,0">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -155,17 +155,18 @@
             </materialDesign:Card>
         </Grid>
 
-        <!-- Sidebar rechts: Filter -->
+        <!-- Sidebar rechts: Filter + Aktionen -->
         <materialDesign:Card Grid.Row="1" Grid.Column="1" Padding="12" Margin="8,0,0,0">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Filter" Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
+                <TextBlock Text="Filter" Style="{StaticResource MaterialDesignSubtitle1TextBlock}" />
 
                 <!-- Prozentumschalter -->
                 <CheckBox Grid.Row="1"
@@ -173,8 +174,21 @@
                           Content="Werte im Kreisdiagramm in %"
                           IsChecked="{Binding ShowPercent, Mode=TwoWay}" />
 
+                <!-- Buttons: Alle / Keine / Anwenden (IconTextButton wie in AddressesView) -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal">
+                    <Button Style="{StaticResource IconTextButton}" Tag="check-all" Content="Alle"
+                            MinHeight="40" Margin="0,0,8,8"
+                            Command="{Binding SelectAllRangesCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="close" Content="Keine"
+                            MinHeight="40" Margin="0,0,8,8"
+                            Command="{Binding SelectNoneRangesCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="refresh" Content="Anwenden"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding ApplyFiltersCommand}"/>
+                </StackPanel>
+
                 <!-- Dynamische Nummernkreise -->
-                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="Kontenkreise" Opacity="0.7" Margin="0,0,0,6"/>
                         <ItemsControl ItemsSource="{Binding NumberRanges}">
@@ -189,32 +203,11 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Buttons unten -->
-                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                    <Button Command="{Binding SelectAllRangesCommand}"
-                            Style="{StaticResource MaterialDesignFlatButton}"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="SelectAll" Width="18" Height="18" Margin="0,0,6,0"/>
-                            <TextBlock Text="Alle"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SelectNoneRangesCommand}"
-                            Style="{StaticResource MaterialDesignFlatButton}"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="CloseCircleMultipleOutline" Width="18" Height="18" Margin="0,0,6,0"/>
-                            <TextBlock Text="Keine"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ApplyFiltersCommand}"
-                            Style="{StaticResource MaterialDesignRaisedButton}">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="CheckBold" Width="18" Height="18" Margin="0,0,6,0"/>
-                            <TextBlock Text="Anwenden"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
+                <!-- Drucken -->
+                <Button Grid.Row="4"
+                        Style="{StaticResource IconTextButton}" Tag="printer" Content="Drucken"
+                        MinHeight="40" Margin="0,12,0,0"
+                        Click="PrintDashboard_Click"/>
             </Grid>
         </materialDesign:Card>
 
