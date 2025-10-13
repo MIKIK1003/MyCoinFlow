@@ -2,6 +2,6 @@
 <Include>
   <?define Manufacturer="brugilim Software" ?>
   <?define ProductName="MyCoinFlow" ?>
-  <?define ProductVersion="1.0.4" ?>
+  <?define ProductVersion="1.0.5" ?>
   <?define UpgradeCode="{A5B1A2E6-37A1-4E0E-9C6E-2E5E0F3B9E10}" ?>
 </Include>

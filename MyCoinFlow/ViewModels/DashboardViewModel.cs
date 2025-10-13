@@ -25,28 +25,40 @@ namespace MyCoinFlow.ViewModels
             // Gruppierungsvorgaben (einfach gehalten)
             GroupingOptions = new ObservableCollection<GroupingOption>
             {
-                new GroupingOption { Id = "Art", Label = "Art" },
-                new GroupingOption { Id = "Gruppe", Label = "Gruppe" },
-                new GroupingOption { Id = "Untergruppe", Label = "Untergruppe" }
+                new GroupingOption { Id = "Art",          Label = "Art" },
+                new GroupingOption { Id = "Gruppe",       Label = "Gruppe" },
+                new GroupingOption { Id = "Untergruppe",  Label = "Untergruppe" }
             };
             SelectedGrouping = GroupingOptions.First();
 
             // Commands
             RefreshCommand = new RelayCommand(_ => Apply());
-            SelectAllRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = true; OnPropertyChanged(nameof(NumberRanges)); });
-            SelectNoneRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = false; OnPropertyChanged(nameof(NumberRanges)); });
+            SelectAllRangesCommand = new RelayCommand(_ =>
+            {
+                foreach (var r in NumberRanges) r.IsSelected = true;
+                OnPropertyChanged(nameof(NumberRanges));
+            });
+            SelectNoneRangesCommand = new RelayCommand(_ =>
+            {
+                foreach (var r in NumberRanges) r.IsSelected = false;
+                OnPropertyChanged(nameof(NumberRanges));
+            });
             ApplyFiltersCommand = new RelayCommand(_ => Apply());
 
-            // Achsen default
+            // Achsen defaults
             XAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
             YAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
-
             BankYAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
             BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
+
+            // Top-Dev Achsen defaults
+            TopDevYAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
+            TopDevXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
 
             ColumnSeries = Array.Empty<ISeries>();
             PieSeries = Array.Empty<ISeries>();
             BankSeries = Array.Empty<ISeries>();
+            TopDevSeries = Array.Empty<ISeries>();
 
             LoadNumberRanges(); // dynamisch aus DB
             Apply();            // initial berechnen
@@ -79,11 +91,20 @@ namespace MyCoinFlow.ViewModels
 
         #region charts + kpis bindables
         private string _columnChartTitle = "Budget vs. IST";
-        public string ColumnChartTitle { get => _columnChartTitle; set { _columnChartTitle = value; OnPropertyChanged(nameof(ColumnChartTitle)); } }
+        public string ColumnChartTitle
+        {
+            get => _columnChartTitle;
+            set { _columnChartTitle = value; OnPropertyChanged(nameof(ColumnChartTitle)); }
+        }
 
         public IEnumerable<ISeries> ColumnSeries { get; private set; }
         public IEnumerable<ISeries> PieSeries { get; private set; }
         public IEnumerable<ISeries> BankSeries { get; private set; }
+
+        // NEU: Top-Abweichungen
+        public IEnumerable<ISeries> TopDevSeries { get; private set; }
+        public List<Axis> TopDevXAxes { get; private set; }
+        public List<Axis> TopDevYAxes { get; private set; }
 
         public List<Axis> XAxes { get; private set; }
         public List<Axis> YAxes { get; private set; }
@@ -91,13 +112,25 @@ namespace MyCoinFlow.ViewModels
         public List<Axis> BankYAxes { get; private set; }
 
         private string _zeitraumLabel = "";
-        public string ZeitraumLabel { get => _zeitraumLabel; set { _zeitraumLabel = value; OnPropertyChanged(nameof(ZeitraumLabel)); } }
+        public string ZeitraumLabel
+        {
+            get => _zeitraumLabel;
+            set { _zeitraumLabel = value; OnPropertyChanged(nameof(ZeitraumLabel)); }
+        }
 
         private int _openImportCount;
-        public int OpenImportCount { get => _openImportCount; set { _openImportCount = value; OnPropertyChanged(nameof(OpenImportCount)); } }
+        public int OpenImportCount
+        {
+            get => _openImportCount;
+            set { _openImportCount = value; OnPropertyChanged(nameof(OpenImportCount)); }
+        }
 
         private int _bankImportItemCount;
-        public int BankImportItemCount { get => _bankImportItemCount; set { _bankImportItemCount = value; OnPropertyChanged(nameof(BankImportItemCount)); } }
+        public int BankImportItemCount
+        {
+            get => _bankImportItemCount;
+            set { _bankImportItemCount = value; OnPropertyChanged(nameof(BankImportItemCount)); }
+        }
         #endregion
 
         #region loading + building
@@ -121,7 +154,7 @@ namespace MyCoinFlow.ViewModels
             }
             catch
             {
-                // wenn Tabelle fehlt o.ä. → einfach leer lassen
+                // Wenn Tabelle fehlt o.ä. → leer lassen
             }
         }
 
@@ -136,25 +169,24 @@ namespace MyCoinFlow.ViewModels
 
         private IEnumerable<KontoplanEintrag> FilterKontenByRanges(IEnumerable<KontoplanEintrag> src)
         {
-            var activeRanges = NumberRanges.Where(n => n.IsSelected).ToList();
+            var active = NumberRanges.Where(n => n.IsSelected).ToList();
 
-            // WICHTIG: Keine Auswahl => LEER (vorher: "alles")
-            if (activeRanges.Count == 0)
+            // WICHTIG: Keine Auswahl => LEER
+            if (active.Count == 0)
                 return Enumerable.Empty<KontoplanEintrag>();
 
             return src.Where(k =>
             {
                 var nr = k.Kontonummer;
-                foreach (var r in activeRanges)
+                foreach (var r in active)
                     if (nr >= r.From && nr <= r.To) return true;
                 return false;
             });
         }
 
-
         private void Apply()
         {
-            // aktive Zeitraum-Beschriftung
+            // Zeitraum-Label
             try
             {
                 var zList = _db.LadeBudgetzeitraeume();
@@ -193,17 +225,19 @@ namespace MyCoinFlow.ViewModels
             };
             ColumnChartTitle = $"{SelectedGrouping?.Label ?? "Art"} – Budget vs. IST";
 
+            // Aggregation je Label
             var groups = filtered
                 .GroupBy(keySel)
                 .Select(g => new
                 {
                     Key = g.Key,
-                    Budget = g.Sum(x => x.Budgetwert ?? 0m),
-                    Ist = g.Sum(x => x.Gebucht)
+                    Budget = g.Sum(x => x.Budgetwert ?? 0m), // => decimal (nicht null)
+                    Ist = g.Sum(x => x.Gebucht)              // => decimal
                 })
                 .OrderByDescending(x => Math.Abs(x.Budget))
                 .ToList();
 
+            // --- (1) Säulen: Budget vs. IST -----------------------------------
             var labels = groups.Select(g => g.Key).ToArray();
             var budgetVals = groups.Select(g => (double)g.Budget).ToArray();
             var istVals = groups.Select(g => (double)g.Ist).ToArray();
@@ -214,14 +248,18 @@ namespace MyCoinFlow.ViewModels
             ColumnSeries = new ISeries[]
             {
                 new ColumnSeries<double> { Name = "Budget", Values = budgetVals },
-                new ColumnSeries<double> { Name = "IST",    Values = istVals }
+                new ColumnSeries<double> { Name = "IST",    Values = istVals    }
             };
             OnPropertyChanged(nameof(XAxes));
             OnPropertyChanged(nameof(YAxes));
             OnPropertyChanged(nameof(ColumnSeries));
 
-            // Pie: Verteilung der IST-Werte (Beträge absolut)
-            var slices = groups.Select(g => new { g.Key, Val = Math.Abs(g.Ist) }).Where(x => x.Val > 0).ToList();
+            // --- (2) Pie: Verteilung IST --------------------------------------
+            var slices = groups
+                .Select(g => new { g.Key, Val = Math.Abs(g.Ist) })
+                .Where(x => x.Val > 0)
+                .ToList();
+
             var total = slices.Sum(s => s.Val);
             var pie = new List<ISeries>();
             foreach (var s in slices)
@@ -232,45 +270,91 @@ namespace MyCoinFlow.ViewModels
                     var pct = s.Val / total;
                     title = $"{s.Key} ({pct:P0})";
                 }
-                pie.Add(new PieSeries<double> { Name = title, Values = new[] { (double)s.Val }, InnerRadius = 50 });
+
+                pie.Add(new PieSeries<double>
+                {
+                    Name = title,
+                    Values = new[] { (double)s.Val },
+                    InnerRadius = 50
+                });
             }
             PieSeries = pie;
             OnPropertyChanged(nameof(PieSeries));
+
+            // --- (3) NEU: Top‑Abweichungen (unten links) ----------------------
+            var top = groups
+                .Select(x => new
+                {
+                    x.Key,
+                    x.Budget,
+                    x.Ist,
+                    Dev = x.Ist - x.Budget,              // signierte Abweichung
+                    DevAbs = Math.Abs(x.Ist - x.Budget)  // absolute Abweichung
+                })
+                .OrderByDescending(x => x.DevAbs)
+                .Take(8)
+                .ToList();
+
+            var topLabels = top.Select(t => t.Key).ToArray();
+            var topValues = top.Select(t => (double)t.Dev).ToArray(); // negative/positive Balken
+
+            TopDevYAxes = new List<Axis> { new Axis { Labels = topLabels } };
+            TopDevXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
+
+            TopDevSeries = new ISeries[]
+            {
+                new RowSeries<double>
+                {
+                    Name = "Abweichung (IST − Budget)",
+                    Values = topValues,
+                    // Werte im Balken
+                    DataLabelsPaint    = new SolidColorPaint(SKColors.White),
+                    DataLabelsSize     = 13,
+                    DataLabelsPosition = DataLabelsPosition.Middle,
+                    DataLabelsFormatter = p => p.Model.ToString("N2")
+                }
+            };
+            OnPropertyChanged(nameof(TopDevYAxes));
+            OnPropertyChanged(nameof(TopDevXAxes));
+            OnPropertyChanged(nameof(TopDevSeries));
         }
 
         private void BuildBanks()
         {
             List<GeldinstitutSaldo> banks;
-            try { banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today); } // aus DB berechnet
+            try { banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today); }
             catch { banks = new List<GeldinstitutSaldo>(); }
 
-            // Achsenbeschriftungen: nur Namen links, Beträge als DataLabels IM Balken
-            var labels = banks.Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"ID {b.Id}" : b.Name).ToArray();
-            var values = banks.Select(b => (double)b.Schlussaldo).ToArray();
+            var labels = banks
+                .Select(b => string.IsNullOrWhiteSpace(b.Name) ? $"ID {b.Id}" : b.Name)
+                .ToArray();
+
+            var values = banks
+                .Select(b => (double)b.Schlussaldo)
+                .ToArray();
 
             BankYAxes = new List<Axis> { new Axis { Labels = labels } };
             BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
 
-            // Eine Row‑Serie mit DataLabels in der Mitte des Balkens
             BankSeries = new ISeries[]
             {
-        new RowSeries<double>
-        {
-            Name = "Saldo",
-            Values = values,
-            // Labels im Balken; "Model" = double‑Wert des Punktes
-            DataLabelsPaint = new SolidColorPaint(SKColors.White),
-            DataLabelsSize = 13,
-            DataLabelsPosition = DataLabelsPosition.Middle,
-            DataLabelsFormatter = p => p.Model.ToString("N2")
-        }
+                new RowSeries<double>
+                {
+                    Name = "Saldo",
+                    Values = values,
+
+                    // Werte IM Balken – ohne ChartPoint-Details
+                    DataLabelsPaint    = new SolidColorPaint(SKColors.White),
+                    DataLabelsSize     = 13,
+                    DataLabelsPosition = DataLabelsPosition.Middle,
+                    DataLabelsFormatter = p => p.Model.ToString("N2")
+                }
             };
 
             OnPropertyChanged(nameof(BankYAxes));
             OnPropertyChanged(nameof(BankXAxes));
             OnPropertyChanged(nameof(BankSeries));
         }
-
         #endregion
 
         #region INotifyPropertyChanged
@@ -294,8 +378,14 @@ namespace MyCoinFlow.ViewModels
             public int To { get; set; }
             public string Direction { get; set; } = "";
             public string Display { get; set; } = "";
+
             private bool _isSelected;
-            public bool IsSelected { get => _isSelected; set { _isSelected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } }
+            public bool IsSelected
+            {
+                get => _isSelected;
+                set { _isSelected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); }
+            }
+
             public event PropertyChangedEventHandler? PropertyChanged;
         }
         #endregion
