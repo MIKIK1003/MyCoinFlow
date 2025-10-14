@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using MyCoinFlow.Models;
@@ -11,14 +12,10 @@ namespace MyCoinFlow.Views
     {
         private readonly DatabaseService _db = new();
 
-        private void BudgetCheck_Changed(object sender, RoutedEventArgs e) => UpdateUiForType();
-
-
-
-        // Edit-Modus: bestehende Id (null => Neu)
+        // Edit-Modus
         private int? _editId;
 
-        // Vorbelegungen (optional)
+        // Vorbelegungen (vom Aufrufer gesetzt)
         private int? _prefVonKontoId;
         private int? _prefNachKontoId;
         private int? _prefGeldinstitutId;
@@ -26,7 +23,7 @@ namespace MyCoinFlow.Views
         private DateTime? _prefDatum;
         private decimal? _prefBetrag;
         private string? _prefNotiz;
-        private string? _prefTypName; // "Bank → Konto" | "Konto → Konto" | "Konto → Bank" | "Adresse → Bank"
+        private string? _prefTypName;
 
         public TransactionsDialog()
         {
@@ -35,31 +32,34 @@ namespace MyCoinFlow.Views
 
         public TransactionsDialog(Transaktion? t) : this()
         {
-            if (t != null)
-            {
-                _editId = t.Id; // Edit-Id merken
-                _prefDatum = t.Datum;
-                _prefVonKontoId = t.VonKontoId;
-                _prefNachKontoId = t.NachKontoId;
-                _prefGeldinstitutId = t.GeldinstitutId;
-                _prefAdresseId = t.AdresseId;
-                _prefBetrag = t.Betrag;
-                _prefNotiz = t.Notiz;
-                _prefTypName = BestimmeTypName(t);
-            }
+            if (t == null) return;
+
+            _editId = t.Id;
+            _prefDatum = t.Datum;
+            _prefVonKontoId = t.VonKontoId;
+            _prefNachKontoId = t.NachKontoId;
+            _prefGeldinstitutId = t.GeldinstitutId;
+            _prefAdresseId = t.AdresseId;
+            _prefBetrag = t.Betrag;
+            _prefNotiz = t.Notiz;
+            _prefTypName = BestimmeTypName(t);
         }
 
-        private static string BestimmeTypName(Transaktion t)
+        private string BestimmeTypName(Transaktion t)
         {
+            if (string.Equals((t.Notiz ?? "").Trim(), "Budgetierte Einnahme", StringComparison.OrdinalIgnoreCase))
+                return "Budgetierte Einnahme";
+
             if (!t.VonKontoId.HasValue && t.NachKontoId.HasValue) return "Bank → Konto";
             if (t.VonKontoId.HasValue && t.NachKontoId.HasValue) return "Konto → Konto";
             if (t.VonKontoId.HasValue && !t.NachKontoId.HasValue) return "Konto → Bank";
             if (t.AdresseId.HasValue && t.GeldinstitutId.HasValue &&
                 !t.VonKontoId.HasValue && !t.NachKontoId.HasValue) return "Adresse → Bank";
+
             return "Bank → Konto";
         }
 
-        // ---------------- Loaded ----------------
+        // ======= Loaded =======
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             try
@@ -81,7 +81,7 @@ namespace MyCoinFlow.Views
 
                 Title = _editId.HasValue ? "Buchung bearbeiten" : "Neue Buchung";
 
-                // ---- Typ-Erkennung nur aus Feldern ----
+                // --- bestehende Typ-Erkennung (vereinfacht aus Feldern) ---
                 bool isBudgetLeg =
                     string.Equals((_prefNotiz ?? "").Trim(), "Budgetierte Einnahme", StringComparison.OrdinalIgnoreCase);
 
@@ -111,48 +111,38 @@ namespace MyCoinFlow.Views
                     !_prefNachKontoId.HasValue &&
                     _prefAdresseId.HasValue;
 
-                // Auswahl + Lock-Flag
-                bool lockThisType = false;  // nur für Spezialfälle im Edit
                 if (isBudgetLeg)
                 {
-                    TypeAdresseToBank.IsChecked = true;        // Optik ok
+                    TypeAdresseToBank.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = true;
-                    lockThisType = true;
                 }
                 else if (isAdresseBankEinnahme)
                 {
                     TypeAdresseToBank.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = true;
-                    lockThisType = true;
                 }
                 else if (isBankToKontoAusgabe)
                 {
                     TypeBankToKonto.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = false;
-                    lockThisType = false;
                 }
                 else if (isKontoZuKonto)
                 {
                     TypeKontoToKonto.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = false;
-                    lockThisType = false;
                 }
                 else if (isKontoZuBank)
                 {
-                    // >>> WICHTIG: Konto→Bank VOR Adresse→Bank(Refund) behandeln!
                     TypeKontoToBank.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = false;
-                    lockThisType = false;
                 }
                 else if (isAdresseBankRefund)
                 {
                     TypeAdresseToBank.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = false;
-                    lockThisType = true;
                 }
                 else
                 {
-                    // Fallback auf früher ermittelten Typnamen
                     switch (_prefTypName ?? "Bank → Konto")
                     {
                         case "Konto → Konto": TypeKontoToKonto.IsChecked = true; break;
@@ -161,20 +151,22 @@ namespace MyCoinFlow.Views
                         default: TypeBankToKonto.IsChecked = true; break;
                     }
                     BudgetEinnahmeBox.IsChecked = false;
-                    lockThisType = false;
                 }
 
-                // Sperren NUR für Spezialfälle im Edit
+                // Sperren nur für Spezialfälle im Edit
                 bool isEdit = _editId.HasValue;
-                bool lockTypeForThisEdit = isEdit && lockThisType;
+                bool lockThisType = isEdit && (isBudgetLeg || isAdresseBankEinnahme || isAdresseBankRefund);
 
-                TypeBankToKonto.IsEnabled = !lockTypeForThisEdit;
-                TypeKontoToKonto.IsEnabled = !lockTypeForThisEdit;
-                TypeKontoToBank.IsEnabled = !lockTypeForThisEdit;
-                TypeAdresseToBank.IsEnabled = !lockTypeForThisEdit;
-                BudgetEinnahmeBox.IsEnabled = !lockTypeForThisEdit;
+                TypeBankToKonto.IsEnabled = !lockThisType;
+                TypeKontoToKonto.IsEnabled = !lockThisType;
+                TypeKontoToBank.IsEnabled = !lockThisType;
+                TypeAdresseToBank.IsEnabled = !lockThisType;
+                BudgetEinnahmeBox.IsEnabled = !lockThisType;
 
                 UpdateUiForType();
+
+                // >>> Hinweis Budgetzeitraum
+                TryShowBudgetHint();
             }
             catch (Exception ex)
             {
@@ -185,60 +177,40 @@ namespace MyCoinFlow.Views
             bool Safe(Func<bool> f) { try { return f(); } catch { return false; } }
         }
 
-
         private void TxnType_Checked(object sender, RoutedEventArgs e) => UpdateUiForType();
+        private void BudgetCheck_Changed(object sender, RoutedEventArgs e) => UpdateUiForType();
 
         private void UpdateUiForType()
         {
-            // Reset
             SafeSetEnabled(VonKontoBox, false);
             SafeSetEnabled(NachKontoBox, false);
             SafeSetEnabled(BankBox, false);
             SafeSetEnabled(AdresseBox, true);
 
-            // Bank → Konto
             if (TypeBankToKonto.IsChecked == true)
             {
                 SafeSetEnabled(BankBox, true);
                 SafeSetEnabled(NachKontoBox, true);
                 return;
             }
-
-            // Konto → Konto
             if (TypeKontoToKonto.IsChecked == true)
             {
                 SafeSetEnabled(VonKontoBox, true);
                 SafeSetEnabled(NachKontoBox, true);
                 return;
             }
-
-            // Konto → Bank
             if (TypeKontoToBank.IsChecked == true)
             {
                 SafeSetEnabled(VonKontoBox, true);
                 SafeSetEnabled(BankBox, true);
                 return;
             }
-
-            // Adresse → Bank
             if (TypeAdresseToBank.IsChecked == true)
             {
-                // Für BEIDE Varianten (Einnahme+Refund) sollen Bank und Konto editierbar sein:
-                // - Haken an  -> Konto = Einnahmenkonto (Nach-Konto)
-                // - Haken aus -> Konto = Rückzahlungs-Konto (Von-Konto)
                 SafeSetEnabled(BankBox, true);
                 SafeSetEnabled(NachKontoBox, true);
                 return;
             }
-        }
-
-
-        private string GetSelectedType()
-        {
-            if (TypeKontoToKonto.IsChecked == true) return "Konto → Konto";
-            if (TypeKontoToBank.IsChecked == true) return "Konto → Bank";
-            if (TypeAdresseToBank.IsChecked == true) return "Adresse → Bank";
-            return "Bank → Konto";
         }
 
         private static void SafeSetEnabled(Control? c, bool enabled)
@@ -246,7 +218,6 @@ namespace MyCoinFlow.Views
             if (c != null) c.IsEnabled = enabled;
         }
 
-        // ---------------- Buttons ----------------
         private void Abbrechen_Click(object sender, RoutedEventArgs e)
             => DialogResult = false;
 
@@ -269,14 +240,13 @@ namespace MyCoinFlow.Views
                 int? adresseId = GetSelectedIntOrNull(AdresseBox?.SelectedValue);
                 string? notiz = string.IsNullOrWhiteSpace(NotizBox.Text) ? null : NotizBox.Text.Trim();
 
-                // Typ ausschließlich aus Radio-Buttons
                 string typ;
                 if (TypeKontoToKonto.IsChecked == true) typ = "Konto → Konto";
                 else if (TypeKontoToBank.IsChecked == true) typ = "Konto → Bank";
                 else if (TypeAdresseToBank.IsChecked == true) typ = "Adresse → Bank";
                 else typ = "Bank → Konto";
 
-                // Guard: "Bank → Konto" nicht auf Einnahmenkonto
+                // Guard: Bank → Konto darf nicht auf Einnahmenkonto
                 if (typ == "Bank → Konto" && nachKontoId.HasValue && _db.IstEinnahmenKonto(nachKontoId.Value))
                 {
                     MessageBox.Show(
@@ -287,9 +257,9 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                bool haken = (BudgetEinnahmeBox != null) && (BudgetEinnahmeBox.IsChecked == true);
+                bool haken = BudgetEinnahmeBox?.IsChecked == true;
 
-                // ===== EDIT =====  (Nur diese eine Zeile anpassen – keine Zweitbuchung)
+                // EDIT: nur die eine Zeile ändern
                 if (_editId.HasValue)
                 {
                     switch (typ)
@@ -325,7 +295,6 @@ namespace MyCoinFlow.Views
 
                                 if (haken)
                                 {
-                                    // Einnahme-Variante: EIN Satz – NachKontoId = Einnahmenkonto, Bank gesetzt
                                     if (!nachKontoId.HasValue)
                                     {
                                         MessageBox.Show("Bitte das Einnahmen-Konto (Nach-Konto) wählen.", "Hinweis",
@@ -334,19 +303,11 @@ namespace MyCoinFlow.Views
                                     }
                                     var not = string.IsNullOrWhiteSpace(notiz) ? "Budgetierte Einnahme" : notiz;
 
-                                    _db.AktualisiereTransaktion(
-                                        _editId.Value, datum,
-                                        vonKontoId: null,
-                                        nachKontoId: nachKontoId,
-                                        betrag: betrag,
-                                        notiz: not,
-                                        adresseId: adresseId,
-                                        geldinstitutId: bankId
-                                    );
+                                    _db.AktualisiereTransaktion(_editId.Value, datum,
+                                        null, nachKontoId, betrag, not, adresseId, bankId);
                                 }
                                 else
                                 {
-                                    // Refund-Variante: EIN Satz – VonKontoId = Budgetkonto, Bank gesetzt
                                     if (!nachKontoId.HasValue)
                                     {
                                         MessageBox.Show("Bitte das Rückzahlungs-Konto wählen (Budget-Konto).", "Hinweis",
@@ -354,20 +315,13 @@ namespace MyCoinFlow.Views
                                         return;
                                     }
 
-                                    _db.AktualisiereTransaktion(
-                                        _editId.Value, datum,
-                                        vonKontoId: nachKontoId,   // Quelle = Budgetkonto
-                                        nachKontoId: null,
-                                        betrag: betrag,
-                                        notiz: notiz,
-                                        adresseId: adresseId,
-                                        geldinstitutId: bankId
-                                    );
+                                    _db.AktualisiereTransaktion(_editId.Value, datum,
+                                        nachKontoId, null, betrag, notiz, adresseId, bankId);
                                 }
                                 break;
                             }
 
-                        default: // "Bank → Konto"
+                        default: // Bank → Konto
                             if (!nachKontoId.HasValue || !bankId.HasValue)
                             {
                                 MessageBox.Show("Bitte Geldinstitut und Nach-Konto wählen.", "Hinweis",
@@ -382,7 +336,7 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // ===== NEU =====  (einzelner Satz – identisch interpretierbar wie via Import)
+                // NEU: ein Satz pro Variante
                 switch (typ)
                 {
                     case "Konto → Konto":
@@ -415,7 +369,6 @@ namespace MyCoinFlow.Views
 
                         if (haken)
                         {
-                            // Einnahme-Variante: EIN Satz – NachKontoId = Einnahmenkonto, Bank gesetzt
                             if (!nachKontoId.HasValue)
                             {
                                 MessageBox.Show("Bitte das Einnahmen-Konto (Nach-Konto) wählen.", "Hinweis",
@@ -428,19 +381,17 @@ namespace MyCoinFlow.Views
                         }
                         else
                         {
-                            // Refund-Variante: EIN Satz – VonKontoId = Budgetkonto, Bank gesetzt
                             if (!nachKontoId.HasValue)
                             {
                                 MessageBox.Show("Bitte das Rückzahlungs-Konto wählen (Budget-Konto).", "Hinweis",
                                     MessageBoxButton.OK, MessageBoxImage.Information);
                                 return;
                             }
-
                             _db.SpeichereTransaktion(datum, nachKontoId, null, betrag, notiz, adresseId, bankId);
                         }
                         break;
 
-                    default: // "Bank → Konto"
+                    default: // Bank → Konto
                         if (!nachKontoId.HasValue || !bankId.HasValue)
                         {
                             MessageBox.Show("Bitte Geldinstitut und Nach-Konto wählen.", "Hinweis",
@@ -460,12 +411,74 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private static int? GetSelectedIntOrNull(object? value)
         {
             if (value == null || value == DBNull.Value) return null;
-            try { return Convert.ToInt32(value); }
-            catch { return null; }
+            try { return Convert.ToInt32(value); } catch { return null; }
         }
+               
+
+        /// <summary>
+        /// Blendet den gelben Hinweis ein, wenn das gewählte Datum außerhalb des aktiven Budgetzeitraums liegt.
+        /// Rein informativ. Keine Mechanikänderung.
+        /// </summary>
+        private void TryShowBudgetHint()
+        {
+            try
+            {
+                // Hinweis-Controls vorhanden?
+                if (TxnBudgetHint == null || TxnBudgetHintText == null) return;
+
+                // Standard: ausblenden
+                TxnBudgetHint.Visibility = Visibility.Collapsed;
+                TxnBudgetHintText.Text = string.Empty;
+
+                // Datum aus Picker
+                DateTime dt = (DatumBox?.SelectedDate ?? DateTime.Today).Date;
+
+                var period = GetActiveBudgetPeriod();
+                if (period == null) return;
+
+                DateTime start = period.Item1.Date;
+                DateTime end = period.Item2.Date;
+
+                if (dt < start || dt > end)
+                {
+                    TxnBudgetHint.Visibility = Visibility.Visible;
+                    TxnBudgetHintText.Text =
+                        $"Diese Buchung ({dt:dd.MM.yyyy}) ist außerhalb vom Budgetzeitraum";
+                }
+            }
+            catch
+            {
+                // still – rein informativ
+            }
+        }
+        private Tuple<DateTime, DateTime>? GetActiveBudgetPeriod()
+        {
+            try
+            {
+                var id = _db.HoleAktivenBudgetzeitraumId();
+                if (!id.HasValue) return null;
+
+                var bz = _db.HoleBudgetzeitraum(id.Value);
+                if (bz == null) return null;
+
+                return Tuple.Create(bz.Startdatum, bz.Enddatum);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
+        /// <summary>
+        /// Liest Start/Ende des aktiven Budgetzeitraums per Reflection aus dem DatabaseService.
+        /// Unterstützt mehrere plausible Methodennamen/Propertynamen. Gibt null zurück, wenn nichts gefunden.
+        /// </summary>
+
+
+
     }
 }

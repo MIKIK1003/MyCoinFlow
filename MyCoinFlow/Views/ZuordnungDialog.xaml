@@ -5,9 +5,9 @@
         Title="Buchung zuordnen"
         Height="680" Width="820"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Loaded="Window_Loaded">
 
-    <!-- EINZIGES Resources-Block (ohne PackIcon-Style) -->
     <Window.Resources>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
@@ -34,7 +34,7 @@
 
     <DockPanel Margin="16">
 
-        <!-- Footer (Standard-Design) -->
+        <!-- Footer -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Style="{StaticResource IconTextButton}"
                     Tag="Close"
@@ -52,11 +52,30 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Orientation="Vertical" >
 
-                <!-- Kopf: Buchungskurzinfo -->
+                <!-- Kopf: Info -->
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                     <StackPanel>
                         <TextBlock Text="{Binding BuchungInfo}" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding BuchungText}" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Hinweis aktiver Budgetzeitraum -->
+                <Border x:Name="BudgetHint"
+                        Background="{DynamicResource MaterialDesignPaper}"
+                        BorderBrush="{DynamicResource PrimaryHueLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="8"
+                        Margin="0,0,0,12"
+                        Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Alert"
+                                                 Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                                 Width="20" Height="20" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="BudgetHintText"
+                                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
@@ -69,7 +88,6 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Blaue Icon-Preview -->
                         <materialDesign:PackIcon x:Name="TypIcon"
                                                  Kind="BankTransfer"
                                                  Width="36" Height="36"
@@ -95,9 +113,16 @@
                     <StackPanel Grid.Column="0" Orientation="Vertical">
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
+
                                 <TextBlock Text="Adresse" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
 
                                 <CheckBox x:Name="NeueAdresseCheck" Content="Neue Adresse anlegen"
+                                          Checked="UiChanged" Unchecked="UiChanged"/>
+
+                                <!-- IMMER sichtbar -->
+                                <CheckBox x:Name="BudgetEinnahmenCheck"
+                                          Content="Budgetierte Einnahme (zusätzliches Einnahmen-Leg erzeugen/aktualisieren)"
+                                          Margin="0,8,0,8"
                                           Checked="UiChanged" Unchecked="UiChanged"/>
 
                                 <!-- Bestehend -->
@@ -137,12 +162,6 @@
 
                                     <TextBlock Text="IBAN (optional)" Style="{StaticResource FieldLabel}" Margin="0,8,0,0"/>
                                     <TextBox x:Name="NeuIbanBox" Style="{StaticResource BigText}" TextChanged="UiChanged"/>
-
-                                    <!-- Nur sinnvoll bei Einnahmen -->
-                                    <CheckBox x:Name="BudgetEinnahmenCheck"
-                                              Content="Adresse ist budgetierte Einnahme (Nach-Konto wird Standard-Einnahmenkonto)"
-                                              Margin="0,8,0,0"
-                                              Checked="UiChanged" Unchecked="UiChanged"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

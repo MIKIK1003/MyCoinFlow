@@ -89,7 +89,7 @@
 
     <DockPanel LastChildFill="True" Margin="16">
 
-        <!-- Footer: Aktionen (STANDARD) -->
+        <!-- Footer -->
         <StackPanel DockPanel.Dock="Bottom"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
@@ -100,7 +100,6 @@
                     IsCancel="True"
                     Margin="0,0,8,0"
                     Click="Abbrechen_Click"/>
-
             <Button Style="{StaticResource IconTextButton}"
                     Tag="ContentSave"
                     Content="Speichern"
@@ -122,55 +121,70 @@
 
                 <!-- Typ-Auswahl -->
                 <Border CornerRadius="12" Padding="12" Margin="0,0,0,12"
-        Background="{DynamicResource MaterialDesignCardBackground}">
+                        Background="{DynamicResource MaterialDesignCardBackground}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <!-- Radios -->
                             <RowDefinition Height="Auto"/>
-                            <!-- Checkbox darunter -->
                         </Grid.RowDefinitions>
 
                         <!-- Zeile 1: Radio-Buttons -->
                         <StackPanel Orientation="Horizontal" Grid.Row="0">
                             <RadioButton x:Name="TypeBankToKonto"
-                   GroupName="TxnType"
-                   Style="{StaticResource TypeRadioStyle}"
-                   Tag="{x:Static materialDesign:PackIconKind.BankTransferOut}"
-                   Content="Bank → Konto"
-                   Checked="TxnType_Checked"/>
+                                         GroupName="TxnType"
+                                         Style="{StaticResource TypeRadioStyle}"
+                                         Tag="{x:Static materialDesign:PackIconKind.BankTransferOut}"
+                                         Content="Bank → Konto"
+                                         Checked="TxnType_Checked"/>
                             <RadioButton x:Name="TypeKontoToKonto"
-                   GroupName="TxnType"
-                   Style="{StaticResource TypeRadioStyle}"
-                   Tag="{x:Static materialDesign:PackIconKind.SwapHorizontal}"
-                   Content="Konto → Konto"
-                   Checked="TxnType_Checked"/>
+                                         GroupName="TxnType"
+                                         Style="{StaticResource TypeRadioStyle}"
+                                         Tag="{x:Static materialDesign:PackIconKind.SwapHorizontal}"
+                                         Content="Konto → Konto"
+                                         Checked="TxnType_Checked"/>
                             <RadioButton x:Name="TypeKontoToBank"
-                   GroupName="TxnType"
-                   Style="{StaticResource TypeRadioStyle}"
-                   Tag="{x:Static materialDesign:PackIconKind.BankTransferIn}"
-                   Content="Konto → Bank"
-                   Checked="TxnType_Checked"/>
+                                         GroupName="TxnType"
+                                         Style="{StaticResource TypeRadioStyle}"
+                                         Tag="{x:Static materialDesign:PackIconKind.BankTransferIn}"
+                                         Content="Konto → Bank"
+                                         Checked="TxnType_Checked"/>
                             <RadioButton x:Name="TypeAdresseToBank"
-                   GroupName="TxnType"
-                   Style="{StaticResource TypeRadioStyle}"
-                   Tag="{x:Static materialDesign:PackIconKind.AccountCash}"
-                   Content="Adresse → Bank"
-                   Checked="TxnType_Checked"/>
+                                         GroupName="TxnType"
+                                         Style="{StaticResource TypeRadioStyle}"
+                                         Tag="{x:Static materialDesign:PackIconKind.AccountCash}"
+                                         Content="Adresse → Bank"
+                                         Checked="TxnType_Checked"/>
                         </StackPanel>
 
                         <!-- Zeile 2: Haken – aktiv nutzbar -->
                         <CheckBox x:Name="BudgetEinnahmeBox"
-                          Grid.Row="1"
-                            Content="Budgetierte Einnahme"
-                            Margin="4,10,0,0"
-                            HorizontalAlignment="Left"
-                            Checked="BudgetCheck_Changed"
-                            Unchecked="BudgetCheck_Changed"/>
-
+                                  Grid.Row="1"
+                                  Content="Budgetierte Einnahme"
+                                  Margin="4,10,0,0"
+                                  HorizontalAlignment="Left"
+                                  Checked="BudgetCheck_Changed"
+                                  Unchecked="BudgetCheck_Changed"/>
                     </Grid>
                 </Border>
 
+                <!-- Hinweis aktiver Budgetzeitraum (optional sichtbar) -->
+                <Border x:Name="TxnBudgetHint"
+                        Background="{DynamicResource MaterialDesignPaper}"
+                        BorderBrush="{DynamicResource PrimaryHueLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="8"
+                        Margin="0,0,0,12"
+                        Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Alert"
+                                                 Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                                 Width="20" Height="20" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="TxnBudgetHintText"
+                                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
 
                 <!-- Formularkarte -->
                 <Border CornerRadius="12" Padding="16"

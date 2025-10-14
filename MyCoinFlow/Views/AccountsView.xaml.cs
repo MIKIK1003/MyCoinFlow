@@ -189,19 +189,44 @@ namespace MyCoinFlow.Views
 
         private void OpenKontoTransaktionen_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.DataContext is KontoplanEintrag row)
+            try
             {
+                // Sicherstellen, dass das Event nicht mehrfach hochbubbelt
+                if (e != null) e.Handled = true;
+
+                // 1) Zeilenmodell aus dem Button-Kontext holen
+                if (sender is not Button btn || btn.DataContext is not KontoplanEintrag row)
+                    return;
+
                 int kontoId = row.Id;
                 string name = !string.IsNullOrWhiteSpace(row.Detail)
-                              ? row.Detail
-                              : (row.Kontonummer > 0 ? $"Konto {row.Kontonummer}" : $"Konto #{kontoId}");
+                    ? row.Detail
+                    : (row.Kontonummer > 0 ? $"Konto {row.Kontonummer}" : $"Konto #{kontoId}");
 
-                var wnd = new KontoTransaktionenWindow(kontoId, name)
+                // 2) Dialog erzeugen
+                var dlg = new KontoTransaktionenWindow(kontoId, name);
+
+                // 3) Owner **sicher** setzen:
+                //    - Bevorzugt: das Fenster, in dem diese AccountsView tatsächlich steckt
+                //    - Fallback: aktuell aktives Window
+                //    - Niemals: Owner auf sich selbst setzen
+                var owner = Window.GetWindow(this)
+                            ?? Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
                 {
-                    Owner = Application.Current.MainWindow
-                };
-                wnd.ShowDialog();
+                    dlg.Owner = owner; // CenterOwner funktioniert dann auch sauber
+                }
+
+                dlg.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Unerwarteter Fehler beim Öffnen der Konto-Transaktionen:\n" + ex.Message,
+                    "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
     }
 }
