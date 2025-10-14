@@ -9,14 +9,14 @@
     <ApplicationIcon>Assets\Icons\piggybank.ico</ApplicationIcon>
 
     <!-- sichtbare Produktversion -->
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
 
     <!-- Assembly-/Datei-Versionen (4-teilig) -->
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
 
     <!-- von UpdateService ausgelesen -->
-    <InformationalVersion>1.1.0</InformationalVersion>
+    <InformationalVersion>1.2.0</InformationalVersion>
 
 
 
@@ -39,12 +39,28 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.76.0" />
     <PackageReference Include="PdfPig" Version="0.1.11" />
+    <PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\Icons\piggybank.ico">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
   </ItemGroup>
 
 </Project>

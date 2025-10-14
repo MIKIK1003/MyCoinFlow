@@ -11,31 +11,23 @@ using System.Text;
 using FieldMapping = MyCoinFlow.Models.FieldMapping;
 using ImportSchema = MyCoinFlow.Models.ImportSchema;
 
-
 namespace MyCoinFlow.Services
 {
-    
     /// <summary>
     /// Kapselt: Master-Header, Schemas, Feld-Mappings und die eigentliche Umbenennung der DataTable.
     /// Greift NICHT in deinen nachfolgenden Workflow ein.
     /// </summary>
     public class CreditCardImportMappingService
     {
-        
-        
-        private readonly ICreditCardImportRepository _db; // Repository nur für Mapping-Tabellen
-        private readonly List<string> _masterHeaders; // aus deinem funktionierenden Excel (in exakt der Schreibweise)
+        private readonly ICreditCardImportRepository _db;            // Repository nur für Mapping-Tabellen
+        private readonly List<string> _masterHeaders;                // aus deinem funktionierenden Excel (in exakt der Schreibweise)
 
-
-
-        // oben: private readonly ICreditCardImportRepository _db;
         public CreditCardImportMappingService(ICreditCardImportRepository db)
         {
-            _db = db;
+            _db = db ?? throw new ArgumentNullException(nameof(db));
             _masterHeaders = LoadMasterHeaders();
             EnsureMasterSchemaExists();
         }
-
 
         // === Öffentliche API ===
 
@@ -52,7 +44,6 @@ namespace MyCoinFlow.Services
         }
 
         public void UpdateSchemaName(int schemaId, string name) => _db.ImportSchemaUpdateName(schemaId, name);
-
 
         public IList<FieldMapping> GetFieldMappings(int schemaId) => _db.FieldMappingsGetBySchema(schemaId);
 
@@ -71,6 +62,8 @@ namespace MyCoinFlow.Services
 
         public DataTable ApplyMappingIfNeeded(DataTable raw)
         {
+            if (raw == null) throw new ArgumentNullException(nameof(raw));
+
             // A) Harte Konvertierung TOP-Card → Master (inhaltlich, fix)
             if (TryConvertTopCardXlsx(raw, out var master))
                 return master;
@@ -149,15 +142,11 @@ namespace MyCoinFlow.Services
             return raw;
         }
 
-
-
-
-
         // Hilfen für UI
 
         public List<string>? PickHeadersFromSampleFile()
         {
-            var dlg = new Microsoft.Win32.OpenFileDialog
+            var dlg = new OpenFileDialog
             {
                 Title = "Musterdatei wählen",
                 Filter = "Excel|*.xlsx;*.xls|CSV|*.csv|Alle Dateien|*.*",
@@ -173,14 +162,14 @@ namespace MyCoinFlow.Services
             {
                 if (string.IsNullOrWhiteSpace(h)) return true;
                 var s = Normalize(h);
-                return s.StartsWith("abgeschlossene zahlungen"); // TOP-Card Überschrift, keine echte Headerzeile
+                return s.StartsWith("abgeschlossene zahlungen");
             }
 
             try
             {
                 if (ext == ".csv")
                 {
-                    var first = System.IO.File.ReadLines(path).FirstOrDefault();
+                    var first = File.ReadLines(path).FirstOrDefault();
                     if (string.IsNullOrWhiteSpace(first)) return null;
                     var cols = first.Split(new[] { ';', ',', '\t' }, StringSplitOptions.None)
                                     .Select(h => h.Trim())
@@ -189,11 +178,11 @@ namespace MyCoinFlow.Services
                     return cols.Count > 0 ? cols : null;
                 }
 
-                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-                using var fs = System.IO.File.Open(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                using var fs = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
                 // 1) Roh lesen (ohne Headerinterpretation), um die tatsächliche Header-Zeile zu finden
-                using (var readerRaw = ExcelDataReader.ExcelReaderFactory.CreateReader(fs))
+                using (var readerRaw = ExcelReaderFactory.CreateReader(fs))
                 {
                     var dsRaw = readerRaw.AsDataSet(); // keine Header
                     if (dsRaw.Tables.Count == 0 || dsRaw.Tables[0].Rows.Count == 0) return null;
@@ -204,7 +193,7 @@ namespace MyCoinFlow.Services
                         "Ausführungsdatum","Auftragsnummer","Auftragsart","Belastungskonto",
                         "Status","Rubrik","IBAN","Begünstigter","Zahlungsgrund","Eigene Notiz",
                         "Währung","Betrag"
-                        }.Select(Normalize));
+                    }.Select(Normalize));
 
                     int bestRow = -1, bestScore = -1;
                     int maxRow = Math.Min(10, raw.Rows.Count);
@@ -241,14 +230,14 @@ namespace MyCoinFlow.Services
 
                 // 2) Fallback: normal mit UseHeaderRow
                 fs.Position = 0;
-                using var reader = ExcelDataReader.ExcelReaderFactory.CreateReader(fs);
-                var ds = reader.AsDataSet(new ExcelDataReader.ExcelDataSetConfiguration
+                using var reader = ExcelReaderFactory.CreateReader(fs);
+                var ds = reader.AsDataSet(new ExcelDataSetConfiguration
                 {
-                    ConfigureDataTable = _ => new ExcelDataReader.ExcelDataTableConfiguration { UseHeaderRow = true }
+                    ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = true }
                 });
                 if (ds.Tables.Count == 0) return null;
                 var t = ds.Tables[0];
-                var excelHeaders = t.Columns.Cast<System.Data.DataColumn>()
+                var excelHeaders = t.Columns.Cast<DataColumn>()
                                     .Select(c => c.ColumnName.Trim())
                                     .Where(h => !IsBanned(h))
                                     .ToList();
@@ -259,99 +248,6 @@ namespace MyCoinFlow.Services
                 return null;
             }
         }
-
-        // Mappt eine TOP-Card CSV (Einkaufsdatum/Buchungstext/Branche/Belastung/Gutschrift)
-        // robust auf die Master-Header. Gibt true zurück, wenn eine Umformung stattfand.
-        private bool TryMapTopCardCsv(DataTable t)
-        {
-            bool Has(string name) => t.Columns.Cast<DataColumn>().Any(c => EqualsNormalized(c.ColumnName, name));
-            string? Find(string name)
-                => t.Columns.Cast<DataColumn>().FirstOrDefault(c => EqualsNormalized(c.ColumnName, name))?.ColumnName;
-
-            // Erkennen: typische TOP-Card-Spalten vorhanden?
-            var hasTopSignature = Has("Einkaufsdatum") && Has("Buchungstext") && (Has("Belastung") || Has("Gutschrift"));
-            if (!hasTopSignature) return false;
-
-            // 1) Umbenennen auf Master
-            void RenameIfExists(string src, string dest)
-            {
-                var colName = Find(src);
-                if (colName != null)
-                    t.Columns[colName].ColumnName = dest;
-            }
-
-            RenameIfExists("Einkaufsdatum", "Transaktionsdatum");
-            RenameIfExists("Buchungstext", "Beschreibung");
-            RenameIfExists("Branche", "Händlerkategorie");
-            RenameIfExists("Kartennummer", "Kartennummer");   // passt schon
-            RenameIfExists("Währung", "Währung");
-            RenameIfExists("Betrag", "Betrag");
-
-            // Händler gibt es in der CSV nicht explizit -> leere Spalte anlegen,
-            // (optional: aus Beschreibung heuristisch ziehen – lassen wir bewusst neutral)
-            if (!Has("Händler")) t.Columns.Add("Händler");
-
-            // 2) Debit/Kredit aus Belastung/Gutschrift ableiten
-            if (!Has("Debit/Kredit")) t.Columns.Add("Debit/Kredit");
-
-            var colBelastung = Find("Belastung");
-            var colGutschrift = Find("Gutschrift");
-            var colBetrag = Find("Betrag") ?? Find("Betrag"); // nach Umbenennung heißt sie "Betrag"
-
-            foreach (DataRow r in t.Rows)
-            {
-                // Betrag: wenn CSV zwei Spalten hat, ist "Betrag" meist schon gesetzt.
-                // Wichtig ist: Debit/Kredit bestimmen.
-                string dk = r["Debit/Kredit"]?.ToString()?.Trim() ?? "";
-
-                if (string.IsNullOrWhiteSpace(dk))
-                {
-                    decimal bel = 0m, gut = 0m;
-                    if (colBelastung != null)
-                        decimal.TryParse((r[colBelastung]?.ToString() ?? "").Replace("’", "").Replace("'", ""), NumberStyles.Any, CultureInfo.GetCultureInfo("de-CH"), out bel);
-                    if (colGutschrift != null)
-                        decimal.TryParse((r[colGutschrift]?.ToString() ?? "").Replace("’", "").Replace("'", ""), NumberStyles.Any, CultureInfo.GetCultureInfo("de-CH"), out gut);
-
-                    // Regel: positiver Wert in "Belastung" => Debit; positiver Wert in "Gutschrift" => Kredit.
-                    // Falls beides 0/leer: als Debit annehmen (defensiv); dein Import nimmt später Betrag.Abs().
-                    if (bel > 0 && gut == 0) dk = "Debit";
-                    else if (gut > 0 && bel == 0) dk = "Kredit";
-                    else if (bel == 0 && gut == 0)
-                    {
-                        // fallback: Betrag-Vorzeichen auswerten (falls gesetzt)
-                        if (colBetrag != null &&
-                            decimal.TryParse((r[colBetrag]?.ToString() ?? ""), NumberStyles.Any, CultureInfo.GetCultureInfo("de-CH"), out var bet))
-                            dk = bet < 0 ? "Debit" : "Kredit";
-                        else
-                            dk = "Debit";
-                    }
-                    else
-                    {
-                        // beides gesetzt (sollte nicht vorkommen) -> Debit bevorzugen
-                        dk = "Debit";
-                    }
-
-                    r["Debit/Kredit"] = dk;
-                }
-            }
-
-            // 3) Pflichtspalten, die dein Import erwartet, sicherstellen
-            void EnsureColumn(string name)
-            {
-                if (!Has(name)) t.Columns.Add(name);
-            }
-            EnsureColumn("Transaktionsdatum");
-            EnsureColumn("Beschreibung");
-            EnsureColumn("Händler");
-            EnsureColumn("Händlerkategorie");
-            EnsureColumn("Betrag");
-            EnsureColumn("Debit/Kredit");
-            EnsureColumn("Kartennummer"); // optional, leer ok
-
-            return true;
-        }
-
-
 
         public string? SuggestSourceForMaster(string masterHeader, IEnumerable<string> sampleHeaders)
         {
@@ -371,7 +267,7 @@ namespace MyCoinFlow.Services
                 ["Kartennummer"] = new[] { "Kartennummer", "Karte" }
             };
 
-            var candidates = sampleHeaders.Where(h => !IsBanned(h)).ToList();
+            var candidates = sampleHeaders?.Where(h => !IsBanned(h)).ToList() ?? new List<string>();
             if (candidates.Count == 0) return null;
 
             // 1) Exakt
@@ -393,8 +289,6 @@ namespace MyCoinFlow.Services
                 .FirstOrDefault()?.h;
         }
 
-
-
         public void NotifyLabelPropertiesChanged()
         {
             // Hook für deine bestehende UI-Konvention
@@ -411,18 +305,16 @@ namespace MyCoinFlow.Services
             return required.All(h => set.Contains(Normalize(h)));
         }
 
-
         private List<string> LoadMasterHeaders() => new()
-{
-        "Transaktionsdatum",
-        "Beschreibung",
-        "Händler",
-        "Händlerkategorie",
-        "Betrag",
-        "Debit/Kredit",
-        "Kartennummer"
-};
-
+        {
+            "Transaktionsdatum",
+            "Beschreibung",
+            "Händler",
+            "Händlerkategorie",
+            "Betrag",
+            "Debit/Kredit",
+            "Kartennummer"
+        };
 
         private void EnsureMasterSchemaExists()
         {
@@ -433,16 +325,25 @@ namespace MyCoinFlow.Services
             }
         }
 
-        private static bool EqualsNormalized(string a, string b) => Normalize(a) == Normalize(b);
+        private static bool EqualsNormalized(string? a, string? b) => Normalize(a) == Normalize(b);
 
-        private static string Normalize(string s)
+        private static string Normalize(string? s)
         {
-            if (s == null) return "";
+            if (s == null) return string.Empty;
             s = s.Trim().ToLowerInvariant();
             s = s.Replace('\u00A0', ' '); // non-breaking space
             var normalized = s.Normalize(NormalizationForm.FormD);
-            var chars = normalized.Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark);
+            var chars = normalized.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
             return new string(chars.ToArray()).Normalize(NormalizationForm.FormC);
+        }
+
+        // Pflichtspalte: gibt den tatsächlichen Spaltennamen oder wirft mit klarer Meldung
+        private static string GetRequiredColumnName(DataTable t, string expected)
+        {
+            var name = t.Columns.Cast<DataColumn>()
+                                .FirstOrDefault(c => EqualsNormalized(c.ColumnName, expected))
+                                ?.ColumnName;
+            return name ?? throw new InvalidOperationException($"Erwartete Spalte '{expected}' wurde nicht gefunden.");
         }
 
         // Liefert ein DefaultValue (Stellvertreter) aus irgendeinem Nicht-Master-Schema
@@ -460,14 +361,11 @@ namespace MyCoinFlow.Services
             return null;
         }
 
-
-
-
-        // TOP-Card XLSX → Master-Table (inhaltlich, nicht nach "ähnlichen" Überschriften)
         // TOP-Card XLSX → Master-Table (inhaltlich, deterministisch)
         private bool TryConvertTopCardXlsx(DataTable src, out DataTable dst)
         {
             dst = src;
+            if (src == null || src.Columns.Count == 0) return false;
 
             // Helpers
             bool Has(string name) => src.Columns.Cast<DataColumn>().Any(c => EqualsNormalized(c.ColumnName, name));
@@ -477,15 +375,15 @@ namespace MyCoinFlow.Services
             var looksTopCard = Has("Buchung") && Has("Buchungstext") && (Has("Belastung") || Has("Gutschrift"));
             if (!looksTopCard) return false;
 
-            // Quellspalten (konkret aus deinem Muster)
-            var colBuchung = Find("Buchung")!;            // Datum
-            var colText = Find("Buchungstext")!;       // Beschreibung
-            var colBranche = Find("Branche");             // Händlerkategorie (optional)
-            var colKarte = Find("Kartennummer");        // optional
-            var colWaehrung = Find("Währung");             // optional (für Master nicht zwingend)
-            var colBelastung = Find("Belastung");           // optional
-            var colGutschrift = Find("Gutschrift");          // optional
-            var colBetrag = Find("Betrag");              // optional (manchmal zusätzliche Gesamtsumme)
+            // Quellspalten (konkret aus deinem Muster) – jetzt ohne „!“
+            var colBuchung = GetRequiredColumnName(src, "Buchung");        // Datum
+            var colText = GetRequiredColumnName(src, "Buchungstext");   // Beschreibung
+            var colBranche = Find("Branche");                               // optional
+            var colKarte = Find("Kartennummer");                           // optional
+            var colWaehrung = Find("Währung");                                // optional (für Master nicht zwingend)
+            var colBelastung = Find("Belastung");                              // optional
+            var colGutschrift = Find("Gutschrift");                             // optional
+            var colBetrag = Find("Betrag");                                 // optional
 
             // Ziel: exakt die Master-Header, die dein Reader erwartet
             var master = new DataTable();
@@ -577,9 +475,6 @@ namespace MyCoinFlow.Services
             return true;
         }
 
-
-
-
         // sehr einfache Score-Funktion für "ähnlichste" Header (Longest Common Subsequence approximiert)
         private static int LcsScore(string a, string b)
         {
@@ -592,12 +487,13 @@ namespace MyCoinFlow.Services
         }
     }
 
-
     // Minimaler Header-Reader (du kannst hier deine vorhandenen Excel/CSV-Leser nutzen)
     internal static class SimpleTableReader
     {
         public static DataTable? ReadHeadersOnly(string path)
         {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+
             // Falls du bereits EPPlus/ClosedXML einsetzt: dort einfach Sheet erste Zeile lesen
             // Hier Dummy: CSV nur als Beispiel
             if (Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase))

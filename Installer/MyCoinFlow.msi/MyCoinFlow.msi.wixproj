@@ -17,7 +17,7 @@
     <WixTargets4>$(ProgramFiles(x86))\WiX Toolset v3.14\SDK\wix.targets</WixTargets4>
     <DefineConstants>
 			PublishDir=$(PublishDir);
-			Manufacturer=Stegmann Software;
+			Manufacturer=Brugilim AG;
 			ProductName=MyCoinFlow;
 		</DefineConstants>
     <ProjectGuid>{ffb2f10d-8464-4e90-a546-0595cee2cb9d}</ProjectGuid>

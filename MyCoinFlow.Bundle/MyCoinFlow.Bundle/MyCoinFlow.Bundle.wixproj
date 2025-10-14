@@ -17,7 +17,7 @@
     <MsiPath>C:\Dev\MyCoinFlow\Installer\MyCoinFlow.msi\bin\Debug\MyCoinFlow.msi</MsiPath>
 
     <DefineConstants>
-			Manufacturer=Stegmann Software;
+			Manufacturer=Brugilim AG;
 			ProductName=MyCoinFlow;
 			MsiPath=$(MsiPath)
 		</DefineConstants>

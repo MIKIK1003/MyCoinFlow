@@ -3,7 +3,7 @@
      xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
 
 	<Bundle Name="$(var.ProductName) Setup"
-			Version="1.0.4"
+			Version="1.2.0"
 			Manufacturer="$(var.Manufacturer)"
 			UpgradeCode="{8C0C1A16-0C4D-4D65-9D03-9D6EABED4E21}">
 		<!-- Schlichtes Standard-UI -->

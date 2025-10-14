@@ -1,0 +1,45 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <OutputName>MyCoinFlow-Setup</OutputName>
+    <OutputType>Bundle</OutputType>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+    <!-- Robuster Standardpfad zu WiX -->
+    <WixToolPath Condition=" '$(WixToolPath)' == '' ">$([System.Environment]::GetFolderPath(SpecialFolder.ProgramFilesX86))\WiX Toolset v3.14\bin</WixToolPath>
+    <!-- Mehrere mögliche Orte für Wix.targets -->
+    <WixTargets1>$(WixTargetsPath)</WixTargets1>
+    <WixTargets2>$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargets2>
+    <WixTargets3>$(ProgramFiles(x86))\WiX Toolset v3.14\bin\Wix.targets</WixTargets3>
+    <WixTargets4>$(ProgramFiles(x86))\WiX Toolset v3.14\SDK\wix.targets</WixTargets4>
+    <!-- Pfad zur vorhin gebauten MSI-Datei -->
+    <MsiPath>C:\Dev\MyCoinFlow\Installer\MyCoinFlow.msi\bin\Debug\MyCoinFlow.msi</MsiPath>
+
+    <DefineConstants>
+			Manufacturer=Stegmann Software;
+			ProductName=MyCoinFlow;
+			MsiPath=$(MsiPath)
+		</DefineConstants>
+    <ProjectGuid>{ea61a310-f888-4c77-80e1-6a3ef327ff38}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Bundle.wxs" />
+    <WixExtension Include="WixBalExtension">
+      <HintPath>WixBalExtension</HintPath>
+      <Name>WixBalExtension</Name>
+    </WixExtension>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="License.rtf" />
+  </ItemGroup>
+  <!-- WiX-Targets importieren (erster existierender gewinnt) -->
+  <Import Project="$(WixTargets1)" Condition="Exists('$(WixTargets1)')" />
+  <Import Project="$(WixTargets2)" Condition="Exists('$(WixTargets2)')" />
+  <Import Project="$(WixTargets3)" Condition="Exists('$(WixTargets3)')" />
+  <Import Project="$(WixTargets4)" Condition="Exists('$(WixTargets4)')" />
+  <!-- Sicherstellen, dass mindestens ein Import klappte -->
+  <Target Name="EnsureWixTargets" BeforeTargets="Build;Rebuild;Clean">
+    <Error Condition=" !Exists('$(WixTargets1)') AND !Exists('$(WixTargets2)') AND !Exists('$(WixTargets3)') AND !Exists('$(WixTargets4)') " Text="Wix.targets wurde nicht gefunden. Bitte WiX Toolset v3.14 (Build Tools) + VS-Erweiterung installieren." />
+  </Target>
+</Project>

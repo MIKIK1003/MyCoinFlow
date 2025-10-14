@@ -4,8 +4,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-
-
 namespace MyCoinFlow.Services
 {
     /// <summary>
@@ -81,10 +79,10 @@ END");
             await c.OpenAsync();
             await EnsureSchemaAsync();
 
-            var cmd = c.CreateCommand();
+            await using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.Users) THEN 1 ELSE 0 END;";
             var x = await cmd.ExecuteScalarAsync();
-            return Convert.ToInt32(x) == 1;
+            return ToInt32Safe(x) == 1;
         }
 
         public async Task CreateFirstUserAsync(string username, string password)
@@ -101,20 +99,25 @@ END");
             if (await HasAnyInternalAsync(c))
                 throw new InvalidOperationException("Es existiert bereits ein Benutzer.");
 
-            var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(1) FROM dbo.Users WHERE LOWER(Username)=LOWER(@u);";
-            cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
-            var cnt = (int)await cmd.ExecuteScalarAsync();
-            if (cnt > 0) throw new InvalidOperationException("Dieser Benutzername ist bereits vergeben.");
+            await using (var cmd = c.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(1) FROM dbo.Users WHERE LOWER(Username)=LOWER(@u);";
+                cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
+                var cntObj = await cmd.ExecuteScalarAsync();
+                var cnt = ToInt32Safe(cntObj);
+                if (cnt > 0) throw new InvalidOperationException("Dieser Benutzername ist bereits vergeben.");
+            }
 
             var hash = PasswordHasher.Hash(password);
 
-            cmd = c.CreateCommand();
-            cmd.CommandText = "INSERT INTO dbo.Users(Username, PasswordHash, Email) VALUES(@u,@p,@e);";
-            cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
-            cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 400) { Value = hash });
-            cmd.Parameters.Add(new SqlParameter("@e", SqlDbType.NVarChar, 320) { Value = username.Trim() + "@local" });
-            await cmd.ExecuteNonQueryAsync();
+            await using (var cmd = c.CreateCommand())
+            {
+                cmd.CommandText = "INSERT INTO dbo.Users(Username, PasswordHash, Email) VALUES(@u,@p,@e);";
+                cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
+                cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 400) { Value = hash });
+                cmd.Parameters.Add(new SqlParameter("@e", SqlDbType.NVarChar, 320) { Value = username.Trim() + "@local" });
+                await cmd.ExecuteNonQueryAsync();
+            }
         }
 
         public async Task<bool> ValidateUserAsync(string username, string password)
@@ -126,7 +129,7 @@ END");
             await c.OpenAsync();
             await EnsureSchemaAsync();
 
-            var cmd = c.CreateCommand();
+            await using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT TOP(1) PasswordHash, IsActive FROM dbo.Users WHERE LOWER(Username)=LOWER(@u);";
             cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
 
@@ -150,10 +153,25 @@ END");
 
         private static async Task<bool> HasAnyInternalAsync(SqlConnection c)
         {
-            var cmd = c.CreateCommand();
+            await using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.Users) THEN 1 ELSE 0 END;";
             var x = await cmd.ExecuteScalarAsync();
-            return Convert.ToInt32(x) == 1;
+            return ToInt32Safe(x) == 1;
+        }
+
+        // Sichere Konvertierung für ExecuteScalar-Ergebnisse (NULL/DBNull -> 0)
+        private static int ToInt32Safe(object? value)
+        {
+            if (value is null || value is DBNull) return 0;
+            try
+            {
+                return Convert.ToInt32(value);
+            }
+            catch
+            {
+                // Defensive: im Zweifel lieber 0 als Crash bei fehlerhaftem Scalar-Rückgabewert
+                return 0;
+            }
         }
 
         private static bool IsValidUsername(string username)
