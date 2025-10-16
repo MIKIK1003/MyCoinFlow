@@ -7,21 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\Icons\piggybank.ico</ApplicationIcon>
-
-    <!-- sichtbare Produktversion -->
-    <Version>1.2.0</Version>
-
-    <!-- Assembly-/Datei-Versionen (4-teilig) -->
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-
-    <!-- von UpdateService ausgelesen -->
-    <InformationalVersion>1.2.0</InformationalVersion>
-
-
-
-
-  </PropertyGroup>
+    <!-- Versionsangaben: JSON ist die Quelle der Wahrheit. Assembly-/Datei-Version bleiben fix für Fallback & Dateieigenschaften. -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+</PropertyGroup>
+ 
 
   <ItemGroup>
     <None Remove="Assets\Icons\piggybank.ico" />

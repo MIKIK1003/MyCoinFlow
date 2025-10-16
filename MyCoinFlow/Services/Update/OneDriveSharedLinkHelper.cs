@@ -1,115 +1,125 @@
 ﻿using System;
-using System.Web;
+using System.Text;
 
 namespace MyCoinFlow.Services.Update
 {
+    /// <summary>
+    /// Hilfsfunktionen zur robusten Auflösung von öffentlichen OneDrive-Share-Links
+    /// auf echte Download-Endpunkte (ohne HTML/Anmeldung).
+    /// </summary>
     public static class OneDriveSharedLinkHelper
     {
         /// <summary>
-        /// Wandelt übliche OneDrive-Share-Links in echte "download"-Links um.
-        /// Unterstützt:
-        /// - 1drv.ms/*  (erzwingt download=1)
-        /// - onedrive.live.com/?id=...&cid=...  ->  onedrive.live.com/download?cid=...&resid=...&authkey=...
-        /// - onedrive.live.com/?resid=...&cid=...
-        /// Alle anderen Links: hängt ?download=1 bzw. &download=1 an (idempotent).
+        /// Für Nicht-1drv-Links "download=1" anhängen; 1drv.ms lassen wir unverändert (die Umleitung erledigt OneDrive).
         /// </summary>
-        public static string EnsureDirectDownload(string sharedUrl)
+        public static string EnsureDirectDownload(string url)
         {
-            if (string.IsNullOrWhiteSpace(sharedUrl)) return sharedUrl;
+            if (string.IsNullOrWhiteSpace(url)) return url;
 
-            // 1drv.ms-Kurzlinks NICHT anfassen – sie leiten selbst korrekt auf live.com um
-            try
+            // 1drv.ms: erfahrungsgemäß Vorschau-HTML → direkt download=1 anhängen
+            if (url.IndexOf("1drv.ms/", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                var host = new Uri(sharedUrl).Host.ToLowerInvariant();
-                if (host.Contains("1drv.ms"))
-                    return sharedUrl;
-            }
-            catch
-            {
-                // Falls Uri-Parsing scheitert, lieber nichts anhängen
-                return sharedUrl;
+                return url.Contains("download=", StringComparison.OrdinalIgnoreCase)
+                    ? url
+                    : (url.Contains("?") ? url + "&download=1" : url + "?download=1");
             }
 
-            // Für alle anderen: download=1 anhängen, wenn nicht vorhanden
-            return sharedUrl.IndexOf("download=", StringComparison.OrdinalIgnoreCase) >= 0
-                ? sharedUrl
-                : (sharedUrl.Contains("?") ? sharedUrl + "&download=1" : sharedUrl + "?download=1");
+            // onedrive.live.com & andere: ebenfalls download=1, falls nicht vorhanden
+            return url.Contains("download=", StringComparison.OrdinalIgnoreCase)
+                ? url
+                : (url.Contains("?") ? url + "&download=1" : url + "?download=1");
         }
 
 
-        private static string AppendDownloadParam(string url)
-        {
-            if (url.IndexOf("download=", StringComparison.OrdinalIgnoreCase) >= 0)
-                return url; // bereits vorhanden
-
-            return url.Contains("?") ? url + "&download=1" : url + "?download=1";
-        }
-
+        /// <summary>
+        /// Finale Redirect-URI von onedrive.live.com etc. in eine Download-URL umschreiben (download=1 erzwingen).
+        /// </summary>
         public static string RewriteFromFinalUri(Uri finalUri)
         {
-            var abs = finalUri.AbsoluteUri;
-            var host = finalUri.Host.ToLowerInvariant();
+            if (finalUri == null) return string.Empty;
+            var u = finalUri.ToString();
 
-            // Schon "echter" Download-Endpunkt?
-            if (abs.Contains("onedrive.live.com/download", StringComparison.OrdinalIgnoreCase))
-                return abs;
-
-            // OneDrive (Consumer): zwei Varianten
-            if (host.Contains("onedrive.live.com"))
+            // Falls schon eine saubere /download-URL → download=1 sicherstellen
+            if (u.Contains("onedrive.live.com", StringComparison.OrdinalIgnoreCase) &&
+                u.Contains("/download", StringComparison.OrdinalIgnoreCase))
             {
-                try
-                {
-                    var q = System.Web.HttpUtility.ParseQueryString(finalUri.Query);
-                    var cid = q.Get("cid");
-                    var resid = q.Get("resid");
-                    var id = q.Get("id");       // kann ein Pfad sein: "/personal/.../Documents/.../version.json"
-                    var auth = q.Get("authkey");
-
-                    // Variante A: klassische "cid/resid" – dann auf /download umbauen
-                    if (!string.IsNullOrEmpty(cid) && !string.IsNullOrEmpty(resid))
-                    {
-                        var b = new UriBuilder("https://onedrive.live.com/download");
-                        var qq = System.Web.HttpUtility.ParseQueryString(string.Empty);
-                        qq["cid"] = cid;
-                        qq["resid"] = resid;
-                        if (!string.IsNullOrEmpty(auth)) qq["authkey"] = auth;
-                        b.Query = qq.ToString()!;
-                        return b.Uri.ToString();
-                    }
-
-                    // Variante B: "id=/personal/…&parent=…" (pfadbasierte Links)
-                    // -> NICHT auf "/download" umbiegen, sondern nur "download=1" an den aktuellen Link hängen.
-                    if (!string.IsNullOrEmpty(id) && (id.StartsWith("/personal/", StringComparison.OrdinalIgnoreCase) ||
-                                                      id.Contains("%2Fpersonal%2F", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return AppendDownloadParam(abs);
-                    }
-                }
-                catch
-                {
-                    // Fallback unten
-                }
-
-                // Generischer Fallback für live.com
-                return AppendDownloadParam(abs);
+                if (!u.Contains("download=", StringComparison.OrdinalIgnoreCase))
+                    u += (u.Contains("?") ? "&" : "?") + "download=1";
+                return u;
             }
 
-            // 1drv.ms und SharePoint: einfach "download=1" anhängen
-            if (host.Contains("1drv.ms")) return AppendDownloadParam(abs);
-            if (host.Contains(".sharepoint.com")) return AppendDownloadParam(abs);
+            // redir-/view-Links in /download umschreiben und unnötige Parameter entsorgen
+            if (u.Contains("onedrive.live.com", StringComparison.OrdinalIgnoreCase))
+            {
+                var builder = new UriBuilder(u);
+                var q = System.Web.HttpUtility.ParseQueryString(builder.Query);
 
-            // Generischer Fallback
-            return AppendDownloadParam(abs);
+                var resid = q["resid"] ?? q["id"];
+                var authkey = q["authkey"];
+                var cid = q["cid"];
+
+                var clean = "https://onedrive.live.com/download?";
+                if (!string.IsNullOrWhiteSpace(resid)) clean += "resid=" + Uri.EscapeDataString(resid);
+                if (!string.IsNullOrWhiteSpace(authkey)) clean += (clean.EndsWith("?") ? "" : "&") + "authkey=" + Uri.EscapeDataString(authkey);
+                if (!string.IsNullOrWhiteSpace(cid)) clean += (clean.EndsWith("?") ? "" : "&") + "cid=" + Uri.EscapeDataString(cid);
+                // Anonymer Download-Hinweis
+                clean += (clean.EndsWith("?") ? "" : "&") + "em=2";
+                // sicherheitshalber download=1
+                clean += "&download=1";
+                return clean;
+            }
+
+            // 1drv.ms lassen wir unverändert (wird separat behandelt)
+            return u;
         }
 
+
+        /// <summary>
+        /// Shares-API Content-URL (api.onedrive.com) bauen: https://api.onedrive.com/v1.0/shares/u!{b64}/root/content
+        /// </summary>
         public static string BuildSharesApiContentUrl(string sharedUrl)
         {
-            // OneDrive Shares API: https://api.onedrive.com/v1.0/shares/u!<base64url(sharedUrl)>/root/content
-            var bytes = System.Text.Encoding.UTF8.GetBytes(sharedUrl);
-            var b64 = Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-            return $"https://api.onedrive.com/v1.0/shares/u!{b64}/root/content";
+            var token = BuildSharesApiToken(sharedUrl);
+            return $"https://api.onedrive.com/v1.0/shares/{token}/root/content";
         }
 
+        /// <summary>
+        /// Graph-API Content-URL bauen (zweites Standbein):
+        /// https://graph.microsoft.com/v1.0/shares/u!{b64}/driveItem/content
+        /// Für öffentliche Consumer-Shares funktioniert in der Praxis api.onedrive.com häufiger,
+        /// aber wir probieren Graph als zusätzlichen Fallback.
+        /// </summary>
+        public static string BuildGraphSharesContentUrl(string sharedUrl)
+        {
+            var token = BuildSharesApiToken(sharedUrl);
+            return $"https://graph.microsoft.com/v1.0/shares/{token}/driveItem/content";
+        }
 
+        /// <summary>
+        /// Aus einem OneDrive-Share-Link das "u!{base64url(originalUrl)}" bauen.
+        /// </summary>
+        private static string BuildSharesApiToken(string sharedUrl)
+        {
+            if (string.IsNullOrWhiteSpace(sharedUrl))
+                throw new ArgumentException(nameof(sharedUrl));
+
+            // Original-URL als Base64URL (RFC 4648 ohne Padding) kodieren
+            var b64 = Base64UrlEncode(sharedUrl);
+            return "u!" + b64;
+        }
+
+        private static string Base64UrlEncode(string input)
+        {
+            var bytes = Encoding.UTF8.GetBytes(input);
+            var b64 = Convert.ToBase64String(bytes);
+
+            // URL-safe machen: '+' -> '-', '/' -> '_', '=' entfernen
+            return b64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        }
+
+        private static bool Is1Drv(string url)
+        {
+            return url.Contains("1drv.ms/", StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

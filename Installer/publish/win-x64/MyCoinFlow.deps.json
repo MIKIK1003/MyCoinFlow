@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v9.0": {},
     ".NETCoreApp,Version=v9.0/win-x64": {
-      "MyCoinFlow/1.2.0": {
+      "MyCoinFlow/1.0.0": {
         "dependencies": {
           "ClosedXML": "0.105.0",
           "CommunityToolkit.Mvvm": "8.4.0",
@@ -1730,7 +1730,7 @@
     }
   },
   "libraries": {
-    "MyCoinFlow/1.2.0": {
+    "MyCoinFlow/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
