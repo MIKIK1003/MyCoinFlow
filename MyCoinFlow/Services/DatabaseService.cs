@@ -1593,98 +1593,76 @@ WHEN NOT MATCHED THEN
             }
         }
 
-
-
         public List<GeldinstitutSaldo> LadeGeldinstituteMitSaldo(DateTime? abgrenzungsdatum)
         {
-            EnsureNumberRangeRulesTable();
+            var bis = (abgrenzungsdatum?.Date ?? DateTime.Today);
 
-            var list = new List<GeldinstitutSaldo>();
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
+            var result = new List<GeldinstitutSaldo>();
+            var institute = LadeGeldinstitute(); // Stammdaten inkl. Anfangsbestand/-datum
 
-            var bis = (object?)(abgrenzungsdatum?.Date ?? DateTime.Today) ?? DBNull.Value;
-
-            const string sql = @"
-SELECT
-    g.Id, g.Name, g.BIC, g.IBAN, g.KontoNummer, g.Notiz,
-    g.Anfangsbestand, g.Anfangsdatum,
-    ISNULL(s.Gebucht, 0) AS Gebucht,
-    g.Anfangsbestand + ISNULL(s.Gebucht, 0) AS Schlussaldo
-FROM Geldinstitut g
-OUTER APPLY (
-    SELECT SUM(
-        CASE
-            /* A) Bank-only Buchungen (NachKontoId NULL) */
-            WHEN t.NachKontoId IS NULL THEN
-                CASE
-                    WHEN t.ImportQuelle = N'CAMT-MIRROR' THEN  t.Betrag
-                    WHEN t.ImportQuelle = N'CAMT-UMB'    THEN -t.Betrag
-                    WHEN t.VonKontoId IS NOT NULL        THEN  t.Betrag
-                    WHEN t.VonKontoId IS NULL AND t.AdresseId IS NOT NULL THEN t.Betrag
-                    ELSE 0
-                END
-
-            /* B) Bank ↔ Budgetkonto (NachKontoId gesetzt):
-                   - Einnahme: Bank +
-                   - Ausgabe: Bank −
-                   - Neutral: keine harte Vorgabe → Heuristik wie früher bei NULL */
-            WHEN t.NachKontoId IS NOT NULL THEN
-                CASE 
-                    WHEN nr.Richtung = N'Einnahme'
-                         OR ((nr.Richtung IS NULL OR nr.Richtung = N'Neutral') AND (
-                               UPPER(ISNULL(kp.Art,''))        LIKE '%EINNAHM%' OR
-                               UPPER(ISNULL(kp.Art,''))        LIKE '%ERTR%'   OR
-                               UPPER(ISNULL(kp.Gruppe,''))     LIKE '%EINNAHM%' OR
-                               UPPER(ISNULL(kp.Gruppe,''))     LIKE '%ERTR%'   OR
-                               UPPER(ISNULL(kp.Untergruppe,''))LIKE '%EINNAHM%' OR
-                               UPPER(ISNULL(kp.Untergruppe,''))LIKE '%ERTR%'   OR
-                               UPPER(ISNULL(kp.Detail,''))     LIKE '%EINNAHM%' OR
-                               UPPER(ISNULL(kp.Detail,''))     LIKE '%ERTR%'
-                         ))
-                    THEN  t.Betrag   -- Einnahme/Heuristik: Bank +
-                    ELSE -t.Betrag   -- Ausgabe (oder Heuristik negativ): Bank −
-                END
-            ELSE 0
-        END
-    ) AS Gebucht
-    FROM Transaktion t
-    LEFT JOIN Kontenplan kp ON kp.Id = t.NachKontoId
-    OUTER APPLY (
-        SELECT TOP 1 Richtung
-        FROM NumberRangeRules
-        WHERE kp.Kontonummer IS NOT NULL
-          AND kp.Kontonummer BETWEEN RangeStart AND RangeEnd
-        ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC
-    ) nr
-    WHERE t.GeldinstitutId = g.Id
-      AND t.Datum <= @bis
-      AND (g.Anfangsdatum IS NULL OR t.Datum >= g.Anfangsdatum)
-) s
-ORDER BY g.Name;";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@bis", bis);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            foreach (var g in institute)
             {
-                list.Add(new GeldinstitutSaldo
+                DateTime? von = g.Anfangsdatum?.Date; // nur ab Anfangsdatum zählen
+                var tx = LadeTransaktionenByGeldinstitut(
+                    geldinstitutId: g.Id,
+                    von: von,
+                    bis: bis,
+                    minBetrag: null,
+                    maxBetrag: null,
+                    adresseId: null,
+                    kontoId: null
+                );
+
+                decimal gebucht = 0m;
+
+                foreach (var t in tx)
                 {
-                    Id = r.GetInt32(0),
-                    Name = r.GetString(1),
-                    BIC = r.IsDBNull(2) ? null : r.GetString(2),
-                    IBAN = r.IsDBNull(3) ? null : r.GetString(3),
-                    KontoNummer = r.IsDBNull(4) ? null : r.GetString(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    Anfangsbestand = r.IsDBNull(6) ? 0m : r.GetDecimal(6),
-                    Anfangsdatum = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
-                    Gebucht = r.IsDBNull(8) ? 0m : r.GetDecimal(8),
-                    Schlussaldo = r.IsDBNull(9) ? 0m : r.GetDecimal(9)
+                    if (t.NachKontoId.HasValue && !t.VonKontoId.HasValue)
+                    {
+                        // Bank -> Budgetkonto: Richtung über Nummernkreis der Nach-Seite
+                        if (IstEinnahmenKonto(t.NachKontoId.Value))
+                            gebucht += t.Betrag;   // Bank +
+                        else
+                            gebucht -= t.Betrag;   // Bank -
+                    }
+                    else if (!t.NachKontoId.HasValue)
+                    {
+                        // Bank-only (keine Nach-Konto-Seite):
+                        // Pragmatik wie in der Detailansicht:
+                        // - Wenn VonKontoId oder Adresse vorhanden -> Geldfluss *zur* Bank => +
+                        // - sonst neutral (0)
+                        if (t.VonKontoId.HasValue || t.AdresseId.HasValue)
+                            gebucht += t.Betrag;   // Bank +
+                                                   // else: gebucht += 0;
+                    }
+                    else
+                    {
+                        // Exotisch: beide Budgetseiten gesetzt -> neutral
+                        // (kommt praktisch nicht vor, deshalb 0)
+                    }
+                }
+
+                var saldo = g.Anfangsbestand + gebucht;
+
+                result.Add(new GeldinstitutSaldo
+                {
+                    Id = g.Id,
+                    Name = g.Name,
+                    BIC = g.BIC,
+                    IBAN = g.IBAN,
+                    KontoNummer = g.KontoNummer,
+                    Notiz = g.Notiz,
+                    Anfangsbestand = g.Anfangsbestand,
+                    Anfangsdatum = g.Anfangsdatum,
+                    Gebucht = gebucht,
+                    Schlussaldo = saldo
                 });
             }
 
-            return list;
+            return result.OrderBy(x => x.Name).ToList();
         }
+
+
 
 
         public int CountCreditCardStaging()
@@ -4231,11 +4209,20 @@ ORDER BY a.Id";
 
         public List<Transaktion> SucheTransaktionen(string? term, DateTime? vonDatum, DateTime? bisDatum, string? addressTerm)
         {
-            var tokens = (term ?? string.Empty)
+            var rawTokens = (term ?? string.Empty)
                 .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .Where(t => t.Length > 0)
                 .ToArray();
+
+            // in numerische und Text-Tokens trennen
+            var numTokens = new List<int>();
+            var txtTokens = new List<string>();
+            foreach (var tok in rawTokens)
+            {
+                if (int.TryParse(tok, out var n)) numTokens.Add(n);
+                else txtTokens.Add(tok);
+            }
 
             using var c = CreateConnection();
             c.Open();
@@ -4247,10 +4234,13 @@ SELECT DISTINCT
        t.AdresseId, a.Name AS AdresseName,
        t.GeldinstitutId, g.Name AS BankName
 FROM dbo.Transaktion t
-LEFT JOIN dbo.Adresse a        ON t.AdresseId      = a.Id
-LEFT JOIN dbo.Geldinstitut g   ON t.GeldinstitutId = g.Id
-LEFT JOIN dbo.Attachment att   ON att.TransaktionId = t.Id
-LEFT JOIN dbo.AttachmentText at ON at.AttachmentId  = att.Id
+LEFT JOIN dbo.Adresse        a  ON t.AdresseId      = a.Id
+LEFT JOIN dbo.Geldinstitut   g  ON t.GeldinstitutId = g.Id
+LEFT JOIN dbo.Attachment     att ON att.TransaktionId = t.Id
+LEFT JOIN dbo.AttachmentText at  ON at.AttachmentId  = att.Id
+/* NEU: Kontenplan für Von/Nach – damit Kontonummern gefiltert werden können */
+LEFT JOIN dbo.Kontenplan     kv ON kv.Id = t.VonKontoId
+LEFT JOIN dbo.Kontenplan     kn ON kn.Id = t.NachKontoId
 WHERE 1=1
 ");
 
@@ -4259,7 +4249,8 @@ WHERE 1=1
             if (!string.IsNullOrWhiteSpace(addressTerm))
                 sb.AppendLine("  AND a.Name LIKE @addr COLLATE Latin1_General_CI_AI");
 
-            for (int i = 0; i < tokens.Length; i++)
+            // Text-Tokens (LIKE) – unverändert
+            for (int i = 0; i < txtTokens.Count; i++)
             {
                 sb.Append(@"
   AND (
@@ -4271,14 +4262,27 @@ WHERE 1=1
   )");
             }
 
+            // NEU: Numerische Tokens → exakte Kontonummer-Matches
+            for (int j = 0; j < numTokens.Count; j++)
+            {
+                sb.Append(@"
+  AND (
+       kv.Kontonummer = @n" + j + @" 
+    OR kn.Kontonummer = @n" + j + @"
+  )");
+            }
+
             sb.AppendLine("\nORDER BY t.Datum DESC;");
 
             using var cmd = new SqlCommand(sb.ToString(), c);
             if (vonDatum.HasValue) cmd.Parameters.AddWithValue("@von", vonDatum.Value.Date);
             if (bisDatum.HasValue) cmd.Parameters.AddWithValue("@bis", bisDatum.Value.Date);
             if (!string.IsNullOrWhiteSpace(addressTerm)) cmd.Parameters.AddWithValue("@addr", "%" + addressTerm.Trim() + "%");
-            for (int i = 0; i < tokens.Length; i++)
-                cmd.Parameters.AddWithValue("@q" + i, "%" + tokens[i] + "%");
+
+            for (int i = 0; i < txtTokens.Count; i++)
+                cmd.Parameters.AddWithValue("@q" + i, "%" + txtTokens[i] + "%");
+            for (int j = 0; j < numTokens.Count; j++)
+                cmd.Parameters.AddWithValue("@n" + j, numTokens[j]);
 
             var list = new List<Transaktion>();
             using var r = cmd.ExecuteReader();
@@ -4300,6 +4304,7 @@ WHERE 1=1
             }
             return list;
         }
+
 
 
         /// <summary>

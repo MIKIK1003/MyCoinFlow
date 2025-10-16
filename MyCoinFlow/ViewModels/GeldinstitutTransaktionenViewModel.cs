@@ -103,30 +103,23 @@ namespace MyCoinFlow.ViewModels
             return idx >= 0 ? anzeige[..idx].Trim() : anzeige.Trim();
         }
 
+        // GeldinstitutTransaktionenViewModel.cs
+        // — KOMPLETTE METHODE ERSETZEN —
         private System.Collections.Generic.HashSet<int> BuildIncomeAccountSet()
         {
             var set = new System.Collections.Generic.HashSet<int>();
+
+            // Alle Konten laden und pro Konto die zentrale Regel aus DatabaseService nutzen.
+            // Damit gelten deine Nummernkreise (Admin -> Nummernkreise) 1:1,
+            // ohne harte Bereiche wie 3000–3999 im Code.
             foreach (var k in _db.LadeKontenplan())
             {
-                bool isIncome =
-                       (k.Kontonummer >= 3000 && k.Kontonummer <= 3999)
-                    || (k.Kontonummer >= 7000 && k.Kontonummer <= 7999)
-                    || ContainsIncome(k.Art)
-                    || ContainsIncome(k.Gruppe)
-                    || ContainsIncome(k.Untergruppe)
-                    || ContainsIncome(k.Detail);
-
-                if (isIncome) set.Add(k.Id);
+                if (_db.IstEinnahmenKonto(k.Id))
+                    set.Add(k.Id);
             }
             return set;
-
-            static bool ContainsIncome(string? s)
-            {
-                if (string.IsNullOrWhiteSpace(s)) return false;
-                var u = s.ToUpperInvariant();
-                return u.Contains("EINNAHM") || u.Contains("ERTR") || u.Contains("INCOME") || u.Contains("REVENUE");
-            }
         }
+
 
         private void Load()
         {
