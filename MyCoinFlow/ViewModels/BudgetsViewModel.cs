@@ -154,16 +154,47 @@ namespace MyCoinFlow.ViewModels
 
 
         // NEU: Fenster zur Budgetwerterfassung öffnen
+        // NEU: Fenster zur Budgetwerterfassung öffnen (robustes Owner-Handling)
         private void BudgetwerteErfassen()
         {
             if (AusgewaehlterZeitraum == null) return;
 
-            var win = new BudgetDetailWindow(AusgewaehlterZeitraum.Id)
+            try
             {
-                Owner = Application.Current.MainWindow
-            };
-            win.ShowDialog();
+                var dlg = new BudgetDetailWindow(AusgewaehlterZeitraum.Id);
+
+                // Robuster Owner: aktives Window > MainWindow; nur setzen, wenn sichtbar
+                Window? owner = null;
+                try
+                {
+                    owner = Application.Current?.Windows?.OfType<Window>().FirstOrDefault(w => w.IsActive)
+                            ?? Application.Current?.MainWindow;
+                }
+                catch { /* still */ }
+
+                if (owner != null && owner.IsVisible && !ReferenceEquals(owner, dlg))
+                {
+                    dlg.Owner = owner;
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
+                else
+                {
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                }
+
+                dlg.ShowDialog();
+
+                // Optional: nach Rückkehr neu laden, falls der Dialog Werte verändert hat
+                // LadeBudgetzeitraeume();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Unerwarteter Fehler (UI): " + ex.GetType().Name + "\n" + ex.Message,
+                    "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
 
         // INotifyPropertyChanged
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -3,7 +3,7 @@
 ; Installiert: App (self-contained publish), Templates, Prereqs (LocalDB 2022, Tesseract)
 
 #define AppName        "MyCoinFlow"
-#define AppVersion     "1.2.12"
+#define AppVersion     "1.2.13"
 #define Manufacturer   "brugilimSoft"
 
 ; ====== HARDE Pfade (bitte prüfen/anpassen, falls nötig) ======
@@ -67,8 +67,7 @@ Filename: "{#SrcTesseract}"; Parameters: "/VERYSILENT /NORESTART"; StatusMsg: "I
 ; (optional) hier könntest du Produktinfos ablegen – nicht nötig.
 
 ; ======== Post-Compile: version.json im OneDrive-Ordner schreiben ========
-#define OneDriveUpdateDir "C:\Users\miche\OneDrive\Dokumente\MyCoinFlowUpdate"
-#define SetupDownloadUrl  "https://my.microsoftpersonalcontent.com/personal/74e7b5071216d03a/_layouts/15/download.aspx?UniqueId=17186074-cf0e-4759-8998-f2412b40d307&Translate=false&tempauth=v1e.eyJzaXRlaWQiOiIzOGJkN2Q4OS04YzAzLTRjZGEtOWIwZi00ZjRlNzZlODdlMmUiLCJhcHBpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDA0ODE3MTBhNCIsImF1ZCI6IjAwMDAwMDAzLTAwMDAtMGZmMS1jZTAwLTAwMDAwMDAwMDAwMC9teS5taWNyb3NvZnRwZXJzb25hbGNvbnRlbnQuY29tQDkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZCIsImV4cCI6IjE3NjA2NTAyNzYifQ.NYG2TmcQYSToNm0MT5eLCEsNdJc_jtrBQzXcpdDkf08wUlWaMCZ5Wi_QORoSGFmcLlyvt6cbJbKCicmoJ8NzEDfJrXZENSRs9Jwl-1yorzqEKs9WRDnFKPwdC4eYnZg0XzM-KCA6-fnWk-u72NUdj8BJdXxnNTpgnCWXnSYcwnbfnVJdd0zwlnAQPvKO_g8v2_H1rEjoGLMVWzyp4hmzF9cmoUwXUSdkxP84jk5w_9-c6NVKllZZQPu89tHz-JJr3G445FGqWcRUvbZHZpoaENPGVWiXLf206EPEdZ0L0seKh409MauVAJ848Nv2glX-N1Mq2yXeJaIyzQrsFtB802Y7dFctDZ0tde5v__n-IqTGR4nh2yRu73FVcg-m8E4qUrABJJ7_wGje3cZt7zgnUebTfizQX90iu4ANHJ--pEc.W8iXK-sGKOrCVhC4SoMxxJ_AAspx_bUF00m0ZvCrRUo&ApiVersion=2.0&AVOverride=1"
+#define OneDriveUpdateDir "https://my.microsoftpersonalcontent.com/personal/74e7b5071216d03a/_layouts/15/download.aspx?UniqueId=d118d424-f5c0-41d4-8a62-62677e2cfa96&Translate=false&tempauth=v1e.eyJzaXRlaWQiOiIzOGJkN2Q4OS04YzAzLTRjZGEtOWIwZi00ZjRlNzZlODdlMmUiLCJhcHBpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDA0ODE3MTBhNCIsImF1ZCI6IjAwMDAwMDAzLTAwMDAtMGZmMS1jZTAwLTAwMDAwMDAwMDAwMC9teS5taWNyb3NvZnRwZXJzb25hbGNvbnRlbnQuY29tQDkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZCIsImV4cCI6IjE3NjA2NTM2NDMifQ.rl4q69A7nNbz5N1dPCmoIYQPf3OldT7VW27nKb9G4C9nRtluQmyePidqoiZjxoGhKjez_HxEUS8NGew5gsETgG-kCAcvgafd-6_dN_72P9RY4Y0H5Oe2oEJ9x67aZJKwjMQGrDw50WbEx_nimRgyX8Fs-HqWvar8zU1HfvGRqIQWTz1jBwKe9Uc6IJft3BVCc9LSraB7xkgxXz98VFg_Pp1YP14e3teEshSFX0kt8MDjf3qnMv-BQwoSzl64Mfzo3oYrjC3WUo8Np1CyU7mRxfmjX1uwccV6LlosGrEhwIXvMshqj9VOFxGneZEDGHModacBTw45S3PVbDlpZmugQXIsYQAOFr0-MARxU1KumRpAWE6Xc-lc9TdGHhDzVwHNDMPn82kWy3tabY4tuuJnHoNH7jlZb0ddi1uxqnS-xUw.PNz4DFYFK4oTJtcSPvX8bnvJnJjcUPYj8mruiNA2Sfs&ApiVersion=2.0&AVOverride=1"
 #define ReleaseNotes      " "  ; optional
 
 #define JsonPath AddBackslash(OneDriveUpdateDir) + "version.json"
