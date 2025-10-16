@@ -23,10 +23,7 @@
 
         <!-- Header über beide Spalten -->
         <DockPanel Grid.Row="0" Grid.ColumnSpan="2" LastChildFill="False" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                <materialDesign:PackIcon Kind="ViewDashboard" Width="28" Height="28" Margin="0,0,8,0"/>
-                <TextBlock Text="Dashboard" Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
-            </StackPanel>
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center"/>
 
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                 <ComboBox Width="220"

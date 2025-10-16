@@ -3,9 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:views="clr-namespace:MyCoinFlow.Views"
-        Title="MyCoinFlow" Height="900" Width="1800" WindowStyle="ThreeDBorderWindow">
+        Title="MyCoinFlow"
+        Height="900"
+        Width="1800"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="CanResize"
+        x:Name="RootWindow">
 
     <Grid>
+        <!-- Spalten: links Navigation, rechts Inhalt -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="240"/>
             <ColumnDefinition Width="*"/>
@@ -13,52 +19,96 @@
 
         <!-- Linkes Menü -->
         <StackPanel Grid.Column="0" Background="{DynamicResource MaterialDesignPaper}">
-            <!-- Buttons holen ihren Style global aus App.xaml: NavIconButton -->
+            <!-- Nutzt deinen globalen Style aus App.xaml (NavIconButton oder NavIconButton_Emphasis) -->
             <Button Style="{StaticResource NavIconButton}"
                     Tag="ViewDashboard"
                     Content="Dashboard"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowDashboardCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="SwapHorizontal"
                     Content="Transaktionen"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowTransactionsCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="FileTreeOutline"
                     Content="Kontenplan"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowAccountsCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="BankOutline"
                     Content="Geldinstitute"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowInstitutionsCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="AccountBoxOutline"
                     Content="Adressen"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowAddressesCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="HandCoin"
                     Content="Budget"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowBudgetsCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton}"
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="Cog"
                     Content="Admin"
+                    MinHeight="50"
+                    Padding="12,8"
                     Command="{Binding ShowAdminCommand}"
                     Margin="15"/>
         </StackPanel>
 
         <!-- Inhalt rechts -->
-        <ContentControl Grid.Column="1"
-                        Content="{Binding CurrentView}"/>
+        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+
+        <!-- Unten links: Beenden-Button + Versionsanzeige -->
+        <Grid Grid.Column="0" VerticalAlignment="Bottom" Margin="12,0,12,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Beenden -->
+            <Button x:Name="ExitButton"
+                    Padding="12,8"
+                    MinHeight="36"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    ToolTip="MyCoinFlow beenden">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="Power"
+                                             Width="18" Height="18" Margin="0,0,8,0"
+                                             Foreground="{DynamicResource MaterialDesignValidationErrorBrush}"/>
+                    <TextBlock Text="Beenden"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Version rechts klein -->
+            <TextBlock Grid.Column="1"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       FontSize="11"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Text="{Binding ElementName=RootWindow, Path=VersionText,
+                                      FallbackValue=v0.0.0, TargetNullValue=v0.0.0}"/>
+        </Grid>
     </Grid>
 </Window>

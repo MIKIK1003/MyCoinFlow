@@ -3,6 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
     <Application.Resources>
+    
+
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!-- Material Design Theme -->
@@ -121,6 +123,38 @@
             <Style TargetType="Window">
                 <Setter Property="Icon" Value="pack://application:,,,/Assets/Icons/piggybank.ico"/>
             </Style>
+
+            <!-- Navigation: Erweiterung auf Basis deines globalen NavIconButton -->
+            <Style x:Key="NavIconButton_Emphasis"
+            TargetType="Button"
+            BasedOn="{StaticResource NavIconButton}">
+                <!-- Mehr Fläche für Hover, sauberer Rand um Text/Icon -->
+                <Setter Property="Padding" Value="16,10"/>
+                <Setter Property="MinHeight" Value="40"/>
+
+                <!-- optional: kleine Rundung -->
+                <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="0"/>
+
+                <!-- Hover / Fokus farblich abheben (MaterialDesign-Farben) -->
+                <Style.Triggers>
+                    <!-- Hover -->
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueLightBrush}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Trigger>
+
+                    <!-- Tastaturfokus im Button -->
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MaterialDesignPaper}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>
