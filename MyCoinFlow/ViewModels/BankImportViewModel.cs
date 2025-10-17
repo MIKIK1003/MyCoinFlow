@@ -38,6 +38,8 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand EinzelBuchenCommand { get; }
         public RelayCommand AnlernenCommand { get; }
         public RelayCommand BearbeitenCommand { get; }
+        public RelayCommand DeleteImportedRowCommand { get; }
+
 
         private string _filePath = "";
         public string FilePath
@@ -66,6 +68,12 @@ namespace MyCoinFlow.ViewModels
             ClearCommand = new RelayCommand(_ => { Items.Clear(); FilePath = ""; SaveToDbCommand?.RaiseCanExecuteChanged(); RefreshItemsView(); });
             SaveToDbCommand = new RelayCommand(_ => SaveToDb(), _ => Items.Count > 0);
             LoadPendingFromDbCommand = new RelayCommand(_ => LoadPendingFromDb());
+
+            DeleteImportedRowCommand = new RelayCommand(
+            p => { if (p is BankImportItem it) DeleteImportedRow(it); },
+            p => p is BankImportItem it && (it != null)    // defensiv
+            );
+
 
             RefreshRecognitionCommand = new RelayCommand(_ =>
             {
@@ -519,6 +527,54 @@ namespace MyCoinFlow.ViewModels
                     "Einzelbuchung", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void DeleteImportedRow(BankImportItem it)
+        {
+            if (it == null) return;
+
+            var preview = (it.Text ?? it.CounterpartyName ?? "").Trim();
+            if (preview.Length > 80) preview = preview.Substring(0, 80) + "…";
+
+            var ask = MessageBox.Show(
+                $"Soll diese Importzeile gelöscht werden?\n\nDatum: {it.BookingDate:dd.MM.yyyy}\nText: {preview}",
+                "Importzeile löschen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (ask != MessageBoxResult.Yes) return;
+
+            try
+            {
+                // Falls bereits im Staging (DB) gespeichert: dort löschen
+                if (it.StagingId.HasValue)
+                {
+                    _db.DeleteBankImportItem(it.StagingId.Value);
+                }
+
+                // Aus der aktuellen Ansicht entfernen
+                Items.Remove(it);
+
+                // UI aktualisieren
+                RefreshItemsView();
+
+                // Label-/Status-Cache refreshen wie an anderen Stellen
+                BankImportLabelCache.Refresh();
+                foreach (var it2 in Items)
+                    it2.NotifyLabelPropertiesChanged();
+
+                SaveToDbCommand?.RaiseCanExecuteChanged();
+                BulkUebernehmenCommand?.RaiseCanExecuteChanged();
+                EinzelBuchenCommand?.RaiseCanExecuteChanged();
+
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Zeile konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Bankimport", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
 
         private void BulkUebernehmenAlleZugeordneten()
         {

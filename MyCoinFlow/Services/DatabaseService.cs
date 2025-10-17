@@ -1772,6 +1772,16 @@ ORDER BY Label";
         }
 
 
+        // -----------Löscht eine importierte BankImportItem-Zeile-------------
+        public void DeleteBankImportItem(int id)
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
+                "DELETE FROM dbo.BankImportItem WHERE Id = @id;", c);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
 
         // ---------- TRANSAKTIONEN ----------
 
