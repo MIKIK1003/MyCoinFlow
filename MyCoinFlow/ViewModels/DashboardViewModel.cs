@@ -22,47 +22,46 @@ namespace MyCoinFlow.ViewModels
         #region ctor + init
         public DashboardViewModel()
         {
-            // Gruppierungsvorgaben (einfach gehalten)
+            // Gruppierungsvorgaben
             GroupingOptions = new ObservableCollection<GroupingOption>
-            {
-                new GroupingOption { Id = "Art",          Label = "Art" },
-                new GroupingOption { Id = "Gruppe",       Label = "Gruppe" },
-                new GroupingOption { Id = "Untergruppe",  Label = "Untergruppe" }
-            };
-            SelectedGrouping = GroupingOptions.First();
+    {
+        new GroupingOption { Id = "Art",         Label = "Art" },
+        new GroupingOption { Id = "Gruppe",      Label = "Gruppe" },
+        new GroupingOption { Id = "Untergruppe", Label = "Untergruppe" }
+    };
+
+            // Standard: Untergruppe
+            SelectedGrouping = GroupingOptions.FirstOrDefault(x => x.Id == "Untergruppe")
+                               ?? GroupingOptions.First();
 
             // Commands
             RefreshCommand = new RelayCommand(_ => Apply());
-            SelectAllRangesCommand = new RelayCommand(_ =>
-            {
-                foreach (var r in NumberRanges) r.IsSelected = true;
-                OnPropertyChanged(nameof(NumberRanges));
-            });
-            SelectNoneRangesCommand = new RelayCommand(_ =>
-            {
-                foreach (var r in NumberRanges) r.IsSelected = false;
-                OnPropertyChanged(nameof(NumberRanges));
-            });
+            SelectAllRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = true; OnPropertyChanged(nameof(NumberRanges)); });
+            SelectNoneRangesCommand = new RelayCommand(_ => { foreach (var r in NumberRanges) r.IsSelected = false; OnPropertyChanged(nameof(NumberRanges)); });
             ApplyFiltersCommand = new RelayCommand(_ => Apply());
 
-            // Achsen defaults
+            // Achsen/Serien Defaults
             XAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
             YAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
             BankYAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
             BankXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
-
-            // Top-Dev Achsen defaults
             TopDevYAxes = new List<Axis> { new Axis { Labels = Array.Empty<string>() } };
             TopDevXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
-
             ColumnSeries = Array.Empty<ISeries>();
             PieSeries = Array.Empty<ISeries>();
             BankSeries = Array.Empty<ISeries>();
             TopDevSeries = Array.Empty<ISeries>();
 
-            LoadNumberRanges(); // dynamisch aus DB
-            Apply();            // initial berechnen
+            // Vorgabe: Anzeige in % aktiv
+            ShowPercent = true;
+
+            // Nummernkreise laden (Defaults kommen in LoadNumberRanges)
+            LoadNumberRanges();
+
+            // Initial berechnen
+            Apply();
         }
+
         #endregion
 
         #region sidebar state
@@ -134,29 +133,77 @@ namespace MyCoinFlow.ViewModels
         #endregion
 
         #region loading + building
+
         private void LoadNumberRanges()
         {
             NumberRanges.Clear();
+
             try
             {
-                foreach (var r in _db.LadeNummernRegeln())
+                var rules = _db.LadeNummernRegeln(); // liefert u.a. Bezeichnung/Richtung/RangeStart/RangeEnd
+
+                foreach (var r in rules)
                 {
+                    // Anzeige-Text stabil aufbauen
+                    var display = Sanitize(r.Bezeichnung) ?? $"{r.RangeStart}–{r.RangeEnd}";
+
                     NumberRanges.Add(new RangeFilterItem
                     {
                         Id = r.Id,
                         From = r.RangeStart,
                         To = r.RangeEnd,
                         Direction = r.Richtung ?? "",
-                        Display = Sanitize(r.Bezeichnung) ?? $"{r.RangeStart}–{r.RangeEnd}",
-                        IsSelected = true
+                        Display = display,
+                        // Wichtig: NICHT nach "Richtung" selektieren!
+                        // Nur die echte Kategorie "Ausgaben" vorwählen.
+                        IsSelected = IsAusgabenLabel(display)
                     });
                 }
+
+                // Failsafe: sicherstellen, dass höchstens EIN Eintrag selektiert ist.
+                // Preferenz: exakter Name "Ausgaben", sonst erste passende Ausgaben-Kategorie.
+                if (NumberRanges.Any())
+                {
+                    var selected = NumberRanges.Where(n => n.IsSelected).ToList();
+
+                    if (selected.Count == 0)
+                    {
+                        var firstAusgaben = NumberRanges.FirstOrDefault(n => IsAusgabenLabel(n.Display));
+                        if (firstAusgaben != null) firstAusgaben.IsSelected = true;
+                    }
+                    else if (selected.Count > 1)
+                    {
+                        var exact = NumberRanges.FirstOrDefault(n =>
+                            string.Equals(n.Display?.Trim(), "Ausgaben", StringComparison.OrdinalIgnoreCase));
+
+                        var keep = exact ?? selected.First();
+                        foreach (var n in NumberRanges) n.IsSelected = ReferenceEquals(n, keep);
+                    }
+                }
+
+                OnPropertyChanged(nameof(NumberRanges));
             }
             catch
             {
-                // Wenn Tabelle fehlt o.ä. → leer lassen
+                // defensiv: leer lassen
             }
         }
+
+        private static bool IsAusgabenLabel(string? label)
+        {
+            var s = (label ?? "").Trim().ToLowerInvariant();
+            if (s.Length == 0) return false;
+
+            // explizit ausschließen:
+            if (s.Contains("invest")) return false;        // Investitionen
+            if (s.Contains("amort")) return false;         // Amortisationen
+            if (s.Contains("durchlauf")) return false;     // Durchlaufkonten
+
+            // nur "Ausgaben" zulassen (Ausgabe/Ausgaben)
+            return s.StartsWith("ausgab");
+        }
+
+
 
         private static string? Sanitize(string? s)
         {
@@ -210,6 +257,7 @@ namespace MyCoinFlow.ViewModels
 
         private void BuildCharts()
         {
+            // --- Daten laden + filtern ---
             List<KontoplanEintrag> all;
             try { all = _db.LadeKontenplan(); }
             catch { all = new List<KontoplanEintrag>(); }
@@ -231,33 +279,57 @@ namespace MyCoinFlow.ViewModels
                 .Select(g => new
                 {
                     Key = g.Key,
-                    Budget = g.Sum(x => x.Budgetwert ?? 0m), // => decimal (nicht null)
-                    Ist = g.Sum(x => x.Gebucht)              // => decimal
+                    Budget = g.Sum(x => x.Budgetwert ?? 0m),
+                    Ist = g.Sum(x => x.Gebucht)
                 })
                 .OrderByDescending(x => Math.Abs(x.Budget))
                 .ToList();
 
-            // --- (1) Säulen: Budget vs. IST -----------------------------------
-            var labels = groups.Select(g => g.Key).ToArray();
+            // Kleiner Helfer: lange Kategorienamen kürzen (nur Anzeige)
+            static string Short(string? s, int max = 22)
+            {
+                var t = (s ?? "").Trim();
+                return (t.Length > max) ? t.Substring(0, max - 1) + "…" : t;
+            }
+
+            // ---------------- (1) Säulen: Budget vs. IST ----------------
+            var labelsFull = groups.Select(g => g.Key).ToArray();
+            var labelsShort = labelsFull.Select(l => Short(l)).ToArray();
             var budgetVals = groups.Select(g => (double)g.Budget).ToArray();
             var istVals = groups.Select(g => (double)g.Ist).ToArray();
 
-            XAxes = new List<Axis> { new Axis { Labels = labels } };
+            // ACHTUNG: vertikale Spalten -> Beschriftung auf X-Achse
+            // Rotation = 90°, kleinere Textgröße und etwas Padding für bessere Lesbarkeit
+            XAxes = new List<Axis>
+            {
+            new Axis
+            {
+            Labels = labelsShort,
+            LabelsRotation = 60, // vertikale Beschriftung
+            LabelsPaint = new SolidColorPaint(SKColors.Gray),
+            TextSize = 16,
+            // optional: etwas Achsen-Padding gegen Rand-Clipping
+            Padding = new LiveChartsCore.Drawing.Padding(0, 12, 0, 0)
+            }
+            };
+
             YAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
 
             ColumnSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Budget", Values = budgetVals },
-                new ColumnSeries<double> { Name = "IST",    Values = istVals    }
+        new ColumnSeries<double> { Name = "Budget", Values = budgetVals },
+        new ColumnSeries<double> { Name = "IST",    Values = istVals    }
             };
             OnPropertyChanged(nameof(XAxes));
             OnPropertyChanged(nameof(YAxes));
             OnPropertyChanged(nameof(ColumnSeries));
 
-            // --- (2) Pie: Verteilung IST --------------------------------------
+            // --------------- (2) Pie: Verteilung IST -------------------
+            // NEU: absteigend nach Betrag sortieren -> Reihenfolge der Series
             var slices = groups
                 .Select(g => new { g.Key, Val = Math.Abs(g.Ist) })
                 .Where(x => x.Val > 0)
+                .OrderByDescending(x => x.Val) // << Sortierung für Segmente & Legende
                 .ToList();
 
             var total = slices.Sum(s => s.Val);
@@ -281,43 +353,43 @@ namespace MyCoinFlow.ViewModels
             PieSeries = pie;
             OnPropertyChanged(nameof(PieSeries));
 
-            // --- (3) NEU: Top‑Abweichungen (unten links) ----------------------
+            // --------- (3) Top-Abweichungen (unten links, unverändert) ----------
             var top = groups
                 .Select(x => new
                 {
                     x.Key,
                     x.Budget,
                     x.Ist,
-                    Dev = x.Ist - x.Budget,              // signierte Abweichung
-                    DevAbs = Math.Abs(x.Ist - x.Budget)  // absolute Abweichung
+                    Dev = x.Ist - x.Budget,
+                    DevAbs = Math.Abs(x.Ist - x.Budget)
                 })
                 .OrderByDescending(x => x.DevAbs)
                 .Take(8)
                 .ToList();
 
             var topLabels = top.Select(t => t.Key).ToArray();
-            var topValues = top.Select(t => (double)t.Dev).ToArray(); // negative/positive Balken
+            var topValues = top.Select(t => (double)t.Dev).ToArray();
 
             TopDevYAxes = new List<Axis> { new Axis { Labels = topLabels } };
             TopDevXAxes = new List<Axis> { new Axis { Labeler = v => v.ToString("N2") } };
 
             TopDevSeries = new ISeries[]
             {
-                new RowSeries<double>
-                {
-                    Name = "Abweichung (IST − Budget)",
-                    Values = topValues,
-                    // Werte im Balken
-                    DataLabelsPaint    = new SolidColorPaint(SKColors.White),
-                    DataLabelsSize     = 13,
-                    DataLabelsPosition = DataLabelsPosition.Middle,
-                    DataLabelsFormatter = p => p.Model.ToString("N2")
-                }
+        new RowSeries<double>
+        {
+            Name = "Abweichung (IST − Budget)",
+            Values = topValues,
+            DataLabelsPaint    = new SolidColorPaint(SKColors.White),
+            DataLabelsSize     = 13,
+            DataLabelsPosition = DataLabelsPosition.Middle,
+            DataLabelsFormatter = p => p.Model.ToString("N2")
+        }
             };
             OnPropertyChanged(nameof(TopDevYAxes));
             OnPropertyChanged(nameof(TopDevXAxes));
             OnPropertyChanged(nameof(TopDevSeries));
         }
+
 
         private void BuildBanks()
         {
