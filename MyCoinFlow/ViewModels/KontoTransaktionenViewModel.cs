@@ -139,16 +139,15 @@ namespace MyCoinFlow.ViewModels
             {
                 decimal ein = 0m, aus = 0m;
 
-                // 1) Eindeutige Formen (aus deiner Vorgabe):
-                //    Gutschrift/Storno (Einnahme): Konto → Bank  => Von = KontoId, Nach = NULL
+                // (1) Gutschrift/Storno: Von = Konto, Nach = NULL  => als Einnahme anzeigen
                 if (t.VonKontoId == _kontoId && t.NachKontoId == null)
                 {
                     ein = t.Betrag;
                 }
-                //    Zahlung/Ausgabe: Bank → Konto  => Von = NULL, Nach = KontoId
+                // (2) BANK -> KONTO: Von = NULL, Nach = Konto
                 else if (t.VonKontoId == null && t.NachKontoId == _kontoId)
                 {
-                    // Ausnahme: Adresse als "Standard-Einnahme Adresse→Bank" angelernt
+                    // Ausnahme: Adresse als "Standard-Einnahme" angelernt -> Einnahme
                     bool istStandardEinnahme = false;
                     if (t.AdresseId.HasValue)
                     {
@@ -158,18 +157,19 @@ namespace MyCoinFlow.ViewModels
                     }
 
                     if (istStandardEinnahme)
-                        ein = t.Betrag;   // Anzeige: Einnahme
+                    {
+                        ein = t.Betrag;            // explizit Einnahme
+                    }
                     else
-                        aus = t.Betrag;   // normale Ausgabe
+                    {
+                        aus = t.Betrag;            // **fix**: echte Bankzahlung ist Ausgabe
+                    }
                 }
-                // 2) Fallbacks
-                else if (t.NachKontoId == _kontoId)
+                // (3) Rest inkl. Konto->Konto (z. B. KK-Detailverteilung Durchlauf -> Budget)
+                else
                 {
-                    ein = t.Betrag;
-                }
-                else if (t.VonKontoId == _kontoId)
-                {
-                    aus = t.Betrag;
+                    bool istAusgabe = _db.IstAusgabeFuerKonto(_kontoId, t); // enthält KK-Sonderfall
+                    if (istAusgabe) aus = t.Betrag; else ein = t.Betrag;
                 }
 
                 einSum += ein;
@@ -196,10 +196,12 @@ namespace MyCoinFlow.ViewModels
             Budget = _db.LadeBudgetSummeForKonto(_kontoId, FilterVon, FilterBis);
 
             // Delta je nach Konto-Art:
-            //  - Ausgabenkonto: Delta = Budget − Istverbrauch = Budget + Saldo
-            //  - Einnahmenkonto: Delta = Budget − IstEinnahmen = Budget − Saldo
+            //  - Ausgabenkonto: Budget − Istverbrauch = Budget + Saldo
+            //  - Einnahmenkonto: Budget − IstEinnahmen = Budget − Saldo
             Delta = _isIncomeAccount ? (Budget - Saldo) : (Budget + Saldo);
         }
+
+
 
         private void UpdateSummary() => OnPropertyChanged(nameof(SummaryText));
 

@@ -1840,15 +1840,16 @@ ORDER BY Label";
             c.Open();
 
             const string sql = @"
-        SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
-                t.Betrag, t.Notiz,
-                t.AdresseId, a.Name as AdresseName,
-                t.GeldinstitutId, g.Name as BankName
-                FROM Transaktion t
-                LEFT JOIN Adresse a ON t.AdresseId = a.Id
-                LEFT JOIN Geldinstitut g ON t.GeldinstitutId = g.Id
-                WHERE (@bis IS NULL OR t.Datum <= @bis)
-                ORDER BY t.Datum DESC";
+SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+       t.Betrag, t.Notiz,
+       t.AdresseId, a.Name as AdresseName,
+       t.GeldinstitutId, g.Name as BankName,
+       t.ImportQuelle
+FROM Transaktion t
+LEFT JOIN Adresse a     ON t.AdresseId = a.Id
+LEFT JOIN Geldinstitut g ON t.GeldinstitutId = g.Id
+WHERE (@bis IS NULL OR t.Datum <= @bis)
+ORDER BY t.Datum DESC";
 
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@bis", (object?)bisDatum ?? DBNull.Value);
@@ -1867,7 +1868,8 @@ ORDER BY Label";
                     AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
                     AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
                     GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
                 });
             }
 
@@ -1875,24 +1877,26 @@ ORDER BY Label";
         }
 
 
+
         // NEU: Gefilterte Transaktionen für ein Geldinstitut
         public List<Transaktion> LadeTransaktionenByGeldinstitut(
-            int geldinstitutId,
-            DateTime? von = null,
-            DateTime? bis = null,
-            decimal? minBetrag = null,
-            decimal? maxBetrag = null,
-            int? adresseId = null,
-            int? kontoId = null)
+    int geldinstitutId,
+    DateTime? von = null,
+    DateTime? bis = null,
+    decimal? minBetrag = null,
+    decimal? maxBetrag = null,
+    int? adresseId = null,
+    int? kontoId = null)
         {
             var list = new List<Transaktion>();
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
-            var sql = @"
+            const string sql = @"
 SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId, t.Betrag, t.Notiz,
        t.AdresseId, a.Name as AdresseName,
-       t.GeldinstitutId, g.Name as BankName
+       t.GeldinstitutId, g.Name as BankName,
+       t.ImportQuelle
 FROM Transaktion t
 LEFT JOIN Adresse a ON t.AdresseId = a.Id
 LEFT JOIN Geldinstitut g ON t.GeldinstitutId = g.Id
@@ -1928,13 +1932,13 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                     AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
                     AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
                     GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
                 });
             }
+
             return list;
         }
-
-
 
 
 
@@ -2427,60 +2431,98 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
         }
 
         // ---- Alles-in-einem: Verbuchen (liefert Kennzahlen) ----
-        public (int inserted, int skipped, int duplicates) VerbucheCreditCardRows(
-            IEnumerable<CreditCardImportRow> rows,
-            bool ignoriereKategorieZahlungen = true,
-            int? geldinstitutId = null)
+        public (int inserted, int skipped, int duplicates) VerbuchenCcStaging(int batchId, int kreditkartenKontoId, int? geldinstitutId)
         {
-            int inserted = 0, skipped = 0, duplicates = 0;
+            int ins = 0, skip = 0, dup = 0;
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            // Nur gemappte Zeilen des Batches
+            const string sel = @"
+            SELECT Id, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, KontoId, ImportHash
+            FROM CreditCardImportStaging
+            WHERE BatchId=@b AND KontoId IS NOT NULL
+            ORDER BY Datum, Id";
+
+            using var cmd = new SqlCommand(sel, c);
+            cmd.Parameters.AddWithValue("@b", batchId);
+
+            var rows = new List<(int Id, DateTime Datum, decimal Betrag, string DK, string? Bez, string? H, string? K, string? Card, int KontoId, string? Hash)>();
+            using (var r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                {
+                    rows.Add((
+                        r.GetInt32(0),
+                        r.GetDateTime(1),
+                        r.GetDecimal(2),
+                        r.IsDBNull(3) ? "" : r.GetString(3),
+                        r.IsDBNull(4) ? null : r.GetString(4),
+                        r.IsDBNull(5) ? null : r.GetString(5),
+                        r.IsDBNull(6) ? null : r.GetString(6),
+                        r.IsDBNull(7) ? null : r.GetString(7),
+                        r.GetInt32(8),
+                        r.IsDBNull(9) ? null : r.GetString(9)
+                    ));
+                }
+            }
 
             foreach (var r in rows)
             {
-                // Konto nötig
-                if (!r.KontoId.HasValue) { skipped++; continue; }
+                var dk = (r.DK ?? "").Trim();
 
-                // Optional „Zahlungen“ ignorieren
-                if (ignoriereKategorieZahlungen && string.Equals(r.Kategorie, "Zahlungen", StringComparison.OrdinalIgnoreCase))
-                { skipped++; continue; }
+                bool isBel = IstBelastung(dk);
+                bool isGut = IstGutschrift(dk);
 
-                // Debit oder Credit akzeptieren (Synonyme)
-                int? von = null, nach = null;
-                var dk = r.DebitKredit?.Trim();
+                if (!isBel && !isGut) { skip++; continue; }
 
-                if (IstBelastung(dk))
+                var betrag = Math.Abs(r.Betrag);
+                var hash = r.Hash ?? BaueImportHashV2(r.Datum, betrag, r.Bez ?? "", r.H, r.Card, r.DK);
+
+                if (SucheTransaktionIdByHash(hash).HasValue) { dup++; continue; }
+
+                // Richtung:
+                //  - Belastung:  KK-/Durchlaufkonto  -> Zielkonto (Ausgabe)
+                //  - Gutschrift: Zielkonto           -> KK-/Durchlaufkonto (Rückzahlung)
+                int? von = isBel ? kreditkartenKontoId : r.KontoId;
+                int? nach = isBel ? r.KontoId : kreditkartenKontoId;
+
+                var adrId = FindeOderErzeugeAdresseByName(r.H);
+
+                // **WICHTIG**: Keine Bank mehr referenzieren -> GeldinstitutId = null
+                // Damit ist es fachlich eine reine Konto->Konto-Buchung und taucht NICHT im Banksaldo auf.
+                var tid = InsertTransaktionMitImport(
+                    r.Datum,
+                    von,
+                    nach,
+                    betrag,
+                    r.Bez,
+                    adrId,
+                    geldinstitutId: null,              // <-- EINZIGE relevante Änderung
+                    importQuelle: "KreditkartenExcel",
+                    importHash: hash
+                );
+                ins++;
+
+                // Archiv + Staging löschen
+                using (var a = new SqlCommand(@"
+                INSERT INTO CreditCardImportArchive
+                (BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, ImportHash, TransaktionId)
+                SELECT BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, ImportHash, @tid
+                FROM CreditCardImportStaging WHERE Id=@id;
+
+                DELETE FROM CreditCardImportStaging WHERE Id=@id;", c))
                 {
-                    // Ausgabe: Geld geht "nach" Zielkonto (deine bisherige Logik)
-                    nach = r.KontoId.Value;
+                    a.Parameters.AddWithValue("@id", r.Id);
+                    a.Parameters.AddWithValue("@tid", tid);
+                    a.ExecuteNonQuery();
                 }
-                else if (IstGutschrift(dk))
-                {
-                    // Rückzahlung/Gutschrift: Geld kommt "von" Zielkonto
-                    von = r.KontoId.Value;
-                }
-                else
-                {
-                    // wirklich unklarer Fall
-                    skipped++;
-                    continue;
-                }
-
-                // Adresse
-                int? adresseId = FindeOderErzeugeAdresseByName(r.Haendler);
-
-                // Dedupe
-                var hash = BaueImportHash(r.Datum, r.Betrag, r.Beschreibung, r.Haendler, r.Kartennummer);
-                if (SucheTransaktionIdByHash(hash).HasValue) { duplicates++; continue; }
-
-                // Buchung mit positivem Betrag (r.Betrag wurde zuvor bereits als Math.Abs(...) normalisiert)
-                InsertTransaktionMitImport(
-                    r.Datum, von, nach, r.Betrag, r.Beschreibung, adresseId, geldinstitutId,
-                    importQuelle: "KreditkartenExcel", importHash: hash);
-
-                inserted++;
             }
 
-            return (inserted, skipped, duplicates);
+            return (ins, skip, dup);
         }
+
 
 
         public string BaueMappingSchluessel(string? beschreibung, string? haendler, string? kategorie)
@@ -2795,88 +2837,7 @@ ORDER BY s.Datum, s.Id";
             tx.Commit();
         }
 
-        public (int inserted, int skipped, int duplicates) VerbuchenCcStaging(int batchId, int kreditkartenKontoId, int? geldinstitutId)
-        {
-            int ins = 0, skip = 0, dup = 0;
-
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            // Nur gemappte Zeilen des Batches
-            const string sel = @"
-SELECT Id, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, KontoId, ImportHash
-FROM CreditCardImportStaging
-WHERE BatchId=@b AND KontoId IS NOT NULL
-ORDER BY Datum, Id";
-
-            using var cmd = new SqlCommand(sel, c);
-            cmd.Parameters.AddWithValue("@b", batchId);
-
-            var rows = new List<(int Id, DateTime Datum, decimal Betrag, string DK, string? Bez, string? H, string? K, string? Card, int KontoId, string? Hash)>();
-            using (var r = cmd.ExecuteReader())
-            {
-                while (r.Read())
-                {
-                    rows.Add((
-                        r.GetInt32(0),
-                        r.GetDateTime(1),
-                        r.GetDecimal(2),
-                        r.IsDBNull(3) ? "" : r.GetString(3),
-                        r.IsDBNull(4) ? null : r.GetString(4),
-                        r.IsDBNull(5) ? null : r.GetString(5),
-                        r.IsDBNull(6) ? null : r.GetString(6),
-                        r.IsDBNull(7) ? null : r.GetString(7),
-                        r.GetInt32(8),
-                        r.IsDBNull(9) ? null : r.GetString(9)
-                    ));
-                }
-            }
-
-            foreach (var r in rows)
-            {
-                var dk = (r.DK ?? "").Trim();
-
-                bool isBel = IstBelastung(dk);
-                bool isGut = IstGutschrift(dk);
-
-                if (!isBel && !isGut) { skip++; continue; }
-
-                var betrag = Math.Abs(r.Betrag);
-                var hash = r.Hash ?? BaueImportHashV2(r.Datum, betrag, r.Bez ?? "", r.H, r.Card, r.DK);
-
-                if (SucheTransaktionIdByHash(hash).HasValue) { dup++; continue; }
-
-                // Richtung:
-                //  - Belastung:  KK-Konto -> Zielkonto
-                //  - Gutschrift: Zielkonto -> KK-Konto
-                int? von = isBel ? kreditkartenKontoId : r.KontoId;
-                int? nach = isBel ? r.KontoId : kreditkartenKontoId;
-
-                var adrId = FindeOderErzeugeAdresseByName(r.H);
-                var tid = InsertTransaktionMitImport(
-                    r.Datum, von, nach, betrag, r.Bez, adrId, geldinstitutId,
-                    "KreditkartenExcel", hash);
-                ins++;
-
-                // Archiv + Staging löschen (unverändert)
-                using (var a = new SqlCommand(@"
-INSERT INTO CreditCardImportArchive
-(BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, ImportHash, TransaktionId)
-SELECT BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, ImportHash, @tid
-FROM CreditCardImportStaging WHERE Id=@id;
-
-DELETE FROM CreditCardImportStaging WHERE Id=@id;", c))
-                {
-                    a.Parameters.AddWithValue("@id", r.Id);
-                    a.Parameters.AddWithValue("@tid", tid);
-                    a.ExecuteNonQuery();
-                }
-
-            }
-
-            return (ins, skip, dup);
-        }
-
+        
         // Helper in DatabaseService (gleich wie VM-Variante)
         private static bool IstBelastung(string? dk)
         {
@@ -3184,13 +3145,13 @@ VALUES (@sid, @master, @source, @def);", c, tx);
 
         // Transaktionen für ein bestimmtes Konto (sowohl als Von, als Nach)
         public List<Transaktion> LadeTransaktionenByKonto(
-            int kontoId,
-            DateTime? von = null,
-            DateTime? bis = null,
-            decimal? minBetrag = null,
-            decimal? maxBetrag = null,
-            int? adresseId = null,
-            int? geldinstitutId = null)
+    int kontoId,
+    DateTime? von = null,
+    DateTime? bis = null,
+    decimal? minBetrag = null,
+    decimal? maxBetrag = null,
+    int? adresseId = null,
+    int? geldinstitutId = null)
         {
             var list = new List<Transaktion>();
             using var c = new SqlConnection(_connectionString);
@@ -3199,7 +3160,8 @@ VALUES (@sid, @master, @source, @def);", c, tx);
             const string sql = @"
 SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId, t.Betrag, t.Notiz,
        t.AdresseId, a.Name as AdresseName,
-       t.GeldinstitutId, g.Name as BankName
+       t.GeldinstitutId, g.Name as BankName,
+       t.ImportQuelle
 FROM Transaktion t
 LEFT JOIN Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN Geldinstitut g ON g.Id = t.GeldinstitutId
@@ -3235,11 +3197,14 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                     AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
                     AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
                     GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
                 });
             }
+
             return list;
         }
+
 
         // Budgetsumme für ein Konto im Zeitraum (defensiv: 0 wenn Tabelle/Spalten fehlen)
         public decimal LadeBudgetSummeForKonto(int kontoId, DateTime? von, DateTime? bis)
@@ -3317,6 +3282,64 @@ WHERE Id = @Id";
 
             return false;
         }
+
+        /// <summary>
+        /// Liefert true, wenn die Transaktion für das angefragte Konto als "Ausgabe" angezeigt werden soll.
+        /// Standard: Von=Konto -> Ausgabe, Nach=Konto -> Einnahme.
+        /// Spezialfall: KreditkartenExcel (Detailverteilung) -> auf Nicht-Einnahmenkonten immer Ausgabe.
+        /// </summary>
+        public bool IstAusgabeFuerKonto(int kontoId, Transaktion t)
+        {
+            // KK-Detailbuchung? Dann auf Kosten-/Budgetkonten immer als Ausgabe zeigen.
+            if (string.Equals(t.ImportQuelle, "KreditkartenExcel", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!IstEinnahmenKonto(kontoId)) return true;  // Budget-/Kostenkonten: Ausgabe
+                                                               // Einnahmenkonten: normale Logik
+            }
+
+            // Standarddarstellung:
+            if (t.VonKontoId == kontoId) return true;   // Abgang = Ausgabe
+            if (t.NachKontoId == kontoId) return false; // Zugang = Einnahme
+
+            // Fallback: Wenn das Konto "Einnahmenkonto" ist -> Einnahme, sonst Ausgabe
+            return !IstEinnahmenKonto(kontoId);
+        }
+
+
+
+        /// <summary>
+        /// Liefert true, wenn diese Transaktion für das angegebene Konto als "Ausgabe" angezeigt werden soll.
+        /// Standard: Von=Konto -> Ausgabe, Nach=Konto -> Einnahme.
+        /// Spezialfall: KreditkartenExcel-Import -> auf Nicht-Einnahmenkonten stets Ausgabe (auch wenn Nach=Konto).
+        /// </summary>
+        public bool IstAusgabeFuerKonto(int kontoId, Transaktion t, string? importQuelle)
+        {
+            // 1) Kreditkarten-Detailbuchungen (Konto->Konto-Umbuchung der KK-Verteilung)
+            if (string.Equals(importQuelle, "KreditkartenExcel", StringComparison.OrdinalIgnoreCase))
+            {
+                // Wenn das angefragte Konto kein Einnahmenkonto ist, als Ausgabe darstellen.
+                // (Dein Budget-/Kostenkonto bleibt damit visuell "Ausgabe", auch wenn es Nach=Konto ist.)
+                if (!IstEinnahmenKonto(kontoId))
+                    return true;
+                // Einnahmenkonten (z. B. Lohn) dürfen bei KK-Gutschriften als Einnahme erscheinen:
+                if (t.NachKontoId == kontoId) return false;
+                if (t.VonKontoId == kontoId) return true;
+                // Fallback
+                return false;
+            }
+
+            // 2) Standardfall (ohne Import-Speziallogik)
+            if (t.VonKontoId == kontoId) return true;   // Ausgabe
+            if (t.NachKontoId == kontoId) return false; // Einnahme
+
+            // Fallback: wenn das Konto grundsätzlich ein Ausgabenkonto ist, als Ausgabe darstellen
+            return !IstEinnahmenKonto(kontoId);
+        }
+
+
+
+
+
 
         public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId);
 
@@ -3558,6 +3581,7 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
         // ---------------------------------------------
         // NEU: Transaktionen nach Adresse laden (mit Filtern)
         // ---------------------------------------------
+
         public List<Transaktion> LadeTransaktionenByAdresse(
             int adresseId,
             DateTime? von = null,
@@ -3569,9 +3593,7 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
         {
             var result = new List<Transaktion>();
 
-            // Defensive Checks
-            if (adresseId <= 0)
-                return result;
+            if (adresseId <= 0) return result;
 
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
@@ -3587,7 +3609,8 @@ SELECT
     t.AdresseId, 
     a.Name AS AdresseName,
     t.GeldinstitutId, 
-    g.Name AS BankName
+    g.Name AS BankName,
+    t.ImportQuelle
 FROM Transaktion t
 LEFT JOIN Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN Geldinstitut g ON g.Id = t.GeldinstitutId
@@ -3623,14 +3646,15 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                     AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
                     AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
                     GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
                 };
-
                 result.Add(t);
             }
 
             return result;
         }
+
 
         // Sorgt dafür, dass es genau EIN Master-Schema gibt (Name = "Master").
         // Legt es nur an, wenn es fehlt. Mehrfach-Aufruf ist unkritisch.
@@ -4225,7 +4249,6 @@ ORDER BY a.Id";
                 .Where(t => t.Length > 0)
                 .ToArray();
 
-            // in numerische und Text-Tokens trennen
             var numTokens = new List<int>();
             var txtTokens = new List<string>();
             foreach (var tok in rawTokens)
@@ -4242,15 +4265,16 @@ SELECT DISTINCT
        t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
        t.Betrag, t.Notiz,
        t.AdresseId, a.Name AS AdresseName,
-       t.GeldinstitutId, g.Name AS BankName
+       t.GeldinstitutId, g.Name AS BankName,
+       t.ImportQuelle
 FROM dbo.Transaktion t
 LEFT JOIN dbo.Adresse        a  ON t.AdresseId      = a.Id
 LEFT JOIN dbo.Geldinstitut   g  ON t.GeldinstitutId = g.Id
 LEFT JOIN dbo.Attachment     att ON att.TransaktionId = t.Id
 LEFT JOIN dbo.AttachmentText at  ON at.AttachmentId  = att.Id
 /* NEU: Kontenplan für Von/Nach – damit Kontonummern gefiltert werden können */
-LEFT JOIN dbo.Kontenplan     kv ON kv.Id = t.VonKontoId
-LEFT JOIN dbo.Kontenplan     kn ON kn.Id = t.NachKontoId
+LEFT JOIN dbo.Kontenplan kv ON kv.Id = t.VonKontoId
+LEFT JOIN dbo.Kontenplan kn ON kn.Id = t.NachKontoId
 WHERE 1=1
 ");
 
@@ -4259,7 +4283,6 @@ WHERE 1=1
             if (!string.IsNullOrWhiteSpace(addressTerm))
                 sb.AppendLine("  AND a.Name LIKE @addr COLLATE Latin1_General_CI_AI");
 
-            // Text-Tokens (LIKE) – unverändert
             for (int i = 0; i < txtTokens.Count; i++)
             {
                 sb.Append(@"
@@ -4272,7 +4295,6 @@ WHERE 1=1
   )");
             }
 
-            // NEU: Numerische Tokens → exakte Kontonummer-Matches
             for (int j = 0; j < numTokens.Count; j++)
             {
                 sb.Append(@"
@@ -4309,9 +4331,11 @@ WHERE 1=1
                     AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
                     AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
                     GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9)
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
                 });
             }
+
             return list;
         }
 

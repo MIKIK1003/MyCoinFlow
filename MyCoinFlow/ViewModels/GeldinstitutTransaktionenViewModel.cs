@@ -120,7 +120,6 @@ namespace MyCoinFlow.ViewModels
             return set;
         }
 
-
         private void Load()
         {
             Rows.Clear();
@@ -130,28 +129,33 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var t in list.OrderByDescending(t => t.Datum).ThenByDescending(t => t.Id))
             {
-                // Konto: bevorzugt VON, dann NACH, sonst Bankname – Anzeige ohne Klassifikation
+                // DEFENSIV: KK-Detailverteilungen gehören NICHT in die Bankansicht.
+                // Falls so eine Zeile irrtümlich doch eine GeldinstitutId hätte: einfach überspringen.
+                if (string.Equals(t.ImportQuelle, "KreditkartenExcel", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Kontoanzeige: bevorzugt VON, dann NACH, sonst Bankname – ohne Klassifikationsanhang
                 string konto =
                       (t.VonKontoId.HasValue && _kontoLabel.TryGetValue(t.VonKontoId.Value, out var vLbl)) ? vLbl
                     : (t.NachKontoId.HasValue && _kontoLabel.TryGetValue(t.NachKontoId.Value, out var nLbl)) ? nLbl
                     : (t.BankName ?? "Bank");
 
-                // Einnahmen/Ausgaben bankseitig (wie in deiner Saldo-SQL):
+                // Einnahmen/Ausgaben bankseitig (wie deine Saldo-Sicht):
                 decimal einnahmen = 0m, ausgaben = 0m;
 
                 if (t.NachKontoId.HasValue)
                 {
-                    // Bank -> Budgetkonto
+                    // Bank -> Konto
                     if (_incomeAccounts.Contains(t.NachKontoId.Value))
-                        einnahmen = t.Betrag;      // Ertragskonto → Zugang zur Bank
+                        einnahmen = t.Betrag;   // Ertragskonto -> Zugang zur Bank
                     else
-                        ausgaben = t.Betrag;       // Aufwand/sonst → Abgang von Bank
+                        ausgaben = t.Betrag;    // Aufwand/sonst -> Abgang von Bank
                 }
                 else
                 {
                     // Bank-only (kein NachKontoId)
                     if (t.VonKontoId.HasValue || t.AdresseId.HasValue)
-                        einnahmen = t.Betrag;      // Budget→Bank oder Adresse→Bank
+                        einnahmen = t.Betrag;   // Budget->Bank oder Adresse->Bank
                 }
 
                 Rows.Add(new Row
@@ -168,6 +172,8 @@ namespace MyCoinFlow.ViewModels
 
             OnPropertyChanged(nameof(SummaryText));
         }
+
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null)
