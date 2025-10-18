@@ -136,7 +136,7 @@ namespace MyCoinFlow.Services.Update
 
         public async Task<string?> DownloadSetupAsync(string fileUrl, IProgress<double>? progress = null, CancellationToken ct = default)
         {
-            // ---- Failsafe-Logging ---------------------------------------------------
+            // ---- Diagnose-Log (immer) ---------------------------------------------
             var attempts = new List<(string Url, string Stage, int? Status, string? MediaType, string? Note)>();
             string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MyCoinFlow");
             Directory.CreateDirectory(appDataDir);
@@ -147,22 +147,20 @@ namespace MyCoinFlow.Services.Update
                 !media.Contains("text/html", StringComparison.OrdinalIgnoreCase) &&
                 !media.Contains("text/plain", StringComparison.OrdinalIgnoreCase);
 
-            // ------------------------------------------------------------------------
-
             Directory.CreateDirectory(AppReleaseConfig.LocalDownloadFolder);
             string target = Path.Combine(AppReleaseConfig.LocalDownloadFolder, AppReleaseConfig.DefaultSetupFileName);
 
-            // Browserähnliche Header (einige Hoster verlangen das)
+            // Browser-Header
             try
             {
-                if (!_http.DefaultRequestHeaders.UserAgent.TryParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari")) { }
+                _http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36");
                 _http.DefaultRequestHeaders.Accept.ParseAdd("*/*");
             }
             catch { /* ignore */ }
 
             try
             {
-                // (A) Fallback: lokale OneDrive-Datei
+                // (A) Fallback: lokales Setup aus OneDrive-Ordner
                 if (string.IsNullOrWhiteSpace(fileUrl))
                 {
                     var local = OneDriveLocalResolver.TryGetSetupLocalPath(AppReleaseConfig.DefaultSetupFileName);
@@ -186,201 +184,165 @@ namespace MyCoinFlow.Services.Update
                     return target;
                 }
 
-                // ===== HTTP/HTTPS =====
-                async Task<string?> TryDownloadAsync(string url, string stage, bool allowHtmlScrape, int depth = 0)
+                // (C) HTTP/HTTPS – erst direkt versuchen …
+                using (var resp = await _http.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead, ct))
                 {
-                    try
+                    var media = resp.Content.Headers.ContentType?.MediaType ?? "";
+                    attempts.Add((fileUrl, "direct", (int)resp.StatusCode, media, null));
+
+                    if (!resp.IsSuccessStatusCode)
+                        throw new InvalidOperationException($"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
+
+                    // Binär -> speichern
+                    if (IsBinary(media) || string.IsNullOrWhiteSpace(media))
                     {
-                        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                        var media = resp.Content.Headers.ContentType?.MediaType ?? "";
-                        attempts.Add((url, stage, (int)resp.StatusCode, media, null));
+                        var disp = resp.Content.Headers.ContentDisposition;
+                        var suggested = disp != null ? (disp.FileNameStar ?? disp.FileName) : null;
+                        if (!string.IsNullOrWhiteSpace(suggested))
+                            target = Path.Combine(AppReleaseConfig.LocalDownloadFolder, suggested!.Trim('"'));
 
-                        if (!resp.IsSuccessStatusCode) return null;
+                        var total = resp.Content.Headers.ContentLength ?? -1L;
+                        await using var input = await resp.Content.ReadAsStreamAsync(ct);
+                        await using var output = File.Create(target);
 
-                        // Binär -> direkt speichern
-                        if (IsBinary(media) || string.IsNullOrWhiteSpace(media))
+                        var buf = new byte[81920];
+                        long read = 0;
+                        int n;
+                        while ((n = await input.ReadAsync(buf.AsMemory(0, buf.Length), ct)) > 0)
                         {
-                            var disp = resp.Content.Headers.ContentDisposition;
-                            var suggested = disp != null ? (disp.FileNameStar ?? disp.FileName) : null;
-                            if (!string.IsNullOrWhiteSpace(suggested))
-                                target = Path.Combine(AppReleaseConfig.LocalDownloadFolder, suggested!.Trim('"'));
-
-                            var total = resp.Content.Headers.ContentLength ?? -1L;
-                            await using var input = await resp.Content.ReadAsStreamAsync(ct);
-                            await using var output = File.Create(target);
-
-                            var buf = new byte[81920];
-                            long read = 0;
-                            int n;
-                            while ((n = await input.ReadAsync(buf.AsMemory(0, buf.Length), ct)) > 0)
-                            {
-                                await output.WriteAsync(buf.AsMemory(0, n), ct);
-                                read += n;
-                                if (total > 0 && progress != null)
-                                    progress.Report(read / (double)total);
-                            }
-                            return target;
+                            await output.WriteAsync(buf.AsMemory(0, n), ct);
+                            read += n;
+                            if (total > 0 && progress != null)
+                                progress.Report(read / (double)total);
                         }
+                        return target;
+                    }
 
-                        // HTML-Scrape (nur für Nicht-mscontent; für mscontent kommt direkt Binär)
-                        if (allowHtmlScrape && media.Contains("text/html", StringComparison.OrdinalIgnoreCase) && depth < 2)
+                    // … sonst ist es HTML: darin den echten Download-Link finden und **genau den** laden
+                    var baseUri = resp.RequestMessage?.RequestUri;             // wichtig fürs Auflösen relativer Links
+                    var html = await resp.Content.ReadAsStringAsync(ct);
+
+                    // Kandidat 1: JSON-Feld "downloadUrl":"<…>"
+                    string? candidate = null;
+                    var mJson = System.Text.RegularExpressions.Regex.Match(
+                        html, @"""downloadUrl""\s*:\s*""([^""]+)""",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (mJson.Success)
+                    {
+                        candidate = mJson.Groups[1].Value
+                            .Replace("\\u0026", "&").Replace("\\/", "/")
+                            .Replace("\\u003d", "=").Replace("\\u003f", "?");
+                    }
+
+                    // Kandidat 2: absoluter Link auf /download.aspx?…
+                    if (string.IsNullOrWhiteSpace(candidate))
+                    {
+                        var mAbs = System.Text.RegularExpressions.Regex.Match(
+                            html, @"https?://(?:onedrive\.live|my\.microsoftpersonalcontent)\.com/[^\s""'>]*download\.aspx[^\s""'>]*",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (mAbs.Success) candidate = mAbs.Value;
+                    }
+
+                    // Kandidat 3: relativer Link /_layouts/15/download.aspx?… oder /download?…
+                    if (string.IsNullOrWhiteSpace(candidate))
+                    {
+                        var mRel = System.Text.RegularExpressions.Regex.Match(
+                            html, @"href\s*=\s*[""'](/(?:_layouts/15/)?download(?:\.aspx)?\?[^""'>\s]+)[""']",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (mRel.Success && baseUri != null)
                         {
-                            var html = await resp.Content.ReadAsStringAsync(ct);
+                            var builder = new Uri(baseUri, mRel.Groups[1].Value);
+                            candidate = builder.ToString();
+                        }
+                    }
 
-                            string? candidate = null;
-
-                            // FilesConfig.si → ReturnUrl
-                            var mSi = System.Text.RegularExpressions.Regex.Match(
-                                html, @"""si""\s*:\s*""([^""]+)""",
-                                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-                            if (mSi.Success)
+                    // Kandidat 4: FilesConfig.si → ReturnUrl=… (OneDrive-Seite)
+                    if (string.IsNullOrWhiteSpace(candidate))
+                    {
+                        var mSi = System.Text.RegularExpressions.Regex.Match(
+                            html, @"""si""\s*:\s*""([^""]+)""",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                        if (mSi.Success)
+                        {
+                            try
                             {
-                                try
+                                var siUrl = System.Net.WebUtility.HtmlDecode(mSi.Groups[1].Value);
+                                var ub = new UriBuilder(siUrl);
+                                var qs = System.Web.HttpUtility.ParseQueryString(ub.Query);
+                                var ret = qs["ReturnUrl"];
+                                if (!string.IsNullOrWhiteSpace(ret))
                                 {
-                                    var siUrl = System.Net.WebUtility.HtmlDecode(mSi.Groups[1].Value);
-                                    var ub = new UriBuilder(siUrl);
-                                    var qs = System.Web.HttpUtility.ParseQueryString(ub.Query);
-                                    var ret = qs["ReturnUrl"];
-                                    if (!string.IsNullOrWhiteSpace(ret))
-                                    {
-                                        var retDec = System.Web.HttpUtility.UrlDecode(ret);
-                                        if (retDec.StartsWith("/")) retDec = "https://onedrive.live.com" + retDec;
+                                    var retDec = System.Web.HttpUtility.UrlDecode(ret);
+                                    if (baseUri != null && retDec.StartsWith("/"))
+                                        candidate = new Uri(baseUri, retDec).ToString();
+                                    else
                                         candidate = retDec;
-                                    }
-                                }
-                                catch { }
-                            }
-
-                            // downloadUrl":"..."
-                            if (string.IsNullOrWhiteSpace(candidate))
-                            {
-                                var mJson = System.Text.RegularExpressions.Regex.Match(
-                                    html, @"""downloadUrl""\s*:\s*""([^""]+)""",
-                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-                                if (mJson.Success)
-                                {
-                                    candidate = mJson.Groups[1].Value
-                                        .Replace("\\u0026", "&").Replace("\\/", "/")
-                                        .Replace("\\u003d", "=").Replace("\\u003f", "?");
                                 }
                             }
-
-                            // absoluter /download?...
-                            if (string.IsNullOrWhiteSpace(candidate))
-                            {
-                                var mAbs = System.Text.RegularExpressions.Regex.Match(
-                                    html, @"https?://onedrive\.live\.com/download\?[^""'>\s]+",
-                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                                if (mAbs.Success) candidate = mAbs.Value;
-                            }
-
-                            // relativer /download?...
-                            if (string.IsNullOrWhiteSpace(candidate))
-                            {
-                                var mRel = System.Text.RegularExpressions.Regex.Match(
-                                    html, @"href\s*=\s*[""'](/download\?[^""'>\s]+)[""']",
-                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                                if (mRel.Success) candidate = "https://onedrive.live.com" + mRel.Groups[1].Value;
-                            }
-
-                            // Meta-Refresh
-                            if (string.IsNullOrWhiteSpace(candidate))
-                            {
-                                var mMeta = System.Text.RegularExpressions.Regex.Match(
-                                    html, @"http-equiv\s*=\s*[""']refresh[""']\s+content\s*=\s*[""'][^""']*url=([^""'>\s]+)[""']",
-                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                                if (mMeta.Success) candidate = System.Net.WebUtility.HtmlDecode(mMeta.Groups[1].Value.Trim('\'', '"'));
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(candidate))
-                            {
-                                if (!candidate.Contains("download=", StringComparison.OrdinalIgnoreCase))
-                                    candidate += (candidate.Contains("?") ? "&" : "?") + "download=1";
-                                if (!candidate.Contains("em=", StringComparison.OrdinalIgnoreCase))
-                                    candidate += "&em=2";
-
-                                var rHtml = await TryDownloadAsync(candidate, stage + "+html-scrape", allowHtmlScrape: true, depth: depth + 1);
-                                if (!string.IsNullOrWhiteSpace(rHtml)) return rHtml;
-                            }
-                            else
-                            {
-                                try { File.WriteAllText(Path.Combine(appDataDir, "update_preview.html"), html, System.Text.Encoding.UTF8); } catch { }
-                            }
+                            catch { /* ignore */ }
                         }
-
-                        return null;
                     }
-                    catch (Exception ex)
+
+                    if (!string.IsNullOrWhiteSpace(candidate))
                     {
-                        attempts.Add((url, stage, null, null, ex.GetType().Name + ": " + ex.Message));
-                        return null;
+                        // Zweiter, finaler Downloadversuch **ohne** Umschreibung
+                        using var resp2 = await _http.GetAsync(candidate, HttpCompletionOption.ResponseHeadersRead, ct);
+                        var media2 = resp2.Content.Headers.ContentType?.MediaType ?? "";
+                        attempts.Add((candidate, "html-extract", (int)resp2.StatusCode, media2, null));
+
+                        if (!resp2.IsSuccessStatusCode)
+                            throw new InvalidOperationException($"HTTP {(int)resp2.StatusCode} {resp2.ReasonPhrase}");
+
+                        if (!IsBinary(media2) && !string.IsNullOrWhiteSpace(media2))
+                            throw new InvalidOperationException($"Server liefert keinen Binär-Content (Content-Type={media2}). URL: {candidate}");
+
+                        var disp2 = resp2.Content.Headers.ContentDisposition;
+                        var suggested2 = disp2 != null ? (disp2.FileNameStar ?? disp2.FileName) : null;
+                        if (!string.IsNullOrWhiteSpace(suggested2))
+                            target = Path.Combine(AppReleaseConfig.LocalDownloadFolder, suggested2!.Trim('"'));
+
+                        var total2 = resp2.Content.Headers.ContentLength ?? -1L;
+                        await using var input2 = await resp2.Content.ReadAsStreamAsync(ct);
+                        await using var output2 = File.Create(target);
+
+                        var buf2 = new byte[81920];
+                        long read2 = 0;
+                        int n2;
+                        while ((n2 = await input2.ReadAsync(buf2.AsMemory(0, buf2.Length), ct)) > 0)
+                        {
+                            await output2.WriteAsync(buf2.AsMemory(0, n2), ct);
+                            read2 += n2;
+                            if (total2 > 0 && progress != null)
+                                progress.Report(read2 / (double)total2);
+                        }
+                        return target;
                     }
+
+                    // HTML ohne Kandidat -> Vorschau sichern zur Analyse
+                    try { File.WriteAllText(Path.Combine(appDataDir, "update_preview.html"), html, System.Text.Encoding.UTF8); } catch { }
+                    throw new InvalidOperationException("Download-Link konnte aus der OneDrive-Seite nicht extrahiert werden.");
                 }
-
-                // === SPEZIALFALL: mscontent (Direkt-Download) ===
-                if (Uri.TryCreate(fileUrl, UriKind.Absolute, out var u) &&
-                    u.Host.IndexOf("my.microsoftpersonalcontent.com", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    // Referrer setzen (manche mscontent-Links wollen eine Herkunft)
-                    try { _http.DefaultRequestHeaders.Referrer = new Uri("https://onedrive.live.com/"); } catch { }
-                    var r0 = await TryDownloadAsync(fileUrl, "mscontent-direct", allowHtmlScrape: false);
-                    if (!string.IsNullOrWhiteSpace(r0)) return r0;
-                    // kein Fallback auf Shares/Graph – diese Links sind bereits „final“
-                }
-
-                // 1) direct (download=1 auch für 1drv)
-                var url1 = OneDriveSharedLinkHelper.EnsureDirectDownload(fileUrl);
-                var r1 = await TryDownloadAsync(url1, "direct", allowHtmlScrape: true, depth: 0);
-                if (!string.IsNullOrWhiteSpace(r1)) return r1;
-
-                // 2) finale Redirect-URL → /download...
-                try
-                {
-                    using var probe = await _http.GetAsync(url1, ct);
-                    var finalUri = probe.RequestMessage?.RequestUri;
-                    if (finalUri != null)
-                    {
-                        var url2 = OneDriveSharedLinkHelper.RewriteFromFinalUri(finalUri);
-                        var r2 = await TryDownloadAsync(url2, "rewrite", allowHtmlScrape: true, depth: 0);
-                        if (!string.IsNullOrWhiteSpace(r2)) return r2;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    attempts.Add((url1, "probe", null, null, ex.GetType().Name + ": " + ex.Message));
-                }
-
-                // 3) Shares-API
-                var apiUrl = OneDriveSharedLinkHelper.BuildSharesApiContentUrl(fileUrl);
-                var r3 = await TryDownloadAsync(apiUrl, "shares-api", allowHtmlScrape: false, depth: 0);
-                if (!string.IsNullOrWhiteSpace(r3)) return r3;
-
-                // 4) Graph-API
-                var graphUrl = OneDriveSharedLinkHelper.BuildGraphSharesContentUrl(fileUrl);
-                var r4 = await TryDownloadAsync(graphUrl, "graph-api", allowHtmlScrape: false, depth: 0);
-                if (!string.IsNullOrWhiteSpace(r4)) return r4;
-
-                // Diagnose + Pfad anzeigen
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine("Setup-Datei konnte nicht heruntergeladen werden. Prüfen Sie den öffentlichen Link in der version.json.");
-                sb.AppendLine(); sb.AppendLine("Versuche:");
+            }
+            catch (Exception ex)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Setup-Download fehlgeschlagen.");
+                sb.AppendLine("Versuche:");
                 foreach (var t in attempts)
                     sb.AppendLine($"[{t.Stage}] {t.Url}  status={(t.Status?.ToString() ?? "-")}  media={t.MediaType ?? "-"}  note={t.Note ?? "-"}");
                 sb.AppendLine(); sb.AppendLine("Log: " + logPath);
-
-                throw new InvalidOperationException(sb.ToString());
+                throw new InvalidOperationException(sb.ToString(), ex);
             }
             finally
             {
-                // Log immer schreiben
                 try
                 {
-                    var sb = new System.Text.StringBuilder();
+                    var sb = new StringBuilder();
                     foreach (var t in attempts)
                         sb.AppendLine($"[{t.Stage}] {t.Url}  status={(t.Status?.ToString() ?? "-")}  media={t.MediaType ?? "-"}  note={t.Note ?? "-"}");
-                    File.WriteAllText(logPath, sb.ToString(), System.Text.Encoding.UTF8);
+                    File.WriteAllText(logPath, sb.ToString(), Encoding.UTF8);
                 }
-                catch { }
+                catch { /* ignore */ }
             }
         }
 

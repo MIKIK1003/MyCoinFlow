@@ -139,7 +139,7 @@ namespace MyCoinFlow.ViewModels
             {
                 decimal ein = 0m, aus = 0m;
 
-                // (1) Gutschrift/Storno: Von = Konto, Nach = NULL  => als Einnahme anzeigen
+                // (1) Gutschrift/Storno: Von = Konto, Nach = NULL  => Einnahme
                 if (t.VonKontoId == _kontoId && t.NachKontoId == null)
                 {
                     ein = t.Betrag;
@@ -147,7 +147,7 @@ namespace MyCoinFlow.ViewModels
                 // (2) BANK -> KONTO: Von = NULL, Nach = Konto
                 else if (t.VonKontoId == null && t.NachKontoId == _kontoId)
                 {
-                    // Ausnahme: Adresse als "Standard-Einnahme" angelernt -> Einnahme
+                    // Ausnahme: "Standard-Einnahme"-Adresse -> Einnahme
                     bool istStandardEinnahme = false;
                     if (t.AdresseId.HasValue)
                     {
@@ -158,14 +158,14 @@ namespace MyCoinFlow.ViewModels
 
                     if (istStandardEinnahme)
                     {
-                        ein = t.Betrag;            // explizit Einnahme
+                        ein = t.Betrag;         // explizit Einnahme
                     }
                     else
                     {
-                        aus = t.Betrag;            // **fix**: echte Bankzahlung ist Ausgabe
+                        aus = t.Betrag;         // **fix**: echte Bankzahlung ist Ausgabe
                     }
                 }
-                // (3) Rest inkl. Konto->Konto (z. B. KK-Detailverteilung Durchlauf -> Budget)
+                // (3) Rest inkl. Konto->Konto (KK-Detailverteilung Durchlauf -> Budget)
                 else
                 {
                     bool istAusgabe = _db.IstAusgabeFuerKonto(_kontoId, t); // enthält KK-Sonderfall
@@ -195,11 +195,12 @@ namespace MyCoinFlow.ViewModels
             // Budget (aktive/überlappende Zeiträume)
             Budget = _db.LadeBudgetSummeForKonto(_kontoId, FilterVon, FilterBis);
 
-            // Delta je nach Konto-Art:
-            //  - Ausgabenkonto: Budget − Istverbrauch = Budget + Saldo
-            //  - Einnahmenkonto: Budget − IstEinnahmen = Budget − Saldo
+            // Delta:
+            //  - Einnahmenkonto: Delta = Budget − IstEinnahmen = Budget − Saldo
+            //  - Ausgabenkonto:  Delta = Budget − Istverbrauch = Budget + Saldo
             Delta = _isIncomeAccount ? (Budget - Saldo) : (Budget + Saldo);
         }
+
 
 
 

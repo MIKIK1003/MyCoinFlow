@@ -3,7 +3,7 @@
 ; Installiert: App (self-contained publish), Templates, Prereqs (LocalDB 2022, Tesseract)
 
 #define AppName        "MyCoinFlow"
-#define AppVersion     "1.2.15"
+#define AppVersion     "1.2.18"
 #define Manufacturer   "brugilimSoft"
 
 ; ====== HARDE Pfade (bitte prüfen/anpassen, falls nötig) ======
@@ -71,7 +71,7 @@ Filename: "{#SrcTesseract}"; Parameters: "/VERYSILENT /NORESTART"; StatusMsg: "I
 #define OneDriveUpdateDir "C:\Users\miche\OneDrive\Dokumente\MyCoinFlowUpdate"
 
 ; Direkter Online-Downloadlink zur EXE (mscontent-Link aus Chrome „Downloadlink kopieren“)
-#define SetupDownloadUrl  "https://my.microsoftpersonalcontent.com/personal/74e7b5071216d03a/_layouts/15/download.aspx?UniqueId=d118d424-f5c0-41d4-8a62-62677e2cfa96&Translate=false&tempauth=v1e.eyJzaXRlaWQiOiIzOGJkN2Q4OS04YzAzLTRjZGEtOWIwZi00ZjRlNzZlODdlMmUiLCJhcHBpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDA0ODE3MTBhNCIsImF1ZCI6IjAwMDAwMDAzLTAwMDAtMGZmMS1jZTAwLTAwMDAwMDAwMDAwMC9teS5taWNyb3NvZnRwZXJzb25hbGNvbnRlbnQuY29tQDkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZCIsImV4cCI6IjE3NjA2NTM2NDMifQ.rl4q69A7nNbz5N1dPCmoIYQPf3OldT7VW27nKb9G4C9nRtluQmyePidqoiZjxoGhKjez_HxEUS8NGew5gsETgG-kCAcvgafd-6_dN_72P9RY4Y0H5Oe2oEJ9x67aZJKwjMQGrDw50WbEx_nimRgyX8Fs-HqWvar8zU1HfvGRqIQWTz1jBwKe9Uc6IJft3BVCc9LSraB7xkgxXz98VFg_Pp1YP14e3teEshSFX0kt8MDjf3qnMv-BQwoSzl64Mfzo3oYrjC3WUo8Np1CyU7mRxfmjX1uwccV6LlosGrEhwIXvMshqj9VOFxGneZEDGHModacBTw45S3PVbDlpZmugQXIsYQAOFr0-MARxU1KumRpAWE6Xc-lc9TdGHhDzVwHNDMPn82kWy3tabY4tuuJnHoNH7jlZb0ddi1uxqnS-xUw.PNz4DFYFK4oTJtcSPvX8bnvJnJjcUPYj8mruiNA2Sfs&ApiVersion=2.0&AVOverride=1"
+#define SetupDownloadUrl  "https://onedrive.live.com/personal/74e7b5071216d03a/_layouts/15/download.aspx?SourceUrl=%2Fpersonal%2F74e7b5071216d03a%2FDocuments%2FDokumente%2FMyCoinFlowUpdate%2FMyCoinFlow%2DSetup%2Eexe"
 
 ; Release Notes optional (einzeilig, minifiziert)
 #define ReleaseNotes      " "
