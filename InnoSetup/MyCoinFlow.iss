@@ -3,7 +3,7 @@
 ; Installiert: App (self-contained publish), Templates, Prereqs (LocalDB 2022, Tesseract)
 
 #define AppName        "MyCoinFlow"
-#define AppVersion     "1.2.18"
+#define AppVersion     "1.2.23"
 #define Manufacturer   "brugilimSoft"
 
 ; ====== HARDE Pfade (bitte prüfen/anpassen, falls nötig) ======

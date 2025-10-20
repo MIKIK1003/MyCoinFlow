@@ -23,6 +23,8 @@ namespace MyCoinFlow.Views
 
         private readonly DatabaseService _db = new();
         private ImportSchema? _currentSchema;
+        private readonly CreditCardImportMappingService _svc = new(new DatabaseService());
+
 
         public CreditCardImportMappingView()
         {
@@ -326,19 +328,11 @@ namespace MyCoinFlow.Views
             await Task.Yield();
             MasterHeaders.Clear();
 
-            string[] defaults =
-            {
-                "Transaktionsdatum",
-                "Beschreibung",
-                "Betrag",
-                "Währung",
-                "Karteninhaber",
-                "Kartennummer",
-                "Kategorie",
-                "Referenz"
-            };
-            foreach (var s in defaults) MasterHeaders.Add(s);
+            // WICHTIG: echte Master-Header aus dem Service holen
+            foreach (var h in _svc.GetMasterHeaders())
+                MasterHeaders.Add(h);
         }
+
 
         private void PrefillRowsWithMasterDefaults()
         {
