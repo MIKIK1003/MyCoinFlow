@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{Binding Titel}"
-        Height="700" Width="1200"
+        Height="800" Width="1200"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource MaterialDesignPaper}">
@@ -84,6 +84,14 @@
                                 Command="{Binding ResetFilterCommand}"/>
 
                         <Separator Margin="0,8,0,8"/>
+                        
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Edit"
+                                Content="Bearbeiten"
+                                Margin="0,8,0,0"
+                                Click="Edit_Click"/>
+
+                        <Separator Margin="0,8,0,8"/>
 
                         <!-- Drucken und Schließen: bewusst unten -->
                         <Button Style="{StaticResource IconTextButton}"
@@ -143,7 +151,8 @@
 
         <!-- Hauptbereich rechts: Tabelle -->
         <Grid Margin="12">
-            <DataGrid ItemsSource="{Binding Rows}"
+            <DataGrid x:Name="TransGrid"
+                      ItemsSource="{Binding Rows}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"

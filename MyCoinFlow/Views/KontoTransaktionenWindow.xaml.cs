@@ -43,6 +43,69 @@ namespace MyCoinFlow.Views
             }
         }
 
+        private void Edit_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1) Selektion prüfen
+                if (TransGrid == null || TransGrid.SelectedItem is not KontoTransaktionenViewModel.Row row)
+                {
+                    MessageBox.Show("Bitte zuerst eine Transaktion in der Liste auswählen.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 2) Vollständigen Transaktionssatz laden (für korrekte Vorbelegung im Dialog)
+                var db = new MyCoinFlow.Services.DatabaseService();
+                var t = db.HoleTransaktion(row.Id);
+                if (t == null)
+                {
+                    MessageBox.Show("Die ausgewählte Transaktion konnte nicht geladen werden.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 3) Dialog wie im Transactions-Modul öffnen (Owner setzen, zentrieren)
+                var dlg = new TransactionsDialog(t);
+
+                Window? owner = null;
+                try
+                {
+                    owner = Application.Current?.Windows?.OfType<Window>()?.FirstOrDefault(w => w.IsActive)
+                         ?? Application.Current?.MainWindow;
+                }
+                catch { /* still */ }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+                // 4) Bei Erfolg: Liste/Label neu aufbauen
+                if (dlg.ShowDialog() == true)
+                {
+                    // Deine VM hat Commands/PropertyChanged verkabelt; ApplyFilter lädt sicher erneut.
+                    VM.ApplyFilterCommand?.Execute(null);
+
+                    // Bonus: Position / Auswahl beibehalten (best effort)
+                    foreach (var it in TransGrid.Items)
+                    {
+                        if (it is KontoTransaktionenViewModel.Row r && r.Id == row.Id)
+                        {
+                            TransGrid.SelectedItem = it;
+                            TransGrid.ScrollIntoView(it);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Bearbeiten fehlgeschlagen:\n" + ex.Message,
+                    "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private FlowDocument BuildFlowDocumentForPrint(double printableWidth, double printableHeight)
         {
             var culture = new CultureInfo("de-CH");

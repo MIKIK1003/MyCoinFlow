@@ -7,11 +7,15 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;   // <— wichtig für FontFamily, Brushes
+using MyCoinFlow.Services;
+
 
 namespace MyCoinFlow.Views
 {
     public partial class AdresseTransaktionenWindow : Window
+
     {
+
         public AdresseTransaktionenWindow(int adresseId, string adresseName)
         {
             InitializeComponent();
@@ -259,6 +263,74 @@ namespace MyCoinFlow.Views
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void Edit_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1) Selektion prüfen
+                if (TransGrid == null || TransGrid.SelectedItem is not AdresseTransaktionenViewModel.Row row)
+                {
+                    MessageBox.Show("Bitte zuerst eine Transaktion in der Liste auswählen.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 2) Vollständige Transaktion laden
+                var db = new MyCoinFlow.Services.DatabaseService();
+                var t = db.HoleTransaktion(row.Id);
+                if (t == null)
+                {
+                    MessageBox.Show("Die ausgewählte Transaktion konnte nicht geladen werden.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 3) Dialog öffnen
+                var dlg = new TransactionsDialog(t);
+
+                Window? owner = null;
+                try
+                {
+                    owner = Application.Current?.Windows?.OfType<Window>()?.FirstOrDefault(w => w.IsActive)
+                         ?? Application.Current?.MainWindow;
+                }
+                catch { /* still */ }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+                // 4) Nach erfolgreichem Speichern neu laden
+                if (dlg.ShowDialog() == true)
+                {
+                    (DataContext as AdresseTransaktionenViewModel)?
+                        .ApplyFilterCommand?
+                        .Execute(null);
+
+                    // Optional: vorherige Auswahl wiederherstellen
+                    foreach (var it in TransGrid.Items)
+                    {
+                        if (it is AdresseTransaktionenViewModel.Row r && r.Id == row.Id)
+                        {
+                            TransGrid.SelectedItem = it;
+                            TransGrid.ScrollIntoView(it);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Bearbeiten fehlgeschlagen:\n" + ex.Message,
+                    "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+
+
 
     }
 }

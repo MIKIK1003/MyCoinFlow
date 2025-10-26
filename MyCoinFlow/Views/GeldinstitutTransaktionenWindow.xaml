@@ -58,7 +58,7 @@
                                     SelectedDate="{Binding FilterBis, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
 
-                    <!-- Adresse -->
+                        <!-- Adresse -->
                     <TextBlock Text="Adresse" Margin="0,12,0,4"/>
                     <ComboBox ItemsSource="{Binding Adressen}"
                               SelectedValuePath="Id"
@@ -90,6 +90,15 @@
                                 Command="{Binding ResetFilterCommand}"/>
 
                         <Separator Margin="0,8,0,8"/>
+
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Edit"
+                                Content="Bearbeiten"
+                                Margin="0,8,0,0"
+                                Click="Edit_Click"/>
+
+                        <Separator Margin="0,8,0,8"/>
+
 
                         <Button Style="{StaticResource IconTextButton}"
                                 Tag="Printer"
@@ -148,7 +157,8 @@
 
         <!-- Tabelle rechts -->
         <Grid Margin="12">
-            <DataGrid ItemsSource="{Binding Rows}"
+            <DataGrid x:Name="TransGrid"
+                      ItemsSource="{Binding Rows}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"

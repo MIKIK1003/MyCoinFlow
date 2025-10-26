@@ -1876,7 +1876,43 @@ ORDER BY t.Datum DESC";
             return list;
         }
 
+        public MyCoinFlow.Models.Transaktion? HoleTransaktion(int id)
+        {
+            using var c = CreateConnection();
+            c.Open();
 
+            const string sql = @"
+SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+       t.Betrag, t.Notiz,
+       t.AdresseId, a.Name AS AdresseName,
+       t.GeldinstitutId, g.Name AS BankName,
+       t.ImportQuelle
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
+LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+WHERE t.Id = @id;";
+
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", id);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            return new MyCoinFlow.Models.Transaktion
+            {
+                Id = r.GetInt32(0),
+                Datum = r.GetDateTime(1),
+                VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                Betrag = r.GetDecimal(4),
+                Notiz = r.IsDBNull(5) ? null : r.GetString(5),
+                AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
+                AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
+                GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
+                BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+            };
+        }
 
         // NEU: Gefilterte Transaktionen für ein Geldinstitut
         public List<Transaktion> LadeTransaktionenByGeldinstitut(

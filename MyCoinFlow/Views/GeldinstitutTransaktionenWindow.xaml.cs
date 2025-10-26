@@ -258,5 +258,72 @@ namespace MyCoinFlow.Views
             return $"{VM.Titel}   |   Zeitraum: {VonBis(VM.FilterVon, VM.FilterBis)}   |   " +
                    $"Einnahmen {ein:N2}   |   Ausgaben {aus:N2}   |   Saldo {sal:N2}";
         }
+
+        private void Edit_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1) Selektion prüfen
+                if (TransGrid == null || TransGrid.SelectedItem is not GeldinstitutTransaktionenViewModel.Row row)
+                {
+                    MessageBox.Show("Bitte zuerst eine Transaktion in der Liste auswählen.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 2) Vollständige Transaktion laden
+                var db = new MyCoinFlow.Services.DatabaseService();
+                var t = db.HoleTransaktion(row.Id);
+                if (t == null)
+                {
+                    MessageBox.Show("Die ausgewählte Transaktion konnte nicht geladen werden.",
+                        "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 3) Dialog öffnen
+                var dlg = new TransactionsDialog(t);
+
+                Window? owner = null;
+                try
+                {
+                    owner = Application.Current?.Windows?.OfType<Window>()?.FirstOrDefault(w => w.IsActive)
+                         ?? Application.Current?.MainWindow;
+                }
+                catch { /* ignore */ }
+
+                if (owner != null && !ReferenceEquals(owner, dlg))
+                    dlg.Owner = owner;
+                else
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+                // 4) Nach erfolgreichem Speichern neu laden + Auswahl halten
+                if (dlg.ShowDialog() == true)
+                {
+                    (DataContext as GeldinstitutTransaktionenViewModel)?
+                        .ApplyFilterCommand?
+                        .Execute(null);
+
+                    foreach (var it in TransGrid.Items)
+                    {
+                        if (it is GeldinstitutTransaktionenViewModel.Row r && r.Id == row.Id)
+                        {
+                            TransGrid.SelectedItem = it;
+                            TransGrid.ScrollIntoView(it);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Bearbeiten fehlgeschlagen:\n" + ex.Message,
+                    "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+
+
     }
 }
