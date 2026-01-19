@@ -3,12 +3,23 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:views="clr-namespace:MyCoinFlow.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
         Title="MyCoinFlow"
         Height="900"
         Width="1800"
         WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
         x:Name="RootWindow">
+
+    <!--
+        MainWindow = Shell der Anwendung:
+        - links: Navigation (Buttons -> Commands im ViewModel)
+        - rechts: ContentHost (CurrentView)
+        - unten links: Beenden + Versionsanzeige
+        Hinweis: Layout/Verhalten bewusst unverändert (keine Row-Umstellung), nur Bereinigung/Kommentierung.
+    -->
 
     <Grid>
         <!-- Spalten: links Navigation, rechts Inhalt -->
@@ -17,9 +28,12 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Linkes Menü -->
-        <StackPanel Grid.Column="0" Background="{DynamicResource MaterialDesignPaper}">
-            <!-- Nutzt deinen globalen Style aus App.xaml (NavIconButton oder NavIconButton_Emphasis) -->
+        <!-- Linkes Menü (Navigation) -->
+        <StackPanel Grid.Column="0"
+                    Background="{DynamicResource MaterialDesignPaper}">
+            <!-- Nutzt deinen globalen Style aus App.xaml (NavIconButton / NavIconButton_Emphasis) -->
+
+            <!-- Dashboard -->
             <Button Style="{StaticResource NavIconButton}"
                     Tag="ViewDashboard"
                     Content="Dashboard"
@@ -28,6 +42,7 @@
                     Command="{Binding ShowDashboardCommand}"
                     Margin="15"/>
 
+            <!-- Transaktionen -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="SwapHorizontal"
                     Content="Transaktionen"
@@ -36,6 +51,7 @@
                     Command="{Binding ShowTransactionsCommand}"
                     Margin="15"/>
 
+            <!-- Kontenplan -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="FileTreeOutline"
                     Content="Kontenplan"
@@ -44,6 +60,7 @@
                     Command="{Binding ShowAccountsCommand}"
                     Margin="15"/>
 
+            <!-- Geldinstitute -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="BankOutline"
                     Content="Geldinstitute"
@@ -52,6 +69,7 @@
                     Command="{Binding ShowInstitutionsCommand}"
                     Margin="15"/>
 
+            <!-- Adressen -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="AccountBoxOutline"
                     Content="Adressen"
@@ -60,6 +78,7 @@
                     Command="{Binding ShowAddressesCommand}"
                     Margin="15"/>
 
+            <!-- Budget -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="HandCoin"
                     Content="Budget"
@@ -68,6 +87,7 @@
                     Command="{Binding ShowBudgetsCommand}"
                     Margin="15"/>
 
+            <!-- Admin -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="Cog"
                     Content="Admin"
@@ -77,31 +97,37 @@
                     Margin="15"/>
         </StackPanel>
 
-        <!-- Inhalt rechts -->
-        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+        <!-- Inhalt rechts (Host für CurrentView aus dem MainViewModel) -->
+        <ContentControl Grid.Column="1"
+                        Content="{Binding CurrentView}"/>
 
         <!-- Unten links: Beenden-Button + Versionsanzeige -->
-        <Grid Grid.Column="0" VerticalAlignment="Bottom" Margin="12,0,12,12">
+        <Grid Grid.Column="0"
+              VerticalAlignment="Bottom"
+              Margin="12,0,12,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Beenden -->
+            <!-- Beenden (Event/Command wird bewusst nicht verändert; Binding/Handler ist außerhalb dieser XAML gelöst) -->
             <Button x:Name="ExitButton"
                     Padding="12,8"
                     MinHeight="36"
                     Style="{StaticResource MaterialDesignOutlinedButton}"
                     ToolTip="MyCoinFlow beenden">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
                     <materialDesign:PackIcon Kind="Power"
-                                             Width="18" Height="18" Margin="0,0,8,0"
+                                             Width="18"
+                                             Height="18"
+                                             Margin="0,0,8,0"
                                              Foreground="{DynamicResource MaterialDesignValidationErrorBrush}"/>
                     <TextBlock Text="Beenden"/>
                 </StackPanel>
             </Button>
 
-            <!-- Version rechts klein -->
+            <!-- Version rechts klein (VersionText kommt aus Code-behind/VM; Fallbacks verhindern leere Anzeige) -->
             <TextBlock Grid.Column="1"
                        VerticalAlignment="Center"
                        Margin="12,0,0,0"
