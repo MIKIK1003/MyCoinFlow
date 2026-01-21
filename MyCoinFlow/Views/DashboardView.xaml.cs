@@ -2,8 +2,8 @@
 using System.Windows.Controls;
 using System.Printing;
 using System.Windows.Media;
-using System.Windows.Documents;        // FixedDocument, FixedPage, PageContent
-using System.Windows.Shapes;           // Rectangle
+using System.Windows.Documents;
+using System.Windows.Shapes;
 
 namespace MyCoinFlow.Views
 {
@@ -12,8 +12,7 @@ namespace MyCoinFlow.Views
         public DashboardView()
         {
             InitializeComponent();
-            if (DataContext == null)
-                DataContext = new MyCoinFlow.ViewModels.DashboardViewModel();
+            // DataContext kommt über DataTemplate (App.xaml) vom MainViewModel (CurrentViewModel)
         }
 
         private void PrintDashboard_Click(object sender, RoutedEventArgs e)

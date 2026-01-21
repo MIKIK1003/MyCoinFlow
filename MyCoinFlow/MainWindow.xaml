@@ -99,7 +99,7 @@
 
         <!-- Inhalt rechts (Host für CurrentView aus dem MainViewModel) -->
         <ContentControl Grid.Column="1"
-                        Content="{Binding CurrentView}"/>
+                        Content="{Binding CurrentViewModel}"/>
 
         <!-- Unten links: Beenden-Button + Versionsanzeige -->
         <Grid Grid.Column="0"

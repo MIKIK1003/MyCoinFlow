@@ -1,18 +1,22 @@
 ﻿using MyCoinFlow.Helpers;
 using System.Windows.Input;
-using MyCoinFlow.Views;
-using System.Windows.Controls;
-using MyCoinFlow.ViewModels; // <-- wichtig, damit AddressesViewModel gefunden wird
 
 namespace MyCoinFlow.ViewModels
 {
+    /// <summary>
+    /// Navigation: setzt CurrentViewModel. Die Views werden über DataTemplates in App.xaml gewählt.
+    /// </summary>
     public class MainViewModel : BaseViewModel
     {
-        private UserControl? _currentView;
-        public UserControl? CurrentView
+        private object? _currentViewModel;
+
+        /// <summary>
+        /// Aktuell angezeigtes ViewModel (ContentControl bindet daran).
+        /// </summary>
+        public object? CurrentViewModel
         {
-            get => _currentView;
-            set { _currentView = value; OnPropertyChanged(); }
+            get => _currentViewModel;
+            set { _currentViewModel = value; OnPropertyChanged(); }
         }
 
         public ICommand ShowDashboardCommand { get; }
@@ -25,55 +29,15 @@ namespace MyCoinFlow.ViewModels
 
         public MainViewModel()
         {
-            // Startview (optional auch mit VM setzen, je nach Bedarf)
-            CurrentView = new DashboardView();
+            CurrentViewModel = new DashboardViewModel();
 
-            ShowDashboardCommand = new RelayCommand(_ =>
-            {
-                CurrentView = new DashboardView();
-            });
-
-            ShowTransactionsCommand = new RelayCommand(_ =>
-            {
-                var v = new TransactionsView();
-                v.DataContext = new TransactionsViewModel(); // <-- wichtig
-                CurrentView = v;
-            });
-
-
-            ShowAccountsCommand = new RelayCommand(_ =>
-            {
-                CurrentView = new AccountsView();
-            });
-
-            ShowInstitutionsCommand = new RelayCommand(_ =>
-            {
-                var v = new InstitutionsView();
-                v.DataContext = new InstitutionsViewModel(); // <-- wichtig
-                CurrentView = v;
-            });
-
-
-            // *** HIER WICHTIG: View + ViewModel verbinden ***
-            ShowAddressesCommand = new RelayCommand(_ =>
-            {
-                var v = new AddressesView();
-                v.DataContext = new AddressesViewModel();   // <- ohne das geht "Neu" nicht
-                CurrentView = v;
-            });
-
-            ShowAdminCommand = new RelayCommand(_ =>
-            {
-                CurrentView = new AdminView();
-            });
-
-            ShowBudgetsCommand = new RelayCommand(_ =>
-            {
-                var v = new BudgetsView();
-                v.DataContext = new BudgetsViewModel();     // (optional) gleich mit VM
-                CurrentView = v;
-            });
-
+            ShowDashboardCommand = new RelayCommand(_ => CurrentViewModel = new DashboardViewModel());
+            ShowTransactionsCommand = new RelayCommand(_ => CurrentViewModel = new TransactionsViewModel());
+            ShowAccountsCommand = new RelayCommand(_ => CurrentViewModel = new AccountsViewModel());
+            ShowInstitutionsCommand = new RelayCommand(_ => CurrentViewModel = new InstitutionsViewModel());
+            ShowAddressesCommand = new RelayCommand(_ => CurrentViewModel = new AddressesViewModel());
+            ShowAdminCommand = new RelayCommand(_ => CurrentViewModel = new AdminViewModel());
+            ShowBudgetsCommand = new RelayCommand(_ => CurrentViewModel = new BudgetsViewModel());
         }
     }
 }

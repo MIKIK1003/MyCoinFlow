@@ -18,10 +18,10 @@ namespace MyCoinFlow.Views
         public AccountsView()
         {
             InitializeComponent();
-            // VM wie in deiner funktionierenden Version
-            this.DataContext = new AccountsViewModel(); // VM-Zuweisung beibehalten
+            // DataContext kommt jetzt von außen (MainViewModel via DataTemplate)
             this.Loaded += AccountsView_Loaded;
         }
+
 
         private void AccountsView_Loaded(object? sender, RoutedEventArgs e)
         {
