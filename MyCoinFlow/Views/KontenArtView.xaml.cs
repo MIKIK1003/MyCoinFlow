@@ -8,7 +8,9 @@ namespace MyCoinFlow.Views
         public KontenArtView()
         {
             InitializeComponent();
-            this.DataContext = new KontenArtViewModel();
+
+            // Admin-SubView: hostet ihr eigenes ViewModel (kein Navigation-Target via DataTemplates)
+            DataContext = new KontenArtViewModel();
         }
     }
 }

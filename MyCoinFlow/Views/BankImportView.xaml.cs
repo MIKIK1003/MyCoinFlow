@@ -8,6 +8,9 @@ namespace MyCoinFlow.Views
         public BankImportView()
         {
             InitializeComponent();
+
+            // BankImport ist ein eigenständiger Editor/View:
+            // Er hostet sein ViewModel selbst, damit Commands (z.B. CAMT/OpenFile) funktionieren.
             DataContext = new BankImportViewModel();
         }
     }
