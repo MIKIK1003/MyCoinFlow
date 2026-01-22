@@ -87,6 +87,15 @@
                     Command="{Binding ShowBudgetsCommand}"
                     Margin="15"/>
 
+            <!-- Liegenschaften (STWE) -->
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
+                    Tag="HomeCityOutline"
+                    Content="Liegenschaften"
+                    MinHeight="50"
+                    Padding="12,8"
+                    Command="{Binding ShowLiegenschaftenCommand}"
+                    Margin="15"/>
+
             <!-- Admin -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="Cog"

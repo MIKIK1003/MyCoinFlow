@@ -4,7 +4,9 @@ using System.Windows.Input;
 namespace MyCoinFlow.ViewModels
 {
     /// <summary>
-    /// Navigation: setzt CurrentViewModel. Die Views werden über DataTemplates in App.xaml gewählt.
+    /// Zentrales ViewModel für das MainWindow.
+    /// Navigation erfolgt über CurrentViewModel (ViewModels statt Views).
+    /// Die Anzeige wird über DataTemplates in App.xaml (ViewModel -> View) gelöst.
     /// </summary>
     public class MainViewModel : BaseViewModel
     {
@@ -27,6 +29,9 @@ namespace MyCoinFlow.ViewModels
         public ICommand ShowAdminCommand { get; }
         public ICommand ShowBudgetsCommand { get; }
 
+        // NEU
+        public ICommand ShowLiegenschaftenCommand { get; }
+
         public MainViewModel()
         {
             CurrentViewModel = new DashboardViewModel();
@@ -36,8 +41,11 @@ namespace MyCoinFlow.ViewModels
             ShowAccountsCommand = new RelayCommand(_ => CurrentViewModel = new AccountsViewModel());
             ShowInstitutionsCommand = new RelayCommand(_ => CurrentViewModel = new InstitutionsViewModel());
             ShowAddressesCommand = new RelayCommand(_ => CurrentViewModel = new AddressesViewModel());
-            ShowAdminCommand = new RelayCommand(_ => CurrentViewModel = new AdminViewModel());
             ShowBudgetsCommand = new RelayCommand(_ => CurrentViewModel = new BudgetsViewModel());
+            ShowAdminCommand = new RelayCommand(_ => CurrentViewModel = new AdminViewModel());
+
+            // NEU: Liegenschaften
+            ShowLiegenschaftenCommand = new RelayCommand(_ => CurrentViewModel = new LiegenschaftenViewModel());
         }
     }
 }

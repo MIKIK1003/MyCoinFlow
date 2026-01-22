@@ -4477,6 +4477,352 @@ WHERE (@von IS NULL OR t.Datum >= @von)
             return o != null && o != DBNull.Value;
         }
 
+        /// <summary>
+        /// Legt die Tabellen für das STWE/Liegenschaften-Modul an (idempotent).
+        /// Wird beim ersten Klick auf "Liegenschaften" aufgerufen.
+        /// </summary>
+        public void EnsureStweSchema()
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            // Minimaler Start (Schritt 1): nur Basis-Tabellen.
+            // In Schritt 2/3 erweitern wir um Eigentümerwechsel, Sets, Lines, Schlüssel etc.
+            const string sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweLiegenschaft' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweLiegenschaft
+    (
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweLiegenschaft PRIMARY KEY,
+        Name          NVARCHAR(120) NOT NULL,
+        Strasse       NVARCHAR(120) NULL,
+        PLZ           NVARCHAR(10)  NULL,
+        Ort           NVARCHAR(80)  NULL,
+        Notiz         NVARCHAR(400) NULL,
+        CreatedAtUtc  DATETIME2 NOT NULL CONSTRAINT DF_StweLiegenschaft_Created DEFAULT SYSUTCDATETIME()
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEinheit' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweEinheit
+    (
+        Id             INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweEinheit PRIMARY KEY,
+        LiegenschaftId INT NOT NULL,
+        Bezeichnung    NVARCHAR(80) NOT NULL,        -- z.B. 'Whg 3.2', 'Garage G12'
+        Typ            NVARCHAR(30) NULL,            -- Wohnung/Garage/Keller/Gewerbe (später)
+        MeaPromille    DECIMAL(9,3) NULL,            -- Miteigentumsanteil (‰)
+        FlaecheM2      DECIMAL(9,2) NULL,
+        Notiz          NVARCHAR(400) NULL,
+        CONSTRAINT FK_StweEinheit_Liegenschaft FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id)
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEigentuemer' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweEigentuemer
+    (
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweEigentuemer PRIMARY KEY,
+        Name          NVARCHAR(120) NOT NULL,
+        Email         NVARCHAR(160) NULL,
+        Telefon       NVARCHAR(60)  NULL,
+        Notiz         NVARCHAR(400) NULL,
+        CreatedAtUtc  DATETIME2 NOT NULL CONSTRAINT DF_StweEigentuemer_Created DEFAULT SYSUTCDATETIME()
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEinheitEigentum' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweEinheitEigentum
+    (
+        Id           INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweEinheitEigentum PRIMARY KEY,
+        EinheitId    INT NOT NULL,
+        EigentuemerId INT NOT NULL,
+        GueltigVon   DATE NOT NULL,
+        GueltigBis   DATE NULL,
+
+        CONSTRAINT FK_StweEinheitEigentum_Einheit
+            FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id),
+
+        CONSTRAINT FK_StweEinheitEigentum_Eigentuemer
+            FOREIGN KEY (EigentuemerId) REFERENCES dbo.StweEigentuemer(Id)
+    );
+
+    CREATE INDEX IX_StweEinheitEigentum_EinheitId ON dbo.StweEinheitEigentum(EinheitId);
+    CREATE INDEX IX_StweEinheitEigentum_EigentuemerId ON dbo.StweEinheitEigentum(EigentuemerId);
+END;
+
+
+
+
+";
+
+        
+
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Lädt alle Liegenschaften (STWE) für die Übersicht.
+        /// </summary>
+        public List<MyCoinFlow.Models.StweLiegenschaft> StweLiegenschaftenGetAll()
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweLiegenschaft>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, Name, Strasse, PLZ, Ort, Notiz
+FROM dbo.StweLiegenschaft
+ORDER BY Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweLiegenschaft
+                {
+                    Id = r.GetInt32(0),
+                    Name = r.GetString(1),
+                    Strasse = r.IsDBNull(2) ? null : r.GetString(2),
+                    PLZ = r.IsDBNull(3) ? null : r.GetString(3),
+                    Ort = r.IsDBNull(4) ? null : r.GetString(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// Legt eine neue Liegenschaft an und gibt die neue Id zurück.
+        /// </summary>
+        public int StweLiegenschaftInsert(MyCoinFlow.Models.StweLiegenschaft l)
+        {
+            if (l == null) throw new ArgumentNullException(nameof(l));
+            if (string.IsNullOrWhiteSpace(l.Name))
+                throw new ArgumentException("Name darf nicht leer sein.", nameof(l));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweLiegenschaft (Name, Strasse, PLZ, Ort, Notiz)
+OUTPUT INSERTED.Id
+VALUES (@n, @s, @p, @o, @no);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var pN = cmd.CreateParameter(); pN.ParameterName = "@n"; pN.Value = l.Name.Trim(); cmd.Parameters.Add(pN);
+            var pS = cmd.CreateParameter(); pS.ParameterName = "@s"; pS.Value = (object?)l.Strasse ?? DBNull.Value; cmd.Parameters.Add(pS);
+            var pP = cmd.CreateParameter(); pP.ParameterName = "@p"; pP.Value = (object?)l.PLZ ?? DBNull.Value; cmd.Parameters.Add(pP);
+            var pO = cmd.CreateParameter(); pO.ParameterName = "@o"; pO.Value = (object?)l.Ort ?? DBNull.Value; cmd.Parameters.Add(pO);
+            var pNo = cmd.CreateParameter(); pNo.ParameterName = "@no"; pNo.Value = (object?)l.Notiz ?? DBNull.Value; cmd.Parameters.Add(pNo);
+
+            var idObj = cmd.ExecuteScalar();
+            return Convert.ToInt32(idObj);
+        }
+
+        public List<MyCoinFlow.Models.StweEinheit> StweEinheitenGetByLiegenschaft(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweEinheit>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, LiegenschaftId, Bezeichnung, Typ, MeaPromille, FlaecheM2, Notiz
+FROM dbo.StweEinheit
+WHERE LiegenschaftId = @lid
+ORDER BY Bezeichnung;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@lid";
+            p.Value = liegenschaftId;
+            cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweEinheit
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    Bezeichnung = r.GetString(2),
+                    Typ = r.IsDBNull(3) ? null : r.GetString(3),
+                    MeaPromille = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
+                    FlaecheM2 = r.IsDBNull(5) ? (decimal?)null : r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                });
+            }
+            return list;
+        }
+
+        public int StweEinheitInsert(MyCoinFlow.Models.StweEinheit e)
+        {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (e.LiegenschaftId <= 0) throw new ArgumentException("LiegenschaftId fehlt.", nameof(e));
+            if (string.IsNullOrWhiteSpace(e.Bezeichnung)) throw new ArgumentException("Bezeichnung fehlt.", nameof(e));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweEinheit (LiegenschaftId, Bezeichnung, Typ, MeaPromille, FlaecheM2, Notiz)
+OUTPUT INSERTED.Id
+VALUES (@lid, @b, @t, @m, @f, @n);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = e.LiegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@b"; p2.Value = e.Bezeichnung.Trim(); cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@t"; p3.Value = (object?)e.Typ ?? DBNull.Value; cmd.Parameters.Add(p3);
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@m"; p4.Value = (object?)e.MeaPromille ?? DBNull.Value; cmd.Parameters.Add(p4);
+            var p5 = cmd.CreateParameter(); p5.ParameterName = "@f"; p5.Value = (object?)e.FlaecheM2 ?? DBNull.Value; cmd.Parameters.Add(p5);
+            var p6 = cmd.CreateParameter(); p6.ParameterName = "@n"; p6.Value = (object?)e.Notiz ?? DBNull.Value; cmd.Parameters.Add(p6);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public List<MyCoinFlow.Models.StweEigentuemer> StweEigentuemerGetAll()
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweEigentuemer>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, Name, Email, Telefon, Notiz
+FROM dbo.StweEigentuemer
+ORDER BY Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweEigentuemer
+                {
+                    Id = r.GetInt32(0),
+                    Name = r.GetString(1),
+                    Email = r.IsDBNull(2) ? null : r.GetString(2),
+                    Telefon = r.IsDBNull(3) ? null : r.GetString(3),
+                    Notiz = r.IsDBNull(4) ? null : r.GetString(4),
+                });
+            }
+            return list;
+        }
+
+        public int StweEigentuemerInsert(MyCoinFlow.Models.StweEigentuemer e)
+        {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (string.IsNullOrWhiteSpace(e.Name))
+                throw new ArgumentException("Name darf nicht leer sein.", nameof(e));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweEigentuemer (Name, Email, Telefon, Notiz)
+OUTPUT INSERTED.Id
+VALUES (@n, @em, @tel, @no);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var pN = cmd.CreateParameter(); pN.ParameterName = "@n"; pN.Value = e.Name.Trim(); cmd.Parameters.Add(pN);
+            var pE = cmd.CreateParameter(); pE.ParameterName = "@em"; pE.Value = (object?)e.Email ?? DBNull.Value; cmd.Parameters.Add(pE);
+            var pT = cmd.CreateParameter(); pT.ParameterName = "@tel"; pT.Value = (object?)e.Telefon ?? DBNull.Value; cmd.Parameters.Add(pT);
+            var pN2 = cmd.CreateParameter(); pN2.ParameterName = "@no"; pN2.Value = (object?)e.Notiz ?? DBNull.Value; cmd.Parameters.Add(pN2);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public List<MyCoinFlow.Models.StweEinheitEigentumRow> StweEinheitEigentumGetByEinheit(int einheitId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweEinheitEigentumRow>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT x.Id, x.EinheitId, x.EigentuemerId, e.Name, x.GueltigVon, x.GueltigBis
+FROM dbo.StweEinheitEigentum x
+JOIN dbo.StweEigentuemer e ON e.Id = x.EigentuemerId
+WHERE x.EinheitId = @eid
+ORDER BY x.GueltigVon DESC, e.Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            var p = cmd.CreateParameter(); p.ParameterName = "@eid"; p.Value = einheitId; cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweEinheitEigentumRow
+                {
+                    Id = r.GetInt32(0),
+                    EinheitId = r.GetInt32(1),
+                    EigentuemerId = r.GetInt32(2),
+                    EigentuemerName = r.GetString(3),
+                    GueltigVon = r.GetDateTime(4),
+                    GueltigBis = r.IsDBNull(5) ? (DateTime?)null : r.GetDateTime(5)
+                });
+            }
+            return list;
+        }
+
+        public int StweEinheitEigentumInsert(int einheitId, int eigentuemerId, DateTime gueltigVon, DateTime? gueltigBis)
+        {
+            EnsureStweSchema();
+
+            if (einheitId <= 0) throw new ArgumentOutOfRangeException(nameof(einheitId));
+            if (eigentuemerId <= 0) throw new ArgumentOutOfRangeException(nameof(eigentuemerId));
+            if (gueltigBis.HasValue && gueltigBis.Value.Date < gueltigVon.Date)
+                throw new ArgumentException("GueltigBis darf nicht vor GueltigVon liegen.");
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweEinheitEigentum (EinheitId, EigentuemerId, GueltigVon, GueltigBis)
+OUTPUT INSERTED.Id
+VALUES (@eid, @oid, @von, @bis);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@eid"; p1.Value = einheitId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@oid"; p2.Value = eigentuemerId; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@von"; p3.Value = gueltigVon.Date; cmd.Parameters.Add(p3);
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@bis"; p4.Value = (object?)gueltigBis?.Date ?? DBNull.Value; cmd.Parameters.Add(p4);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
 
     }
 }

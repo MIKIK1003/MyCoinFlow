@@ -39,6 +39,9 @@
             <DataTemplate DataType="{x:Type vm:BudgetsViewModel}">
                 <views:BudgetsView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:LiegenschaftenViewModel}">
+                <views:LiegenschaftenView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
             </DataTemplate>
