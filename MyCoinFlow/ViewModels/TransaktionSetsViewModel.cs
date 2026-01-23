@@ -9,9 +9,6 @@ using System.Windows.Input;
 
 namespace MyCoinFlow.ViewModels
 {
-    /// <summary>
-    /// Tages-Workflow: Transaktion auswählen -> Set anlegen -> (Verteilung folgt in Schritt 6).
-    /// </summary>
     public class TransaktionSetsViewModel : BaseViewModel
     {
         private readonly DatabaseService _db = new();
@@ -36,7 +33,7 @@ namespace MyCoinFlow.ViewModels
         public StweSetRow? SelectedSet
         {
             get => _selectedSet;
-            set { _selectedSet = value; OnPropertyChanged(); }
+            set { _selectedSet = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
         }
 
         private string _statusText = "";
@@ -47,6 +44,9 @@ namespace MyCoinFlow.ViewModels
         }
 
         public RelayCommand NeuesSetAusTransaktionCommand { get; }
+
+        // NEU
+        public RelayCommand SetVerteilenCommand { get; }
 
         public TransaktionSetsViewModel()
         {
@@ -61,6 +61,7 @@ namespace MyCoinFlow.ViewModels
             }
 
             NeuesSetAusTransaktionCommand = new RelayCommand(_ => NeuesSetAusTransaktion(), _ => SelectedLiegenschaft != null);
+            SetVerteilenCommand = new RelayCommand(_ => SetVerteilen(), _ => SelectedSet != null);
 
             LoadLiegenschaften();
         }
@@ -95,13 +96,8 @@ namespace MyCoinFlow.ViewModels
             foreach (var s in _db.StweSetsGetByLiegenschaft(SelectedLiegenschaft.Id))
                 Sets.Add(s);
 
-            if (Sets.Count == 0)
-                StatusText = "Noch keine Sets. Klicke auf „Set aus Transaktion“.";
-            else
-                StatusText = $"{Sets.Count} Set(s) gefunden.";
-
-            if (Sets.Count > 0)
-                SelectedSet = Sets[0];
+            StatusText = Sets.Count == 0 ? "Noch keine Sets. Klicke auf „Set aus Transaktion“." : $"{Sets.Count} Set(s) gefunden.";
+            if (Sets.Count > 0) SelectedSet = Sets[0];
         }
 
         private void NeuesSetAusTransaktion()
@@ -115,13 +111,24 @@ namespace MyCoinFlow.ViewModels
                 return;
 
             var t = dlg.Result;
-
             var titel = string.IsNullOrWhiteSpace(t.Notiz)
                 ? (t.AdresseName ?? "(ohne Text)")
                 : t.Notiz.Trim();
 
             _db.StweSetInsert(SelectedLiegenschaft.Id, t.Id, titel);
 
+            LoadSets();
+        }
+
+        private void SetVerteilen()
+        {
+            if (SelectedSet == null) return;
+
+            var dlg = new SetVerteilenDialog(SelectedSet);
+            TrySetOwner(dlg);
+            dlg.ShowDialog();
+
+            // nach Dialog: Sets neu laden (Rest/Verteilt aktualisiert sich über OUTER APPLY)
             LoadSets();
         }
 

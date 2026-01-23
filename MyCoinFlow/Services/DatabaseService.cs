@@ -5163,6 +5163,99 @@ VALUES (@sid, @oid, @pct);";
             }
         }
 
+        public void StweSetLineInsert(int setId, int? einheitId, int? eigentuemerId, string schluessel, decimal betrag)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweSetLine (SetId, EinheitId, EigentuemerId, Schluessel, Betrag)
+VALUES (@sid, @eid, @oid, @s, @b);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@sid"; p1.Value = setId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@eid"; p2.Value = (object?)einheitId ?? DBNull.Value; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@oid"; p3.Value = (object?)eigentuemerId ?? DBNull.Value; cmd.Parameters.Add(p3);
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@s"; p4.Value = schluessel; cmd.Parameters.Add(p4);
+            var p5 = cmd.CreateParameter(); p5.ParameterName = "@b"; p5.Value = betrag; cmd.Parameters.Add(p5);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<MyCoinFlow.Models.StweSetLine> StweSetLinesGet(int setId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweSetLine>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, SetId, EinheitId, EigentuemerId, Schluessel, Betrag, Notiz
+FROM dbo.StweSetLine
+WHERE SetId = @sid
+ORDER BY Id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = setId; cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweSetLine
+                {
+                    Id = r.GetInt32(0),
+                    SetId = r.GetInt32(1),
+                    EinheitId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    EigentuemerId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    Schluessel = r.IsDBNull(4) ? null : r.GetString(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6)
+                });
+            }
+            return list;
+        }
+
+        public void StweSetLinesDeleteBySet(int setId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM dbo.StweSetLine WHERE SetId = @sid;";
+            var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = setId; cmd.Parameters.Add(p);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void StweSetLineInsert(int setId, int? einheitId, int? eigentuemerId, string schluessel, decimal betrag, string? notiz = null)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweSetLine (SetId, EinheitId, EigentuemerId, Schluessel, Betrag, Notiz)
+VALUES (@sid, @eid, @oid, @s, @b, @n);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@sid"; p1.Value = setId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@eid"; p2.Value = (object?)einheitId ?? DBNull.Value; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@oid"; p3.Value = (object?)eigentuemerId ?? DBNull.Value; cmd.Parameters.Add(p3);
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@s"; p4.Value = schluessel; cmd.Parameters.Add(p4);
+            var p5 = cmd.CreateParameter(); p5.ParameterName = "@b"; p5.Value = betrag; cmd.Parameters.Add(p5);
+            var p6 = cmd.CreateParameter(); p6.ParameterName = "@n"; p6.Value = (object?)notiz ?? DBNull.Value; cmd.Parameters.Add(p6);
+
+            cmd.ExecuteNonQuery();
+        }
+
 
 
 
