@@ -45,6 +45,10 @@
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:TransaktionSetsViewModel}">
+                <views:TransaktionSetsView />
+            </DataTemplate>
+
 
 
             <!-- ======= Brand ======= -->

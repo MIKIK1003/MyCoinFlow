@@ -51,6 +51,14 @@
                     Command="{Binding ShowTransactionsCommand}"
                     Margin="15"/>
 
+            <Button Style="{StaticResource NavIconButton_Emphasis}"
+                    Tag="PlaylistPlus"
+                    Content="Transaktion Sets"
+                    MinHeight="50"
+                    Padding="12,8"
+                    Command="{Binding ShowTransaktionSetsCommand}"
+                    Margin="15"/>
+
             <!-- Kontenplan -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="FileTreeOutline"

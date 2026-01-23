@@ -31,6 +31,11 @@
             <RowDefinition Height="12"/>
             <RowDefinition Height="*"/>
             <!-- Zuordnungen Grid -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -164,6 +169,50 @@
                 <DataGridTextColumn Header="Bis" Binding="{Binding GueltigBis}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
+
+        <!-- Schlüssel Header -->
+        <DockPanel Grid.Row="16" LastChildFill="False">
+            <TextBlock FontSize="18"
+               FontWeight="SemiBold"
+               Text="Schlüssel (Verteilpläne)"
+               DockPanel.Dock="Left"/>
+
+            <Button DockPanel.Dock="Right"
+            Style="{StaticResource MaterialDesignOutlinedButton}"
+            Command="{Binding SchluesselZeilenBearbeitenCommand}"
+            Padding="14,8"
+            Margin="8,0,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="PlaylistEdit" Width="18" Height="18" Margin="0,0,8,0"/>
+                    <TextBlock Text="Zeilen bearbeiten"/>
+                </StackPanel>
+            </Button>
+
+            <Button DockPanel.Dock="Right"
+            Style="{StaticResource MaterialDesignRaisedButton}"
+            Command="{Binding NeuerSchluesselCommand}"
+            Padding="14,8">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                    <TextBlock Text="Schlüssel neu"/>
+                </StackPanel>
+            </Button>
+        </DockPanel>
+
+        <!-- Schlüssel Liste -->
+        <DataGrid Grid.Row="18"
+          ItemsSource="{Binding Schluessel}"
+          SelectedItem="{Binding SelectedSchluessel}"
+          AutoGenerateColumns="False"
+          IsReadOnly="True"
+          CanUserAddRows="False"
+          Margin="0,6,0,0">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
+                <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
 
     </Grid>
 </UserControl>

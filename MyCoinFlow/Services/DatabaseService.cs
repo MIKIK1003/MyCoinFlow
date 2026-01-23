@@ -4552,7 +4552,79 @@ BEGIN
     CREATE INDEX IX_StweEinheitEigentum_EigentuemerId ON dbo.StweEinheitEigentum(EigentuemerId);
 END;
 
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSet' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweSet
+    (
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweSet PRIMARY KEY,
+        LiegenschaftId INT NOT NULL,
+        TransaktionId INT NOT NULL,
+        Titel         NVARCHAR(160) NULL,
+        CreatedAtUtc  DATETIME2 NOT NULL CONSTRAINT DF_StweSet_Created DEFAULT SYSUTCDATETIME(),
+        IsClosed      BIT NOT NULL CONSTRAINT DF_StweSet_IsClosed DEFAULT(0),
 
+        CONSTRAINT FK_StweSet_Liegenschaft FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id),
+        CONSTRAINT FK_StweSet_Transaktion  FOREIGN KEY (TransaktionId)  REFERENCES dbo.Transaktion(Id)
+    );
+
+    CREATE INDEX IX_StweSet_LiegenschaftId ON dbo.StweSet(LiegenschaftId);
+    CREATE INDEX IX_StweSet_TransaktionId  ON dbo.StweSet(TransaktionId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSetLine' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweSetLine
+    (
+        Id           INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweSetLine PRIMARY KEY,
+        SetId        INT NOT NULL,
+        EinheitId    INT NULL,
+        EigentuemerId INT NULL,
+        Schluessel   NVARCHAR(40) NULL,     -- z.B. MEA / Fläche / Fix / Individuell (kommt in Schritt 6)
+        Betrag       DECIMAL(18,2) NOT NULL,
+        Notiz        NVARCHAR(200) NULL,
+        CreatedAtUtc DATETIME2 NOT NULL CONSTRAINT DF_StweSetLine_Created DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_StweSetLine_Set FOREIGN KEY (SetId) REFERENCES dbo.StweSet(Id)
+    );
+
+    CREATE INDEX IX_StweSetLine_SetId ON dbo.StweSetLine(SetId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSchluessel' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweSchluessel
+    (
+        Id             INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweSchluessel PRIMARY KEY,
+        LiegenschaftId INT NOT NULL,
+        Name           NVARCHAR(120) NOT NULL,
+        Modus          NVARCHAR(12) NOT NULL, -- 'FIX' | 'MEA'
+        CreatedAtUtc   DATETIME2 NOT NULL CONSTRAINT DF_StweSchluessel_Created DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_StweSchluessel_Liegenschaft
+            FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id)
+    );
+
+    CREATE INDEX IX_StweSchluessel_LiegenschaftId ON dbo.StweSchluessel(LiegenschaftId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSchluesselLine' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweSchluesselLine
+    (
+        Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweSchluesselLine PRIMARY KEY,
+        SchluesselId INT NOT NULL,
+        EigentuemerId INT NOT NULL,
+        AnteilProzent DECIMAL(9,4) NOT NULL, -- 0..100
+
+        CONSTRAINT FK_StweSchluesselLine_Schluessel
+            FOREIGN KEY (SchluesselId) REFERENCES dbo.StweSchluessel(Id),
+
+        CONSTRAINT FK_StweSchluesselLine_Eigentuemer
+            FOREIGN KEY (EigentuemerId) REFERENCES dbo.StweEigentuemer(Id)
+    );
+
+    CREATE INDEX IX_StweSchluesselLine_SchluesselId ON dbo.StweSchluesselLine(SchluesselId);
+END;
 
 
 ";
@@ -4822,6 +4894,276 @@ VALUES (@eid, @oid, @von, @bis);";
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
+
+        public List<MyCoinFlow.Models.Transaktion> StweTransaktionenGetRecent(int top = 500)
+        {
+            // Wir nutzen die bestehende Tabelle Transaktion.
+            // Minimal: letzte N Transaktionen für Auswahl im Dialog.
+            var list = new List<MyCoinFlow.Models.Transaktion>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            var sql = $@"
+SELECT TOP ({top})
+    t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+    t.Betrag, t.Notiz,
+    t.AdresseId, a.Name as AdresseName,
+    t.GeldinstitutId, g.Name as BankName,
+    t.ImportQuelle
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
+LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+ORDER BY t.Datum DESC, t.Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.Transaktion
+                {
+                    Id = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    Betrag = r.GetDecimal(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
+                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
+                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
+                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
+                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
+                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+                });
+            }
+
+            return list;
+        }
+
+        public int StweSetInsert(int liegenschaftId, int transaktionId, string? titel)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweSet (LiegenschaftId, TransaktionId, Titel)
+OUTPUT INSERTED.Id
+VALUES (@lid, @tid, @t);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@tid"; p2.Value = transaktionId; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@t"; p3.Value = (object?)titel ?? DBNull.Value; cmd.Parameters.Add(p3);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public List<MyCoinFlow.Models.StweSetRow> StweSetsGetByLiegenschaft(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweSetRow>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT 
+    s.Id,
+    s.LiegenschaftId,
+    s.TransaktionId,
+    t.Datum,
+    t.Betrag,
+    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
+    s.IsClosed,
+    ISNULL(x.Verteilt, 0) AS Verteilt,
+    (t.Betrag - ISNULL(x.Verteilt, 0)) AS Rest
+FROM dbo.StweSet s
+JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+OUTER APPLY (
+    SELECT SUM(l.Betrag) AS Verteilt
+    FROM dbo.StweSetLine l
+    WHERE l.SetId = s.Id
+) x
+WHERE s.LiegenschaftId = @lid
+ORDER BY t.Datum DESC, s.Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@lid";
+            p.Value = liegenschaftId;
+            cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweSetRow
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    TransaktionId = r.GetInt32(2),
+                    Datum = r.GetDateTime(3),
+                    Betrag = r.GetDecimal(4),
+                    Titel = r.GetString(5),
+                    IsClosed = r.GetBoolean(6),
+                    Verteilt = r.GetDecimal(7),
+                    Rest = r.GetDecimal(8)
+                });
+            }
+
+            return list;
+        }
+        public List<MyCoinFlow.Models.StweSchluessel> StweSchluesselGetByLiegenschaft(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweSchluessel>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, LiegenschaftId, Name, Modus
+FROM dbo.StweSchluessel
+WHERE LiegenschaftId = @lid
+ORDER BY Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            var p = cmd.CreateParameter(); p.ParameterName = "@lid"; p.Value = liegenschaftId; cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweSchluessel
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    Name = r.GetString(2),
+                    Modus = r.GetString(3)
+                });
+            }
+            return list;
+        }
+
+        public int StweSchluesselInsert(int liegenschaftId, string name, string modus)
+        {
+            EnsureStweSchema();
+
+            if (liegenschaftId <= 0) throw new ArgumentOutOfRangeException(nameof(liegenschaftId));
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name darf nicht leer sein.", nameof(name));
+
+            modus = (modus ?? "").Trim().ToUpperInvariant();
+            if (modus != "FIX" && modus != "MEA")
+                throw new ArgumentException("Modus muss FIX oder MEA sein.", nameof(modus));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweSchluessel (LiegenschaftId, Name, Modus)
+OUTPUT INSERTED.Id
+VALUES (@lid, @n, @m);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@n"; p2.Value = name.Trim(); cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@m"; p3.Value = modus; cmd.Parameters.Add(p3);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public List<MyCoinFlow.Models.StweSchluesselLine> StweSchluesselLinesGet(int schluesselId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweSchluesselLine>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT l.Id, l.SchluesselId, l.EigentuemerId, e.Name, l.AnteilProzent
+FROM dbo.StweSchluesselLine l
+JOIN dbo.StweEigentuemer e ON e.Id = l.EigentuemerId
+WHERE l.SchluesselId = @sid
+ORDER BY e.Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; cmd.Parameters.Add(p);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweSchluesselLine
+                {
+                    Id = r.GetInt32(0),
+                    SchluesselId = r.GetInt32(1),
+                    EigentuemerId = r.GetInt32(2),
+                    EigentuemerName = r.GetString(3),
+                    AnteilProzent = r.GetDecimal(4)
+                });
+            }
+
+            return list;
+        }
+
+        public void StweSchluesselLinesReplace(int schluesselId, List<(int EigentuemerId, decimal AnteilProzent)> lines)
+        {
+            EnsureStweSchema();
+
+            if (schluesselId <= 0) throw new ArgumentOutOfRangeException(nameof(schluesselId));
+            lines ??= new();
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // delete old
+                using (var del = c.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM dbo.StweSchluesselLine WHERE SchluesselId = @sid;";
+                    var p = del.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; del.Parameters.Add(p);
+                    del.ExecuteNonQuery();
+                }
+
+                // insert new
+                foreach (var (oid, pct) in lines)
+                {
+                    using var ins = c.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = @"
+INSERT INTO dbo.StweSchluesselLine (SchluesselId, EigentuemerId, AnteilProzent)
+VALUES (@sid, @oid, @pct);";
+
+                    var p1 = ins.CreateParameter(); p1.ParameterName = "@sid"; p1.Value = schluesselId; ins.Parameters.Add(p1);
+                    var p2 = ins.CreateParameter(); p2.ParameterName = "@oid"; p2.Value = oid; ins.Parameters.Add(p2);
+                    var p3 = ins.CreateParameter(); p3.ParameterName = "@pct"; p3.Value = pct; ins.Parameters.Add(p3);
+
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+
 
 
     }

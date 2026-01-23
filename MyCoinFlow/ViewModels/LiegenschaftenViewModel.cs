@@ -4,6 +4,7 @@ using MyCoinFlow.Services;
 using MyCoinFlow.Views;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 
@@ -11,10 +12,9 @@ namespace MyCoinFlow.ViewModels
 {
     /// <summary>
     /// Liegenschaften-Modul (STWE):
-    /// - Liegenschaften anlegen/anzeigen
-    /// - Einheiten anlegen/anzeigen
-    /// - Eigentümer anlegen/anzeigen
-    /// - Eigentümer zeitabhängig einer Einheit zuordnen (Von/Bis)
+    /// - Liegenschaften, Einheiten, Eigentümer
+    /// - Eigentümer-Zuordnung (Von/Bis)
+    /// - Schlüssel (Verteilpläne) als Stammdaten
     /// </summary>
     public class LiegenschaftenViewModel : BaseViewModel
     {
@@ -26,6 +26,9 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<StweEigentuemer> Eigentuemer { get; } = new();
         public ObservableCollection<StweEinheitEigentumRow> EigentumRows { get; } = new();
 
+        // NEU: Schlüssel
+        public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
+
         // ===== Selektionen =====
         private StweLiegenschaft? _selectedLiegenschaft;
         public StweLiegenschaft? SelectedLiegenschaft
@@ -36,6 +39,7 @@ namespace MyCoinFlow.ViewModels
                 _selectedLiegenschaft = value;
                 OnPropertyChanged();
                 LoadEinheiten();
+                LoadSchluessel();
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -60,6 +64,13 @@ namespace MyCoinFlow.ViewModels
             set { _selectedEigentuemer = value; OnPropertyChanged(); }
         }
 
+        private StweSchluessel? _selectedSchluessel;
+        public StweSchluessel? SelectedSchluessel
+        {
+            get => _selectedSchluessel;
+            set { _selectedSchluessel = value; OnPropertyChanged(); }
+        }
+
         // ===== Status =====
         private string _statusText = "";
         public string StatusText
@@ -74,9 +85,12 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeueEigentuemerCommand { get; }
         public RelayCommand EigentumZuordnenCommand { get; }
 
+        // NEU: Schlüssel
+        public RelayCommand NeuerSchluesselCommand { get; }
+        public RelayCommand SchluesselZeilenBearbeitenCommand { get; }
+
         public LiegenschaftenViewModel()
         {
-            // Schema beim ersten Öffnen sicherstellen
             try
             {
                 _db.EnsureStweSchema();
@@ -91,6 +105,12 @@ namespace MyCoinFlow.ViewModels
             NeueEinheitCommand = new RelayCommand(_ => NeueEinheit(), _ => SelectedLiegenschaft != null);
             NeueEigentuemerCommand = new RelayCommand(_ => NeuerEigentuemer());
             EigentumZuordnenCommand = new RelayCommand(_ => EigentumZuordnen(), _ => SelectedEinheit != null);
+
+            NeuerSchluesselCommand = new RelayCommand(_ => NeuerSchluessel(), _ => SelectedLiegenschaft != null);
+            SchluesselZeilenBearbeitenCommand = new RelayCommand(
+                _ => SchluesselZeilenBearbeiten(),
+                _ => SelectedSchluessel != null && SelectedSchluessel.Modus == "FIX"
+            );
 
             LoadLiegenschaften();
             LoadEigentuemer();
@@ -110,6 +130,7 @@ namespace MyCoinFlow.ViewModels
                 SelectedLiegenschaft = null;
                 Einheiten.Clear();
                 EigentumRows.Clear();
+                Schluessel.Clear();
                 return;
             }
 
@@ -124,23 +145,12 @@ namespace MyCoinFlow.ViewModels
             Einheiten.Clear();
             EigentumRows.Clear();
 
-            if (SelectedLiegenschaft == null)
-                return;
+            if (SelectedLiegenschaft == null) return;
 
             foreach (var e in _db.StweEinheitenGetByLiegenschaft(SelectedLiegenschaft.Id))
                 Einheiten.Add(e);
 
-            if (Einheiten.Count > 0)
-            {
-                if (SelectedEinheit == null)
-                    SelectedEinheit = Einheiten[0];
-                else
-                    LoadEigentumRows();
-            }
-            else
-            {
-                SelectedEinheit = null;
-            }
+            SelectedEinheit = Einheiten.FirstOrDefault();
         }
 
         private void LoadEigentuemer()
@@ -157,6 +167,67 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var r in _db.StweEinheitEigentumGetByEinheit(SelectedEinheit.Id))
                 EigentumRows.Add(r);
+        }
+
+        // ===== Schlüssel =====
+
+        private void LoadSchluessel()
+        {
+            Schluessel.Clear();
+            SelectedSchluessel = null;
+
+            if (SelectedLiegenschaft == null) return;
+
+            foreach (var s in _db.StweSchluesselGetByLiegenschaft(SelectedLiegenschaft.Id))
+                Schluessel.Add(s);
+
+            SelectedSchluessel = Schluessel.FirstOrDefault();
+        }
+
+        private void NeuerSchluessel()
+        {
+            if (SelectedLiegenschaft == null) return;
+
+            var dlg = new SchluesselNeuDialog();
+            TrySetOwner(dlg);
+
+            if (dlg.ShowDialog() == true)
+            {
+                _db.StweSchluesselInsert(
+                    SelectedLiegenschaft.Id,
+                    dlg.Model.Name,
+                    dlg.Model.Modus
+                );
+
+                LoadSchluessel();
+            }
+        }
+
+        private void SchluesselZeilenBearbeiten()
+        {
+            if (SelectedSchluessel == null || SelectedSchluessel.Modus != "FIX")
+                return;
+
+            LoadEigentuemer();
+
+            var existing = _db.StweSchluesselLinesGet(SelectedSchluessel.Id);
+            var dlg = new SchluesselZeilenDialog(
+                SelectedSchluessel.Name,
+                Eigentuemer,
+                existing
+            );
+
+            TrySetOwner(dlg);
+
+            if (dlg.ShowDialog() == true)
+            {
+                var lines = dlg.Rows
+                    .Select(r => (r.EigentuemerId, r.AnteilProzent))
+                    .ToList();
+
+                _db.StweSchluesselLinesReplace(SelectedSchluessel.Id, lines);
+            }
+
         }
 
         // ===== Actions =====
@@ -203,7 +274,6 @@ namespace MyCoinFlow.ViewModels
         {
             if (SelectedEinheit == null) return;
 
-            // aktuelle Eigentümerliste sicherstellen
             LoadEigentuemer();
 
             var dlg = new EigentumZuordnenDialog(Eigentuemer);
@@ -215,10 +285,10 @@ namespace MyCoinFlow.ViewModels
                 if (owner == null || !dlg.Von.HasValue) return;
 
                 _db.StweEinheitEigentumInsert(
-                    einheitId: SelectedEinheit.Id,
-                    eigentuemerId: owner.Id,
-                    gueltigVon: dlg.Von.Value,
-                    gueltigBis: dlg.Bis
+                    SelectedEinheit.Id,
+                    owner.Id,
+                    dlg.Von.Value,
+                    dlg.Bis
                 );
 
                 LoadEigentumRows();
