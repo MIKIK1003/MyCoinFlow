@@ -5256,6 +5256,32 @@ VALUES (@sid, @eid, @oid, @s, @b, @n);";
             cmd.ExecuteNonQuery();
         }
 
+        public int? StweEigentuemerGetByEinheitAtDate(int einheitId, DateTime stichtag)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1 EigentuemerId
+FROM dbo.StweEinheitEigentum
+WHERE EinheitId = @eid
+  AND GueltigVon <= @d
+  AND (GueltigBis IS NULL OR GueltigBis >= @d)
+ORDER BY GueltigVon DESC, Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@eid"; p1.Value = einheitId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@d"; p2.Value = stichtag.Date; cmd.Parameters.Add(p2);
+
+            var obj = cmd.ExecuteScalar();
+            if (obj == null || obj == DBNull.Value) return null;
+
+            return Convert.ToInt32(obj);
+        }
 
 
 

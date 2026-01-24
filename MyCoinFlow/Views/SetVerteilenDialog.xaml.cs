@@ -2,17 +2,25 @@
 using MyCoinFlow.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace MyCoinFlow.Views
 {
     public partial class SetVerteilenDialog : Window, INotifyPropertyChanged
     {
+        // -------- RawShare: typ-sicherer Container statt dynamic --------
+        private sealed class RawShare
+        {
+            public int EigentuemerId { get; set; }
+            public string Name { get; set; } = "";
+            public decimal BetragRaw { get; set; }
+        }
+
         public sealed class RowVm : INotifyPropertyChanged
         {
             private int? _eigentuemerId;
@@ -20,6 +28,7 @@ namespace MyCoinFlow.Views
             private string _betragText = "0.00";
             private decimal _betrag;
             private string? _notiz;
+            private string _source = "MANUELL";
 
             public int? EigentuemerId
             {
@@ -33,9 +42,6 @@ namespace MyCoinFlow.Views
                 set { _eigentuemerName = value; OnPropertyChanged(); }
             }
 
-            /// <summary>
-            /// UI-Eingabe (string) – erlaubt Punkt UND Komma
-            /// </summary>
             public string BetragText
             {
                 get => _betragText;
@@ -47,9 +53,6 @@ namespace MyCoinFlow.Views
                 }
             }
 
-            /// <summary>
-            /// Rechenwert (decimal) – wird aus BetragText abgeleitet
-            /// </summary>
             public decimal Betrag
             {
                 get => _betrag;
@@ -62,25 +65,19 @@ namespace MyCoinFlow.Views
                 set { _notiz = value; OnPropertyChanged(); }
             }
 
+            public string Source
+            {
+                get => _source;
+                set { _source = value; OnPropertyChanged(); }
+            }
+
             private void ParseBetrag()
             {
-                var raw = (_betragText ?? "")
-                    .Trim()
-                    .Replace(" ", "")
-                    .Replace(",", ".");
-
-                if (decimal.TryParse(
-                        raw,
-                        NumberStyles.Any,
-                        CultureInfo.InvariantCulture,
-                        out var val))
-                {
+                var raw = (_betragText ?? "").Trim().Replace(" ", "").Replace(",", ".");
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
                     Betrag = val;
-                }
                 else
-                {
                     Betrag = 0m;
-                }
             }
 
             public event PropertyChangedEventHandler? PropertyChanged;
@@ -93,6 +90,14 @@ namespace MyCoinFlow.Views
 
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
         public ObservableCollection<RowVm> Rows { get; } = new();
+        public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
+
+        private StweSchluessel? _selectedSchluessel;
+        public StweSchluessel? SelectedSchluessel
+        {
+            get => _selectedSchluessel;
+            set { _selectedSchluessel = value; OnPropertyChanged(); }
+        }
 
         public string HeaderText { get; private set; } = "";
         public string TotalText => $"Total: {FormatChf(_set.Betrag)}";
@@ -107,85 +112,30 @@ namespace MyCoinFlow.Views
             HeaderText = $"{_set.Datum:yyyy-MM-dd}  |  {_set.Titel}";
 
             LoadOwners();
+            LoadSchluessel();
             LoadExistingLines();
 
-            Rows.CollectionChanged += (_, e) =>
-            {
-                // neue Zeilen anhängen / entfernte lösen
-                if (e.NewItems != null)
-                    foreach (var it in e.NewItems)
-                        if (it is RowVm r) AttachRow(r);
-
-                if (e.OldItems != null)
-                    foreach (var it in e.OldItems)
-                        if (it is RowVm r) DetachRow(r);
-
-                RaiseTotals();
-            };
+            Rows.CollectionChanged += Rows_CollectionChanged;
             Closing += SetVerteilenDialog_Closing;
 
             DataContext = this;
+            RaiseTotals();
         }
-
-        private void SetVerteilenDialog_Closing(object? sender, CancelEventArgs e)
-        {
-            // Wenn Auto-Save fehlschlägt (z.B. ungültige Daten),
-            // verhindern wir das Schließen.
-            if (!TrySave())
-            {
-                e.Cancel = true;
-            }
-        }
-
-
-        private void AttachRow(RowVm r)
-        {
-            if (r == null) return;
-            r.PropertyChanged += Row_PropertyChanged;
-        }
-
-        private void DetachRow(RowVm r)
-        {
-            if (r == null) return;
-            r.PropertyChanged -= Row_PropertyChanged;
-        }
-
-        private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            try
-            {
-                if (sender is RowVm row)
-                {
-                    // Wenn Eigentümer gewählt wurde -> Name sofort nachziehen
-                    if (e.PropertyName == nameof(RowVm.EigentuemerId))
-                    {
-                        var o = row.EigentuemerId.HasValue
-                            ? Owners.FirstOrDefault(x => x.Id == row.EigentuemerId.Value)
-                            : null;
-
-                        row.EigentuemerName = o?.Name ?? "";
-                    }
-
-                    // Beträge -> Totals live
-                    if (e.PropertyName == nameof(RowVm.BetragText) || e.PropertyName == nameof(RowVm.Betrag))
-                    {
-                        RaiseTotals();
-                    }
-                }
-            }
-            catch
-            {
-                // still
-            }
-        }
-
-
 
         private void LoadOwners()
         {
             Owners.Clear();
             foreach (var o in _db.StweEigentuemerGetAll())
                 Owners.Add(o);
+        }
+
+        private void LoadSchluessel()
+        {
+            Schluessel.Clear();
+            foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
+                Schluessel.Add(s);
+
+            SelectedSchluessel = Schluessel.FirstOrDefault();
         }
 
         private void LoadExistingLines()
@@ -198,18 +148,56 @@ namespace MyCoinFlow.Views
                     ? Owners.FirstOrDefault(x => x.Id == l.EigentuemerId.Value)
                     : null;
 
-                Rows.Add(new RowVm
+                var row = new RowVm
                 {
                     EigentuemerId = l.EigentuemerId,
                     EigentuemerName = owner?.Name ?? "",
                     BetragText = l.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
-                    Notiz = l.Notiz
-                });
-                AttachRow(Rows.Last());
+                    Notiz = l.Notiz,
+                    Source = string.IsNullOrWhiteSpace(l.Schluessel) ? "MANUELL" : l.Schluessel!
+                };
 
+                AttachRow(row);
+                Rows.Add(row);
             }
+        }
+
+        private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+                foreach (var it in e.NewItems)
+                    if (it is RowVm r) AttachRow(r);
+
+            if (e.OldItems != null)
+                foreach (var it in e.OldItems)
+                    if (it is RowVm r) DetachRow(r);
 
             RaiseTotals();
+        }
+
+        private void AttachRow(RowVm r) => r.PropertyChanged += Row_PropertyChanged;
+        private void DetachRow(RowVm r) => r.PropertyChanged -= Row_PropertyChanged;
+
+        private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            try
+            {
+                if (sender is RowVm row)
+                {
+                    if (e.PropertyName == nameof(RowVm.EigentuemerId))
+                    {
+                        var o = row.EigentuemerId.HasValue
+                            ? Owners.FirstOrDefault(x => x.Id == row.EigentuemerId.Value)
+                            : null;
+
+                        row.EigentuemerName = o?.Name ?? "";
+                    }
+
+                    if (e.PropertyName == nameof(RowVm.BetragText) || e.PropertyName == nameof(RowVm.Betrag))
+                        RaiseTotals();
+                }
+            }
+            catch { /* still */ }
         }
 
         private void AddRow_Click(object sender, RoutedEventArgs e)
@@ -218,31 +206,232 @@ namespace MyCoinFlow.Views
             {
                 EigentuemerId = null,
                 EigentuemerName = "",
-                BetragText = "0.00"
+                BetragText = "0.00",
+                Source = "MANUELL"
             });
-            AttachRow(Rows.Last());
-            RaiseTotals();
         }
 
         private void DeleteRow_Click(object sender, RoutedEventArgs e)
         {
             if (Grid.SelectedItem is RowVm row)
                 Rows.Remove(row);
+        }
+
+        private void ClearRows_Click(object sender, RoutedEventArgs e)
+        {
+            Rows.Clear();
             RaiseTotals();
         }
+
+        // ---------------- Auto FIX (6b) ----------------
+
+        private void AutoFix_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedSchluessel == null)
+            {
+                MessageBox.Show("Bitte zuerst einen Schlüssel auswählen.", "Auto verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (SelectedSchluessel.Modus != "FIX")
+            {
+                MessageBox.Show("Dieser Schlüssel ist nicht FIX.", "Auto verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var lines = _db.StweSchluesselLinesGet(SelectedSchluessel.Id);
+            if (lines.Count == 0)
+            {
+                MessageBox.Show("Dieser FIX-Schlüssel hat noch keine Zeilen.\n\nBitte unter „Liegenschaften → Schlüssel“ erfassen.",
+                    "Auto verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var sumPct = lines.Sum(x => x.AnteilProzent);
+            if (Math.Abs((double)(sumPct - 100m)) > 0.0001)
+            {
+                MessageBox.Show($"Schlüssel ist ungültig: Summe ist {sumPct:N4}% (muss 100.0000% sein).",
+                    "Auto verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var raw = lines
+                .Select(l =>
+                {
+                    var owner = Owners.FirstOrDefault(o => o.Id == l.EigentuemerId);
+                    var name = owner?.Name ?? l.EigentuemerName ?? "";
+                    var amount = _set.Betrag * (l.AnteilProzent / 100m);
+
+                    return new RawShare
+                    {
+                        EigentuemerId = l.EigentuemerId,
+                        Name = name,
+                        BetragRaw = amount
+                    };
+                })
+                .ToList();
+
+            ApplyRoundedRows(raw, $"Auto (FIX): {SelectedSchluessel.Name}", $"FIX:{SelectedSchluessel.Id}");
+
+        }
+
+        // ---------------- Auto MEA (6c) ----------------
+
+        private void AutoMea_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedSchluessel == null)
+            {
+                MessageBox.Show("Bitte zuerst einen Schlüssel auswählen.", "Auto verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (SelectedSchluessel.Modus != "MEA")
+            {
+                MessageBox.Show("Dieser Schlüssel ist nicht MEA.", "Auto verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
+                           .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
+                           .ToList();
+
+            if (units.Count == 0)
+            {
+                MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
+                    "Auto verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var ownerMea = new System.Collections.Generic.Dictionary<int, decimal>();
+            var missing = new System.Collections.Generic.List<string>();
+
+            foreach (var u in units)
+            {
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    missing.Add(u.Bezeichnung);
+                    continue;
+                }
+
+                if (!ownerMea.ContainsKey(oid.Value))
+                    ownerMea[oid.Value] = 0m;
+
+                ownerMea[oid.Value] += (u.MeaPromille ?? 0m);
+            }
+
+            if (missing.Count > 0)
+            {
+                MessageBox.Show(
+                    "Für folgende Einheiten ist am Transaktionsdatum kein Eigentümer zugeordnet:\n\n• " +
+                    string.Join("\n• ", missing.Take(10)) +
+                    (missing.Count > 10 ? "\n…" : "") +
+                    "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
+                    "Auto verteilen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var sumMea = ownerMea.Values.Sum();
+            if (sumMea <= 0m)
+            {
+                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.", "Auto verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var raw = ownerMea
+                .Select(kv =>
+                {
+                    var oid = kv.Key;
+                    var mea = kv.Value;
+
+                    var owner = Owners.FirstOrDefault(o => o.Id == oid);
+                    var name = owner?.Name ?? $"Eigentümer #{oid}";
+
+                    var amount = _set.Betrag * (mea / sumMea);
+
+                    return new RawShare
+                    {
+                        EigentuemerId = oid,
+                        Name = name,
+                        BetragRaw = amount
+                    };
+                })
+                .ToList();
+
+            ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
+
+        }
+
+        // ---------- Shared: rounding + diff on max row ----------
+
+        private void ApplyRoundedRows(
+            System.Collections.Generic.List<RawShare> raw,
+            string notiz,
+            string source)
+        {
+            var rounded = raw
+                .Select(x => new
+                {
+                    x.EigentuemerId,
+                    x.Name,
+                    Betrag = Math.Round(x.BetragRaw, 2, MidpointRounding.AwayFromZero)
+                })
+                .ToList();
+
+            var sumRounded = rounded.Sum(x => x.Betrag);
+            var diff = _set.Betrag - sumRounded;
+
+            if (diff != 0m && rounded.Count > 0)
+            {
+                var idx = rounded
+                    .Select((x, i) => new { x.Betrag, Index = i })
+                    .OrderByDescending(x => x.Betrag)
+                    .First().Index;
+
+                var item = rounded[idx];
+                rounded[idx] = new { item.EigentuemerId, item.Name, Betrag = item.Betrag + diff };
+            }
+
+            Rows.Clear();
+            foreach (var r in rounded)
+            {
+                Rows.Add(new RowVm
+                {
+                    EigentuemerId = r.EigentuemerId,
+                    EigentuemerName = r.Name,
+                    BetragText = r.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
+                    Notiz = notiz,
+                    Source = source
+                });
+            }
+
+            RaiseTotals();
+        }
+
+        // ---------------- Save / Close ----------------
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             TrySave(showSuccessMessage: true);
         }
 
-
-
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            // Auto-Save beim Schließen (damit nichts verloren geht)
             if (TrySave())
                 Close();
+        }
+
+        private void SetVerteilenDialog_Closing(object? sender, CancelEventArgs e)
+        {
+            if (!TrySave())
+                e.Cancel = true;
         }
 
         private bool TrySave(bool showSuccessMessage = false)
@@ -262,7 +451,7 @@ namespace MyCoinFlow.Views
                         setId: _set.Id,
                         einheitId: null,
                         eigentuemerId: r.EigentuemerId,
-                        schluessel: "MANUELL",
+                        schluessel: r.Source,
                         betrag: r.Betrag,
                         notiz: r.Notiz
                     );
@@ -284,27 +473,18 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private void SyncOwnerNames()
         {
             foreach (var r in Rows)
             {
-                var o = r.EigentuemerId.HasValue
-                    ? Owners.FirstOrDefault(x => x.Id == r.EigentuemerId.Value)
-                    : null;
-
+                var o = r.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == r.EigentuemerId.Value) : null;
                 r.EigentuemerName = o?.Name ?? "";
             }
         }
 
         private bool ValidateBeforeSave()
         {
-            if (Rows.Count == 0)
-            {
-                MessageBox.Show("Bitte mindestens eine Zeile erfassen.", "Set verteilen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
-            }
+            if (Rows.Count == 0) return true;
 
             if (Rows.Any(r => !r.EigentuemerId.HasValue || r.EigentuemerId.Value <= 0))
             {
@@ -316,6 +496,13 @@ namespace MyCoinFlow.Views
             if (Rows.Any(r => r.Betrag < 0m))
             {
                 MessageBox.Show("Beträge dürfen nicht negativ sein.", "Set verteilen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+
+            if (Rows.GroupBy(r => r.EigentuemerId!.Value).Any(g => g.Count() > 1))
+            {
+                MessageBox.Show("Ein Eigentümer darf im Set nur einmal vorkommen (V1).", "Set verteilen",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }

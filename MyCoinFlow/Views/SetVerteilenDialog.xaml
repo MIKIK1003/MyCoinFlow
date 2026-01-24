@@ -45,21 +45,67 @@
                 CornerRadius="8"
                 Background="{DynamicResource MaterialDesignPaper}">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="12"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock Grid.Column="0"
-                           Text="{Binding HeaderText}"
-                           TextWrapping="Wrap"/>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding DistributedText}"/>
-                    <TextBlock Text="{Binding RestText}" FontWeight="SemiBold"/>
-                </StackPanel>
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding HeaderText}"
+                               TextWrapping="Wrap"/>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding DistributedText}"/>
+                        <TextBlock Text="{Binding RestText}" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Schlüssel Auswahl -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding Schluessel}"
+                              SelectedItem="{Binding SelectedSchluessel}"
+                              DisplayMemberPath="Name"
+                              materialDesign:HintAssist.Hint="Schlüssel (Verteilplan)"
+                              MinWidth="260" />
+
+                    <Button Grid.Column="2"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Content="Auto verteilen (FIX)"
+                            Click="AutoFix_Click"
+                            Padding="14,8"/>
+
+                    <Button Grid.Column="4"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Content="Auto verteilen (MEA)"
+                            Click="AutoMea_Click"
+                            Padding="14,8"/>
+
+                    <Button Grid.Column="6"
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="Zeilen leeren"
+                            Click="ClearRows_Click"
+                            Padding="14,8"/>
+                </Grid>
             </Grid>
         </Border>
 
@@ -119,6 +165,6 @@
         <!-- Footer -->
         <TextBlock Grid.Row="8"
                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                   Text="Hinweis: Punkt oder Komma als Dezimaltrenner möglich."/>
+                   Text="6c: MEA-Auto nutzt Einheit.MEA (‰) und die Eigentümer-Zuordnung am Transaktionsdatum. Rundungsdifferenz geht auf die größte Zeile."/>
     </Grid>
 </Window>
