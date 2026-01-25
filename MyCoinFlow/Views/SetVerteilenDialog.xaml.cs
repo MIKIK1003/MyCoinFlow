@@ -13,7 +13,6 @@ namespace MyCoinFlow.Views
 {
     public partial class SetVerteilenDialog : Window, INotifyPropertyChanged
     {
-        // -------- RawShare: typ-sicherer Container statt dynamic --------
         private sealed class RawShare
         {
             public int EigentuemerId { get; set; }
@@ -99,6 +98,12 @@ namespace MyCoinFlow.Views
             set { _selectedSchluessel = value; OnPropertyChanged(); }
         }
 
+        // ---- Closed handling ----
+        public bool IsEditable => !_set.IsClosed;
+        public bool IsReadOnlyGrid => _set.IsClosed;
+
+        public string StatusLine => _set.IsClosed ? "Status: GESCHLOSSEN" : "Status: OFFEN";
+
         public string HeaderText { get; private set; } = "";
         public string TotalText => $"Total: {FormatChf(_set.Betrag)}";
         public string DistributedText => $"Verteilt: {FormatChf(Rows.Sum(r => r.Betrag))}";
@@ -119,6 +124,11 @@ namespace MyCoinFlow.Views
             Closing += SetVerteilenDialog_Closing;
 
             DataContext = this;
+
+            OnPropertyChanged(nameof(IsEditable));
+            OnPropertyChanged(nameof(IsReadOnlyGrid));
+            OnPropertyChanged(nameof(StatusLine));
+
             RaiseTotals();
         }
 
@@ -144,9 +154,7 @@ namespace MyCoinFlow.Views
 
             foreach (var l in _db.StweSetLinesGet(_set.Id))
             {
-                var owner = l.EigentuemerId.HasValue
-                    ? Owners.FirstOrDefault(x => x.Id == l.EigentuemerId.Value)
-                    : null;
+                var owner = l.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == l.EigentuemerId.Value) : null;
 
                 var row = new RowVm
                 {
@@ -186,10 +194,7 @@ namespace MyCoinFlow.Views
                 {
                     if (e.PropertyName == nameof(RowVm.EigentuemerId))
                     {
-                        var o = row.EigentuemerId.HasValue
-                            ? Owners.FirstOrDefault(x => x.Id == row.EigentuemerId.Value)
-                            : null;
-
+                        var o = row.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == row.EigentuemerId.Value) : null;
                         row.EigentuemerName = o?.Name ?? "";
                     }
 
@@ -200,8 +205,12 @@ namespace MyCoinFlow.Views
             catch { /* still */ }
         }
 
+        // -------- Buttons / Actions --------
+
         private void AddRow_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
+
             Rows.Add(new RowVm
             {
                 EigentuemerId = null,
@@ -213,20 +222,24 @@ namespace MyCoinFlow.Views
 
         private void DeleteRow_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
+
             if (Grid.SelectedItem is RowVm row)
                 Rows.Remove(row);
         }
 
         private void ClearRows_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
+
             Rows.Clear();
             RaiseTotals();
         }
 
-        // ---------------- Auto FIX (6b) ----------------
-
         private void AutoFix_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
+
             if (SelectedSchluessel == null)
             {
                 MessageBox.Show("Bitte zuerst einen Schlüssel auswählen.", "Auto verteilen",
@@ -274,13 +287,12 @@ namespace MyCoinFlow.Views
                 .ToList();
 
             ApplyRoundedRows(raw, $"Auto (FIX): {SelectedSchluessel.Name}", $"FIX:{SelectedSchluessel.Id}");
-
         }
-
-        // ---------------- Auto MEA (6c) ----------------
 
         private void AutoMea_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
+
             if (SelectedSchluessel == null)
             {
                 MessageBox.Show("Bitte zuerst einen Schlüssel auswählen.", "Auto verteilen",
@@ -327,7 +339,7 @@ namespace MyCoinFlow.Views
             if (missing.Count > 0)
             {
                 MessageBox.Show(
-                    "Für folgende Einheiten ist am Transaktionsdatum kein Eigentümer zugeordnet:\n\n• " +
+                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
                     string.Join("\n• ", missing.Take(10)) +
                     (missing.Count > 10 ? "\n…" : "") +
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
@@ -366,15 +378,9 @@ namespace MyCoinFlow.Views
                 .ToList();
 
             ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
-
         }
 
-        // ---------- Shared: rounding + diff on max row ----------
-
-        private void ApplyRoundedRows(
-            System.Collections.Generic.List<RawShare> raw,
-            string notiz,
-            string source)
+        private void ApplyRoundedRows(System.Collections.Generic.List<RawShare> raw, string notiz, string source)
         {
             var rounded = raw
                 .Select(x => new
@@ -415,21 +421,56 @@ namespace MyCoinFlow.Views
             RaiseTotals();
         }
 
-        // ---------------- Save / Close ----------------
+        // ---- Save / Close / Closing ----
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
+            if (_set.IsClosed) return;
             TrySave(showSuccessMessage: true);
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
         {
+            // Schließen immer möglich
+            if (_set.IsClosed) { Close(); return; }
+
             if (TrySave())
                 Close();
         }
 
+        private void CloseSet_Click(object sender, RoutedEventArgs e)
+        {
+            if (_set.IsClosed) return;
+
+            if (!TrySave())
+                return;
+
+            var rest = _set.Betrag - Rows.Sum(r => r.Betrag);
+            if (Math.Abs((double)rest) > 0.0001)
+            {
+                MessageBox.Show("Set kann nur abgeschlossen werden, wenn Rest = 0.00 ist.",
+                    "Abschließen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _db.StweSetSetClosed(_set.Id, true);
+            MessageBox.Show("Set wurde abgeschlossen.", "Abschließen",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+
+            _set.IsClosed = true;
+            OnPropertyChanged(nameof(IsEditable));
+            OnPropertyChanged(nameof(IsReadOnlyGrid));
+            OnPropertyChanged(nameof(StatusLine));
+
+            Close();
+        }
+
         private void SetVerteilenDialog_Closing(object? sender, CancelEventArgs e)
         {
+            // Wenn geschlossen -> nie blockieren
+            if (_set.IsClosed) return;
+
+            // Auto-Save beim X
             if (!TrySave())
                 e.Cancel = true;
         }

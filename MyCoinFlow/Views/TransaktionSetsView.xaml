@@ -31,6 +31,18 @@
 
             <Button DockPanel.Dock="Right"
         Style="{StaticResource MaterialDesignOutlinedButton}"
+        Command="{Binding ShowAuswertungCommand}"
+        Padding="14,8"
+        Margin="0,0,8,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ChartBoxOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                    <TextBlock Text="Auswertung…"/>
+                </StackPanel>
+            </Button>
+
+
+            <Button DockPanel.Dock="Right"
+        Style="{StaticResource MaterialDesignOutlinedButton}"
         Command="{Binding SetVerteilenCommand}"
         Padding="14,8"
         Margin="0,0,8,0">
@@ -78,6 +90,8 @@
                 <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="3*"/>
                 <DataGridTextColumn Header="Verteilt" Binding="{Binding Verteilt}" Width="120"/>
                 <DataGridTextColumn Header="Rest" Binding="{Binding Rest}" Width="120"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding IsClosed}" Width="100"/>
+
             </DataGrid.Columns>
         </DataGrid>
 

@@ -5283,6 +5283,117 @@ ORDER BY GueltigVon DESC, Id DESC;";
             return Convert.ToInt32(obj);
         }
 
+        public void StweSetSetClosed(int setId, bool isClosed)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.StweSet SET IsClosed = @c WHERE Id = @id;";
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@c"; p1.Value = isClosed ? 1 : 0; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@id"; p2.Value = setId; cmd.Parameters.Add(p2);
+
+            cmd.ExecuteNonQuery();
+        }
+        public List<MyCoinFlow.Models.StweOwnerSummaryRow> StweReportOwnerSummary(
+    int liegenschaftId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweOwnerSummaryRow>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    o.Id AS EigentuemerId,
+    o.Name AS EigentuemerName,
+    SUM(l.Betrag) AS Summe
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s           ON s.Id = l.SetId
+JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
+JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
+WHERE s.LiegenschaftId = @lid
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+GROUP BY o.Id, o.Name
+ORDER BY o.Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@von"; p2.Value = (object?)von?.Date ?? DBNull.Value; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@bis"; p3.Value = (object?)bis?.Date ?? DBNull.Value; cmd.Parameters.Add(p3);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweOwnerSummaryRow
+                {
+                    EigentuemerId = r.GetInt32(0),
+                    EigentuemerName = r.GetString(1),
+                    Summe = r.GetDecimal(2)
+                });
+            }
+
+            return list;
+        }
+        public List<MyCoinFlow.Models.StweOwnerDetailRow> StweReportOwnerDetails(
+    int liegenschaftId, int eigentuemerId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweOwnerDetailRow>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    t.Datum,
+    s.Id AS SetId,
+    s.TransaktionId,
+    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
+    l.Schluessel,
+    l.Notiz,
+    l.Betrag
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s      ON s.Id = l.SetId
+JOIN dbo.Transaktion t  ON t.Id = s.TransaktionId
+WHERE s.LiegenschaftId = @lid
+  AND l.EigentuemerId = @oid
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@oid"; p2.Value = eigentuemerId; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@von"; p3.Value = (object?)von?.Date ?? DBNull.Value; cmd.Parameters.Add(p3);
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@bis"; p4.Value = (object?)bis?.Date ?? DBNull.Value; cmd.Parameters.Add(p4);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweOwnerDetailRow
+                {
+                    Datum = r.GetDateTime(0),
+                    SetId = r.GetInt32(1),
+                    TransaktionId = r.GetInt32(2),
+                    Titel = r.GetString(3),
+                    Schluessel = r.IsDBNull(4) ? null : r.GetString(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
+                    Betrag = r.GetDecimal(6)
+                });
+            }
+
+            return list;
+        }
+
 
 
     }

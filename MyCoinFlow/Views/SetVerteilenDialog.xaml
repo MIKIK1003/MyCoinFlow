@@ -22,15 +22,29 @@
 
         <!-- Header -->
         <DockPanel Grid.Row="0" LastChildFill="False">
-            <TextBlock FontSize="20" FontWeight="SemiBold"
-                       Text="Set verteilen" DockPanel.Dock="Left"/>
+            <TextBlock FontSize="20"
+                       FontWeight="SemiBold"
+                       Text="Set verteilen"
+                       DockPanel.Dock="Left"/>
 
+            <!-- Abschließen nur wenn editierbar -->
+            <Button DockPanel.Dock="Right"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Content="Abschließen"
+                    Click="CloseSet_Click"
+                    Padding="14,8"
+                    Margin="8,0,0,0"
+                    IsEnabled="{Binding IsEditable}"/>
+
+            <!-- Speichern nur wenn editierbar -->
             <Button DockPanel.Dock="Right"
                     Style="{StaticResource MaterialDesignRaisedButton}"
                     Content="Speichern"
                     Click="Save_Click"
-                    Padding="14,8"/>
+                    Padding="14,8"
+                    IsEnabled="{Binding IsEditable}"/>
 
+            <!-- Schließen immer möglich -->
             <Button DockPanel.Dock="Right"
                     Style="{StaticResource MaterialDesignOutlinedButton}"
                     Content="Schließen"
@@ -66,6 +80,9 @@
                         <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding DistributedText}"/>
                         <TextBlock Text="{Binding RestText}" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,6,0,0"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                   Text="{Binding StatusLine}"/>
                     </StackPanel>
                 </Grid>
 
@@ -86,43 +103,49 @@
                               SelectedItem="{Binding SelectedSchluessel}"
                               DisplayMemberPath="Name"
                               materialDesign:HintAssist.Hint="Schlüssel (Verteilplan)"
-                              MinWidth="260" />
+                              MinWidth="260"
+                              IsEnabled="{Binding IsEditable}" />
 
                     <Button Grid.Column="2"
                             Style="{StaticResource MaterialDesignRaisedButton}"
                             Content="Auto verteilen (FIX)"
                             Click="AutoFix_Click"
-                            Padding="14,8"/>
+                            Padding="14,8"
+                            IsEnabled="{Binding IsEditable}"/>
 
                     <Button Grid.Column="4"
                             Style="{StaticResource MaterialDesignRaisedButton}"
                             Content="Auto verteilen (MEA)"
                             Click="AutoMea_Click"
-                            Padding="14,8"/>
+                            Padding="14,8"
+                            IsEnabled="{Binding IsEditable}"/>
 
                     <Button Grid.Column="6"
                             Style="{StaticResource MaterialDesignOutlinedButton}"
                             Content="Zeilen leeren"
                             Click="ClearRows_Click"
-                            Padding="14,8"/>
+                            Padding="14,8"
+                            IsEnabled="{Binding IsEditable}"/>
                 </Grid>
             </Grid>
         </Border>
 
-        <!-- Buttons -->
+        <!-- Zeilen Buttons -->
         <DockPanel Grid.Row="4" LastChildFill="False">
             <Button DockPanel.Dock="Left"
                     Style="{StaticResource MaterialDesignRaisedButton}"
                     Content="Zeile hinzufügen"
                     Click="AddRow_Click"
-                    Padding="14,8"/>
+                    Padding="14,8"
+                    IsEnabled="{Binding IsEditable}"/>
 
             <Button DockPanel.Dock="Left"
                     Style="{StaticResource MaterialDesignOutlinedButton}"
                     Content="Zeile löschen"
                     Click="DeleteRow_Click"
                     Padding="14,8"
-                    Margin="8,0,0,0"/>
+                    Margin="8,0,0,0"
+                    IsEnabled="{Binding IsEditable}"/>
         </DockPanel>
 
         <!-- Grid -->
@@ -131,7 +154,7 @@
                   ItemsSource="{Binding Rows}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
-                  IsReadOnly="False">
+                  IsReadOnly="{Binding IsReadOnlyGrid}">
             <DataGrid.Columns>
 
                 <DataGridTemplateColumn Header="Eigentümer" Width="2*">
@@ -165,6 +188,6 @@
         <!-- Footer -->
         <TextBlock Grid.Row="8"
                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                   Text="6c: MEA-Auto nutzt Einheit.MEA (‰) und die Eigentümer-Zuordnung am Transaktionsdatum. Rundungsdifferenz geht auf die größte Zeile."/>
+                   Text="Geschlossene Sets sind schreibgeschützt. Für Änderungen Set wieder öffnen (später)."/>
     </Grid>
 </Window>

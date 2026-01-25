@@ -48,6 +48,9 @@ namespace MyCoinFlow.ViewModels
         // NEU
         public RelayCommand SetVerteilenCommand { get; }
 
+        public RelayCommand ShowAuswertungCommand { get; }
+
+
         public TransaktionSetsViewModel()
         {
             try
@@ -62,6 +65,8 @@ namespace MyCoinFlow.ViewModels
 
             NeuesSetAusTransaktionCommand = new RelayCommand(_ => NeuesSetAusTransaktion(), _ => SelectedLiegenschaft != null);
             SetVerteilenCommand = new RelayCommand(_ => SetVerteilen(), _ => SelectedSet != null);
+
+            ShowAuswertungCommand = new RelayCommand(_ => ShowAuswertung(), _ => SelectedLiegenschaft != null);
 
             LoadLiegenschaften();
         }
@@ -141,5 +146,21 @@ namespace MyCoinFlow.ViewModels
             }
             catch { /* still */ }
         }
+
+        private void ShowAuswertung()
+        {
+            if (SelectedLiegenschaft == null) return;
+
+            var dlg = new StweAuswertungDialog(SelectedLiegenschaft);
+            try
+            {
+                if (Application.Current?.MainWindow != null)
+                    dlg.Owner = Application.Current.MainWindow;
+            }
+            catch { /* still */ }
+
+            dlg.ShowDialog();
+        }
+
     }
 }
