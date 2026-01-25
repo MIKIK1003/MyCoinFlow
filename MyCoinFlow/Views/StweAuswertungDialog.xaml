@@ -32,18 +32,33 @@
                        Text="{Binding TitleText}" />
 
             <DatePicker Grid.Column="2"
-                        SelectedDate="{Binding Von, UpdateSourceTrigger=PropertyChanged}"
-                        />
+                        SelectedDate="{Binding Von, UpdateSourceTrigger=PropertyChanged}" />
 
             <DatePicker Grid.Column="4"
-                        SelectedDate="{Binding Bis, UpdateSourceTrigger=PropertyChanged}"
-                        />
+                        SelectedDate="{Binding Bis, UpdateSourceTrigger=PropertyChanged}" />
 
-            <Button Grid.Column="6"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Content="Aktualisieren"
-                    Click="Refresh_Click"
-                    Padding="14,8"/>
+            <!-- Actions -->
+            <StackPanel Grid.Column="6"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+
+                <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                        Content="Aktualisieren"
+                        Click="Refresh_Click"
+                        Padding="14,8"
+                        Margin="0,0,10,0"/>
+
+                <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                        Click="Print_Click"
+                        Padding="14,8"
+                        ToolTip="Drucken (PDF über Druckerauswahl)">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="Printer" Width="18" Height="18" Margin="0,0,8,0"/>
+                        <TextBlock Text="Drucken"/>
+                    </StackPanel>
+                </Button>
+
+            </StackPanel>
         </Grid>
 
         <!-- Content -->

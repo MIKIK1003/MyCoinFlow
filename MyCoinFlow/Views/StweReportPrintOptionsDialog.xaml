@@ -1,0 +1,61 @@
+﻿<Window x:Class="MyCoinFlow.Views.StweReportPrintOptionsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Druckoptionen"
+        Width="560"
+        Height="340"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock FontSize="18"
+                   FontWeight="SemiBold"
+                   Text="STWE Bericht – Druckoptionen"/>
+
+        <Border Grid.Row="2"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="14">
+            <StackPanel>
+                <CheckBox Content="Mit Deckblatt"
+                          IsChecked="{Binding Options.MitDeckblatt}"
+                          Margin="0,0,0,10"/>
+
+                <CheckBox Content="Neue Seite pro Eigentümer"
+                          IsChecked="{Binding Options.NeueSeiteProEigentuemer}"
+                          Margin="0,0,0,10"/>
+
+                <CheckBox Content="Ausgabe Original-Transaktionen (mit Totalbetrag)"
+                          IsChecked="{Binding Options.MitOriginalTransaktionen}"
+                          Margin="0,0,0,10"/>
+
+                <TextBlock Margin="0,14,0,0"
+                           Foreground="{DynamicResource MaterialDesignBodyLight}"
+                           TextWrapping="Wrap"
+                           Text="PDF wird über die Druckerauswahl erstellt (z.B. Microsoft Print to PDF)."/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    Width="120"
+                    Margin="0,0,10,0"
+                    Click="Cancel_Click"/>
+
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    Content="Weiter"
+                    Width="120"
+                    Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

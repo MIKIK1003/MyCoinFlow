@@ -5394,7 +5394,49 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
             return list;
         }
 
+public List<StweOriginalTransaktionRow> StweReportOriginalTransaktionen(int liegenschaftId, DateTime? von, DateTime? bis)
+    {
+        var list = new List<StweOriginalTransaktionRow>();
 
+        // Hinweis: wir nehmen die Original-Transaktionen über StweSet.TransaktionsId.
+        // Damit bekommst du den Totalbetrag aus Transaktion.
+        const string sql = @"
+SELECT DISTINCT
+    t.Id            AS TransaktionId,
+    t.Datum         AS Datum,
+    t.Betrag        AS Betrag,
+    t.Notiz         AS Notiz
+FROM StweSet s
+INNER JOIN Transaktion t ON t.Id = s.TransaktionId
+WHERE s.LiegenschaftId = @LiegenschaftId
+  AND (@Von IS NULL OR t.Datum >= @Von)
+  AND (@Bis IS NULL OR t.Datum <= @Bis)
+ORDER BY t.Datum DESC, t.Id DESC;";
 
+        using var con = new SqlConnection(_connectionString);
+        con.Open();
+
+        using var cmd = new SqlCommand(sql, con);
+        cmd.Parameters.AddWithValue("@LiegenschaftId", liegenschaftId);
+        cmd.Parameters.AddWithValue("@Von", (object?)von ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Bis", (object?)bis ?? DBNull.Value);
+
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            list.Add(new StweOriginalTransaktionRow
+            {
+                TransaktionsId = r.GetInt32(0),
+                Datum = r.GetDateTime(1),
+                Betrag = r.GetDecimal(2),
+                Notiz = r.IsDBNull(3) ? null : r.GetString(3)
+            });
+        }
+
+        return list;
     }
+
+
+
+}
 }
