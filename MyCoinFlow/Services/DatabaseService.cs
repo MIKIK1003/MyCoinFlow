@@ -4895,6 +4895,65 @@ VALUES (@eid, @oid, @von, @bis);";
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
+        public void StweEinheitEigentumUpdate(int id, int einheitId, int eigentuemerId, DateTime gueltigVon, DateTime? gueltigBis)
+        {
+            EnsureStweSchema();
+
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
+            if (einheitId <= 0) throw new ArgumentOutOfRangeException(nameof(einheitId));
+            if (eigentuemerId <= 0) throw new ArgumentOutOfRangeException(nameof(eigentuemerId));
+            if (gueltigBis.HasValue && gueltigBis.Value.Date < gueltigVon.Date)
+                throw new ArgumentException("GueltigBis darf nicht vor GueltigVon liegen.");
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweEinheitEigentum SET
+    EinheitId     = @eid,
+    EigentuemerId = @oid,
+    GueltigVon    = @von,
+    GueltigBis    = @bis
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@eid", einheitId);
+            cmd.Parameters.AddWithValue("@oid", eigentuemerId);
+            cmd.Parameters.AddWithValue("@von", gueltigVon.Date);
+            cmd.Parameters.AddWithValue("@bis", (object?)gueltigBis?.Date ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void StweEinheitEigentumDelete(int id)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            try
+            {
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "DELETE FROM dbo.StweEinheitEigentum WHERE Id=@id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Zuordnung")) return;
+
+                System.Windows.MessageBox.Show(
+                    "Zuordnung konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+
         public List<MyCoinFlow.Models.Transaktion> StweTransaktionenGetRecent(int top = 500)
         {
             // Wir nutzen die bestehende Tabelle Transaktion.
@@ -5394,36 +5453,36 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
             return list;
         }
 
-public List<StweOriginalTransaktionRow> StweReportOriginalTransaktionen(int liegenschaftId, DateTime? von, DateTime? bis)
-    {
-        var list = new List<StweOriginalTransaktionRow>();
+        public List<StweOriginalTransaktionRow> StweReportOriginalTransaktionen(int liegenschaftId, DateTime? von, DateTime? bis)
+            {
+            var list = new List<StweOriginalTransaktionRow>();
 
-        // Hinweis: wir nehmen die Original-Transaktionen über StweSet.TransaktionsId.
-        // Damit bekommst du den Totalbetrag aus Transaktion.
-        const string sql = @"
-SELECT DISTINCT
-    t.Id            AS TransaktionId,
-    t.Datum         AS Datum,
-    t.Betrag        AS Betrag,
-    t.Notiz         AS Notiz
-FROM StweSet s
-INNER JOIN Transaktion t ON t.Id = s.TransaktionId
-WHERE s.LiegenschaftId = @LiegenschaftId
-  AND (@Von IS NULL OR t.Datum >= @Von)
-  AND (@Bis IS NULL OR t.Datum <= @Bis)
-ORDER BY t.Datum DESC, t.Id DESC;";
+            // Hinweis: wir nehmen die Original-Transaktionen über StweSet.TransaktionsId.
+            // Damit bekommst du den Totalbetrag aus Transaktion.
+            const string sql = @"
+            SELECT DISTINCT
+            t.Id            AS TransaktionId,
+            t.Datum         AS Datum,
+            t.Betrag        AS Betrag,
+            t.Notiz         AS Notiz
+            FROM StweSet s
+            INNER JOIN Transaktion t ON t.Id = s.TransaktionId
+            WHERE s.LiegenschaftId = @LiegenschaftId
+            AND (@Von IS NULL OR t.Datum >= @Von)
+            AND (@Bis IS NULL OR t.Datum <= @Bis)
+            ORDER BY t.Datum DESC, t.Id DESC;";
 
-        using var con = new SqlConnection(_connectionString);
-        con.Open();
+            using var con = new SqlConnection(_connectionString);
+            con.Open();
 
-        using var cmd = new SqlCommand(sql, con);
-        cmd.Parameters.AddWithValue("@LiegenschaftId", liegenschaftId);
-        cmd.Parameters.AddWithValue("@Von", (object?)von ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@Bis", (object?)bis ?? DBNull.Value);
+            using var cmd = new SqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@LiegenschaftId", liegenschaftId);
+            cmd.Parameters.AddWithValue("@Von", (object?)von ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Bis", (object?)bis ?? DBNull.Value);
 
-        using var r = cmd.ExecuteReader();
-        while (r.Read())
-        {
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
             list.Add(new StweOriginalTransaktionRow
             {
                 TransaktionsId = r.GetInt32(0),
@@ -5431,12 +5490,445 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                 Betrag = r.GetDecimal(2),
                 Notiz = r.IsDBNull(3) ? null : r.GetString(3)
             });
+            }
+
+            return list;
         }
 
-        return list;
+        public void StweLiegenschaftUpdate(MyCoinFlow.Models.StweLiegenschaft l)
+        {
+            if (l == null) throw new ArgumentNullException(nameof(l));
+            if (l.Id <= 0) throw new ArgumentException("Id fehlt.", nameof(l));
+            if (string.IsNullOrWhiteSpace(l.Name))
+                throw new ArgumentException("Name darf nicht leer sein.", nameof(l));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweLiegenschaft SET
+    Name    = @n,
+    Strasse = @s,
+    PLZ     = @p,
+    Ort     = @o,
+    Notiz   = @no
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@id", l.Id);
+            cmd.Parameters.AddWithValue("@n", l.Name.Trim());
+            cmd.Parameters.AddWithValue("@s", (object?)l.Strasse ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", (object?)l.PLZ ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@o", (object?)l.Ort ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)l.Notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public bool StweLiegenschaftHasSets(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP(1) 1
+FROM dbo.StweSet
+WHERE LiegenschaftId = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", liegenschaftId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public void StweLiegenschaftDelete(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // HARTE REGEL: Löschen nur wenn keine Sets existieren
+            if (StweLiegenschaftHasSets(liegenschaftId))
+            {
+                System.Windows.MessageBox.Show(
+                    "Diese Liegenschaft kann nicht gelöscht werden,\n" +
+                    "weil bereits Sets (STWE-Aufteilungen) existieren.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "DELETE FROM dbo.StweLiegenschaft WHERE Id = @id;";
+                cmd.Parameters.AddWithValue("@id", liegenschaftId);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Liegenschaft"))
+                    return;
+
+                System.Windows.MessageBox.Show(
+                    "Liegenschaft konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+        public void StweEinheitUpdate(MyCoinFlow.Models.StweEinheit e)
+        {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (e.Id <= 0) throw new ArgumentException("Id fehlt.", nameof(e));
+            if (e.LiegenschaftId <= 0) throw new ArgumentException("LiegenschaftId fehlt.", nameof(e));
+            if (string.IsNullOrWhiteSpace(e.Bezeichnung)) throw new ArgumentException("Bezeichnung fehlt.", nameof(e));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweEinheit SET
+    LiegenschaftId = @lid,
+    Bezeichnung    = @b,
+    Typ            = @t,
+    MeaPromille    = @m,
+    FlaecheM2      = @f,
+    Notiz          = @n
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@id", e.Id);
+            cmd.Parameters.AddWithValue("@lid", e.LiegenschaftId);
+            cmd.Parameters.AddWithValue("@b", e.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@t", (object?)e.Typ ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@m", (object?)e.MeaPromille ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@f", (object?)e.FlaecheM2 ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@n", (object?)e.Notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public bool StweEinheitHasEigentum(int einheitId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweEinheitEigentum WHERE EinheitId = @id;";
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", einheitId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public bool StweEinheitUsedInSetLines(int einheitId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweSetLine WHERE EinheitId = @id;";
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", einheitId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public void StweEinheitDelete(int einheitId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // HARTE REGELN:
+            // 1) Keine Eigentums-Zuordnungen
+            if (StweEinheitHasEigentum(einheitId))
+            {
+                System.Windows.MessageBox.Show(
+                    "Diese Einheit kann nicht gelöscht werden,\n" +
+                    "weil noch Eigentums-Zuordnungen existieren.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            // 2) Nicht in STWE-Sets verwendet
+            if (StweEinheitUsedInSetLines(einheitId))
+            {
+                System.Windows.MessageBox.Show(
+                    "Diese Einheit kann nicht gelöscht werden,\n" +
+                    "weil sie in STWE-Sets (SetLines) verwendet wird.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "DELETE FROM dbo.StweEinheit WHERE Id = @id;";
+                cmd.Parameters.AddWithValue("@id", einheitId);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Einheit")) return;
+
+                System.Windows.MessageBox.Show(
+                    "Einheit konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        public void StweEigentuemerUpdate(MyCoinFlow.Models.StweEigentuemer e)
+        {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (e.Id <= 0) throw new ArgumentException("Id fehlt.", nameof(e));
+            if (string.IsNullOrWhiteSpace(e.Name))
+                throw new ArgumentException("Name darf nicht leer sein.", nameof(e));
+
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweEigentuemer SET
+    Name    = @n,
+    Email   = @em,
+    Telefon = @tel,
+    Notiz   = @no
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@id", e.Id);
+            cmd.Parameters.AddWithValue("@n", e.Name.Trim());
+            cmd.Parameters.AddWithValue("@em", (object?)e.Email ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@tel", (object?)e.Telefon ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)e.Notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public bool StweEigentuemerHasEigentumZuordnungen(int eigentuemerId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweEinheitEigentum WHERE EigentuemerId = @id;";
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", eigentuemerId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public bool StweEigentuemerUsedInSetLines(int eigentuemerId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweSetLine WHERE EigentuemerId = @id;";
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", eigentuemerId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public void StweEigentuemerDelete(int eigentuemerId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // HARTE REGEL 1: keine Zuordnungen
+            if (StweEigentuemerHasEigentumZuordnungen(eigentuemerId))
+            {
+                System.Windows.MessageBox.Show(
+                    "Dieser Eigentümer kann nicht gelöscht werden,\n" +
+                    "weil noch Eigentums-Zuordnungen existieren.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            // HARTE REGEL 2: nicht in Sets verwendet
+            if (StweEigentuemerUsedInSetLines(eigentuemerId))
+            {
+                System.Windows.MessageBox.Show(
+                    "Dieser Eigentümer kann nicht gelöscht werden,\n" +
+                    "weil er in STWE-Sets (SetLines) verwendet wird.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "DELETE FROM dbo.StweEigentuemer WHERE Id = @id;";
+                cmd.Parameters.AddWithValue("@id", eigentuemerId);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                if (HandleSqlDeleteException(ex, "Eigentümer")) return;
+
+                System.Windows.MessageBox.Show(
+                    "Eigentümer konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        public void StweSchluesselRename(int schluesselId, string newName)
+        {
+            EnsureStweSchema();
+
+            if (schluesselId <= 0) throw new ArgumentOutOfRangeException(nameof(schluesselId));
+            if (string.IsNullOrWhiteSpace(newName))
+                throw new ArgumentException("Name darf nicht leer sein.", nameof(newName));
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // 1) alten Namen + LiegenschaftId holen
+                int liegenschaftId;
+                string oldName;
+
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "SELECT LiegenschaftId, Name FROM dbo.StweSchluessel WHERE Id=@id;";
+                    cmd.Parameters.AddWithValue("@id", schluesselId);
+
+                    using var r = cmd.ExecuteReader();
+                    if (!r.Read())
+                    {
+                        System.Windows.MessageBox.Show("Schlüssel wurde nicht gefunden.",
+                            "Umbenennen nicht möglich",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Information);
+                        tx.Rollback();
+                        return;
+                    }
+
+                    liegenschaftId = r.GetInt32(0);
+                    oldName = r.GetString(1);
+                }
+
+                var trimmed = newName.Trim();
+
+                // 2) Duplikat-Check innerhalb derselben Liegenschaft
+                using (var chk = c.CreateCommand())
+                {
+                    chk.Transaction = tx;
+                    chk.CommandText = @"
+SELECT TOP(1) 1
+FROM dbo.StweSchluessel
+WHERE LiegenschaftId = @lid
+  AND UPPER(LTRIM(RTRIM(Name))) = UPPER(LTRIM(RTRIM(@n)))
+  AND Id <> @id;";
+                    chk.Parameters.AddWithValue("@lid", liegenschaftId);
+                    chk.Parameters.AddWithValue("@n", trimmed);
+                    chk.Parameters.AddWithValue("@id", schluesselId);
+
+                    var v = chk.ExecuteScalar();
+                    if (v != null && v != DBNull.Value)
+                    {
+                        System.Windows.MessageBox.Show(
+                            "Ein Schlüssel mit dieser Bezeichnung existiert bereits in dieser Liegenschaft.",
+                            "Umbenennen nicht möglich",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Information);
+                        tx.Rollback();
+                        return;
+                    }
+                }
+
+                // 3) Schlüsselstamm umbenennen
+                using (var upd = c.CreateCommand())
+                {
+                    upd.Transaction = tx;
+                    upd.CommandText = "UPDATE dbo.StweSchluessel SET Name=@n WHERE Id=@id;";
+                    upd.Parameters.AddWithValue("@n", trimmed);
+                    upd.Parameters.AddWithValue("@id", schluesselId);
+                    upd.ExecuteNonQuery();
+                }
+
+                // 4) Optional: bereits gespeicherte SetLines mit altem Schlüsseltext mitziehen
+                // (weil StweSetLine.Schluessel ein Textfeld ist und oft den Schlüssel-Namen enthält)
+                using (var upd2 = c.CreateCommand())
+                {
+                    upd2.Transaction = tx;
+                    upd2.CommandText = @"
+UPDATE l
+SET l.Schluessel = @new
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s ON s.Id = l.SetId
+WHERE s.LiegenschaftId = @lid
+  AND l.Schluessel = @old;";
+                    upd2.Parameters.AddWithValue("@new", trimmed);
+                    upd2.Parameters.AddWithValue("@lid", liegenschaftId);
+                    upd2.Parameters.AddWithValue("@old", oldName);
+                    upd2.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+
+
+
+
+
     }
-
-
-
-}
 }

@@ -4,215 +4,326 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- Header -->
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-            <!-- Status -->
-            <RowDefinition Height="12"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-            <RowDefinition Height="2*"/>
-            <!-- Liegenschaften Grid -->
-            <RowDefinition Height="16"/>
+        <!-- LINKS: Aktionen -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-            <RowDefinition Height="Auto"/>
-            <!-- Einheiten Header -->
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>
-            <!-- Einheiten Grid -->
-            <RowDefinition Height="16"/>
+                    <TextBlock Text="Aktionen"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
 
-            <RowDefinition Height="Auto"/>
-            <!-- Eigentümer Header -->
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="220"/>
-            <!-- Eigentümer Grid -->
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>
-            <!-- Zuordnungen Grid -->
-            <RowDefinition Height="16"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>
+                    <!-- Liegenschaften -->
+                    <TextBlock Text="Liegenschaften"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,6"/>
 
-        </Grid.RowDefinitions>
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeueLiegenschaftCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="HomePlusOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Neu"/>
+                        </StackPanel>
+                    </Button>
 
-        <!-- Header -->
-        <DockPanel Grid.Row="0" LastChildFill="False">
-            <TextBlock FontSize="26"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding LiegenschaftBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding LiegenschaftLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Einheiten -->
+                    <TextBlock Text="Einheiten"
+                               FontWeight="SemiBold"
+                               Margin="0,10,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeueEinheitCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Einheit hinzufügen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding EinheitBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding EinheitLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Eigentümer -->
+                    <TextBlock Text="Eigentümer"
+                               FontWeight="SemiBold"
+                               Margin="0,10,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding EigentuemerBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding EigentuemerLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Zuordnungen -->
+                    <TextBlock Text="Zuordnungen"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding EigentumZuordnenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="LinkVariant" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zuordnen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ZuordnungBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="CalendarEdit" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zuordnung bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ZuordnungLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="LinkOff" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zuordnung löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Schlüssel -->
+                    <TextBlock Text="Schlüssel"
+                               FontWeight="SemiBold"
+                               Margin="0,10,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeuerSchluesselCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Schlüssel neu"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SchluesselUmbenennenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="RenameBox" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Umbenennen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SchluesselZeilenBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistEdit" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeilen bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Text="Status"
+                               FontWeight="SemiBold"
+                               Margin="0,16,0,6"/>
+
+                    <TextBlock Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Text="{Binding StatusText}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- RECHTS: Inhalt -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="14"/>
+
+                <RowDefinition Height="2*"/>
+                <RowDefinition Height="18"/>
+
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="18"/>
+
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="220"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="18"/>
+
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       FontSize="26"
                        FontWeight="SemiBold"
-                       Text="Liegenschaften (STWE)"
-                       DockPanel.Dock="Left"/>
+                       Text="Liegenschaften (STWE)"/>
 
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Command="{Binding NeueLiegenschaftCommand}"
-                    Padding="14,8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Neu"/>
-                </StackPanel>
-            </Button>
-        </DockPanel>
+            <TextBlock Grid.Row="2"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Text="{Binding StatusText}"
+                       TextWrapping="Wrap"/>
 
-        <!-- Status -->
-        <TextBlock Grid.Row="2"
-                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                   Text="{Binding StatusText}"
-                   TextWrapping="Wrap"/>
+            <!-- Liegenschaften -->
+            <DataGrid Grid.Row="4"
+                      ItemsSource="{Binding Liegenschaften}"
+                      SelectedItem="{Binding SelectedLiegenschaft}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
+                    <DataGridTextColumn Header="Strasse" Binding="{Binding Strasse}" Width="2*"/>
+                    <DataGridTextColumn Header="PLZ" Binding="{Binding PLZ}" Width="*"/>
+                    <DataGridTextColumn Header="Ort" Binding="{Binding Ort}" Width="2*"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-        <!-- Liegenschaften -->
-        <DataGrid Grid.Row="4"
-                  ItemsSource="{Binding Liegenschaften}"
-                  SelectedItem="{Binding SelectedLiegenschaft}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
-                <DataGridTextColumn Header="Strasse" Binding="{Binding Strasse}" Width="2*"/>
-                <DataGridTextColumn Header="PLZ" Binding="{Binding PLZ}" Width="*"/>
-                <DataGridTextColumn Header="Ort" Binding="{Binding Ort}" Width="2*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+            <!-- Einheiten -->
+            <TextBlock Grid.Row="6" FontSize="18" FontWeight="SemiBold" Text="Einheiten"/>
+            <DataGrid Grid.Row="8"
+                      ItemsSource="{Binding Einheiten}"
+                      SelectedItem="{Binding SelectedEinheit}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="2*"/>
+                    <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>
+                    <DataGridTextColumn Header="MEA (‰)" Binding="{Binding MeaPromille}" Width="*"/>
+                    <DataGridTextColumn Header="Fläche (m²)" Binding="{Binding FlaecheM2}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-        <!-- Einheiten Header -->
-        <DockPanel Grid.Row="6" LastChildFill="False">
-            <TextBlock FontSize="18"
-                       FontWeight="SemiBold"
-                       Text="Einheiten"
-                       DockPanel.Dock="Left"/>
+            <!-- Eigentümer / Zuordnung -->
+            <TextBlock Grid.Row="10" FontSize="18" FontWeight="SemiBold" Text="Eigentümer &amp; Zuordnungen"/>
 
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    Command="{Binding NeueEinheitCommand}"
-                    Padding="14,8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Einheit hinzufügen"/>
-                </StackPanel>
-            </Button>
-        </DockPanel>
+            <DataGrid Grid.Row="12"
+                      ItemsSource="{Binding Eigentuemer}"
+                      SelectedItem="{Binding SelectedEigentuemer}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
+                    <DataGridTextColumn Header="E-Mail" Binding="{Binding Email}" Width="2*"/>
+                    <DataGridTextColumn Header="Telefon" Binding="{Binding Telefon}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-        <!-- Einheiten -->
-        <DataGrid Grid.Row="8"
-                  ItemsSource="{Binding Einheiten}"
-                  SelectedItem="{Binding SelectedEinheit}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="2*"/>
-                <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>
-                <DataGridTextColumn Header="MEA (‰)" Binding="{Binding MeaPromille}" Width="*"/>
-                <DataGridTextColumn Header="Fläche (m²)" Binding="{Binding FlaecheM2}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+            <DataGrid Grid.Row="14"
+                      ItemsSource="{Binding EigentumRows}"
+                      SelectedItem="{Binding SelectedEigentumRow}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Eigentümer" Binding="{Binding EigentuemerName}" Width="2*"/>
+                    <DataGridTextColumn Header="Von" Binding="{Binding GueltigVon}" Width="*"/>
+                    <DataGridTextColumn Header="Bis" Binding="{Binding GueltigBis}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-        <!-- Eigentümer Header -->
-        <DockPanel Grid.Row="10" LastChildFill="False">
-            <TextBlock FontSize="18"
-                       FontWeight="SemiBold"
-                       Text="Eigentümer &amp; Zuordnung"
-                       DockPanel.Dock="Left"/>
+            <!-- Schlüssel -->
+            <TextBlock Grid.Row="16" FontSize="18" FontWeight="SemiBold" Text="Schlüssel (Verteilpläne)"/>
+            <DataGrid Grid.Row="18"
+                      ItemsSource="{Binding Schluessel}"
+                      SelectedItem="{Binding SelectedSchluessel}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
+                    <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    Command="{Binding NeueEigentuemerCommand}"
-                    Padding="14,8"
-                    Margin="8,0,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="AccountPlusOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Eigentümer neu"/>
-                </StackPanel>
-            </Button>
-
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Command="{Binding EigentumZuordnenCommand}"
-                    Padding="14,8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="LinkVariant" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Zuordnen"/>
-                </StackPanel>
-            </Button>
-        </DockPanel>
-
-        <!-- Eigentümer -->
-        <DataGrid Grid.Row="12"
-                  ItemsSource="{Binding Eigentuemer}"
-                  SelectedItem="{Binding SelectedEigentuemer}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
-                <DataGridTextColumn Header="E-Mail" Binding="{Binding Email}" Width="2*"/>
-                <DataGridTextColumn Header="Telefon" Binding="{Binding Telefon}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Zuordnungen -->
-        <DataGrid Grid.Row="14"
-                  ItemsSource="{Binding EigentumRows}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Eigentümer" Binding="{Binding EigentuemerName}" Width="2*"/>
-                <DataGridTextColumn Header="Von" Binding="{Binding GueltigVon}" Width="*"/>
-                <DataGridTextColumn Header="Bis" Binding="{Binding GueltigBis}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Schlüssel Header -->
-        <DockPanel Grid.Row="16" LastChildFill="False">
-            <TextBlock FontSize="18"
-               FontWeight="SemiBold"
-               Text="Schlüssel (Verteilpläne)"
-               DockPanel.Dock="Left"/>
-
-            <Button DockPanel.Dock="Right"
-            Style="{StaticResource MaterialDesignOutlinedButton}"
-            Command="{Binding SchluesselZeilenBearbeitenCommand}"
-            Padding="14,8"
-            Margin="8,0,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlaylistEdit" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Zeilen bearbeiten"/>
-                </StackPanel>
-            </Button>
-
-            <Button DockPanel.Dock="Right"
-            Style="{StaticResource MaterialDesignRaisedButton}"
-            Command="{Binding NeuerSchluesselCommand}"
-            Padding="14,8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Schlüssel neu"/>
-                </StackPanel>
-            </Button>
-        </DockPanel>
-
-        <!-- Schlüssel Liste -->
-        <DataGrid Grid.Row="18"
-          ItemsSource="{Binding Schluessel}"
-          SelectedItem="{Binding SelectedSchluessel}"
-          AutoGenerateColumns="False"
-          IsReadOnly="True"
-          CanUserAddRows="False"
-          Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
-                <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-
+        </Grid>
     </Grid>
 </UserControl>
