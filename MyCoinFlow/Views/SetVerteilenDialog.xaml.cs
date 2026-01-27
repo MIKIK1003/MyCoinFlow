@@ -1,6 +1,7 @@
 ﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -13,17 +14,10 @@ namespace MyCoinFlow.Views
 {
     public partial class SetVerteilenDialog : Window, INotifyPropertyChanged
     {
-        private sealed class RawShare
-        {
-            public int EigentuemerId { get; set; }
-            public string Name { get; set; } = "";
-            public decimal BetragRaw { get; set; }
-        }
-
+        // ===== Row VM =====
         public sealed class RowVm : INotifyPropertyChanged
         {
             private int? _eigentuemerId;
-            private string _eigentuemerName = "";
             private string _betragText = "0.00";
             private decimal _betrag;
             private string? _notiz;
@@ -35,18 +29,12 @@ namespace MyCoinFlow.Views
                 set { _eigentuemerId = value; OnPropertyChanged(); }
             }
 
-            public string EigentuemerName
-            {
-                get => _eigentuemerName;
-                set { _eigentuemerName = value; OnPropertyChanged(); }
-            }
-
             public string BetragText
             {
                 get => _betragText;
                 set
                 {
-                    _betragText = value;
+                    _betragText = value ?? "";
                     OnPropertyChanged();
                     ParseBetrag();
                 }
@@ -67,13 +55,18 @@ namespace MyCoinFlow.Views
             public string Source
             {
                 get => _source;
-                set { _source = value; OnPropertyChanged(); }
+                set { _source = value ?? ""; OnPropertyChanged(); }
             }
 
             private void ParseBetrag()
             {
-                var raw = (_betragText ?? "").Trim().Replace(" ", "").Replace(",", ".");
-                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
+                // CH-tolerant: "1'234.50" / "1234,50" / "1234.50"
+                var s = (_betragText ?? "").Trim();
+                s = s.Replace("’", "'").Replace(" ", "");
+                s = s.Replace("'", "");      // Tausender
+                s = s.Replace(",", ".");     // Dezimal
+
+                if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
                     Betrag = val;
                 else
                     Betrag = 0m;
@@ -82,6 +75,13 @@ namespace MyCoinFlow.Views
             public event PropertyChangedEventHandler? PropertyChanged;
             private void OnPropertyChanged([CallerMemberName] string? name = null)
                 => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        // ===== Helper for rounded allocation =====
+        private sealed class RawShare
+        {
+            public int EigentuemerId { get; set; }
+            public decimal BetragRaw { get; set; }
         }
 
         private readonly DatabaseService _db = new();
@@ -98,16 +98,31 @@ namespace MyCoinFlow.Views
             set { _selectedSchluessel = value; OnPropertyChanged(); }
         }
 
-        // ---- Closed handling ----
+        // Status
         public bool IsEditable => !_set.IsClosed;
         public bool IsReadOnlyGrid => _set.IsClosed;
 
-        public string StatusLine => _set.IsClosed ? "Status: GESCHLOSSEN" : "Status: OFFEN";
+        // NEW: Set-Typ aus DB: IsCredit (Single Source of Truth)
+        private bool IsCreditSet => _set.IsCredit;
+
+        // Signed Total (Belastung = +, Gutschrift = -)
+        private decimal SetTotalSigned => IsCreditSet ? -Math.Abs(_set.Betrag) : Math.Abs(_set.Betrag);
 
         public string HeaderText { get; private set; } = "";
-        public string TotalText => $"Total: {FormatChf(_set.Betrag)}";
+
+        public string StatusLine
+        {
+            get
+            {
+                var status = _set.IsClosed ? "Status: GESCHLOSSEN" : "Status: OFFEN";
+                var typ = IsCreditSet ? "Typ: GUTSCHRIFT" : "Typ: BELASTUNG";
+                return $"{status}  |  {typ}";
+            }
+        }
+
+        public string TotalText => $"Total: {FormatChf(SetTotalSigned)}";
         public string DistributedText => $"Verteilt: {FormatChf(Rows.Sum(r => r.Betrag))}";
-        public string RestText => $"Rest: {FormatChf(_set.Betrag - Rows.Sum(r => r.Betrag))}";
+        public string RestText => $"Rest: {FormatChf(SetTotalSigned - Rows.Sum(r => r.Betrag))}";
 
         public SetVerteilenDialog(StweSetRow setRow)
         {
@@ -125,12 +140,13 @@ namespace MyCoinFlow.Views
 
             DataContext = this;
 
+            RaiseTotals();
             OnPropertyChanged(nameof(IsEditable));
             OnPropertyChanged(nameof(IsReadOnlyGrid));
             OnPropertyChanged(nameof(StatusLine));
-
-            RaiseTotals();
         }
+
+        // ===== Load =====
 
         private void LoadOwners()
         {
@@ -154,21 +170,19 @@ namespace MyCoinFlow.Views
 
             foreach (var l in _db.StweSetLinesGet(_set.Id))
             {
-                var owner = l.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == l.EigentuemerId.Value) : null;
-
                 var row = new RowVm
                 {
                     EigentuemerId = l.EigentuemerId,
-                    EigentuemerName = owner?.Name ?? "",
                     BetragText = l.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
                     Notiz = l.Notiz,
                     Source = string.IsNullOrWhiteSpace(l.Schluessel) ? "MANUELL" : l.Schluessel!
                 };
-
                 AttachRow(row);
                 Rows.Add(row);
             }
         }
+
+        // ===== Row events =====
 
         private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -188,41 +202,27 @@ namespace MyCoinFlow.Views
 
         private void Row_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            try
-            {
-                if (sender is RowVm row)
-                {
-                    if (e.PropertyName == nameof(RowVm.EigentuemerId))
-                    {
-                        var o = row.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == row.EigentuemerId.Value) : null;
-                        row.EigentuemerName = o?.Name ?? "";
-                    }
-
-                    if (e.PropertyName == nameof(RowVm.BetragText) || e.PropertyName == nameof(RowVm.Betrag))
-                        RaiseTotals();
-                }
-            }
-            catch { /* still */ }
+            if (e.PropertyName == nameof(RowVm.BetragText) || e.PropertyName == nameof(RowVm.Betrag))
+                RaiseTotals();
         }
 
-        // -------- Buttons / Actions --------
+        // ===== Buttons =====
 
         private void AddRow_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             Rows.Add(new RowVm
             {
                 EigentuemerId = null,
-                EigentuemerName = "",
-                BetragText = "0.00",
+                BetragText = IsCreditSet ? "-0.00" : "0.00",
                 Source = "MANUELL"
             });
         }
 
         private void DeleteRow_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             if (Grid.SelectedItem is RowVm row)
                 Rows.Remove(row);
@@ -230,7 +230,7 @@ namespace MyCoinFlow.Views
 
         private void ClearRows_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             Rows.Clear();
             RaiseTotals();
@@ -238,7 +238,7 @@ namespace MyCoinFlow.Views
 
         private void AutoFix_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             if (SelectedSchluessel == null)
             {
@@ -247,7 +247,7 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            if (SelectedSchluessel.Modus != "FIX")
+            if (!string.Equals(SelectedSchluessel.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show("Dieser Schlüssel ist nicht FIX.", "Auto verteilen",
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -270,28 +270,19 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            var raw = lines
-                .Select(l =>
-                {
-                    var owner = Owners.FirstOrDefault(o => o.Id == l.EigentuemerId);
-                    var name = owner?.Name ?? l.EigentuemerName ?? "";
-                    var amount = _set.Betrag * (l.AnteilProzent / 100m);
-
-                    return new RawShare
-                    {
-                        EigentuemerId = l.EigentuemerId,
-                        Name = name,
-                        BetragRaw = amount
-                    };
-                })
-                .ToList();
+            var total = SetTotalSigned;
+            var raw = lines.Select(l =>
+            {
+                var amount = total * (l.AnteilProzent / 100m);
+                return new RawShare { EigentuemerId = l.EigentuemerId, BetragRaw = amount };
+            }).ToList();
 
             ApplyRoundedRows(raw, $"Auto (FIX): {SelectedSchluessel.Name}", $"FIX:{SelectedSchluessel.Id}");
         }
 
         private void AutoMea_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             if (SelectedSchluessel == null)
             {
@@ -300,7 +291,7 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            if (SelectedSchluessel.Modus != "MEA")
+            if (!string.Equals(SelectedSchluessel.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show("Dieser Schlüssel ist nicht MEA.", "Auto verteilen",
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -318,8 +309,8 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            var ownerMea = new System.Collections.Generic.Dictionary<int, decimal>();
-            var missing = new System.Collections.Generic.List<string>();
+            var ownerMea = new Dictionary<int, decimal>();
+            var missing = new List<string>();
 
             foreach (var u in units)
             {
@@ -344,65 +335,51 @@ namespace MyCoinFlow.Views
                     (missing.Count > 10 ? "\n…" : "") +
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
                     "Auto verteilen",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             var sumMea = ownerMea.Values.Sum();
             if (sumMea <= 0m)
             {
-                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.", "Auto verteilen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
+                    "Auto verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var raw = ownerMea
-                .Select(kv =>
-                {
-                    var oid = kv.Key;
-                    var mea = kv.Value;
-
-                    var owner = Owners.FirstOrDefault(o => o.Id == oid);
-                    var name = owner?.Name ?? $"Eigentümer #{oid}";
-
-                    var amount = _set.Betrag * (mea / sumMea);
-
-                    return new RawShare
-                    {
-                        EigentuemerId = oid,
-                        Name = name,
-                        BetragRaw = amount
-                    };
-                })
-                .ToList();
+            var total = SetTotalSigned;
+            var raw = ownerMea.Select(kv =>
+            {
+                var amount = total * (kv.Value / sumMea);
+                return new RawShare { EigentuemerId = kv.Key, BetragRaw = amount };
+            }).ToList();
 
             ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
         }
 
-        private void ApplyRoundedRows(System.Collections.Generic.List<RawShare> raw, string notiz, string source)
+        private void ApplyRoundedRows(List<RawShare> raw, string notiz, string source)
         {
             var rounded = raw
                 .Select(x => new
                 {
                     x.EigentuemerId,
-                    x.Name,
                     Betrag = Math.Round(x.BetragRaw, 2, MidpointRounding.AwayFromZero)
                 })
                 .ToList();
 
             var sumRounded = rounded.Sum(x => x.Betrag);
-            var diff = _set.Betrag - sumRounded;
+            var diff = SetTotalSigned - sumRounded;
 
             if (diff != 0m && rounded.Count > 0)
             {
+                // Korrektur auf die betragsmässig grösste Zeile (nach Betrag-ABS)
                 var idx = rounded
-                    .Select((x, i) => new { x.Betrag, Index = i })
-                    .OrderByDescending(x => x.Betrag)
+                    .Select((x, i) => new { Abs = Math.Abs(x.Betrag), Index = i })
+                    .OrderByDescending(x => x.Abs)
                     .First().Index;
 
                 var item = rounded[idx];
-                rounded[idx] = new { item.EigentuemerId, item.Name, Betrag = item.Betrag + diff };
+                rounded[idx] = new { item.EigentuemerId, Betrag = item.Betrag + diff };
             }
 
             Rows.Clear();
@@ -411,7 +388,6 @@ namespace MyCoinFlow.Views
                 Rows.Add(new RowVm
                 {
                     EigentuemerId = r.EigentuemerId,
-                    EigentuemerName = r.Name,
                     BetragText = r.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
                     Notiz = notiz,
                     Source = source
@@ -421,54 +397,15 @@ namespace MyCoinFlow.Views
             RaiseTotals();
         }
 
-        // ---- Save / Close / Closing ----
-
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
             TrySave(showSuccessMessage: true);
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            // Schließen immer möglich
-            if (_set.IsClosed) { Close(); return; }
-
-            if (TrySave())
-                Close();
-        }
-
-        private void CloseSet_Click(object sender, RoutedEventArgs e)
-        {
-            if (_set.IsClosed) return;
-
-            if (!TrySave())
-                return;
-
-            var rest = _set.Betrag - Rows.Sum(r => r.Betrag);
-            if (Math.Abs((double)rest) > 0.0001)
-            {
-                MessageBox.Show("Set kann nur abgeschlossen werden, wenn Rest = 0.00 ist.",
-                    "Abschließen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            _db.StweSetSetClosed(_set.Id, true);
-            MessageBox.Show("Set wurde abgeschlossen.", "Abschließen",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-
-            _set.IsClosed = true;
-            OnPropertyChanged(nameof(IsEditable));
-            OnPropertyChanged(nameof(IsReadOnlyGrid));
-            OnPropertyChanged(nameof(StatusLine));
-
-            Close();
         }
 
         private void SetVerteilenDialog_Closing(object? sender, CancelEventArgs e)
         {
-            // Wenn geschlossen -> nie blockieren
-            if (_set.IsClosed) return;
+            if (!IsEditable) return;
 
             // Auto-Save beim X
             if (!TrySave())
@@ -477,8 +414,6 @@ namespace MyCoinFlow.Views
 
         private bool TrySave(bool showSuccessMessage = false)
         {
-            SyncOwnerNames();
-
             if (!ValidateBeforeSave())
                 return false;
 
@@ -514,29 +449,14 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void SyncOwnerNames()
-        {
-            foreach (var r in Rows)
-            {
-                var o = r.EigentuemerId.HasValue ? Owners.FirstOrDefault(x => x.Id == r.EigentuemerId.Value) : null;
-                r.EigentuemerName = o?.Name ?? "";
-            }
-        }
-
         private bool ValidateBeforeSave()
         {
+            // leeres Set ist ok
             if (Rows.Count == 0) return true;
 
             if (Rows.Any(r => !r.EigentuemerId.HasValue || r.EigentuemerId.Value <= 0))
             {
                 MessageBox.Show("Bitte in allen Zeilen einen Eigentümer wählen.", "Set verteilen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
-            }
-
-            if (Rows.Any(r => r.Betrag < 0m))
-            {
-                MessageBox.Show("Beträge dürfen nicht negativ sein.", "Set verteilen",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
@@ -548,12 +468,51 @@ namespace MyCoinFlow.Views
                 return false;
             }
 
-            var sum = Rows.Sum(r => r.Betrag);
-            if (sum > _set.Betrag + 0.0001m)
+            // Vorzeichen-Regeln
+            if (IsCreditSet)
             {
-                MessageBox.Show("Summe der Zeilen darf den Set-Betrag nicht überschreiten.", "Set verteilen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
+                if (Rows.Any(r => r.Betrag > 0m))
+                {
+                    MessageBox.Show("Bei Gutschriften müssen die Zeilenbeträge negativ sein.",
+                        "Set verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+            }
+            else
+            {
+                if (Rows.Any(r => r.Betrag < 0m))
+                {
+                    MessageBox.Show("Bei Belastungen dürfen die Zeilenbeträge nicht negativ sein.",
+                        "Set verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+            }
+
+            // Summen-Regel (Überverteilung verhindern) – für beide Vorzeichen korrekt
+            var sum = Rows.Sum(r => r.Betrag);
+            var total = SetTotalSigned;
+            const decimal eps = 0.0001m;
+
+            if (!IsCreditSet)
+            {
+                // Belastung: Summe darf Total nicht überschreiten
+                if (sum > total + eps)
+                {
+                    MessageBox.Show("Summe der Zeilen darf den Set-Betrag nicht überschreiten.",
+                        "Set verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+            }
+            else
+            {
+                // Gutschrift (total ist negativ): Summe darf nicht "mehr negativ" sein als Total
+                // Beispiel: total = -100, sum = -110 -> zu viel verteilt
+                if (sum < total - eps)
+                {
+                    MessageBox.Show("Summe der Zeilen darf den (negativen) Set-Betrag nicht unterschreiten.",
+                        "Set verteilen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
             }
 
             return true;
@@ -567,8 +526,10 @@ namespace MyCoinFlow.Views
 
         private void RaiseTotals()
         {
+            OnPropertyChanged(nameof(TotalText));
             OnPropertyChanged(nameof(DistributedText));
             OnPropertyChanged(nameof(RestText));
+            OnPropertyChanged(nameof(StatusLine));
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

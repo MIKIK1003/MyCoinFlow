@@ -4571,6 +4571,15 @@ BEGIN
     CREATE INDEX IX_StweSet_TransaktionId  ON dbo.StweSet(TransaktionId);
 END;
 
+-- NEU: Set-Typ (Gutschrift/Belastung)
+IF COL_LENGTH('dbo.StweSet', 'IsCredit') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweSet
+    ADD IsCredit BIT NOT NULL CONSTRAINT DF_StweSet_IsCredit DEFAULT(0);
+END;
+
+
+
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSetLine' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
     CREATE TABLE dbo.StweSetLine
@@ -5037,11 +5046,17 @@ SELECT
     s.LiegenschaftId,
     s.TransaktionId,
     t.Datum,
-    t.Betrag,
+
+    -- SIGNED Total (Belastung = +, Gutschrift = -)
+    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
+
     COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
     s.IsClosed,
+    ISNULL(s.IsCredit, 0) AS IsCredit,
+
     ISNULL(x.Verteilt, 0) AS Verteilt,
-    (t.Betrag - ISNULL(x.Verteilt, 0)) AS Rest
+
+    (CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END) - ISNULL(x.Verteilt, 0) AS Rest
 FROM dbo.StweSet s
 JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
 OUTER APPLY (
@@ -5072,13 +5087,16 @@ ORDER BY t.Datum DESC, s.Id DESC;";
                     Betrag = r.GetDecimal(4),
                     Titel = r.GetString(5),
                     IsClosed = r.GetBoolean(6),
-                    Verteilt = r.GetDecimal(7),
-                    Rest = r.GetDecimal(8)
+                    IsCredit = r.GetBoolean(7),
+                    Verteilt = r.GetDecimal(8),
+                    Rest = r.GetDecimal(9)
                 });
             }
 
             return list;
         }
+
+
         public List<MyCoinFlow.Models.StweSchluessel> StweSchluesselGetByLiegenschaft(int liegenschaftId)
         {
             EnsureStweSchema();
@@ -5356,6 +5374,138 @@ ORDER BY GueltigVon DESC, Id DESC;";
 
             cmd.ExecuteNonQuery();
         }
+
+        public void StweSetSetIsCredit(int setId, bool isCredit)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Defensive: Closed schützt auch DB-seitig
+            using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = "SELECT IsClosed FROM dbo.StweSet WHERE Id=@id;";
+                chk.Parameters.AddWithValue("@id", setId);
+                var v = chk.ExecuteScalar();
+                if (v != null && v != DBNull.Value && Convert.ToBoolean(v))
+                {
+                    System.Windows.MessageBox.Show(
+                        "Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
+                        "Set-Typ ändern nicht möglich",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.StweSet SET IsCredit = @x WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+            cmd.Parameters.AddWithValue("@x", isCredit ? 1 : 0);
+            cmd.ExecuteNonQuery();
+        }
+
+
+
+
+        public void StweSetUpdateTitel(int setId, string? titel)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Defensive: Closed-Schutz auch DB-seitig
+            using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = "SELECT IsClosed FROM dbo.StweSet WHERE Id=@id;";
+                chk.Parameters.AddWithValue("@id", setId);
+                var v = chk.ExecuteScalar();
+                if (v == null || v == DBNull.Value) return;
+
+                if (Convert.ToBoolean(v))
+                {
+                    System.Windows.MessageBox.Show(
+                        "Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
+                        "Titel ändern nicht möglich",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.StweSet SET Titel=@t WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+            cmd.Parameters.AddWithValue("@t", (object?)titel ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void StweSetDelete(int setId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Defensive: Closed-Schutz auch DB-seitig
+            using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = "SELECT IsClosed FROM dbo.StweSet WHERE Id=@id;";
+                chk.Parameters.AddWithValue("@id", setId);
+                var v = chk.ExecuteScalar();
+                if (v == null || v == DBNull.Value) return;
+
+                if (Convert.ToBoolean(v))
+                {
+                    System.Windows.MessageBox.Show(
+                        "Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
+                        "Löschen nicht möglich",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            using var tx = c.BeginTransaction();
+            try
+            {
+                using (var delLines = c.CreateCommand())
+                {
+                    delLines.Transaction = tx;
+                    delLines.CommandText = "DELETE FROM dbo.StweSetLine WHERE SetId=@id;";
+                    delLines.Parameters.AddWithValue("@id", setId);
+                    delLines.ExecuteNonQuery();
+                }
+
+                using (var delSet = c.CreateCommand())
+                {
+                    delSet.Transaction = tx;
+                    delSet.CommandText = "DELETE FROM dbo.StweSet WHERE Id=@id;";
+                    delSet.Parameters.AddWithValue("@id", setId);
+                    delSet.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                try { tx.Rollback(); } catch { }
+
+                if (HandleSqlDeleteException(ex, "Set")) return;
+
+                System.Windows.MessageBox.Show(
+                    "Set konnte nicht gelöscht werden:\n" + ex.Message,
+                    "Löschen fehlgeschlagen",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+
+
+
         public List<MyCoinFlow.Models.StweOwnerSummaryRow> StweReportOwnerSummary(
     int liegenschaftId, DateTime? von, DateTime? bis)
         {
@@ -5925,6 +6075,18 @@ WHERE s.LiegenschaftId = @lid
             }
         }
 
+        public bool StweSetGetIsCredit(int setId)
+        {
+            EnsureStweSchema();
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT IsCredit FROM dbo.StweSet WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value && Convert.ToBoolean(v);
+        }
 
 
 

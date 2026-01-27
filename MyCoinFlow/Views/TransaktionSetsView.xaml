@@ -4,96 +4,192 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Header -->
-        <DockPanel Grid.Row="0" LastChildFill="False">
-            <TextBlock FontSize="26"
+        <!-- LINKS: Aktionen -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Aktionen"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Set erstellen"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeuesSetAusTransaktionCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistPlus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Set aus Transaktion"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <TextBlock Text="Set bearbeiten"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SetVerteilenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ChartPie" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Verteilen / Anzeigen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SetTitelBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Titel ändern"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SetLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Set löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <TextBlock Text="Status"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SetAbschliessenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="LockOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Abschliessen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SetWiederOeffnenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="LockOpenVariantOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Wieder öffnen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Command="{Binding SetAlsGutschriftCommand}"
+        Padding="12,8"
+        Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ArrowDownBoldCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Als Gutschrift"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Command="{Binding SetAlsBelastungCommand}"
+        Padding="12,8"
+        Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ArrowUpBoldCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Als Belastung"/>
+                        </StackPanel>
+                    </Button>
+
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <TextBlock Text="Auswertung"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ShowAuswertungCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileChartOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="STWE Bericht"/>
+                        </StackPanel>
+                    </Button>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- RECHTS: Inhalt -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="14"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       FontSize="26"
                        FontWeight="SemiBold"
-                       Text="Transaktion Sets"
-                       DockPanel.Dock="Left"/>
+                       Text="Transaktion Sets"/>
 
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Command="{Binding NeuesSetAusTransaktionCommand}"
-                    Padding="14,8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlaylistPlus" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Set aus Transaktion"/>
-                </StackPanel>
-            </Button>
-
-            <Button DockPanel.Dock="Right"
-        Style="{StaticResource MaterialDesignOutlinedButton}"
-        Command="{Binding ShowAuswertungCommand}"
-        Padding="14,8"
-        Margin="0,0,8,0">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="ChartBoxOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Auswertung…"/>
-                </StackPanel>
-            </Button>
-
-
-            <Button DockPanel.Dock="Right"
-        Style="{StaticResource MaterialDesignOutlinedButton}"
-        Command="{Binding SetVerteilenCommand}"
-        Padding="14,8"
-        Margin="0,0,8,0">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="FormatListChecks" Width="18" Height="18" Margin="0,0,8,0"/>
-                    <TextBlock Text="Verteilen…"/>
-                </StackPanel>
-            </Button>
-
-
-        </DockPanel>
-
-        <!-- Filter -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <ComboBox Grid.Column="0"
-                      ItemsSource="{Binding Liegenschaften}"
-                      SelectedItem="{Binding SelectedLiegenschaft}"
-                      DisplayMemberPath="Name"
-                      materialDesign:HintAssist.Hint="Liegenschaft" />
-
-            <TextBlock Grid.Column="2"
-                       VerticalAlignment="Center"
+            <TextBlock Grid.Row="2"
                        Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                        Text="{Binding StatusText}"
-                       TextWrapping="Wrap" />
+                       TextWrapping="Wrap"/>
+
+            <!-- Liegenschaft Auswahl -->
+            <StackPanel Grid.Row="4" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Liegenschaft:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <ComboBox Width="380"
+                          ItemsSource="{Binding Liegenschaften}"
+                          SelectedItem="{Binding SelectedLiegenschaft}"
+                          DisplayMemberPath="Name"/>
+            </StackPanel>
+
+            <!-- Sets -->
+            <DataGrid Grid.Row="6"
+                      ItemsSource="{Binding Sets}"
+                      SelectedItem="{Binding SelectedSet}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Datum" Binding="{Binding Datum}" Width="120"/>
+                    <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="3*"/>
+                    <DataGridTextColumn Header="Total" Binding="{Binding Betrag}" Width="110"/>
+                    <DataGridTextColumn Header="Verteilt" Binding="{Binding Verteilt}" Width="110"/>
+                    <DataGridTextColumn Header="Rest" Binding="{Binding Rest}" Width="110"/>
+                    <DataGridCheckBoxColumn Header="Closed" Binding="{Binding IsClosed}" IsReadOnly="True" Width="80"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
         </Grid>
-
-        <!-- Sets -->
-        <DataGrid Grid.Row="4"
-                  ItemsSource="{Binding Sets}"
-                  SelectedItem="{Binding SelectedSet}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  Margin="0,6,0,0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Datum" Binding="{Binding Datum}" Width="120"/>
-                <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag}" Width="120"/>
-                <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="3*"/>
-                <DataGridTextColumn Header="Verteilt" Binding="{Binding Verteilt}" Width="120"/>
-                <DataGridTextColumn Header="Rest" Binding="{Binding Rest}" Width="120"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding IsClosed}" Width="100"/>
-
-            </DataGrid.Columns>
-        </DataGrid>
-
     </Grid>
 </UserControl>

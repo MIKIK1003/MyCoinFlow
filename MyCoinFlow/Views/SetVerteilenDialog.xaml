@@ -3,191 +3,248 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Set verteilen"
-        Width="980"
-        Height="700"
+        Width="1100"
+        Height="720"
         WindowStartupLocation="CenterOwner">
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Header -->
-        <DockPanel Grid.Row="0" LastChildFill="False">
-            <TextBlock FontSize="20"
+        <!-- LINKS: Aktionen -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <TextBlock Text="Aktionen"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
+
+                    <!-- Status -->
+                    <TextBlock Text="Status"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="Save_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ContentSaveOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Speichern"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Automatik -->
+                    <TextBlock Text="Automatik"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="AutoFix_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ChartPie" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Auto verteilen (FIX)"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="AutoMea_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ChartDonut" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Auto verteilen (MEA)"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="ClearRows_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistRemove" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeilen leeren"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Zeilen -->
+                    <TextBlock Text="Zeilen"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="AddRow_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistPlus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeile hinzufügen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="DeleteRow_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistMinus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeile löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- RECHTS: Inhalt -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <TextBlock Grid.Row="0"
+                       FontSize="20"
                        FontWeight="SemiBold"
-                       Text="Set verteilen"
-                       DockPanel.Dock="Left"/>
+                       Text="Set verteilen"/>
 
-            <!-- Abschließen nur wenn editierbar -->
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Content="Abschließen"
-                    Click="CloseSet_Click"
-                    Padding="14,8"
-                    Margin="8,0,0,0"
-                    IsEnabled="{Binding IsEditable}"/>
+            <!-- Status / Titel -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource MaterialDesignPaper}"
+                    CornerRadius="10"
+                    Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-            <!-- Speichern nur wenn editierbar -->
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Content="Speichern"
-                    Click="Save_Click"
-                    Padding="14,8"
-                    IsEnabled="{Binding IsEditable}"/>
+                    <TextBlock Text="{Binding HeaderText}"
+                               FontWeight="SemiBold"
+                               FontSize="14"/>
 
-            <!-- Schließen immer möglich -->
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    Content="Schließen"
-                    Click="Close_Click"
-                    Padding="14,8"
-                    Margin="8,0,0,0"/>
-        </DockPanel>
-
-        <!-- Kopfinfo -->
-        <Border Grid.Row="2"
-                Padding="12"
-                CornerRadius="8"
-                Background="{DynamicResource MaterialDesignPaper}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="10"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0"
-                               Text="{Binding HeaderText}"
-                               TextWrapping="Wrap"/>
-
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding DistributedText}"/>
-                        <TextBlock Text="{Binding RestText}" FontWeight="SemiBold"/>
-                        <TextBlock Margin="0,6,0,0"
-                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                                   Text="{Binding StatusLine}"/>
-                    </StackPanel>
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding StatusLine}"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                 </Grid>
+            </Border>
 
-                <!-- Schlüssel Auswahl -->
-                <Grid Grid.Row="2">
+            <!-- Schlüssel -->
+            <Border Grid.Row="4"
+                    Background="{DynamicResource MaterialDesignPaper}"
+                    CornerRadius="10"
+                    Padding="12">
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="12"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="260"/>
                     </Grid.ColumnDefinitions>
 
-                    <ComboBox Grid.Column="0"
+                    <TextBlock VerticalAlignment="Center"
+                               Text="Schlüssel:"
+                               Margin="0,0,6,0"/>
+
+                    <ComboBox Grid.Column="2"
                               ItemsSource="{Binding Schluessel}"
                               SelectedItem="{Binding SelectedSchluessel}"
                               DisplayMemberPath="Name"
-                              materialDesign:HintAssist.Hint="Schlüssel (Verteilplan)"
-                              MinWidth="260"
-                              IsEnabled="{Binding IsEditable}" />
-
-                    <Button Grid.Column="2"
-                            Style="{StaticResource MaterialDesignRaisedButton}"
-                            Content="Auto verteilen (FIX)"
-                            Click="AutoFix_Click"
-                            Padding="14,8"
-                            IsEnabled="{Binding IsEditable}"/>
-
-                    <Button Grid.Column="4"
-                            Style="{StaticResource MaterialDesignRaisedButton}"
-                            Content="Auto verteilen (MEA)"
-                            Click="AutoMea_Click"
-                            Padding="14,8"
-                            IsEnabled="{Binding IsEditable}"/>
-
-                    <Button Grid.Column="6"
-                            Style="{StaticResource MaterialDesignOutlinedButton}"
-                            Content="Zeilen leeren"
-                            Click="ClearRows_Click"
-                            Padding="14,8"
-                            IsEnabled="{Binding IsEditable}"/>
+                              IsEnabled="{Binding IsEditable}"/>
                 </Grid>
-            </Grid>
-        </Border>
+            </Border>
 
-        <!-- Zeilen Buttons -->
-        <DockPanel Grid.Row="4" LastChildFill="False">
-            <Button DockPanel.Dock="Left"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
-                    Content="Zeile hinzufügen"
-                    Click="AddRow_Click"
-                    Padding="14,8"
-                    IsEnabled="{Binding IsEditable}"/>
+            <!-- Grid -->
+            <DataGrid x:Name="Grid"
+                      Grid.Row="6"
+                      ItemsSource="{Binding Rows}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="{Binding IsReadOnlyGrid}"
+                      Margin="0,6,0,0">
 
-            <Button DockPanel.Dock="Left"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    Content="Zeile löschen"
-                    Click="DeleteRow_Click"
-                    Padding="14,8"
-                    Margin="8,0,0,0"
-                    IsEnabled="{Binding IsEditable}"/>
-        </DockPanel>
+                <DataGrid.Columns>
 
-        <!-- Grid -->
-        <DataGrid Grid.Row="6"
-                  x:Name="Grid"
-                  ItemsSource="{Binding Rows}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  IsReadOnly="{Binding IsReadOnlyGrid}">
-            <DataGrid.Columns>
+                    <!-- ✅ FIX: ItemsSource muss auf DataGrid.DataContext zeigen -->
+                    <DataGridComboBoxColumn Header="Eigentümer"
+                                            SelectedValueBinding="{Binding EigentuemerId, UpdateSourceTrigger=PropertyChanged}"
+                                            SelectedValuePath="Id"
+                                            DisplayMemberPath="Name"
+                                            Width="2*">
+                        <DataGridComboBoxColumn.ElementStyle>
+                            <Style TargetType="ComboBox">
+                                <Setter Property="ItemsSource"
+                                        Value="{Binding DataContext.Owners, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                <Setter Property="IsEnabled" Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                            </Style>
+                        </DataGridComboBoxColumn.ElementStyle>
+                        <DataGridComboBoxColumn.EditingElementStyle>
+                            <Style TargetType="ComboBox">
+                                <Setter Property="ItemsSource"
+                                        Value="{Binding DataContext.Owners, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                <Setter Property="IsEditable" Value="False"/>
+                                <Setter Property="IsEnabled" Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                            </Style>
+                        </DataGridComboBoxColumn.EditingElementStyle>
+                    </DataGridComboBoxColumn>
 
-                <DataGridTemplateColumn Header="Eigentümer" Width="2*">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding EigentuemerName}"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTextColumn Header="Betrag"
+                                        Binding="{Binding BetragText, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="140"/>
 
-                    <DataGridTemplateColumn.CellEditingTemplate>
-                        <DataTemplate>
-                            <ComboBox ItemsSource="{Binding DataContext.Owners, RelativeSource={RelativeSource AncestorType=Window}}"
-                                      SelectedValuePath="Id"
-                                      DisplayMemberPath="Name"
-                                      SelectedValue="{Binding EigentuemerId, UpdateSourceTrigger=PropertyChanged}"
-                                      MinWidth="220"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellEditingTemplate>
-                </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Notiz"
+                                        Binding="{Binding Notiz, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="3*"/>
 
-                <DataGridTextColumn Header="Betrag"
-                                    Binding="{Binding BetragText, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="140"/>
+                    <DataGridTextColumn Header="Quelle"
+                                        Binding="{Binding Source}"
+                                        IsReadOnly="True"
+                                        Width="180"/>
+                </DataGrid.Columns>
+            </DataGrid>
 
-                <DataGridTextColumn Header="Notiz"
-                                    Binding="{Binding Notiz, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="3*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+            <!-- Totals -->
+            <StackPanel Grid.Row="8"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                <TextBlock Text="{Binding TotalText}"
+                           Margin="0,0,14,0"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding DistributedText}"
+                           Margin="0,0,14,0"/>
+                <TextBlock Text="{Binding RestText}"
+                           FontWeight="SemiBold"/>
+            </StackPanel>
 
-        <!-- Footer -->
-        <TextBlock Grid.Row="8"
-                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                   Text="Geschlossene Sets sind schreibgeschützt. Für Änderungen Set wieder öffnen (später)."/>
+        </Grid>
     </Grid>
 </Window>
