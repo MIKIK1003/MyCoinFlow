@@ -1,10 +1,13 @@
-﻿using MyCoinFlow.Models;
+﻿using MaterialDesignThemes.Wpf;
+using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Printing;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -12,22 +15,70 @@ using System.Windows.Media;
 
 namespace MyCoinFlow.Views
 {
-    public partial class StweAuswertungDialog : Window
+    public partial class StweAuswertungDialog : Window, INotifyPropertyChanged
     {
         private readonly DatabaseService _db = new();
         private readonly StweLiegenschaft _liegenschaft;
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void Notify([CallerMemberName] string? propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
         public string TitleText => $"Auswertung – {_liegenschaft.Name}";
+
+        public string ZeitraumText
+        {
+            get
+            {
+                if (Von == null && Bis == null)
+                    return "Zeitraum: —";
+
+                if (Von != null && Bis == null)
+                    return $"Zeitraum: ab {Von:dd.MM.yyyy}";
+
+                if (Von == null && Bis != null)
+                    return $"Zeitraum: bis {Bis:dd.MM.yyyy}";
+
+                return $"Zeitraum: {Von:dd.MM.yyyy} – {Bis:dd.MM.yyyy}";
+            }
+        }
+
         public string DetailTitle => SelectedOwnerRow == null
             ? "Details"
             : $"Details – {SelectedOwnerRow.EigentuemerName}";
 
-        public DateTime? Von { get; set; }
-        public DateTime? Bis { get; set; }
+        private DateTime? _von;
+        public DateTime? Von
+        {
+            get => _von;
+            set
+            {
+                if (_von != value)
+                {
+                    _von = value;
+                    Notify();
+                    Notify(nameof(ZeitraumText));
+                }
+            }
+        }
+
+        private DateTime? _bis;
+        public DateTime? Bis
+        {
+            get => _bis;
+            set
+            {
+                if (_bis != value)
+                {
+                    _bis = value;
+                    Notify();
+                    Notify(nameof(ZeitraumText));
+                }
+            }
+        }
 
         public ObservableCollection<StweOwnerSummaryRow> OwnerRows { get; } = new();
         public ObservableCollection<StweOwnerDetailRow> DetailRows { get; } = new();
-
         public StweOwnerSummaryRow? SelectedOwnerRow { get; set; }
 
         public StweAuswertungDialog(StweLiegenschaft liegenschaft)
@@ -36,6 +87,28 @@ namespace MyCoinFlow.Views
             _liegenschaft = liegenschaft ?? throw new ArgumentNullException(nameof(liegenschaft));
 
             DataContext = this;
+
+            // Zeitraum vorbelegen: aktiver Budgetzeitraum (falls vorhanden)
+            try
+            {
+                if (Von == null && Bis == null)
+                {
+                    var activeId = _db.HoleAktivenBudgetzeitraumId();
+                    if (activeId.HasValue)
+                    {
+                        var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                        if (bz != null)
+                        {
+                            Von = bz.Startdatum.Date;
+                            Bis = bz.Enddatum.Date;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // bewusst still: Dialog soll trotzdem funktionieren
+            }
 
             LoadOwnerSummary();
         }
@@ -126,14 +199,15 @@ namespace MyCoinFlow.Views
                 PageHeight = printableHeight
             };
 
-            Paragraph P(string text, bool bold = false, double? fontSize = null, Brush? color = null)
+            Paragraph P(string text, bool bold = false, double? fontSize = null, TextAlignment? align = null, bool dim = false)
             {
                 var run = new Run(text);
                 Inline inline = bold ? new Bold(run) : run;
 
                 var para = new Paragraph(inline) { Margin = new Thickness(0) };
                 if (fontSize.HasValue) para.FontSize = fontSize.Value;
-                if (color != null) para.Foreground = color;
+                if (align.HasValue) para.TextAlignment = align.Value;
+                if (dim) para.Foreground = Brushes.DimGray;
                 return para;
             }
 
@@ -150,19 +224,18 @@ namespace MyCoinFlow.Views
                 doc.Blocks.Add(P(_liegenschaft.Name, bold: true, fontSize: 16));
                 doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
 
-                doc.Blocks.Add(P($"Zeitraum: {FormatVonBis(Von, Bis)}", color: Brushes.DimGray));
-                doc.Blocks.Add(P($"Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}", color: Brushes.DimGray));
+                doc.Blocks.Add(P($"{ZeitraumText}", dim: true));
+                doc.Blocks.Add(P($"Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}", dim: true));
 
                 doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 18, 0, 0) });
 
                 doc.Blocks.Add(P("Inhalt", bold: true, fontSize: 13));
-                doc.Blocks.Add(new Paragraph(new Run("• Übersicht der Summen pro Eigentümer")) { Margin = new Thickness(0, 6, 0, 0) });
                 if (options.MitOriginalTransaktionen)
-                    doc.Blocks.Add(new Paragraph(new Run("• Liste der Original-Transaktionen (Totalbetrag), die in STWE-Sets aufgeteilt wurden")) { Margin = new Thickness(0, 2, 0, 0) });
+                    doc.Blocks.Add(new Paragraph(new Run("• Liste der Original-Transaktionen (Totalbetrag), die in STWE-Sets aufgeteilt wurden")) { Margin = new Thickness(0, 6, 0, 0) });
                 doc.Blocks.Add(new Paragraph(new Run("• Detailauflistung je Eigentümer (aufgeteilte Positionen)")) { Margin = new Thickness(0, 2, 0, 0) });
 
                 doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 20, 0, 0) });
-                doc.Blocks.Add(P("Hinweis: Der Bericht zeigt die STWE-Aufteilung basierend auf den erfassten Sets.", color: Brushes.DimGray));
+                doc.Blocks.Add(P("Hinweis: Der Bericht zeigt die STWE-Aufteilung basierend auf den erfassten Sets.", dim: true));
 
                 PageBreak();
             }
@@ -170,12 +243,11 @@ namespace MyCoinFlow.Views
             // ─────────────────────────────────────────────
             // Kopf (immer)
             doc.Blocks.Add(P(TitleText, bold: true, fontSize: 16));
-            doc.Blocks.Add(P($"Zeitraum: {FormatVonBis(Von, Bis)}   |   Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}", color: Brushes.DimGray));
+            doc.Blocks.Add(P($"{ZeitraumText}   |   Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}", dim: true));
             doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
 
-
             // ─────────────────────────────────────────────
-            // Original-Transaktionen (optional) -> 1. Seite nach Summen
+            // Original-Transaktionen (optional)
             if (options.MitOriginalTransaktionen)
             {
                 doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 16, 0, 0) });
@@ -185,24 +257,22 @@ namespace MyCoinFlow.Views
                 var originals = _db.StweReportOriginalTransaktionen(_liegenschaft.Id, Von, Bis);
                 if (originals.Count == 0)
                 {
-                    doc.Blocks.Add(P("Keine Original-Transaktionen gefunden.", color: Brushes.DimGray));
+                    doc.Blocks.Add(P("Keine Original-Transaktionen gefunden.", dim: true));
                 }
                 else
                 {
                     doc.Blocks.Add(BuildOriginalTransaktionenTable(doc, originals, culture));
                 }
 
-                // ✅ WICHTIG: Eigentümer sollen immer auf neuer Seite beginnen
-                PageBreak();
+                PageBreak(); // Eigentümer sollen immer auf neuer Seite beginnen
             }
-
 
             // ─────────────────────────────────────────────
             // Details für ALLE Eigentümer
             if (OwnerRows.Count == 0)
             {
                 doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 16, 0, 0) });
-                doc.Blocks.Add(P("Keine Daten vorhanden.", color: Brushes.DimGray));
+                doc.Blocks.Add(P("Keine Daten vorhanden.", dim: true));
                 return doc;
             }
 
@@ -212,8 +282,6 @@ namespace MyCoinFlow.Views
             {
                 if (options.NeueSeiteProEigentuemer)
                 {
-                    // Für den ersten Eigentümer NICHT zwingend umbrechen,
-                    // ausser es gab vorher schon viel Inhalt (Deckblatt/Originals).
                     if (!firstOwner)
                         PageBreak();
                 }
@@ -228,7 +296,7 @@ namespace MyCoinFlow.Views
                 var details = _db.StweReportOwnerDetails(_liegenschaft.Id, owner.EigentuemerId, Von, Bis);
                 if (details == null || details.Count == 0)
                 {
-                    doc.Blocks.Add(P("Keine Detailzeilen vorhanden.", color: Brushes.DimGray));
+                    doc.Blocks.Add(P("Keine Detailzeilen vorhanden.", dim: true));
                 }
                 else
                 {
@@ -243,36 +311,6 @@ namespace MyCoinFlow.Views
 
         // ───────────────────────────── Tables ─────────────────────────────
 
-        private Table BuildOwnerSummaryTable(FlowDocument doc)
-        {
-            var t = new Table { CellSpacing = 0, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.5) };
-
-            double inner = Math.Max(300, doc.PageWidth - doc.PagePadding.Left - doc.PagePadding.Right - 8);
-
-            var wSum = 120d;
-            var wName = Math.Max(180, inner - wSum);
-
-            t.Columns.Add(new TableColumn { Width = new GridLength(wName) });
-            t.Columns.Add(new TableColumn { Width = new GridLength(wSum) });
-
-            var header = new TableRowGroup();
-            var hr = new TableRow(); header.Rows.Add(hr);
-            AddHeaderCell(hr, "Eigentümer");
-            AddHeaderCell(hr, "Summe");
-            t.RowGroups.Add(header);
-
-            var data = new TableRowGroup();
-            foreach (var r in OwnerRows)
-            {
-                var row = new TableRow(); data.Rows.Add(row);
-                AddCell(row, r.EigentuemerName ?? "");
-                AddCellRight(row, r.Summe.ToString("N2", CultureInfo.GetCultureInfo("de-CH")));
-            }
-            t.RowGroups.Add(data);
-
-            return t;
-        }
-
         private Table BuildOriginalTransaktionenTable(FlowDocument doc, System.Collections.Generic.IList<StweOriginalTransaktionRow> rows, CultureInfo culture)
         {
             var t = new Table { CellSpacing = 0, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.5) };
@@ -280,13 +318,15 @@ namespace MyCoinFlow.Views
             double inner = Math.Max(450, doc.PageWidth - doc.PagePadding.Left - doc.PagePadding.Right - 8);
 
             var wDatum = 80d;
+            var wTyp = 40d;        // Icon
             var wId = 70d;
             var wBetrag = 110d;
 
-            var used = wDatum + wId + wBetrag;
+            var used = wDatum + wTyp + wId + wBetrag;
             var wNotiz = Math.Max(180, inner - used);
 
             t.Columns.Add(new TableColumn { Width = new GridLength(wDatum) });
+            t.Columns.Add(new TableColumn { Width = new GridLength(wTyp) });
             t.Columns.Add(new TableColumn { Width = new GridLength(wId) });
             t.Columns.Add(new TableColumn { Width = new GridLength(wBetrag) });
             t.Columns.Add(new TableColumn { Width = new GridLength(wNotiz) });
@@ -294,6 +334,7 @@ namespace MyCoinFlow.Views
             var header = new TableRowGroup();
             var hr = new TableRow(); header.Rows.Add(hr);
             AddHeaderCell(hr, "Datum");
+            AddHeaderCell(hr, "Typ");
             AddHeaderCell(hr, "ID");
             AddHeaderCell(hr, "Total");
             AddHeaderCell(hr, "Notiz");
@@ -308,14 +349,14 @@ namespace MyCoinFlow.Views
 
                 var row = new TableRow(); data.Rows.Add(row);
                 AddCell(row, r.Datum.ToString("dd.MM.yyyy"));
+                AddIconCell(row, r.Betrag < 0);
                 AddCellRight(row, r.TransaktionsId.ToString());
                 AddCellRight(row, r.Betrag.ToString("N2", culture));
                 AddUiCellStar(row, Trunc(r.Notiz ?? "", 200), TextAlignment.Left);
             }
 
-            // Summenzeile
             var sumRow = new TableRow(); data.Rows.Add(sumRow);
-            AddSumCell(sumRow, "Summe", colSpan: 2);
+            AddSumCell(sumRow, "Summe", colSpan: 3);
             AddSumCellRight(sumRow, sum.ToString("N2", culture));
             AddSumCell(sumRow, "", colSpan: 1);
 
@@ -369,16 +410,23 @@ namespace MyCoinFlow.Views
                 AddUiCellStar(row, Trunc(r.Notiz ?? "", 240), TextAlignment.Left);
             }
 
-            // Summenzeile
             var sumRow = new TableRow(); data.Rows.Add(sumRow);
             AddSumCell(sumRow, "Summe", colSpan: 3);
             AddSumCellRight(sumRow, sum.ToString("N2", culture));
-            AddSumCell(sumRow, "", colSpan: 1);
+
+            string hint;
+            if (sum < 0m)
+                hint = "Eigentümerguthaben";
+            else if (sum > 0m)
+                hint = "Fehlbetrag";
+            else
+                hint = "Ist ausgeglichen";
+
+            AddSumUiCell(sumRow, hint);
 
             t.RowGroups.Add(data);
             return t;
         }
-
 
         // ───────────────────────────── Helpers ─────────────────────────────
 
@@ -421,6 +469,7 @@ namespace MyCoinFlow.Views
             };
             row.Cells.Add(cell);
         }
+
         private static void AddSumCell(TableRow row, string text, int colSpan = 1)
         {
             var p = new Paragraph(new Bold(new Run(text))) { Margin = new Thickness(0) };
@@ -448,9 +497,6 @@ namespace MyCoinFlow.Views
             row.Cells.Add(cell);
         }
 
-
-
-        // Feste Breite + Wrap (für Titel)
         private static void AddUiCell(TableRow row, string text, double widthPx, TextAlignment align)
         {
             var tb = new TextBlock
@@ -462,11 +508,15 @@ namespace MyCoinFlow.Views
                 HorizontalAlignment = align == TextAlignment.Right ? HorizontalAlignment.Right : HorizontalAlignment.Left
             };
             var b = new BlockUIContainer(tb) { Margin = new Thickness(0) };
-            var cell = new TableCell(b) { Padding = new Thickness(2), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.5) };
+            var cell = new TableCell(b)
+            {
+                Padding = new Thickness(2),
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(0.5)
+            };
             row.Cells.Add(cell);
         }
 
-        // Restbreite + Wrap (für Notiz) – stabil wie im Geldinstitut-Print
         private static void AddUiCellStar(TableRow row, string text, TextAlignment align)
         {
             var tb = new TextBlock
@@ -477,16 +527,58 @@ namespace MyCoinFlow.Views
                 HorizontalAlignment = align == TextAlignment.Right ? HorizontalAlignment.Right : HorizontalAlignment.Left
             };
             var b = new BlockUIContainer(tb) { Margin = new Thickness(0) };
-            var cell = new TableCell(b) { Padding = new Thickness(2), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.5) };
+            var cell = new TableCell(b)
+            {
+                Padding = new Thickness(2),
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(0.5)
+            };
             row.Cells.Add(cell);
         }
 
-        private static string FormatVonBis(DateTime? v, DateTime? b)
+        private static void AddIconCell(TableRow row, bool isCredit)
         {
-            if (v == null && b == null) return "—";
-            if (v != null && b == null) return $"ab {v:dd.MM.yyyy}";
-            if (v == null && b != null) return $"bis {b:dd.MM.yyyy}";
-            return $"{v:dd.MM.yyyy} – {b:dd.MM.yyyy}";
+            var icon = new PackIcon
+            {
+                Kind = isCredit ? PackIconKind.ArrowDownBoldCircleOutline
+                                : PackIconKind.ArrowUpBoldCircleOutline,
+                Width = 16,
+                Height = 16,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var container = new BlockUIContainer(icon) { Margin = new Thickness(0) };
+            var cell = new TableCell(container)
+            {
+                Padding = new Thickness(2),
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(0.5)
+            };
+            row.Cells.Add(cell);
+        }
+
+        private static void AddSumUiCell(TableRow row, string text)
+        {
+            var tb = new TextBlock
+            {
+                Text = text ?? "",
+                TextWrapping = TextWrapping.Wrap,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var b = new BlockUIContainer(tb) { Margin = new Thickness(0) };
+
+            var cell = new TableCell(b)
+            {
+                Padding = new Thickness(2),
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(0.5),
+                Background = Brushes.WhiteSmoke
+            };
+
+            row.Cells.Add(cell);
         }
 
         private static string FormatDateObj(object? dtObj)
@@ -509,27 +601,6 @@ namespace MyCoinFlow.Views
             catch
             {
                 return dtObj.ToString() ?? "—";
-            }
-        }
-
-        private static string FormatMoneyObj(object? amountObj, CultureInfo culture)
-        {
-            if (amountObj == null) return "0.00";
-            if (amountObj is decimal d) return d.ToString("N2", culture);
-            if (amountObj is double db) return db.ToString("N2", culture);
-            if (amountObj is float f) return f.ToString("N2", culture);
-
-            if (amountObj is string s && decimal.TryParse(s, NumberStyles.Any, culture, out var parsed))
-                return parsed.ToString("N2", culture);
-
-            try
-            {
-                var converted = Convert.ToDecimal(amountObj);
-                return converted.ToString("N2", culture);
-            }
-            catch
-            {
-                return amountObj.ToString() ?? "0.00";
             }
         }
     }

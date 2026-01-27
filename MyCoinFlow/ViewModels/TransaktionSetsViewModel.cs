@@ -161,7 +161,8 @@ namespace MyCoinFlow.ViewModels
             var res = MessageBox.Show(text, "Set-Typ ändern", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (res != MessageBoxResult.Yes) return;
 
-            _db.StweSetSetIsCredit(SelectedSet.Id, isCredit);
+            _db.StweSetFlipCreditAndLines(SelectedSet.Id, isCredit);
+
             LoadSets();
             StatusText = isCredit ? "Set als Gutschrift markiert." : "Set als Belastung markiert.";
         }

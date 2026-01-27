@@ -5604,23 +5604,24 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
         }
 
         public List<StweOriginalTransaktionRow> StweReportOriginalTransaktionen(int liegenschaftId, DateTime? von, DateTime? bis)
-            {
+        {
+            EnsureStweSchema();
+
             var list = new List<StweOriginalTransaktionRow>();
 
-            // Hinweis: wir nehmen die Original-Transaktionen über StweSet.TransaktionsId.
-            // Damit bekommst du den Totalbetrag aus Transaktion.
+            // SIGNED: Wenn Set.IsCredit=1 => Betrag negativ
             const string sql = @"
-            SELECT DISTINCT
-            t.Id            AS TransaktionId,
-            t.Datum         AS Datum,
-            t.Betrag        AS Betrag,
-            t.Notiz         AS Notiz
-            FROM StweSet s
-            INNER JOIN Transaktion t ON t.Id = s.TransaktionId
-            WHERE s.LiegenschaftId = @LiegenschaftId
-            AND (@Von IS NULL OR t.Datum >= @Von)
-            AND (@Bis IS NULL OR t.Datum <= @Bis)
-            ORDER BY t.Datum DESC, t.Id DESC;";
+SELECT DISTINCT
+    t.Id            AS TransaktionsId,
+    t.Datum         AS Datum,
+    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
+    t.Notiz         AS Notiz
+FROM dbo.StweSet s
+INNER JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+WHERE s.LiegenschaftId = @LiegenschaftId
+  AND (@Von IS NULL OR t.Datum >= @Von)
+  AND (@Bis IS NULL OR t.Datum <= @Bis)
+ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var con = new SqlConnection(_connectionString);
             con.Open();
@@ -5633,13 +5634,13 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-            list.Add(new StweOriginalTransaktionRow
-            {
-                TransaktionsId = r.GetInt32(0),
-                Datum = r.GetDateTime(1),
-                Betrag = r.GetDecimal(2),
-                Notiz = r.IsDBNull(3) ? null : r.GetString(3)
-            });
+                list.Add(new StweOriginalTransaktionRow
+                {
+                    TransaktionsId = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    Betrag = r.GetDecimal(2),          // jetzt SIGNED
+                    Notiz = r.IsDBNull(3) ? null : r.GetString(3)
+                });
             }
 
             return list;
@@ -6088,6 +6089,68 @@ WHERE s.LiegenschaftId = @lid
             return v != null && v != DBNull.Value && Convert.ToBoolean(v);
         }
 
+        public void StweSetFlipCreditAndLines(int setId, bool isCredit)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Defensive: Closed schützen
+            using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = "SELECT IsClosed FROM dbo.StweSet WHERE Id=@id;";
+                chk.Parameters.AddWithValue("@id", setId);
+                var v = chk.ExecuteScalar();
+                if (v != null && v != DBNull.Value && Convert.ToBoolean(v))
+                {
+                    System.Windows.MessageBox.Show(
+                        "Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
+                        "Set-Typ ändern nicht möglich",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            using var tx = c.BeginTransaction();
+            try
+            {
+                // 1) Set-Typ setzen
+                using (var upd = c.CreateCommand())
+                {
+                    upd.Transaction = tx;
+                    upd.CommandText = "UPDATE dbo.StweSet SET IsCredit = @x WHERE Id = @id;";
+                    upd.Parameters.AddWithValue("@id", setId);
+                    upd.Parameters.AddWithValue("@x", isCredit ? 1 : 0);
+                    upd.ExecuteNonQuery();
+                }
+
+                // 2) Falls bereits Zeilen existieren -> Beträge spiegeln
+                using (var flip = c.CreateCommand())
+                {
+                    flip.Transaction = tx;
+                    flip.CommandText = @"
+UPDATE dbo.StweSetLine
+SET Betrag = -Betrag
+WHERE SetId = @id;";
+                    flip.Parameters.AddWithValue("@id", setId);
+                    flip.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                try { tx.Rollback(); } catch { }
+
+                System.Windows.MessageBox.Show(
+                    "Set-Typ konnte nicht geändert werden:\n" + ex.Message,
+                    "Fehler",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
 
 
 
