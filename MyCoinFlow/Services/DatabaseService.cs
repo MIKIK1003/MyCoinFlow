@@ -5009,27 +5009,69 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             return list;
         }
 
+        public bool StweAutoDetectIsCreditForTransaktion(int transaktionId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            // Regel:
+            // 1) VonKontoId != NULL => Gutschrift (Rückvergütung etc.)
+            // 2) sonst wenn Adresse.IstBudgetiert = 1 => Einzahlung Eigentümer
+            // 3) sonst => Belastung (Rechnung)
+            const string sql = @"
+SELECT TOP(1)
+    CASE 
+        WHEN t.VonKontoId IS NOT NULL THEN 1
+        WHEN ISNULL(a.IstBudgetiert, 0) = 1 THEN 1
+        ELSE 0
+    END AS IsCredit
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a ON a.Id = t.AdresseId
+WHERE t.Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", transaktionId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+        }
+
         public int StweSetInsert(int liegenschaftId, int transaktionId, string? titel)
         {
             EnsureStweSchema();
+
+            bool isCredit = false;
+            try
+            {
+                isCredit = StweAutoDetectIsCreditForTransaktion(transaktionId);
+            }
+            catch
+            {
+                // defensiv: Default bleibt Belastung
+                isCredit = false;
+            }
 
             using var c = CreateConnection();
             c.Open();
 
             const string sql = @"
-INSERT INTO dbo.StweSet (LiegenschaftId, TransaktionId, Titel)
+INSERT INTO dbo.StweSet (LiegenschaftId, TransaktionId, Titel, IsCredit)
 OUTPUT INSERTED.Id
-VALUES (@lid, @tid, @t);";
+VALUES (@lid, @tid, @t, @ic);";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
 
-            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
-            var p2 = cmd.CreateParameter(); p2.ParameterName = "@tid"; p2.Value = transaktionId; cmd.Parameters.Add(p2);
-            var p3 = cmd.CreateParameter(); p3.ParameterName = "@t"; p3.Value = (object?)titel ?? DBNull.Value; cmd.Parameters.Add(p3);
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@tid", transaktionId);
+            cmd.Parameters.AddWithValue("@t", (object?)titel ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ic", isCredit ? 1 : 0);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
+
+
 
         public List<MyCoinFlow.Models.StweSetRow> StweSetsGetByLiegenschaft(int liegenschaftId)
         {
@@ -6152,6 +6194,71 @@ WHERE SetId = @id;";
             }
         }
 
+        public List<MyCoinFlow.Models.StweSetRow> StweSetsGetByLiegenschaft(int liegenschaftId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweSetRow>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT 
+    s.Id,
+    s.LiegenschaftId,
+    s.TransaktionId,
+    t.Datum,
+
+    -- SIGNED Total (Belastung = +, Gutschrift = -)
+    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
+
+    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
+    s.IsClosed,
+    ISNULL(s.IsCredit, 0) AS IsCredit,
+
+    ISNULL(x.Verteilt, 0) AS Verteilt,
+
+    (CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END) - ISNULL(x.Verteilt, 0) AS Rest
+FROM dbo.StweSet s
+JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+OUTER APPLY (
+    SELECT SUM(l.Betrag) AS Verteilt
+    FROM dbo.StweSetLine l
+    WHERE l.SetId = s.Id
+) x
+WHERE s.LiegenschaftId = @lid
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+ORDER BY t.Datum DESC, s.Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@von", (object?)von?.Date ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bis", (object?)bis?.Date ?? DBNull.Value);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweSetRow
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    TransaktionId = r.GetInt32(2),
+                    Datum = r.GetDateTime(3),
+                    Betrag = r.GetDecimal(4),
+                    Titel = r.GetString(5),
+                    IsClosed = r.GetBoolean(6),
+                    IsCredit = r.GetBoolean(7),
+                    Verteilt = r.GetDecimal(8),
+                    Rest = r.GetDecimal(9)
+                });
+            }
+
+            return list;
+        }
 
 
 

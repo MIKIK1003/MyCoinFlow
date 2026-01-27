@@ -10,21 +10,53 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- LINKS: Aktionen -->
+        <!-- LINKS: Aktionen + Filter -->
         <Border Grid.Column="0"
                 Background="{DynamicResource MaterialDesignPaper}"
                 CornerRadius="10"
                 Padding="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
+
                     <TextBlock Text="Aktionen"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Set erstellen"
+                    <!-- Filter -->
+                    <TextBlock Text="Filter"
                                FontWeight="SemiBold"
                                Margin="0,6,0,6"/>
+
+                    <TextBlock Text="Liegenschaft"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,4"/>
+
+                    <ComboBox ItemsSource="{Binding Liegenschaften}"
+                              SelectedItem="{Binding SelectedLiegenschaft}"
+                              DisplayMemberPath="Name"
+                              Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Datum von"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,4"/>
+
+                    <DatePicker SelectedDate="{Binding Von, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Datum bis"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,4"/>
+
+                    <DatePicker SelectedDate="{Binding Bis, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,8"/>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Set erstellen -->
+                    <TextBlock Text="Set erstellen"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
                             Command="{Binding NeuesSetAusTransaktionCommand}"
@@ -38,6 +70,7 @@
 
                     <Separator Margin="0,6,0,10"/>
 
+                    <!-- Set bearbeiten -->
                     <TextBlock Text="Set bearbeiten"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
@@ -74,6 +107,7 @@
 
                     <Separator Margin="0,6,0,10"/>
 
+                    <!-- Status -->
                     <TextBlock Text="Status"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
@@ -99,9 +133,9 @@
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Command="{Binding SetAlsGutschriftCommand}"
-        Padding="12,8"
-        Margin="0,0,0,8">
+                            Command="{Binding SetAlsGutschriftCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ArrowDownBoldCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Als Gutschrift"/>
@@ -109,18 +143,18 @@
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Command="{Binding SetAlsBelastungCommand}"
-        Padding="12,8"
-        Margin="0,0,0,8">
+                            Command="{Binding SetAlsBelastungCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ArrowUpBoldCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Als Belastung"/>
                         </StackPanel>
                     </Button>
 
-
                     <Separator Margin="0,6,0,10"/>
 
+                    <!-- Auswertung -->
                     <TextBlock Text="Auswertung"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
@@ -145,8 +179,6 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="10"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="14"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="10"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
@@ -161,19 +193,7 @@
                        Text="{Binding StatusText}"
                        TextWrapping="Wrap"/>
 
-            <!-- Liegenschaft Auswahl -->
-            <StackPanel Grid.Row="4" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Liegenschaft:"
-                           VerticalAlignment="Center"
-                           Margin="0,0,10,0"/>
-                <ComboBox Width="380"
-                          ItemsSource="{Binding Liegenschaften}"
-                          SelectedItem="{Binding SelectedLiegenschaft}"
-                          DisplayMemberPath="Name"/>
-            </StackPanel>
-
-            <!-- Sets -->
-            <DataGrid Grid.Row="6"
+            <DataGrid Grid.Row="4"
                       ItemsSource="{Binding Sets}"
                       SelectedItem="{Binding SelectedSet}"
                       AutoGenerateColumns="False"

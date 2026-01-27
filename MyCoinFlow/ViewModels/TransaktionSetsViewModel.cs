@@ -37,6 +37,30 @@ namespace MyCoinFlow.ViewModels
             set { _selectedSet = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
         }
 
+        private DateTime? _von;
+        public DateTime? Von
+        {
+            get => _von;
+            set
+            {
+                _von = value;
+                OnPropertyChanged();
+                LoadSets();
+            }
+        }
+
+        private DateTime? _bis;
+        public DateTime? Bis
+        {
+            get => _bis;
+            set
+            {
+                _bis = value;
+                OnPropertyChanged();
+                LoadSets();
+            }
+        }
+
         private string _statusText = "";
         public string StatusText
         {
@@ -53,7 +77,6 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand SetAbschliessenCommand { get; }
         public RelayCommand SetWiederOeffnenCommand { get; }
 
-        // NEU: Set-Typ setzen (Gutschrift/Belastung)
         public RelayCommand SetAlsGutschriftCommand { get; }
         public RelayCommand SetAlsBelastungCommand { get; }
 
@@ -69,11 +92,28 @@ namespace MyCoinFlow.ViewModels
                 StatusText = "Fehler beim Initialisieren:\n" + ex.Message;
             }
 
+            // Vorbelegung Zeitraum: aktiver Budgetzeitraum
+            try
+            {
+                var activeId = _db.HoleAktivenBudgetzeitraumId();
+                if (activeId.HasValue)
+                {
+                    var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                    if (bz != null)
+                    {
+                        _von = bz.Startdatum.Date;
+                        _bis = bz.Enddatum.Date;
+                    }
+                }
+            }
+            catch
+            {
+                // bewusst still: Filter darf leer bleiben
+            }
+
             NeuesSetAusTransaktionCommand = new RelayCommand(_ => NeuesSetAusTransaktion(), _ => SelectedLiegenschaft != null);
 
-            // Verteilung/Anzeige darf auch bei Closed geöffnet werden (Dialog ist dann read-only).
             SetVerteilenCommand = new RelayCommand(_ => SetVerteilen(), _ => SelectedSet != null);
-
             ShowAuswertungCommand = new RelayCommand(_ => ShowAuswertung(), _ => SelectedLiegenschaft != null);
 
             SetTitelBearbeitenCommand = new RelayCommand(_ => SetTitelBearbeiten(), _ => SelectedSet != null && !SelectedSet.IsClosed);
@@ -86,6 +126,9 @@ namespace MyCoinFlow.ViewModels
             SetAlsBelastungCommand = new RelayCommand(_ => SetType(false), _ => SelectedSet != null && !SelectedSet.IsClosed && SelectedSet.IsCredit == true);
 
             LoadLiegenschaften();
+            // Zeitraum-Properties nachträglich notify (damit UI gefüllt wird)
+            OnPropertyChanged(nameof(Von));
+            OnPropertyChanged(nameof(Bis));
         }
 
         private void LoadLiegenschaften()
@@ -115,10 +158,13 @@ namespace MyCoinFlow.ViewModels
 
             if (SelectedLiegenschaft == null) return;
 
-            foreach (var s in _db.StweSetsGetByLiegenschaft(SelectedLiegenschaft.Id))
+            foreach (var s in _db.StweSetsGetByLiegenschaft(SelectedLiegenschaft.Id, Von, Bis))
                 Sets.Add(s);
 
-            StatusText = Sets.Count == 0 ? "Noch keine Sets. Klicke auf „Set aus Transaktion“." : $"{Sets.Count} Set(s) gefunden.";
+            StatusText = Sets.Count == 0
+                ? "Keine Sets im gewählten Zeitraum."
+                : $"{Sets.Count} Set(s) gefunden.";
+
             if (Sets.Count > 0) SelectedSet = Sets[0];
         }
 
@@ -137,8 +183,6 @@ namespace MyCoinFlow.ViewModels
                 ? (t.AdresseName ?? "(ohne Text)")
                 : t.Notiz.Trim();
 
-            // IsCredit startet bewusst mit false (Belastung). Falls es eine Gutschrift ist:
-            // im Grid markieren -> "Als Gutschrift" klicken.
             _db.StweSetInsert(SelectedLiegenschaft.Id, t.Id, titel);
 
             LoadSets();
@@ -155,8 +199,8 @@ namespace MyCoinFlow.ViewModels
             }
 
             var text = isCredit
-                ? "Als Gutschrift markieren?\n\nAb jetzt werden Verteilzeilen NEGATIV geführt."
-                : "Als Belastung markieren?\n\nAb jetzt werden Verteilzeilen POSITIV geführt.";
+                ? "Als Gutschrift markieren?\n\nVorhandene Verteilzeilen werden automatisch gespiegelt."
+                : "Als Belastung markieren?\n\nVorhandene Verteilzeilen werden automatisch gespiegelt.";
 
             var res = MessageBox.Show(text, "Set-Typ ändern", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (res != MessageBoxResult.Yes) return;
@@ -229,7 +273,6 @@ namespace MyCoinFlow.ViewModels
         {
             if (SelectedSet == null) return false;
             if (SelectedSet.IsClosed) return false;
-
             return Math.Abs((double)SelectedSet.Rest) < 0.0001;
         }
 

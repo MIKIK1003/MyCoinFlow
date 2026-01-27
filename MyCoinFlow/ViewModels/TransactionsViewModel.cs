@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using Microsoft.Win32; // für OpenFileDialog
+﻿using Microsoft.Win32; // für OpenFileDialog
 using MyCoinFlow.Helpers;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
@@ -13,18 +12,15 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 
-
-
 namespace MyCoinFlow.ViewModels
 {
-
-
     public class TransaktionRowExt
     {
         public int Id { get; set; }
         public DateTime Datum { get; set; }
-        public bool HasAttachments { get; set; }      //PDF
-        public string? AttachmentsTooltip { get; set; }  // PDF
+
+        public bool HasAttachments { get; set; }      // PDF/Bilder
+        public string? AttachmentsTooltip { get; set; }
 
         public string VonAnzeige { get; set; } = "";
         public string NachAnzeige { get; set; } = "";
@@ -42,10 +38,8 @@ namespace MyCoinFlow.ViewModels
 
         public int AttachmentCount { get; set; }
         public bool HasMultipleAttachments => AttachmentCount > 1;
+
         public string? SearchHitInfo { get; set; } // „Treffer in: …“
-
-
-
     }
 
     public class TransactionsViewModel : INotifyPropertyChanged
@@ -81,23 +75,46 @@ namespace MyCoinFlow.ViewModels
         public DateTime? FilterVon
         {
             get => _filterVon;
-            set { if (_filterVon != value) { _filterVon = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_filterVon != value)
+                {
+                    _filterVon = value;
+                    OnPropertyChanged();
+                    (ClearSearchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                }
+            }
         }
 
         private DateTime? _filterBis;
         public DateTime? FilterBis
         {
             get => _filterBis;
-            set { if (_filterBis != value) { _filterBis = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_filterBis != value)
+                {
+                    _filterBis = value;
+                    OnPropertyChanged();
+                    (ClearSearchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                }
+            }
         }
 
         private string? _filterAdresse;
         public string? FilterAdresse
         {
             get => _filterAdresse;
-            set { if (_filterAdresse != value) { _filterAdresse = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_filterAdresse != value)
+                {
+                    _filterAdresse = value;
+                    OnPropertyChanged();
+                    (ClearSearchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                }
+            }
         }
-
 
         public string? SearchText
         {
@@ -114,31 +131,69 @@ namespace MyCoinFlow.ViewModels
         public ICommand ApplySearchCommand { get; }
         public ICommand ClearSearchCommand { get; }
 
-
         public TransactionsViewModel()
         {
             NeuBuchungCommand = new RelayCommand(_ => NeueBuchung());
             BearbeitenCommand = new RelayCommand(_ => Bearbeiten(), _ => AusgewaehlteTransaktion != null);
             LoeschenCommand = new RelayCommand(_ => Loeschen(), _ => AusgewaehlteTransaktion != null);
+
             AttachPdfCommand = new RelayCommand(p => AttachPdfFromRow(p), _ => true);
             OpenAttachmentCommand = new RelayCommand(p => OpenAttachmentFromRow(p), _ => true);
             ManageAttachmentsCommand = new RelayCommand(p => ManageAttachmentsFromRow(p), _ => true);
+
             OpenBankImportCommand = new RelayCommand(_ => OpenBankImport());
+
             ApplySearchCommand = new RelayCommand(_ => LadeListe(), _ => true);
 
             ClearSearchCommand = new RelayCommand(_ =>
             {
                 SearchText = string.Empty;
-                FilterVon = null;
-                FilterBis = null;
                 FilterAdresse = string.Empty;
+
+                // ✅ Reset auf aktiven Budgetzeitraum (wie Default)
+                PrefillDateRangeFromActiveBudget();
+
                 LadeListe();
             },
-                _ => !string.IsNullOrWhiteSpace(SearchText) || FilterVon.HasValue || FilterBis.HasValue || !string.IsNullOrWhiteSpace(FilterAdresse));
+            _ => !string.IsNullOrWhiteSpace(SearchText)
+              || FilterVon.HasValue
+              || FilterBis.HasValue
+              || !string.IsNullOrWhiteSpace(FilterAdresse));
+
+            // ✅ Default: aktiver Budgetzeitraum
+            PrefillDateRangeFromActiveBudget();
 
             LadeListe();
         }
 
+        private void PrefillDateRangeFromActiveBudget()
+        {
+            try
+            {
+                var activeId = _db.HoleAktivenBudgetzeitraumId();
+                if (activeId.HasValue)
+                {
+                    var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                    if (bz != null)
+                    {
+                        FilterVon = bz.Startdatum.Date;
+                        FilterBis = bz.Enddatum.Date;
+                        return;
+                    }
+                }
+
+                // Falls kein aktiver Zeitraum existiert:
+                // Filter bewusst leer lassen (zeigt alle Daten)
+                FilterVon = null;
+                FilterBis = null;
+            }
+            catch
+            {
+                // defensiv: Filter leer lassen
+                FilterVon = null;
+                FilterBis = null;
+            }
+        }
 
         private void NeueBuchung()
         {
@@ -146,20 +201,20 @@ namespace MyCoinFlow.ViewModels
             {
                 var dlg = new TransactionsDialog();
 
-                System.Windows.Window? owner = null;
+                Window? owner = null;
                 try
                 {
-                    owner = System.Windows.Application.Current?.Windows
-                                .OfType<System.Windows.Window>()
+                    owner = Application.Current?.Windows
+                                .OfType<Window>()
                                 .FirstOrDefault(w => w.IsActive)
-                         ?? System.Windows.Application.Current?.MainWindow;
+                         ?? Application.Current?.MainWindow;
                 }
                 catch { }
 
                 if (owner != null && !ReferenceEquals(owner, dlg))
                     dlg.Owner = owner;
                 else
-                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
                 if (dlg.ShowDialog() == true)
                     LadeListe();
@@ -191,20 +246,20 @@ namespace MyCoinFlow.ViewModels
 
                 var dlg = new TransactionsDialog(t);
 
-                System.Windows.Window? owner = null;
+                Window? owner = null;
                 try
                 {
-                    owner = System.Windows.Application.Current?.Windows
-                                .OfType<System.Windows.Window>()
+                    owner = Application.Current?.Windows
+                                .OfType<Window>()
                                 .FirstOrDefault(w => w.IsActive)
-                         ?? System.Windows.Application.Current?.MainWindow;
+                         ?? Application.Current?.MainWindow;
                 }
                 catch { }
 
                 if (owner != null && !ReferenceEquals(owner, dlg))
                     dlg.Owner = owner;
                 else
-                    dlg.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+                    dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
                 if (dlg.ShowDialog() == true)
                     LadeListe();
@@ -215,7 +270,6 @@ namespace MyCoinFlow.ViewModels
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
 
         private void Loeschen()
         {
@@ -246,7 +300,7 @@ namespace MyCoinFlow.ViewModels
             var term = (SearchText ?? string.Empty).Trim();
             var list = _db.SucheTransaktionen(term, FilterVon, FilterBis, FilterAdresse);
 
-            // Tokens nur für Treffer-Hinweis (optional)
+            // Tokens nur für Treffer-Hinweis
             var tokens = term.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var t in list)
@@ -269,7 +323,6 @@ namespace MyCoinFlow.ViewModels
                     if (details.Count > names.Count) tooltip += $"\n… (+{details.Count - names.Count})";
                 }
 
-                // Trefferhinweis (nur wenn gesucht wurde)
                 string? hitInfo = null;
                 if (tokens.Length > 0)
                 {
@@ -312,33 +365,28 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-
-
         private void OpenBankImport()
         {
             try
             {
                 var wnd = new BankImportWindow();
 
-                System.Windows.Window? owner = null;
+                Window? owner = null;
                 try
                 {
-                    owner = System.Windows.Application.Current?.Windows
-                                .OfType<System.Windows.Window>()
+                    owner = Application.Current?.Windows
+                                .OfType<Window>()
                                 .FirstOrDefault(w => w.IsActive)
-                         ?? System.Windows.Application.Current?.MainWindow;
+                         ?? Application.Current?.MainWindow;
                 }
                 catch { }
 
                 if (owner != null && !ReferenceEquals(owner, wnd))
                     wnd.Owner = owner;
                 else
-                    wnd.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+                    wnd.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
                 wnd.ShowDialog();
-
-                // Wenn notwendig: Liste neu laden
-                // LadeListe();
             }
             catch (Exception ex)
             {
@@ -347,7 +395,6 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-        // statt: private static int AsTransaktionIdFromParam(object? p)
         private int AsTransaktionIdFromParam(object? p)
         {
             if (p is int i && i > 0) return i;
@@ -364,7 +411,6 @@ namespace MyCoinFlow.ViewModels
             {
                 var dlg = new OpenFileDialog
                 {
-                    // NEU: PDF + Bilder
                     Filter = "Dokumente und Bilder|*.pdf;*.jpg;*.jpeg;*.png|PDF|*.pdf|Bilder|*.jpg;*.jpeg;*.png|Alle Dateien|*.*",
                     Title = "Datei anhängen",
                     Multiselect = false,
@@ -374,9 +420,8 @@ namespace MyCoinFlow.ViewModels
                 if (ok != true) return;
 
                 var service = new AttachmentService();
-                var path = service.AttachAndSave(id, dlg.FileName);
+                service.AttachAndSave(id, dlg.FileName);
 
-                // Liste neu laden und Selektion auf die gleiche Transaktion zurücksetzen
                 var keepId = id;
                 LadeListe();
                 foreach (var row in Transaktionen)
@@ -389,8 +434,6 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-
-        // Neu: öffnet bei 1 Anhang direkt die Datei, bei >1 den AttachmentsDialog
         private void OpenAttachmentFromRow(object? p)
         {
             int id = AsTransaktionIdFromParam(p);
@@ -430,11 +473,10 @@ namespace MyCoinFlow.ViewModels
                     return;
                 }
 
-                // Mehrere Anhänge: Dialog im Open-Only-Modus (keine Lösch-Buttons)
                 var dlg = new MyCoinFlow.Views.AttachmentsDialog(id, allowDelete: false)
                 {
-                    Owner = System.Windows.Application.Current?.Windows?.OfType<System.Windows.Window>()?.FirstOrDefault(w => w.IsActive)
-                            ?? System.Windows.Application.Current?.MainWindow
+                    Owner = Application.Current?.Windows?.OfType<Window>()?.FirstOrDefault(w => w.IsActive)
+                            ?? Application.Current?.MainWindow
                 };
                 dlg.ShowDialog();
             }
@@ -444,7 +486,6 @@ namespace MyCoinFlow.ViewModels
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
 
         private void ManageAttachmentsFromRow(object? p)
         {
@@ -460,12 +501,10 @@ namespace MyCoinFlow.ViewModels
                 };
 
                 var result = dlg.ShowDialog();
-                // Dialog setzt DialogResult = true, wenn Änderungen (z. B. Löschung) erfolgt sind
                 if (result == true)
                 {
                     var keepId = id;
                     LadeListe();
-                    // Auswahl wiederherstellen
                     foreach (var row in Transaktionen)
                         if (row.Id == keepId) { AusgewaehlteTransaktion = row; break; }
                 }
@@ -477,11 +516,8 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? n = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
     }
-
-    
 }
