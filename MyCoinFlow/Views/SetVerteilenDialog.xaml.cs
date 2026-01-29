@@ -86,21 +86,39 @@ namespace MyCoinFlow.Views
 
         private readonly DatabaseService _db = new();
         private readonly StweSetRow _set;
+        private bool _energieHadExisting = false;
+
 
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
         public ObservableCollection<RowVm> Rows { get; } = new();
         public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
+        public ObservableCollection<EnergieZaehlerVm> EnergieZaehler { get; } = new();
+
 
         private StweSchluessel? _selectedSchluessel;
         public StweSchluessel? SelectedSchluessel
         {
             get => _selectedSchluessel;
-            set { _selectedSchluessel = value; OnPropertyChanged(); }
+            set
+            {
+                _selectedSchluessel = value;
+                OnPropertyChanged();
+                UpdateEnergyVisibility();
+            }
+
         }
 
         // Status
         public bool IsEditable => !_set.IsClosed;
         public bool IsReadOnlyGrid => _set.IsClosed;
+
+        private bool _isEnergyVisible;
+        public bool IsEnergyVisible
+        {
+            get => _isEnergyVisible;
+            private set { _isEnergyVisible = value; OnPropertyChanged(); }
+        }
+
 
         // NEW: Set-Typ aus DB: IsCredit (Single Source of Truth)
         private bool IsCreditSet => _set.IsCredit;
@@ -134,6 +152,7 @@ namespace MyCoinFlow.Views
             LoadOwners();
             LoadSchluessel();
             LoadExistingLines();
+            LoadEnergieZaehlerDefaults();
 
             Rows.CollectionChanged += Rows_CollectionChanged;
             Closing += SetVerteilenDialog_Closing;
@@ -162,9 +181,19 @@ namespace MyCoinFlow.Views
                 Schluessel.Add(s);
 
             SelectedSchluessel = Schluessel.FirstOrDefault();
+            UpdateEnergyVisibility();
+
         }
 
+        private void UpdateEnergyVisibility()
+        {
+            // Sichtbar nur wenn der gewählte Schlüssel den Modus "ENERGIE" hat
+            IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase);
+        }
+
+
         private void LoadExistingLines()
+
         {
             Rows.Clear();
 
@@ -180,7 +209,109 @@ namespace MyCoinFlow.Views
                 AttachRow(row);
                 Rows.Add(row);
             }
+
         }
+
+        // ===== Energie: Zählerstände (Alt/Neu) – Vorbelegung =====
+
+        public sealed class EnergieZaehlerVm : INotifyPropertyChanged
+        {
+            private string _altText = "";
+            private string _neuText = "";
+
+            public int ZaehlerId { get; init; }
+            public string Name { get; init; } = "";
+            public string Typ { get; init; } = "";         // DIREKT / ALLG / HEIZ / EVU
+            public int? EinheitId { get; init; }
+
+            public string AltText
+            {
+                get => _altText;
+                set { _altText = value ?? ""; OnPropertyChanged(); }
+            }
+
+            public string NeuText
+            {
+                get => _neuText;
+                set { _neuText = value ?? ""; OnPropertyChanged(); }
+            }
+
+            public decimal AltKwh => ParseDecimal(AltText);
+            public decimal NeuKwh => ParseDecimal(NeuText);
+            public decimal DiffKwh => NeuKwh - AltKwh;
+
+            private static decimal ParseDecimal(string? input)
+            {
+                // CH-tolerant: "1'234.500" / "1234,5" / "1234.5"
+                var s = (input ?? "").Trim();
+                s = s.Replace("’", "'").Replace(" ", "");
+                s = s.Replace("'", "");      // Tausender
+                s = s.Replace(",", ".");     // Dezimal
+
+                if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
+                    return val;
+
+                return 0m;
+            }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void OnPropertyChanged([CallerMemberName] string? name = null)
+                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        private void LoadEnergieZaehlerDefaults()
+        {
+            EnergieZaehler.Clear();
+
+            // 1) Stammdaten Zähler (pro Liegenschaft)
+            var zaehler = _db.StweZaehlerGetByLiegenschaft(_set.LiegenschaftId);
+            if (zaehler.Count == 0)
+                return; // keine Energie-Zähler definiert -> nichts zu laden
+
+            // 2) Falls dieses Set bereits Zählerstände hat -> diese sind "Single Source of Truth"
+            var existing = _db.StweEnergieZaehlerGetBySet(_set.Id);
+            var existingDict = existing.ToDictionary(x => x.ZaehlerId, x => (x.AltKwh, x.NeuKwh));
+            _energieHadExisting = existing.Count > 0;
+
+
+            // 3) Sonst: Alt = letzter Neu-Stand vor Set-Datum
+            Dictionary<int, decimal> lastNeu = new();
+            if (existing.Count == 0)
+            {
+                lastNeu = _db.StweEnergieLastNeuStaendeGet(_set.LiegenschaftId, _set.Datum);
+            }
+
+            foreach (var z in zaehler)
+            {
+                // z = (Id, LiegenschaftId, Name, Typ, EinheitId, Notiz)
+                var zid = z.Id;
+
+                string alt = "";
+                string neu = "";
+
+                if (existingDict.TryGetValue(zid, out var pair))
+                {
+                    alt = pair.AltKwh.ToString("0.###", CultureInfo.InvariantCulture);
+                    neu = pair.NeuKwh.ToString("0.###", CultureInfo.InvariantCulture);
+                }
+                else if (lastNeu.TryGetValue(zid, out var last))
+                {
+                    alt = last.ToString("0.###", CultureInfo.InvariantCulture);
+                    neu = ""; // bewusst leer -> User trägt neuen Stand ein
+                }
+
+                EnergieZaehler.Add(new EnergieZaehlerVm
+                {
+                    ZaehlerId = zid,
+                    Name = z.Name,
+                    Typ = z.Typ,
+                    EinheitId = z.EinheitId,
+                    AltText = alt,
+                    NeuText = neu
+                });
+            }
+        }
+
 
         // ===== Row events =====
 
@@ -417,8 +548,12 @@ namespace MyCoinFlow.Views
             if (!ValidateBeforeSave())
                 return false;
 
+            if (!ValidateEnergieBeforeSave())
+                return false;
+
             try
             {
+                // 1) Normale Set-Verteilung (bestehend)
                 _db.StweSetLinesDeleteBySet(_set.Id);
 
                 foreach (var r in Rows)
@@ -431,6 +566,27 @@ namespace MyCoinFlow.Views
                         betrag: r.Betrag,
                         notiz: r.Notiz
                     );
+                }
+
+                // 2) Energie-Zählerstände (neu)
+                // Nur speichern, wenn:
+                // - mindestens ein Wert erfasst wurde ODER
+                // - es zuvor schon Energie-Daten gab (dann muss "alles leeren" auch in DB ankommen)
+                if (EnergieZaehler.Count > 0)
+                {
+                    var anyText = EnergieZaehler.Any(z =>
+                        !string.IsNullOrWhiteSpace(z.AltText) || !string.IsNullOrWhiteSpace(z.NeuText));
+
+                    if (anyText || _energieHadExisting)
+                    {
+                        var rows = EnergieZaehler
+                            .Where(z => !string.IsNullOrWhiteSpace(z.AltText) || !string.IsNullOrWhiteSpace(z.NeuText))
+                            .Select(z => (ZaehlerId: z.ZaehlerId, AltKwh: z.AltKwh, NeuKwh: z.NeuKwh))
+                            .ToList();
+
+                        _db.StweEnergieZaehlerReplace(_set.Id, rows);
+                        _energieHadExisting = rows.Count > 0;
+                    }
                 }
 
                 if (showSuccessMessage)
@@ -448,6 +604,7 @@ namespace MyCoinFlow.Views
                 return false;
             }
         }
+
 
         private bool ValidateBeforeSave()
         {
@@ -517,6 +674,50 @@ namespace MyCoinFlow.Views
 
             return true;
         }
+
+        private bool ValidateEnergieBeforeSave()
+        {
+            // Kein Energie-Block im Dialog -> ok
+            if (EnergieZaehler == null || EnergieZaehler.Count == 0)
+                return true;
+
+            // Wenn der User bei einem Zähler Neu eingibt, muss Alt auch vorhanden sein.
+            // Und Neu sollte nicht kleiner als Alt sein (defensive Plausibilitätsprüfung).
+            foreach (var z in EnergieZaehler)
+            {
+                var hasAlt = !string.IsNullOrWhiteSpace(z.AltText);
+                var hasNeu = !string.IsNullOrWhiteSpace(z.NeuText);
+
+                if (hasNeu && !hasAlt)
+                {
+                    MessageBox.Show(
+                        $"Beim Zähler „{z.Name}“ ist ein Neu-Stand gesetzt, aber Alt ist leer.\n\n" +
+                        "Bitte Alt und Neu erfassen.",
+                        "Energie-Zählerstände",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return false;
+                }
+
+                if (hasAlt && hasNeu)
+                {
+                    if (z.NeuKwh < z.AltKwh)
+                    {
+                        MessageBox.Show(
+                            $"Beim Zähler „{z.Name}“ ist Neu kleiner als Alt.\n\n" +
+                            $"Alt: {z.AltKwh:0.###}  Neu: {z.NeuKwh:0.###}\n\n" +
+                            "Bitte prüfen (Tippfehler?).",
+                            "Energie-Zählerstände",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
 
         private static string FormatChf(decimal v)
         {

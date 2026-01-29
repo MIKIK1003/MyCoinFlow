@@ -4636,6 +4636,82 @@ BEGIN
 END;
 
 
+-- ------------------------------------------------------------
+-- ENERGIE: Zähler-Stammdaten pro Liegenschaft
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehler' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweZaehler
+    (
+        Id             INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweZaehler PRIMARY KEY,
+        LiegenschaftId INT NOT NULL,
+        Name           NVARCHAR(120) NOT NULL,
+        Typ            NVARCHAR(12) NOT NULL,   -- 'DIREKT' | 'ALLG' | 'HEIZ' | 'EVU'
+        EinheitId      INT NULL,                -- nur bei DIREKT
+        Notiz          NVARCHAR(200) NULL,
+        CreatedAtUtc   DATETIME2 NOT NULL CONSTRAINT DF_StweZaehler_Created DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_StweZaehler_Liegenschaft
+            FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id),
+
+        CONSTRAINT FK_StweZaehler_Einheit
+            FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id)
+    );
+
+    CREATE INDEX IX_StweZaehler_LiegenschaftId ON dbo.StweZaehler(LiegenschaftId);
+    CREATE INDEX IX_StweZaehler_EinheitId      ON dbo.StweZaehler(EinheitId);
+END;
+
+-- ------------------------------------------------------------
+-- ENERGIE: Zählerstände je Set (Alt/Neu)
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEnergieSetZaehler' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweEnergieSetZaehler
+    (
+        Id        INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweEnergieSetZaehler PRIMARY KEY,
+        SetId     INT NOT NULL,
+        ZaehlerId INT NOT NULL,
+        AltKwh    DECIMAL(18,3) NOT NULL,
+        NeuKwh    DECIMAL(18,3) NOT NULL,
+
+        CONSTRAINT FK_StweEnergieSetZaehler_Set
+            FOREIGN KEY (SetId) REFERENCES dbo.StweSet(Id),
+
+        CONSTRAINT FK_StweEnergieSetZaehler_Zaehler
+            FOREIGN KEY (ZaehlerId) REFERENCES dbo.StweZaehler(Id),
+
+        CONSTRAINT UQ_StweEnergieSetZaehler_Set_Zaehler UNIQUE (SetId, ZaehlerId)
+    );
+
+    CREATE INDEX IX_StweEnergieSetZaehler_SetId ON dbo.StweEnergieSetZaehler(SetId);
+END;
+
+-- ------------------------------------------------------------
+-- ENERGIE: Meta je Set (EVU-kWh und PV-Gutschrift fürs Budgetkonto)
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEnergieSetMeta' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweEnergieSetMeta
+    (
+        SetId            INT NOT NULL CONSTRAINT PK_StweEnergieSetMeta PRIMARY KEY,
+        EvuKwh           DECIMAL(18,3) NULL,     -- Leistung auf EVU-Rechnung (kWh)
+        PvGutschriftChf  DECIMAL(18,2) NULL,     -- nur Budget-Zuordnung / Auswertung
+        PvKontoId        INT NULL,               -- dbo.Kontenplan(Id)
+        Notiz            NVARCHAR(200) NULL,
+        UpdatedAtUtc     DATETIME2 NOT NULL CONSTRAINT DF_StweEnergieSetMeta_Updated DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_StweEnergieSetMeta_Set
+            FOREIGN KEY (SetId) REFERENCES dbo.StweSet(Id),
+
+        CONSTRAINT FK_StweEnergieSetMeta_Konto
+            FOREIGN KEY (PvKontoId) REFERENCES dbo.Kontenplan(Id)
+    );
+END;
+
+
+
+
 ";
 
         
@@ -5350,6 +5426,341 @@ ORDER BY Id;";
             var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = setId; cmd.Parameters.Add(p);
             cmd.ExecuteNonQuery();
         }
+
+        // ------------------------------------------------------------
+        // ENERGIE: Zähler (Stammdaten) + Set-Zählerstände + Meta
+        // ------------------------------------------------------------
+
+        public List<(int Id, int LiegenschaftId, string Name, string Typ, int? EinheitId, string? Notiz)> StweZaehlerGetByLiegenschaft(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<(int, int, string, string, int?, string?)>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, LiegenschaftId, Name, Typ, EinheitId, Notiz
+FROM dbo.StweZaehler
+WHERE LiegenschaftId = @lid
+ORDER BY Typ, Name, Id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((
+                    r.GetInt32(0),
+                    r.GetInt32(1),
+                    r.GetString(2),
+                    r.GetString(3),
+                    r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    r.IsDBNull(5) ? null : r.GetString(5)
+                ));
+            }
+
+            return list;
+        }
+
+        public int StweZaehlerInsert(int liegenschaftId, string name, string typ, int? einheitId, string? notiz)
+        {
+            EnsureStweSchema();
+
+            if (liegenschaftId <= 0) throw new ArgumentOutOfRangeException(nameof(liegenschaftId));
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name fehlt.", nameof(name));
+            if (string.IsNullOrWhiteSpace(typ)) throw new ArgumentException("Typ fehlt.", nameof(typ));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweZaehler (LiegenschaftId, Name, Typ, EinheitId, Notiz)
+OUTPUT INSERTED.Id
+VALUES (@lid, @n, @t, @eid, @no);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@n", name.Trim());
+            cmd.Parameters.AddWithValue("@t", typ.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@eid", (object?)einheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)notiz ?? DBNull.Value);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void StweZaehlerUpdate(int id, int liegenschaftId, string name, string typ, int? einheitId, string? notiz)
+        {
+            EnsureStweSchema();
+
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
+            if (liegenschaftId <= 0) throw new ArgumentOutOfRangeException(nameof(liegenschaftId));
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name fehlt.", nameof(name));
+            if (string.IsNullOrWhiteSpace(typ)) throw new ArgumentException("Typ fehlt.", nameof(typ));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweZaehler SET
+    LiegenschaftId = @lid,
+    Name           = @n,
+    Typ            = @t,
+    EinheitId      = @eid,
+    Notiz          = @no
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@n", name.Trim());
+            cmd.Parameters.AddWithValue("@t", typ.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@eid", (object?)einheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public bool StweZaehlerUsedInEnergieSets(int zaehlerId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweEnergieSetZaehler WHERE ZaehlerId = @id;";
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", zaehlerId);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value;
+        }
+
+        public void StweZaehlerDelete(int id)
+        {
+            EnsureStweSchema();
+
+            if (id <= 0) return;
+
+            // Harte Regel: nicht löschen, wenn bereits in Energie-Sets verwendet
+            if (StweZaehlerUsedInEnergieSets(id))
+            {
+                System.Windows.MessageBox.Show(
+                    "Dieser Zähler kann nicht gelöscht werden,\n" +
+                    "weil er bereits in Energie-Sets (Zählerständen) verwendet wird.",
+                    "Löschen nicht möglich",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM dbo.StweZaehler WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<(int ZaehlerId, decimal AltKwh, decimal NeuKwh)> StweEnergieZaehlerGetBySet(int setId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<(int, decimal, decimal)>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT ZaehlerId, AltKwh, NeuKwh
+FROM dbo.StweEnergieSetZaehler
+WHERE SetId = @sid
+ORDER BY ZaehlerId;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@sid", setId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((r.GetInt32(0), r.GetDecimal(1), r.GetDecimal(2)));
+            }
+
+            return list;
+        }
+
+        public Dictionary<int, decimal> StweEnergieLastNeuStaendeGet(int liegenschaftId, DateTime stichtag)
+        {
+            EnsureStweSchema();
+
+            var result = new Dictionary<int, decimal>();
+            using var c = CreateConnection();
+            c.Open();
+
+            // Letzter erfasster Neu-KWh Stand je Zähler (nur aus Sets derselben Liegenschaft),
+            // aber nur aus Sets, deren Transaktionsdatum vor dem Stichtag liegt.
+            // Damit füllen wir bei einer neuen Rechnung automatisch "Alt" vor.
+            const string sql = @"
+;WITH x AS
+(
+    SELECT
+        ez.ZaehlerId,
+        ez.NeuKwh,
+        t.Datum,
+        ROW_NUMBER() OVER (PARTITION BY ez.ZaehlerId ORDER BY t.Datum DESC, s.Id DESC) AS rn
+    FROM dbo.StweEnergieSetZaehler ez
+    JOIN dbo.StweSet s         ON s.Id = ez.SetId
+    JOIN dbo.Transaktion t     ON t.Id = s.TransaktionId
+    WHERE s.LiegenschaftId = @lid
+      AND t.Datum < @d
+)
+SELECT ZaehlerId, NeuKwh
+FROM x
+WHERE rn = 1
+ORDER BY ZaehlerId;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@d", stichtag.Date);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var zaehlerId = r.GetInt32(0);
+                var neuKwh = r.GetDecimal(1);
+
+                // Defensive: pro ZaehlerId nur einmal.
+                if (!result.ContainsKey(zaehlerId))
+                    result.Add(zaehlerId, neuKwh);
+            }
+
+            return result;
+        }
+
+
+
+        public void StweEnergieZaehlerReplace(int setId, List<(int ZaehlerId, decimal AltKwh, decimal NeuKwh)> rows)
+        {
+            EnsureStweSchema();
+
+            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
+            rows ??= new();
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var del = c.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM dbo.StweEnergieSetZaehler WHERE SetId = @sid;";
+                    del.Parameters.AddWithValue("@sid", setId);
+                    del.ExecuteNonQuery();
+                }
+
+                foreach (var (zaehlerId, alt, neu) in rows)
+                {
+                    using var ins = c.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = @"
+INSERT INTO dbo.StweEnergieSetZaehler (SetId, ZaehlerId, AltKwh, NeuKwh)
+VALUES (@sid, @zid, @a, @n);";
+
+                    ins.Parameters.AddWithValue("@sid", setId);
+                    ins.Parameters.AddWithValue("@zid", zaehlerId);
+                    ins.Parameters.AddWithValue("@a", alt);
+                    ins.Parameters.AddWithValue("@n", neu);
+
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+        public (decimal? EvuKwh, decimal? PvGutschriftChf, int? PvKontoId, string? Notiz) StweEnergieMetaGet(int setId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT EvuKwh, PvGutschriftChf, PvKontoId, Notiz
+FROM dbo.StweEnergieSetMeta
+WHERE SetId = @sid;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@sid", setId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read())
+                return (null, null, null, null);
+
+            return (
+                r.IsDBNull(0) ? (decimal?)null : r.GetDecimal(0),
+                r.IsDBNull(1) ? (decimal?)null : r.GetDecimal(1),
+                r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                r.IsDBNull(3) ? null : r.GetString(3)
+            );
+        }
+
+        public void StweEnergieMetaUpsert(int setId, decimal? evuKwh, decimal? pvGutschriftChf, int? pvKontoId, string? notiz)
+        {
+            EnsureStweSchema();
+
+            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+IF EXISTS (SELECT 1 FROM dbo.StweEnergieSetMeta WHERE SetId = @sid)
+BEGIN
+    UPDATE dbo.StweEnergieSetMeta SET
+        EvuKwh          = @e,
+        PvGutschriftChf = @p,
+        PvKontoId       = @k,
+        Notiz           = @n,
+        UpdatedAtUtc    = SYSUTCDATETIME()
+    WHERE SetId = @sid;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.StweEnergieSetMeta (SetId, EvuKwh, PvGutschriftChf, PvKontoId, Notiz)
+    VALUES (@sid, @e, @p, @k, @n);
+END;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@sid", setId);
+            cmd.Parameters.AddWithValue("@e", (object?)evuKwh ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", (object?)pvGutschriftChf ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@k", (object?)pvKontoId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@n", (object?)notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+
+
+
+
 
         public void StweSetLineInsert(int setId, int? einheitId, int? eigentuemerId, string schluessel, decimal betrag, string? notiz = null)
         {

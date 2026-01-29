@@ -7,6 +7,11 @@
         Height="720"
         WindowStartupLocation="CenterOwner">
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="260"/>
@@ -120,14 +125,27 @@
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <!-- 0 Header -->
                 <RowDefinition Height="10"/>
+                <!-- 1 -->
                 <RowDefinition Height="Auto"/>
+                <!-- 2 Status/Titel -->
                 <RowDefinition Height="10"/>
+                <!-- 3 -->
                 <RowDefinition Height="Auto"/>
+                <!-- 4 Schlüssel -->
                 <RowDefinition Height="10"/>
+                <!-- 5 -->
+                <RowDefinition Height="Auto"/>
+                <!-- 6 Energie (NEU) -->
+                <RowDefinition Height="10"/>
+                <!-- 7 -->
                 <RowDefinition Height="*"/>
+                <!-- 8 Grid -->
                 <RowDefinition Height="10"/>
+                <!-- 9 -->
                 <RowDefinition Height="Auto"/>
+                <!-- 10 Totals -->
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -182,9 +200,71 @@
                 </Grid>
             </Border>
 
+            <!-- ENERGIE (NEU) -->
+            <Border Grid.Row="6"
+                    Background="{DynamicResource MaterialDesignPaper}"
+                    CornerRadius="10"
+                    Padding="12"
+                    Visibility="{Binding IsEnergyVisible, Converter={StaticResource BoolToVis}}">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Energie – Zählerstände (kWh)"
+                               FontWeight="SemiBold"
+                               FontSize="14"/>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Alt wird automatisch mit dem letzten Neu-Stand vorbelegt (falls vorhanden). Neu bitte eintragen."
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+
+                    <DataGrid Grid.Row="2"
+                              Margin="0,28,0,0"
+                              ItemsSource="{Binding EnergieZaehler}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="{Binding IsReadOnlyGrid}"
+                              HeadersVisibility="Column"
+                              MinHeight="120">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Typ"
+                                                Binding="{Binding Typ}"
+                                                IsReadOnly="True"
+                                                Width="90"/>
+
+                            <DataGridTextColumn Header="Zähler"
+                                                Binding="{Binding Name}"
+                                                IsReadOnly="True"
+                                                Width="*"/>
+
+                            <DataGridTextColumn Header="Alt"
+                                                Binding="{Binding AltText, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="120"/>
+
+                            <DataGridTextColumn Header="Neu"
+                                                Binding="{Binding NeuText, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="120"/>
+
+                            <DataGridTextColumn Header="Diff"
+                                                Binding="{Binding DiffKwh, StringFormat=0.###}"
+                                                IsReadOnly="True"
+                                                Width="120"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
             <!-- Grid -->
             <DataGrid x:Name="Grid"
-                      Grid.Row="6"
+                      Grid.Row="8"
                       ItemsSource="{Binding Rows}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
@@ -232,7 +312,7 @@
             </DataGrid>
 
             <!-- Totals -->
-            <StackPanel Grid.Row="8"
+            <StackPanel Grid.Row="10"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center">
