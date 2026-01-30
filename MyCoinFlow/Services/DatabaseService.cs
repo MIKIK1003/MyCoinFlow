@@ -5255,8 +5255,10 @@ ORDER BY Name;";
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name darf nicht leer sein.", nameof(name));
 
             modus = (modus ?? "").Trim().ToUpperInvariant();
-            if (modus != "FIX" && modus != "MEA")
-                throw new ArgumentException("Modus muss FIX oder MEA sein.", nameof(modus));
+
+            // NEU: ENERGIE ist jetzt ein erlaubter Modus (zusätzlich zu FIX/MEA)
+            if (modus != "FIX" && modus != "MEA" && modus != "ENERGIE")
+                throw new ArgumentException("Modus muss FIX, MEA oder ENERGIE sein.", nameof(modus));
 
             using var c = CreateConnection();
             c.Open();
@@ -5275,6 +5277,7 @@ VALUES (@lid, @n, @m);";
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
+
 
         public List<MyCoinFlow.Models.StweSchluesselLine> StweSchluesselLinesGet(int schluesselId)
         {
@@ -5431,11 +5434,11 @@ ORDER BY Id;";
         // ENERGIE: Zähler (Stammdaten) + Set-Zählerstände + Meta
         // ------------------------------------------------------------
 
-        public List<(int Id, int LiegenschaftId, string Name, string Typ, int? EinheitId, string? Notiz)> StweZaehlerGetByLiegenschaft(int liegenschaftId)
+        public List<StweZaehler> StweZaehlerGetByLiegenschaft(int liegenschaftId)
         {
             EnsureStweSchema();
 
-            var list = new List<(int, int, string, string, int?, string?)>();
+            var list = new List<StweZaehler>();
             using var c = CreateConnection();
             c.Open();
 
@@ -5452,26 +5455,30 @@ ORDER BY Typ, Name, Id;";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                list.Add((
-                    r.GetInt32(0),
-                    r.GetInt32(1),
-                    r.GetString(2),
-                    r.GetString(3),
-                    r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
-                    r.IsDBNull(5) ? null : r.GetString(5)
-                ));
+                list.Add(new StweZaehler
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    Name = r.GetString(2),
+                    Typ = r.GetString(3),
+                    EinheitId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                });
             }
 
             return list;
         }
 
-        public int StweZaehlerInsert(int liegenschaftId, string name, string typ, int? einheitId, string? notiz)
+        public int StweZaehlerInsert(StweZaehler z)
         {
             EnsureStweSchema();
 
-            if (liegenschaftId <= 0) throw new ArgumentOutOfRangeException(nameof(liegenschaftId));
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name fehlt.", nameof(name));
-            if (string.IsNullOrWhiteSpace(typ)) throw new ArgumentException("Typ fehlt.", nameof(typ));
+            if (z == null) throw new ArgumentNullException(nameof(z));
+            if (z.LiegenschaftId <= 0) throw new ArgumentException("LiegenschaftId fehlt.", nameof(z));
+            if (string.IsNullOrWhiteSpace(z.Name)) throw new ArgumentException("Name darf nicht leer sein.", nameof(z));
+            if (string.IsNullOrWhiteSpace(z.Typ)) throw new ArgumentException("Typ darf nicht leer sein.", nameof(z));
+
+            z.Typ = z.Typ.Trim().ToUpperInvariant();
 
             using var c = CreateConnection();
             c.Open();
@@ -5483,23 +5490,25 @@ VALUES (@lid, @n, @t, @eid, @no);";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
-            cmd.Parameters.AddWithValue("@n", name.Trim());
-            cmd.Parameters.AddWithValue("@t", typ.Trim().ToUpperInvariant());
-            cmd.Parameters.AddWithValue("@eid", (object?)einheitId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@no", (object?)notiz ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lid", z.LiegenschaftId);
+            cmd.Parameters.AddWithValue("@n", z.Name.Trim());
+            cmd.Parameters.AddWithValue("@t", z.Typ);
+            cmd.Parameters.AddWithValue("@eid", (object?)z.EinheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)z.Notiz ?? DBNull.Value);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
-
-        public void StweZaehlerUpdate(int id, int liegenschaftId, string name, string typ, int? einheitId, string? notiz)
+        public void StweZaehlerUpdate(StweZaehler z)
         {
             EnsureStweSchema();
 
-            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
-            if (liegenschaftId <= 0) throw new ArgumentOutOfRangeException(nameof(liegenschaftId));
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name fehlt.", nameof(name));
-            if (string.IsNullOrWhiteSpace(typ)) throw new ArgumentException("Typ fehlt.", nameof(typ));
+            if (z == null) throw new ArgumentNullException(nameof(z));
+            if (z.Id <= 0) throw new ArgumentException("Id fehlt.", nameof(z));
+            if (z.LiegenschaftId <= 0) throw new ArgumentException("LiegenschaftId fehlt.", nameof(z));
+            if (string.IsNullOrWhiteSpace(z.Name)) throw new ArgumentException("Name darf nicht leer sein.", nameof(z));
+            if (string.IsNullOrWhiteSpace(z.Typ)) throw new ArgumentException("Typ darf nicht leer sein.", nameof(z));
+
+            z.Typ = z.Typ.Trim().ToUpperInvariant();
 
             using var c = CreateConnection();
             c.Open();
@@ -5515,15 +5524,16 @@ WHERE Id = @id;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
-            cmd.Parameters.AddWithValue("@n", name.Trim());
-            cmd.Parameters.AddWithValue("@t", typ.Trim().ToUpperInvariant());
-            cmd.Parameters.AddWithValue("@eid", (object?)einheitId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@no", (object?)notiz ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", z.Id);
+            cmd.Parameters.AddWithValue("@lid", z.LiegenschaftId);
+            cmd.Parameters.AddWithValue("@n", z.Name.Trim());
+            cmd.Parameters.AddWithValue("@t", z.Typ);
+            cmd.Parameters.AddWithValue("@eid", (object?)z.EinheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@no", (object?)z.Notiz ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
+
 
         public bool StweZaehlerUsedInEnergieSets(int zaehlerId)
         {

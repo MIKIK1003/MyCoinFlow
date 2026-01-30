@@ -20,6 +20,7 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<StweEigentuemer> Eigentuemer { get; } = new();
         public ObservableCollection<StweEinheitEigentumRow> EigentumRows { get; } = new();
         public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
+        public ObservableCollection<StweZaehler> Zaehler { get; } = new();
 
         // ===== Selektionen =====
         private StweLiegenschaft? _selectedLiegenschaft;
@@ -32,6 +33,7 @@ namespace MyCoinFlow.ViewModels
                 OnPropertyChanged();
                 LoadEinheiten();
                 LoadSchluessel();
+                LoadZaehler();
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -70,6 +72,13 @@ namespace MyCoinFlow.ViewModels
             set { _selectedSchluessel = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
         }
 
+        private StweZaehler? _selectedZaehler;
+        public StweZaehler? SelectedZaehler
+        {
+            get => _selectedZaehler;
+            set { _selectedZaehler = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+        }
+
         // ===== Status =====
         private string _statusText = "";
         public string StatusText
@@ -98,6 +107,11 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeuerSchluesselCommand { get; }
         public RelayCommand SchluesselZeilenBearbeitenCommand { get; }
         public RelayCommand SchluesselUmbenennenCommand { get; }
+
+        // NEU: Zähler
+        public RelayCommand NeuerZaehlerCommand { get; }
+        public RelayCommand ZaehlerBearbeitenCommand { get; }
+        public RelayCommand ZaehlerLoeschenCommand { get; }
 
         public LiegenschaftenViewModel()
         {
@@ -135,6 +149,11 @@ namespace MyCoinFlow.ViewModels
 
             SchluesselUmbenennenCommand = new RelayCommand(_ => SchluesselUmbenennen(), _ => SelectedSchluessel != null);
 
+            // NEU: Zähler Commands
+            NeuerZaehlerCommand = new RelayCommand(_ => NeuerZaehler(), _ => SelectedLiegenschaft != null);
+            ZaehlerBearbeitenCommand = new RelayCommand(_ => ZaehlerBearbeiten(), _ => SelectedZaehler != null);
+            ZaehlerLoeschenCommand = new RelayCommand(_ => ZaehlerLoeschen(), _ => SelectedZaehler != null);
+
             LoadLiegenschaften();
             LoadEigentuemer();
         }
@@ -154,6 +173,8 @@ namespace MyCoinFlow.ViewModels
                 Einheiten.Clear();
                 EigentumRows.Clear();
                 Schluessel.Clear();
+                Zaehler.Clear();
+                SelectedZaehler = null;
                 return;
             }
 
@@ -208,6 +229,19 @@ namespace MyCoinFlow.ViewModels
                 Schluessel.Add(s);
 
             SelectedSchluessel = Schluessel.FirstOrDefault();
+        }
+
+        private void LoadZaehler()
+        {
+            Zaehler.Clear();
+            SelectedZaehler = null;
+
+            if (SelectedLiegenschaft == null) return;
+
+            foreach (var z in _db.StweZaehlerGetByLiegenschaft(SelectedLiegenschaft.Id))
+                Zaehler.Add(z);
+
+            SelectedZaehler = Zaehler.FirstOrDefault();
         }
 
         // ===== Actions =====
@@ -401,7 +435,6 @@ namespace MyCoinFlow.ViewModels
             var dlg = new EigentumZuordnenDialog(Eigentuemer);
             TrySetOwner(dlg);
 
-            // Vorbelegung – passt exakt zu deinem Dialog (SelectedOwner/Von/Bis). :contentReference[oaicite:5]{index=5}
             dlg.SelectedOwner = Eigentuemer.FirstOrDefault(o => o.Id == SelectedEigentumRow.EigentuemerId);
             dlg.Von = SelectedEigentumRow.GueltigVon;
             dlg.Bis = SelectedEigentumRow.GueltigBis;
@@ -498,6 +531,67 @@ namespace MyCoinFlow.ViewModels
                 StatusText = "Schlüssel umbenannt.";
             }
         }
+
+        // ===== Zähler Actions (NEU) =====
+
+        private void NeuerZaehler()
+        {
+            if (SelectedLiegenschaft == null) return;
+
+            // Einheiten müssen verfügbar sein für DIREKT-Zähler
+            // (Einheiten ist bereits geladen, aber defensiv: falls leer -> LoadEinheiten)
+            if (Einheiten.Count == 0)
+                LoadEinheiten();
+
+            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten);
+            TrySetOwner(dlg);
+
+            if (dlg.ShowDialog() == true)
+            {
+                _db.StweZaehlerInsert(dlg.Model);
+                LoadZaehler();
+                StatusText = "Zähler gespeichert.";
+            }
+        }
+
+        private void ZaehlerBearbeiten()
+        {
+            if (SelectedZaehler == null) return;
+
+            if (Einheiten.Count == 0 && SelectedLiegenschaft != null)
+                LoadEinheiten();
+
+            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten);
+            TrySetOwner(dlg);
+
+            dlg.SetModel(SelectedZaehler);
+
+            if (dlg.ShowDialog() == true)
+            {
+                _db.StweZaehlerUpdate(dlg.Model);
+                LoadZaehler();
+                StatusText = "Zähler aktualisiert.";
+            }
+        }
+
+        private void ZaehlerLoeschen()
+        {
+            if (SelectedZaehler == null) return;
+
+            var res = MessageBox.Show(
+                $"Zähler „{SelectedZaehler.Name}“ wirklich löschen?\n\n" +
+                "Hinweis: Löschen ist nur möglich, wenn der Zähler noch nie in einem Energie-Set verwendet wurde.",
+                "Löschen bestätigen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (res != MessageBoxResult.Yes) return;
+
+            _db.StweZaehlerDelete(SelectedZaehler.Id);
+            LoadZaehler();
+            StatusText = "Zähler gelöscht.";
+        }
+
 
         private static void TrySetOwner(Window dlg)
         {

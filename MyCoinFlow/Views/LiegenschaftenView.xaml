@@ -196,6 +196,43 @@
                         </StackPanel>
                     </Button>
 
+                    <Separator Margin="0,6,0,10"/>
+
+                    <!-- Zähler (NEU) -->
+                    <TextBlock Text="Zähler"
+                               FontWeight="SemiBold"
+                               Margin="0,10,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeuerZaehlerCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="MeterElectricOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zähler neu"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ZaehlerBearbeitenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding ZaehlerLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
                     <TextBlock Text="Status"
                                FontWeight="SemiBold"
                                Margin="0,16,0,6"/>
@@ -210,49 +247,95 @@
         <!-- RECHTS: Inhalt -->
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
+                <!-- Titel + Status -->
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
+                <!-- 0 -->
+                <RowDefinition Height="8"/>
+                <!-- 1 -->
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="14"/>
-
-                <RowDefinition Height="2*"/>
+                <!-- 2 -->
                 <RowDefinition Height="18"/>
+                <!-- 3 -->
 
+                <!-- Liegenschaften -->
                 <RowDefinition Height="Auto"/>
+                <!-- 4 -->
                 <RowDefinition Height="10"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="18"/>
-
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
+                <!-- 5 -->
                 <RowDefinition Height="220"/>
-                <RowDefinition Height="10"/>
-                <RowDefinition Height="*"/>
+                <!-- 6 -->
                 <RowDefinition Height="18"/>
+                <!-- 7 -->
 
+                <!-- Einheiten -->
                 <RowDefinition Height="Auto"/>
+                <!-- 8 -->
                 <RowDefinition Height="10"/>
-                <RowDefinition Height="*"/>
+                <!-- 9 -->
+                <RowDefinition Height="200"/>
+                <!-- 10 -->
+                <RowDefinition Height="18"/>
+                <!-- 11 -->
+
+                <!-- Eigentümer -->
+                <RowDefinition Height="Auto"/>
+                <!-- 12 -->
+                <RowDefinition Height="10"/>
+                <!-- 13 -->
+                <RowDefinition Height="160"/>
+                <!-- 14 -->
+                <RowDefinition Height="18"/>
+                <!-- 15 -->
+
+                <!-- Zuordnungen -->
+                <RowDefinition Height="Auto"/>
+                <!-- 16 -->
+                <RowDefinition Height="10"/>
+                <!-- 17 -->
+                <RowDefinition Height="160"/>
+                <!-- 18 -->
+                <RowDefinition Height="18"/>
+                <!-- 19 -->
+
+                <!-- Schlüssel -->
+                <RowDefinition Height="Auto"/>
+                <!-- 20 -->
+                <RowDefinition Height="10"/>
+                <!-- 21 -->
+                <RowDefinition Height="180"/>
+                <!-- 22 -->
+                <RowDefinition Height="18"/>
+                <!-- 23 -->
+
+                <!-- Zähler -->
+                <RowDefinition Height="Auto"/>
+                <!-- 24 -->
+                <RowDefinition Height="10"/>
+                <!-- 25 -->
+                <RowDefinition Height="180"/>
+                <!-- 26 -->
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
-                       FontSize="26"
-                       FontWeight="SemiBold"
-                       Text="Liegenschaften (STWE)"/>
+               FontSize="26"
+               FontWeight="SemiBold"
+               Text="Liegenschaften (STWE)"/>
 
             <TextBlock Grid.Row="2"
-                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                       Text="{Binding StatusText}"
-                       TextWrapping="Wrap"/>
+               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+               Text="{Binding StatusText}"
+               TextWrapping="Wrap"/>
 
             <!-- Liegenschaften -->
-            <DataGrid Grid.Row="4"
-                      ItemsSource="{Binding Liegenschaften}"
-                      SelectedItem="{Binding SelectedLiegenschaft}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      Margin="0,6,0,0">
+            <TextBlock Grid.Row="4" FontSize="18" FontWeight="SemiBold" Text="Liegenschaften"/>
+            <DataGrid Grid.Row="6"
+              ItemsSource="{Binding Liegenschaften}"
+              SelectedItem="{Binding SelectedLiegenschaft}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="220">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Strasse" Binding="{Binding Strasse}" Width="2*"/>
@@ -262,14 +345,15 @@
             </DataGrid>
 
             <!-- Einheiten -->
-            <TextBlock Grid.Row="6" FontSize="18" FontWeight="SemiBold" Text="Einheiten"/>
-            <DataGrid Grid.Row="8"
-                      ItemsSource="{Binding Einheiten}"
-                      SelectedItem="{Binding SelectedEinheit}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      Margin="0,6,0,0">
+            <TextBlock Grid.Row="8" FontSize="18" FontWeight="SemiBold" Text="Einheiten"/>
+            <DataGrid Grid.Row="10"
+              ItemsSource="{Binding Einheiten}"
+              SelectedItem="{Binding SelectedEinheit}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="200">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="2*"/>
                     <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>
@@ -278,16 +362,16 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <!-- Eigentümer / Zuordnung -->
-            <TextBlock Grid.Row="10" FontSize="18" FontWeight="SemiBold" Text="Eigentümer &amp; Zuordnungen"/>
-
-            <DataGrid Grid.Row="12"
-                      ItemsSource="{Binding Eigentuemer}"
-                      SelectedItem="{Binding SelectedEigentuemer}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      Margin="0,6,0,0">
+            <!-- Eigentümer -->
+            <TextBlock Grid.Row="12" FontSize="18" FontWeight="SemiBold" Text="Eigentümer"/>
+            <DataGrid Grid.Row="14"
+              ItemsSource="{Binding Eigentuemer}"
+              SelectedItem="{Binding SelectedEigentuemer}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="160">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="E-Mail" Binding="{Binding Email}" Width="2*"/>
@@ -295,13 +379,16 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <DataGrid Grid.Row="14"
-                      ItemsSource="{Binding EigentumRows}"
-                      SelectedItem="{Binding SelectedEigentumRow}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      Margin="0,6,0,0">
+            <!-- Zuordnungen -->
+            <TextBlock Grid.Row="16" FontSize="18" FontWeight="SemiBold" Text="Zuordnungen"/>
+            <DataGrid Grid.Row="18"
+              ItemsSource="{Binding EigentumRows}"
+              SelectedItem="{Binding SelectedEigentumRow}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="160">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Eigentümer" Binding="{Binding EigentuemerName}" Width="2*"/>
                     <DataGridTextColumn Header="Von" Binding="{Binding GueltigVon}" Width="*"/>
@@ -310,20 +397,40 @@
             </DataGrid>
 
             <!-- Schlüssel -->
-            <TextBlock Grid.Row="16" FontSize="18" FontWeight="SemiBold" Text="Schlüssel (Verteilpläne)"/>
-            <DataGrid Grid.Row="18"
-                      ItemsSource="{Binding Schluessel}"
-                      SelectedItem="{Binding SelectedSchluessel}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      Margin="0,6,0,0">
+            <TextBlock Grid.Row="20" FontSize="18" FontWeight="SemiBold" Text="Schlüssel (Verteilpläne)"/>
+            <DataGrid Grid.Row="22"
+              ItemsSource="{Binding Schluessel}"
+              SelectedItem="{Binding SelectedSchluessel}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="180">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
 
+            <!-- Zähler -->
+            <TextBlock Grid.Row="24" FontSize="18" FontWeight="SemiBold" Text="Zähler (Strom)"/>
+            <DataGrid Grid.Row="26"
+              ItemsSource="{Binding Zaehler}"
+              SelectedItem="{Binding SelectedZaehler}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              CanUserAddRows="False"
+              Margin="0,6,0,0"
+              Height="180">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
+                    <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>
+                    <DataGridTextColumn Header="EinheitId" Binding="{Binding EinheitId}" Width="*"/>
+                    <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" Width="2*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
         </Grid>
+
     </Grid>
 </UserControl>

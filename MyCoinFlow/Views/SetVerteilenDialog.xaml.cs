@@ -96,6 +96,8 @@ namespace MyCoinFlow.Views
 
 
         private StweSchluessel? _selectedSchluessel;
+        public bool CanUseStandardAuto => IsEditable && !IsEnergyVisible;
+
         public StweSchluessel? SelectedSchluessel
         {
             get => _selectedSchluessel;
@@ -177,13 +179,41 @@ namespace MyCoinFlow.Views
         private void LoadSchluessel()
         {
             Schluessel.Clear();
+
             foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
                 Schluessel.Add(s);
 
-            SelectedSchluessel = Schluessel.FirstOrDefault();
-            UpdateEnergyVisibility();
+            // NEU: Default "Energie" sicherstellen (falls noch nicht vorhanden)
+            if (!Schluessel.Any(x => string.Equals(x.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    _db.StweSchluesselInsert(_set.LiegenschaftId, "Energie", "ENERGIE");
 
+                    // Reload
+                    Schluessel.Clear();
+                    foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
+                        Schluessel.Add(s);
+                }
+                catch
+                {
+                    // bewusst still: Dialog soll trotzdem funktionieren
+                }
+            }
+
+            // Standard: MEA (wird am häufigsten verwendet)
+            // Falls kein MEA existiert: FIX
+            // Falls auch kein FIX: irgendwas (z.B. Energie)
+            SelectedSchluessel =
+                Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
+                ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
+                ?? Schluessel.FirstOrDefault();
+
+
+            // falls du den Visibility-Feinschliff bereits eingebaut hast:
+            // UpdateEnergyVisibility();
         }
+
 
         private void UpdateEnergyVisibility()
         {
@@ -488,6 +518,76 @@ namespace MyCoinFlow.Views
             ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
         }
 
+        private Dictionary<int, decimal>? BuildOwnerMeaAtDate()
+        {
+            var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
+                           .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
+                           .ToList();
+
+            if (units.Count == 0)
+            {
+                MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return null;
+            }
+
+            var ownerMea = new Dictionary<int, decimal>();
+            var missing = new List<string>();
+
+            foreach (var u in units)
+            {
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    missing.Add(u.Bezeichnung);
+                    continue;
+                }
+
+                if (!ownerMea.ContainsKey(oid.Value))
+                    ownerMea[oid.Value] = 0m;
+
+                ownerMea[oid.Value] += (u.MeaPromille ?? 0m);
+            }
+
+            if (missing.Count > 0)
+            {
+                MessageBox.Show(
+                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    string.Join("\n• ", missing.Take(10)) +
+                    (missing.Count > 10 ? "\n…" : "") +
+                    "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
+                    "Energie berechnen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return null;
+            }
+
+            return ownerMea;
+        }
+
+        private void ApplyEnergyAsMeaOnly()
+        {
+            var ownerMea = BuildOwnerMeaAtDate();
+            if (ownerMea == null)
+                return;
+
+            var sumMea = ownerMea.Values.Sum();
+            if (sumMea <= 0m)
+            {
+                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var total = SetTotalSigned; // bei Gutschrift negativ (korrekt)
+            var raw = ownerMea.Select(kv =>
+            {
+                var amount = total * (kv.Value / sumMea);
+                return new RawShare { EigentuemerId = kv.Key, BetragRaw = amount };
+            }).ToList();
+
+            ApplyRoundedRows(raw, "Energie (Gutschrift): nach MEA", "ENERGIE");
+        }
+
         private void ApplyRoundedRows(List<RawShare> raw, string notiz, string source)
         {
             var rounded = raw
@@ -527,6 +627,56 @@ namespace MyCoinFlow.Views
 
             RaiseTotals();
         }
+
+        private void ApplyRoundedRows(List<RawShare> raw, Dictionary<int, string> ownerNotiz, string source)
+        {
+            var rounded = raw
+                .Select(x => new
+                {
+                    x.EigentuemerId,
+                    Betrag = Math.Round(x.BetragRaw, 2, MidpointRounding.AwayFromZero)
+                })
+                .ToList();
+
+            var sumRounded = rounded.Sum(x => x.Betrag);
+            var diff = SetTotalSigned - sumRounded;
+
+            if (diff != 0m && rounded.Count > 0)
+            {
+                // Korrektur auf die betragsmässig grösste Zeile (nach Betrag-ABS)
+                var idx = rounded
+                    .Select((x, i) => new { Abs = Math.Abs(x.Betrag), Index = i })
+                    .OrderByDescending(x => x.Abs)
+                    .First().Index;
+
+                var item = rounded[idx];
+                rounded[idx] = new { item.EigentuemerId, Betrag = item.Betrag + diff };
+
+                // Notiz auch anpassen (Diff sichtbar machen)
+                if (ownerNotiz != null && ownerNotiz.TryGetValue(item.EigentuemerId, out var old))
+                {
+                    ownerNotiz[item.EigentuemerId] = $"{old} | Diff {diff:+0.00;-0.00;0.00}";
+                }
+            }
+
+            Rows.Clear();
+            foreach (var r in rounded)
+            {
+                ownerNotiz ??= new();
+                ownerNotiz.TryGetValue(r.EigentuemerId, out var n);
+
+                Rows.Add(new RowVm
+                {
+                    EigentuemerId = r.EigentuemerId,
+                    BetragText = r.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
+                    Notiz = string.IsNullOrWhiteSpace(n) ? null : n,
+                    Source = source
+                });
+            }
+
+            RaiseTotals();
+        }
+
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
@@ -736,5 +886,340 @@ namespace MyCoinFlow.Views
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private void EnergieBerechnen_Click(object sender, RoutedEventArgs e)
+        {
+            if (!IsEditable) return;
+
+            if (Rows.Count > 0)
+            {
+                var res = MessageBox.Show(
+                    "Die Energie-Berechnung ersetzt die bestehenden Verteilzeilen.\n\nMöchtest du fortfahren?",
+                    "Energie berechnen",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (res != MessageBoxResult.Yes)
+                    return;
+            }
+
+            if (EnergieZaehler == null || EnergieZaehler.Count == 0)
+            {
+                MessageBox.Show("Keine Zähler gefunden.\n\nBitte Zähler unter „Liegenschaften → Zähler“ erfassen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Sonderfall: Gutschrift -> komplett nach MEA
+            if (IsCreditSet)
+            {
+                var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
+                               .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
+                               .ToList();
+
+                if (units.Count == 0)
+                {
+                    MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var ownerMea = new Dictionary<int, decimal>();
+                var missing = new List<string>();
+
+                foreach (var u in units)
+                {
+                    var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                    if (!oid.HasValue)
+                    {
+                        missing.Add(u.Bezeichnung);
+                        continue;
+                    }
+
+                    if (!ownerMea.ContainsKey(oid.Value))
+                        ownerMea[oid.Value] = 0m;
+
+                    ownerMea[oid.Value] += (u.MeaPromille ?? 0m);
+                }
+
+                if (missing.Count > 0)
+                {
+                    MessageBox.Show(
+                        $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                        string.Join("\n• ", missing.Take(10)) +
+                        (missing.Count > 10 ? "\n…" : "") +
+                        "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
+                        "Energie berechnen",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var sumMea = ownerMea.Values.Sum();
+                if (sumMea <= 0m)
+                {
+                    MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var rawCredit = ownerMea.Select(kv =>
+                {
+                    var amount = SetTotalSigned * (kv.Value / sumMea);
+                    return new RawShare { EigentuemerId = kv.Key, BetragRaw = amount };
+                }).ToList();
+
+                var ownerNotizCredit = ownerMea.ToDictionary(
+                    kv => kv.Key,
+                    kv => $"MEA {kv.Value:0.###}/{sumMea:0.###} → {SetTotalSigned:0.00}");
+
+                ApplyRoundedRows(rawCredit, ownerNotizCredit, "ENERGIE");
+                return;
+            }
+
+            // Interne Zähler (für Verteilung)
+            var intern = EnergieZaehler
+                .Where(z =>
+                    string.Equals(z.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(z.Typ, "ALLG", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(z.Typ, "HEIZ", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (intern.Count == 0)
+            {
+                MessageBox.Show("Keine verteilrelevanten Zähler gefunden (DIREKT/ALLG/HEIZ).",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (intern.Any(z => string.IsNullOrWhiteSpace(z.AltText) || string.IsNullOrWhiteSpace(z.NeuText)))
+            {
+                MessageBox.Show("Bitte bei allen internen Zählern (DIREKT/ALLG/HEIZ) Alt und Neu erfassen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (intern.Any(z => z.DiffKwh < 0m))
+            {
+                MessageBox.Show("Bitte prüfen: Bei einem Zähler ist Neu kleiner als Alt (Diff < 0).",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var internKwh = intern.Sum(z => z.DiffKwh);
+            if (internKwh <= 0m)
+            {
+                MessageBox.Show("Summe interne kWh ist 0 – keine Verteilung möglich.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // EVU optional (Preis-Basis)
+            var evuList = EnergieZaehler
+                .Where(z => string.Equals(z.Typ, "EVU", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            decimal evuKwh = 0m;
+            if (evuList.Count > 0)
+            {
+                var completeEvu = evuList
+                    .Where(z => !string.IsNullOrWhiteSpace(z.AltText) && !string.IsNullOrWhiteSpace(z.NeuText))
+                    .ToList();
+
+                if (completeEvu.Count > 0)
+                    evuKwh = completeEvu.Sum(z => z.DiffKwh);
+            }
+
+            var basisKwh = evuKwh > 0m ? evuKwh : internKwh;
+            if (basisKwh <= 0m)
+            {
+                MessageBox.Show("Preis-Basis kWh ist 0 – keine Verteilung möglich.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var preis = SetTotalSigned / basisKwh;
+
+            // MEA Basis
+            var meaUnits = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
+                              .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
+                              .ToList();
+
+            if (meaUnits.Count == 0)
+            {
+                MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var ownerMea2 = new Dictionary<int, decimal>();
+            var missing2 = new List<string>();
+
+            foreach (var u in meaUnits)
+            {
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    missing2.Add(u.Bezeichnung);
+                    continue;
+                }
+
+                if (!ownerMea2.ContainsKey(oid.Value))
+                    ownerMea2[oid.Value] = 0m;
+
+                ownerMea2[oid.Value] += (u.MeaPromille ?? 0m);
+            }
+
+            if (missing2.Count > 0)
+            {
+                MessageBox.Show(
+                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    string.Join("\n• ", missing2.Take(10)) +
+                    (missing2.Count > 10 ? "\n…" : "") +
+                    "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
+                    "Energie berechnen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var sumMea2 = ownerMea2.Values.Sum();
+            if (sumMea2 <= 0m)
+            {
+                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Sammeln (mit Detail)
+            var directKwhByOwner = new Dictionary<int, decimal>();
+            var directChfByOwner = new Dictionary<int, decimal>();
+            var allgChfByOwner = new Dictionary<int, decimal>();
+            var heizChfByOwner = new Dictionary<int, decimal>();
+
+            void AddDict(Dictionary<int, decimal> dict, int key, decimal value)
+            {
+                if (!dict.ContainsKey(key)) dict[key] = 0m;
+                dict[key] += value;
+            }
+
+            // DIREKT
+            foreach (var z in intern.Where(x => string.Equals(x.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!z.EinheitId.HasValue)
+                {
+                    MessageBox.Show($"Direkt-Zähler „{z.Name}“ hat keine EinheitId (Stammdaten prüfen).",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(z.EinheitId.Value, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    MessageBox.Show($"Für die Einheit des Zählers „{z.Name}“ ist am Datum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet.",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var chf = z.DiffKwh * preis;
+                AddDict(directKwhByOwner, oid.Value, z.DiffKwh);
+                AddDict(directChfByOwner, oid.Value, chf);
+            }
+
+            // ALLG / HEIZ total kWh und total CHF
+            var kwhAllg = intern.Where(x => string.Equals(x.Typ, "ALLG", StringComparison.OrdinalIgnoreCase))
+                                .Sum(x => x.DiffKwh);
+            var totalAllg = kwhAllg * preis;
+
+            var kwhHeiz = intern.Where(x => string.Equals(x.Typ, "HEIZ", StringComparison.OrdinalIgnoreCase))
+                                .Sum(x => x.DiffKwh);
+            var totalHeiz = kwhHeiz * preis;
+
+            // MEA-Verteilung ALLG/HEIZ auf Owner
+            foreach (var kv in ownerMea2)
+            {
+                var ownerId = kv.Key;
+                var mea = kv.Value;
+
+                if (kwhAllg > 0m)
+                    AddDict(allgChfByOwner, ownerId, totalAllg * (mea / sumMea2));
+
+                if (kwhHeiz > 0m)
+                    AddDict(heizChfByOwner, ownerId, totalHeiz * (mea / sumMea2));
+            }
+
+            // Raw Sum
+            var ownerAmount = new Dictionary<int, decimal>();
+            foreach (var oid in ownerMea2.Keys.Union(directChfByOwner.Keys))
+            {
+                var sum = 0m;
+                if (directChfByOwner.TryGetValue(oid, out var d)) sum += d;
+                if (allgChfByOwner.TryGetValue(oid, out var a)) sum += a;
+                if (heizChfByOwner.TryGetValue(oid, out var h)) sum += h;
+                if (sum != 0m) ownerAmount[oid] = sum;
+            }
+
+            var sumOwner = ownerAmount.Values.Sum();
+            if (sumOwner == 0m)
+            {
+                MessageBox.Show("Es konnte kein Betrag berechnet werden (Summe = 0).",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Skala auf exaktes SetTotalSigned (wichtig bei intern != EVU)
+            var scale = SetTotalSigned / sumOwner;
+
+            var raw = ownerAmount.Select(kv => new RawShare
+            {
+                EigentuemerId = kv.Key,
+                BetragRaw = kv.Value * scale
+            }).ToList();
+
+            // Notizen pro Owner aufbauen
+            var ownerNotiz = new Dictionary<int, string>();
+            foreach (var kv in ownerMea2)
+            {
+                var oid = kv.Key;
+                var mea = kv.Value;
+
+                directKwhByOwner.TryGetValue(oid, out var dkwh);
+                directChfByOwner.TryGetValue(oid, out var dchf);
+                allgChfByOwner.TryGetValue(oid, out var achf);
+                heizChfByOwner.TryGetValue(oid, out var hchf);
+                ownerAmount.TryGetValue(oid, out var sumRaw);
+
+                // kompakt, aber nachvollziehbar
+                var parts =
+                    $"Dir {dkwh:0.###}kWh×{preis:0.####}={dchf:0.00}"
+                    + $" | Allg {kwhAllg:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea2:0.###})={achf:0.00}"
+                    + $" | Heiz {kwhHeiz:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea2:0.###})={hchf:0.00}"
+                    + $" | Sum={sumRaw:0.00}"
+                    + (Math.Abs(scale - 1m) > 0.0000001m ? $" | Scale×{scale:0.######}" : "");
+
+                ownerNotiz[oid] = parts;
+            }
+
+            // falls jemand nur DIREKT hat und keine MEA (theoretisch), trotzdem notiz
+            foreach (var oid in ownerAmount.Keys)
+            {
+                if (!ownerNotiz.ContainsKey(oid))
+                {
+                    directKwhByOwner.TryGetValue(oid, out var dkwh);
+                    directChfByOwner.TryGetValue(oid, out var dchf);
+                    ownerAmount.TryGetValue(oid, out var sumRaw);
+
+                    var parts =
+                        $"Dir {dkwh:0.###}kWh×{preis:0.####}={dchf:0.00}"
+                        + $" | Sum={sumRaw:0.00}"
+                        + (Math.Abs(scale - 1m) > 0.0000001m ? $" | Scale×{scale:0.######}" : "");
+
+                    ownerNotiz[oid] = parts;
+                }
+            }
+
+            // Als Rows übernehmen (inkl. owner-spezifischer Notizen)
+            ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
+        }
+
+
     }
 }

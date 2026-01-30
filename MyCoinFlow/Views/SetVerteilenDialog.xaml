@@ -59,7 +59,7 @@
                             Click="AutoFix_Click"
                             Padding="14,8"
                             Margin="0,0,0,8"
-                            IsEnabled="{Binding IsEditable}">
+                            IsEnabled="{Binding CanUseStandardAuto}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ChartPie" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Auto verteilen (FIX)"/>
@@ -70,23 +70,25 @@
                             Click="AutoMea_Click"
                             Padding="14,8"
                             Margin="0,0,0,8"
-                            IsEnabled="{Binding IsEditable}">
+                            IsEnabled="{Binding CanUseStandardAuto}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ChartDonut" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Auto verteilen (MEA)"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                            Click="ClearRows_Click"
+                    <Button Grid.Row="1"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="EnergieBerechnen_Click"
                             Padding="14,8"
                             Margin="0,0,0,8"
                             IsEnabled="{Binding IsEditable}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PlaylistRemove" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zeilen leeren"/>
+                            <materialDesign:PackIcon Kind="LightningBoltOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Energie berechnen"/>
                         </StackPanel>
                     </Button>
+   
 
                     <Separator Margin="0,6,0,10"/>
 
@@ -114,6 +116,17 @@
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="PlaylistMinus" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Zeile löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="ClearRows_Click"
+                            Padding="14,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsEditable}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistRemove" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeilen leeren"/>
                         </StackPanel>
                     </Button>
 
