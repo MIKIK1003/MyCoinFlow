@@ -14,7 +14,7 @@ namespace MyCoinFlow.Views
 {
     public partial class SetVerteilenDialog : Window, INotifyPropertyChanged
     {
-        // ===== Row VM =====
+        // ===== Row VM (Verteilzeilen) =====
         public sealed class RowVm : INotifyPropertyChanged
         {
             private int? _eigentuemerId;
@@ -22,6 +22,7 @@ namespace MyCoinFlow.Views
             private decimal _betrag;
             private string? _notiz;
             private string _source = "MANUELL";
+            
 
             public int? EigentuemerId
             {
@@ -84,20 +85,47 @@ namespace MyCoinFlow.Views
             public decimal BetragRaw { get; set; }
         }
 
+        // ===== Energie: Diff Anzeige je Zähler =====
+        public sealed class EnergieDiffRowVm : INotifyPropertyChanged
+        {
+            public int ZaehlerId { get; init; }
+            public string Typ { get; init; } = "";
+            public string Name { get; init; } = "";
+            public int? EinheitId { get; init; }
+
+            public decimal AltWert { get; init; }
+            public decimal NeuWert { get; init; }
+            public decimal DiffKwh => NeuWert - AltWert;
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void OnPropertyChanged([CallerMemberName] string? name = null)
+                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        public sealed class ZaehlerdatenSetVm
+        {
+            public StweZaehlerdatenSet Model { get; init; } = null!;
+            public string DisplayText { get; init; } = "";
+        }
+
+
         private readonly DatabaseService _db = new();
         private readonly StweSetRow _set;
-        private bool _energieHadExisting = false;
 
+        private string? _lastUsedSourceFromRows;
 
+        // ===== Collections =====
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
         public ObservableCollection<RowVm> Rows { get; } = new();
         public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
-        public ObservableCollection<EnergieZaehlerVm> EnergieZaehler { get; } = new();
 
+        // NEU: Zählerdaten-Sets (Dropdown) + Diff-Grid
+        public ObservableCollection<ZaehlerdatenSetVm> ZaehlerdatenSets { get; } = new();
 
+        public ObservableCollection<EnergieDiffRowVm> EnergieDiffRows { get; } = new();
+
+        // ===== Selection =====
         private StweSchluessel? _selectedSchluessel;
-        public bool CanUseStandardAuto => IsEditable && !IsEnergyVisible;
-
         public StweSchluessel? SelectedSchluessel
         {
             get => _selectedSchluessel;
@@ -107,26 +135,35 @@ namespace MyCoinFlow.Views
                 OnPropertyChanged();
                 UpdateEnergyVisibility();
             }
-
         }
 
-        // Status
+        private ZaehlerdatenSetVm? _selectedZaehlerdatenSet;
+        public ZaehlerdatenSetVm? SelectedZaehlerdatenSet
+        {
+            get => _selectedZaehlerdatenSet;
+            set { _selectedZaehlerdatenSet = value; OnPropertyChanged(); RefreshEnergieInfo(); }
+        }
+
+
+        // ===== Status / Flags =====
         public bool IsEditable => !_set.IsClosed;
         public bool IsReadOnlyGrid => _set.IsClosed;
+
+        // Set-Typ aus DB: IsCredit (Single Source of Truth)
+        private bool IsCreditSet => _set.IsCredit;
+
+        // Signed Total (Belastung = +, Gutschrift = -)
+        private decimal SetTotalSigned => IsCreditSet ? -Math.Abs(_set.Betrag) : Math.Abs(_set.Betrag);
 
         private bool _isEnergyVisible;
         public bool IsEnergyVisible
         {
             get => _isEnergyVisible;
-            private set { _isEnergyVisible = value; OnPropertyChanged(); }
+            private set { _isEnergyVisible = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanUseStandardAuto)); }
         }
 
-
-        // NEW: Set-Typ aus DB: IsCredit (Single Source of Truth)
-        private bool IsCreditSet => _set.IsCredit;
-
-        // Signed Total (Belastung = +, Gutschrift = -)
-        private decimal SetTotalSigned => IsCreditSet ? -Math.Abs(_set.Betrag) : Math.Abs(_set.Betrag);
+        // FIX/MEA Buttons deaktivieren, wenn ENERGIE aktiv
+        public bool CanUseStandardAuto => IsEditable && !IsEnergyVisible;
 
         public string HeaderText { get; private set; } = "";
 
@@ -144,6 +181,38 @@ namespace MyCoinFlow.Views
         public string DistributedText => $"Verteilt: {FormatChf(Rows.Sum(r => r.Betrag))}";
         public string RestText => $"Rest: {FormatChf(SetTotalSigned - Rows.Sum(r => r.Betrag))}";
 
+        // ===== Energie Info-Texts für XAML =====
+        private string _energieZeitraumText = "Zeitraum: —";
+        public string EnergieZeitraumText
+        {
+            get => _energieZeitraumText;
+            private set { _energieZeitraumText = value; OnPropertyChanged(); }
+        }
+
+        private string _energieNotizText = "Notiz: —";
+        public string EnergieNotizText
+        {
+            get => _energieNotizText;
+            private set { _energieNotizText = value; OnPropertyChanged(); }
+        }
+
+        private string _energieRechnungKwhText = "—";
+        public string EnergieRechnungKwhText
+        {
+            get => _energieRechnungKwhText;
+            private set { _energieRechnungKwhText = value; OnPropertyChanged(); }
+        }
+
+        private string _energieGutschriftChfText = "—";
+        public string EnergieGutschriftChfText
+        {
+            get => _energieGutschriftChfText;
+            private set { _energieGutschriftChfText = value; OnPropertyChanged(); }
+        }
+
+        // Cache: vorheriges Zählerdaten-Set (für Berechnung)
+        private StweZaehlerdatenSet? _prevZaehlerdatenSet;
+
         public SetVerteilenDialog(StweSetRow setRow)
         {
             InitializeComponent();
@@ -152,10 +221,10 @@ namespace MyCoinFlow.Views
             HeaderText = $"{_set.Datum:yyyy-MM-dd}  |  {_set.Titel}";
 
             LoadOwners();
-            LoadSchluessel();
             LoadExistingLines();
-            LoadEnergieZaehlerDefaults();
-
+            LoadSchluessel();
+            LoadZaehlerdatenSets();
+                        
             Rows.CollectionChanged += Rows_CollectionChanged;
             Closing += SetVerteilenDialog_Closing;
 
@@ -176,168 +245,230 @@ namespace MyCoinFlow.Views
                 Owners.Add(o);
         }
 
-        private void LoadSchluessel()
-        {
-            Schluessel.Clear();
-
-            foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
-                Schluessel.Add(s);
-
-            // NEU: Default "Energie" sicherstellen (falls noch nicht vorhanden)
-            if (!Schluessel.Any(x => string.Equals(x.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase)))
-            {
-                try
-                {
-                    _db.StweSchluesselInsert(_set.LiegenschaftId, "Energie", "ENERGIE");
-
-                    // Reload
-                    Schluessel.Clear();
-                    foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
-                        Schluessel.Add(s);
-                }
-                catch
-                {
-                    // bewusst still: Dialog soll trotzdem funktionieren
-                }
-            }
-
-            // Standard: MEA (wird am häufigsten verwendet)
-            // Falls kein MEA existiert: FIX
-            // Falls auch kein FIX: irgendwas (z.B. Energie)
-            SelectedSchluessel =
-                Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
-                ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
-                ?? Schluessel.FirstOrDefault();
-
-
-            // falls du den Visibility-Feinschliff bereits eingebaut hast:
-            // UpdateEnergyVisibility();
-        }
-
-
-        private void UpdateEnergyVisibility()
-        {
-            // Sichtbar nur wenn der gewählte Schlüssel den Modus "ENERGIE" hat
-            IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase);
-        }
-
-
         private void LoadExistingLines()
-
         {
             Rows.Clear();
 
+            // Merkt sich den "dominanten" Source, damit wir den Schlüssel vorauswählen können.
+            // Wir ignorieren MANUELL, wenn es auch echte Schlüssel gibt.
+            var sourceCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var l in _db.StweSetLinesGet(_set.Id))
             {
+                var src = string.IsNullOrWhiteSpace(l.Schluessel) ? "MANUELL" : l.Schluessel!.Trim();
+
+                if (!sourceCount.ContainsKey(src))
+                    sourceCount[src] = 0;
+                sourceCount[src]++;
+
                 var row = new RowVm
                 {
                     EigentuemerId = l.EigentuemerId,
                     BetragText = l.Betrag.ToString("0.00", CultureInfo.InvariantCulture),
                     Notiz = l.Notiz,
-                    Source = string.IsNullOrWhiteSpace(l.Schluessel) ? "MANUELL" : l.Schluessel!
+                    Source = src
                 };
                 AttachRow(row);
                 Rows.Add(row);
             }
 
+            // Wenn bereits verteilt: bevorzugt echten Schlüssel (z.B. ENERGIE, MEA:..., FIX:...)
+            if (Rows.Count > 0)
+            {
+                var best = sourceCount
+                    .Where(kv => !string.Equals(kv.Key, "MANUELL", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => kv.Key)
+                    .FirstOrDefault();
+
+                // Fallback: wenn alles MANUELL ist, bleibt best null
+                _lastUsedSourceFromRows = best;
+            }
+            else
+            {
+                _lastUsedSourceFromRows = null;
+            }
         }
 
-        // ===== Energie: Zählerstände (Alt/Neu) – Vorbelegung =====
 
-        public sealed class EnergieZaehlerVm : INotifyPropertyChanged
+        private void LoadSchluessel()
         {
-            private string _altText = "";
-            private string _neuText = "";
+            Schluessel.Clear();
+            foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
+                Schluessel.Add(s);
 
-            public int ZaehlerId { get; init; }
-            public string Name { get; init; } = "";
-            public string Typ { get; init; } = "";         // DIREKT / ALLG / HEIZ / EVU
-            public int? EinheitId { get; init; }
-
-            public string AltText
+            // Standard: MEA (meist verwendet), dann FIX, sonst erster
+            // Wenn schon verteilt wurde: den verwendeten Schlüssel anzeigen (z.B. ENERGIE)
+            // sonst Standard: MEA → FIX → erster
+            if (!string.IsNullOrWhiteSpace(_lastUsedSourceFromRows))
             {
-                get => _altText;
-                set { _altText = value ?? ""; OnPropertyChanged(); }
+                // ENERGIE ist Modus, aber Source ist "ENERGIE"
+                if (string.Equals(_lastUsedSourceFromRows, "ENERGIE", StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectedSchluessel = Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase))
+                                         ?? Schluessel.FirstOrDefault();
+                }
+                else if (_lastUsedSourceFromRows.StartsWith("MEA:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Source "MEA:<id>"
+                    if (int.TryParse(_lastUsedSourceFromRows.Substring(4), out var id))
+                        SelectedSchluessel = Schluessel.FirstOrDefault(x => x.Id == id) ?? Schluessel.FirstOrDefault();
+                    else
+                        SelectedSchluessel = Schluessel.FirstOrDefault();
+                }
+                else if (_lastUsedSourceFromRows.StartsWith("FIX:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Source "FIX:<id>"
+                    if (int.TryParse(_lastUsedSourceFromRows.Substring(4), out var id))
+                        SelectedSchluessel = Schluessel.FirstOrDefault(x => x.Id == id) ?? Schluessel.FirstOrDefault();
+                    else
+                        SelectedSchluessel = Schluessel.FirstOrDefault();
+                }
+                else
+                {
+                    // unbekannter Source -> Standard
+                    SelectedSchluessel =
+                        Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
+                        ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
+                        ?? Schluessel.FirstOrDefault();
+                }
+            }
+            else
+            {
+                SelectedSchluessel =
+                    Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
+                    ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
+                    ?? Schluessel.FirstOrDefault();
             }
 
-            public string NeuText
-            {
-                get => _neuText;
-                set { _neuText = value ?? ""; OnPropertyChanged(); }
-            }
+            UpdateEnergyVisibility();
 
-            public decimal AltKwh => ParseDecimal(AltText);
-            public decimal NeuKwh => ParseDecimal(NeuText);
-            public decimal DiffKwh => NeuKwh - AltKwh;
 
-            private static decimal ParseDecimal(string? input)
-            {
-                // CH-tolerant: "1'234.500" / "1234,5" / "1234.5"
-                var s = (input ?? "").Trim();
-                s = s.Replace("’", "'").Replace(" ", "");
-                s = s.Replace("'", "");      // Tausender
-                s = s.Replace(",", ".");     // Dezimal
-
-                if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
-                    return val;
-
-                return 0m;
-            }
-
-            public event PropertyChangedEventHandler? PropertyChanged;
-            private void OnPropertyChanged([CallerMemberName] string? name = null)
-                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            UpdateEnergyVisibility();
         }
 
-        private void LoadEnergieZaehlerDefaults()
+        private void LoadZaehlerdatenSets()
         {
-            EnergieZaehler.Clear();
+            ZaehlerdatenSets.Clear();
+            SelectedZaehlerdatenSet = null;
 
-            // 1) Stammdaten Zähler (pro Liegenschaft)
+            var sets = _db.StweZaehlerdatenSetsGetByLiegenschaft(_set.LiegenschaftId)
+                          .OrderByDescending(x => x.ErfasstAm)
+                          .ThenByDescending(x => x.Id)
+                          .ToList();
+
+            if (sets.Count == 0)
+                return;
+
+            var oldest = sets.OrderBy(x => x.ErfasstAm).ThenBy(x => x.Id).First();
+
+            foreach (var s in sets)
+            {
+                var date = s.ErfasstAm.ToString("dd.MM.yyyy");
+                var notiz = (s.Notiz ?? "").Trim();
+
+                var label = string.IsNullOrWhiteSpace(notiz) ? date : $"{date} – {notiz}";
+
+                if (s.Id == oldest.Id)
+                    label += " (erstes Set)";
+
+                if (!s.RechnungKwhTotal.HasValue || s.RechnungKwhTotal.Value <= 0m)
+                    label += " [kWh?]";
+
+                // WICHTIG: Wir fügen jetzt ein ZaehlerdatenSetVm hinzu (nicht das DB-Objekt direkt)
+                ZaehlerdatenSets.Add(new ZaehlerdatenSetVm
+                {
+                    Model = s,
+                    DisplayText = label
+                });
+            }
+
+            // Default-Auswahl: neustes Set, das <= Set-Datum ist (sonst neustes insgesamt)
+            var best = ZaehlerdatenSets
+                .Where(x => x.Model.ErfasstAm.Date <= _set.Datum.Date)
+                .OrderByDescending(x => x.Model.ErfasstAm)
+                .ThenByDescending(x => x.Model.Id)
+                .FirstOrDefault();
+
+            SelectedZaehlerdatenSet = best ?? ZaehlerdatenSets.FirstOrDefault();
+        }
+
+
+        private void UpdateEnergyVisibility()
+        {
+            IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void RefreshEnergieInfo()
+        {
+            EnergieDiffRows.Clear();
+            _prevZaehlerdatenSet = null;
+
+            if (!IsEnergyVisible)
+            {
+                EnergieZeitraumText = "Zeitraum: —";
+                EnergieNotizText = "Notiz: —";
+                EnergieRechnungKwhText = "—";
+                EnergieGutschriftChfText = "—";
+                return;
+            }
+
+            if (SelectedZaehlerdatenSet == null)
+            {
+                EnergieZeitraumText = "Zeitraum: —";
+                EnergieNotizText = "Notiz: —";
+                EnergieRechnungKwhText = "—";
+                EnergieGutschriftChfText = "—";
+                return;
+            }
+
+            var current = SelectedZaehlerdatenSet.Model;
+
+            _prevZaehlerdatenSet = _db.StweZaehlerdatenGetPreviousSet(
+                _set.LiegenschaftId,
+                current.ErfasstAm,
+                current.Id);
+
+            var prevText = _prevZaehlerdatenSet == null ? "—" : _prevZaehlerdatenSet.ErfasstAm.ToString("dd.MM.yyyy");
+            var curText = current.ErfasstAm.ToString("dd.MM.yyyy");
+            EnergieZeitraumText = $"Zeitraum: {prevText} – {curText}";
+
+            var n = (current.Notiz ?? "").Trim();
+            EnergieNotizText = string.IsNullOrWhiteSpace(n) ? "Notiz: —" : $"Notiz: {n}";
+
+            EnergieRechnungKwhText = current.RechnungKwhTotal.HasValue
+                ? current.RechnungKwhTotal.Value.ToString("0.###", CultureInfo.InvariantCulture)
+                : "—";
+
+            EnergieGutschriftChfText = current.GutschriftChf.HasValue
+                ? current.GutschriftChf.Value.ToString("0.00", CultureInfo.InvariantCulture)
+                : "—";
+
             var zaehler = _db.StweZaehlerGetByLiegenschaft(_set.LiegenschaftId);
-            if (zaehler.Count == 0)
-                return; // keine Energie-Zähler definiert -> nichts zu laden
 
-            // 2) Falls dieses Set bereits Zählerstände hat -> diese sind "Single Source of Truth"
-            var existing = _db.StweEnergieZaehlerGetBySet(_set.Id);
-            var existingDict = existing.ToDictionary(x => x.ZaehlerId, x => (x.AltKwh, x.NeuKwh));
-            _energieHadExisting = existing.Count > 0;
+            var curLines = _db.StweZaehlerdatenLinesGetBySet(current.Id)
+                .ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
 
-
-            // 3) Sonst: Alt = letzter Neu-Stand vor Set-Datum
-            Dictionary<int, decimal> lastNeu = new();
-            if (existing.Count == 0)
+            var prevLines = new Dictionary<int, decimal>();
+            if (_prevZaehlerdatenSet != null)
             {
-                lastNeu = _db.StweEnergieLastNeuStaendeGet(_set.LiegenschaftId, _set.Datum);
+                prevLines = _db.StweZaehlerdatenLinesGetBySet(_prevZaehlerdatenSet.Id)
+                    .ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
             }
 
             foreach (var z in zaehler)
             {
-                // z = (Id, LiegenschaftId, Name, Typ, EinheitId, Notiz)
-                var zid = z.Id;
+                curLines.TryGetValue(z.Id, out var neu);
+                prevLines.TryGetValue(z.Id, out var alt);
 
-                string alt = "";
-                string neu = "";
-
-                if (existingDict.TryGetValue(zid, out var pair))
+                EnergieDiffRows.Add(new EnergieDiffRowVm
                 {
-                    alt = pair.AltKwh.ToString("0.###", CultureInfo.InvariantCulture);
-                    neu = pair.NeuKwh.ToString("0.###", CultureInfo.InvariantCulture);
-                }
-                else if (lastNeu.TryGetValue(zid, out var last))
-                {
-                    alt = last.ToString("0.###", CultureInfo.InvariantCulture);
-                    neu = ""; // bewusst leer -> User trägt neuen Stand ein
-                }
-
-                EnergieZaehler.Add(new EnergieZaehlerVm
-                {
-                    ZaehlerId = zid,
-                    Name = z.Name,
+                    ZaehlerId = z.Id,
                     Typ = z.Typ,
+                    Name = z.Name,
                     EinheitId = z.EinheitId,
-                    AltText = alt,
-                    NeuText = neu
+                    AltWert = alt,
+                    NeuWert = neu
                 });
             }
         }
@@ -518,8 +649,61 @@ namespace MyCoinFlow.Views
             ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
         }
 
-        private Dictionary<int, decimal>? BuildOwnerMeaAtDate()
+        // ===== ENERGIE: Rechnen aus Zählerdaten-Set =====
+        private void EnergieBerechnen_Click(object sender, RoutedEventArgs e)
         {
+            if (!IsEditable) return;
+
+            if (!IsEnergyVisible)
+            {
+                MessageBox.Show("Bitte zuerst den Schlüssel „ENERGIE“ wählen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (SelectedZaehlerdatenSet == null)
+            {
+                MessageBox.Show("Bitte zuerst ein Zählerdaten-Set auswählen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!SelectedZaehlerdatenSet.Model.RechnungKwhTotal.HasValue || SelectedZaehlerdatenSet.Model.RechnungKwhTotal.Value <= 0m)
+
+            {
+                MessageBox.Show("Im Zählerdaten-Set fehlt „Rechnung kWh total“.\n\nBitte unter „Zählerdaten“ nachtragen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (Rows.Count > 0)
+            {
+                var res = MessageBox.Show(
+                    "Die Energie-Berechnung ersetzt die bestehenden Verteilzeilen.\n\nMöchtest du fortfahren?",
+                    "Energie berechnen",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (res != MessageBoxResult.Yes)
+                    return;
+            }
+
+            // Preis aus Rechnung-kWh (nicht EVU, nicht interne Summe!)
+            var rechnungKwh = SelectedZaehlerdatenSet.Model.RechnungKwhTotal.Value;
+            var preis = SetTotalSigned / rechnungKwh;
+
+            // Diffs aus DiffRows (Alt/Neu aus Set und previous Set)
+            if (EnergieDiffRows.Count == 0)
+                RefreshEnergieInfo();
+
+            // Gutschrift-Sonderfall: weiterhin vollständig nach MEA
+            if (IsCreditSet)
+            {
+                ApplyEnergyAsMeaOnly();
+                return;
+            }
+
+            // MEA Basis
             var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
                            .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
                            .ToList();
@@ -528,7 +712,7 @@ namespace MyCoinFlow.Views
             {
                 MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
                     "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return null;
+                return;
             }
 
             var ownerMea = new Dictionary<int, decimal>();
@@ -558,17 +742,8 @@ namespace MyCoinFlow.Views
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
                     "Energie berechnen",
                     MessageBoxButton.OK, MessageBoxImage.Information);
-                return null;
-            }
-
-            return ownerMea;
-        }
-
-        private void ApplyEnergyAsMeaOnly()
-        {
-            var ownerMea = BuildOwnerMeaAtDate();
-            if (ownerMea == null)
                 return;
+            }
 
             var sumMea = ownerMea.Values.Sum();
             if (sumMea <= 0m)
@@ -578,15 +753,186 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            var total = SetTotalSigned; // bei Gutschrift negativ (korrekt)
+            // Sammeln (mit Detail)
+            var directKwhByOwner = new Dictionary<int, decimal>();
+            var directChfByOwner = new Dictionary<int, decimal>();
+            var allgChfByOwner = new Dictionary<int, decimal>();
+            var heizChfByOwner = new Dictionary<int, decimal>();
+
+            void AddDict(Dictionary<int, decimal> dict, int key, decimal value)
+            {
+                if (!dict.ContainsKey(key)) dict[key] = 0m;
+                dict[key] += value;
+            }
+
+            // DIREKT: Diff je Direkt-Zähler -> Eigentümer der Einheit am Set-Datum
+            foreach (var d in EnergieDiffRows.Where(x => string.Equals(x.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase)))
+            {
+                var diff = d.DiffKwh;
+                if (diff <= 0m) continue;
+
+                if (!d.EinheitId.HasValue)
+                {
+                    MessageBox.Show($"Direkt-Zähler „{d.Name}“ hat keine EinheitId (Stammdaten prüfen).",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(d.EinheitId.Value, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    MessageBox.Show($"Für die Einheit des Zählers „{d.Name}“ ist am Datum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet.",
+                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var chf = diff * preis;
+                AddDict(directKwhByOwner, oid.Value, diff);
+                AddDict(directChfByOwner, oid.Value, chf);
+            }
+
+            // ALLG/HEIZ total kWh
+            var kwhAllg = EnergieDiffRows.Where(x => string.Equals(x.Typ, "ALLG", StringComparison.OrdinalIgnoreCase))
+                                        .Sum(x => Math.Max(0m, x.DiffKwh));
+            var totalAllg = kwhAllg * preis;
+
+            var kwhHeiz = EnergieDiffRows.Where(x => string.Equals(x.Typ, "HEIZ", StringComparison.OrdinalIgnoreCase))
+                                        .Sum(x => Math.Max(0m, x.DiffKwh));
+            var totalHeiz = kwhHeiz * preis;
+
+            // MEA-Verteilung ALLG/HEIZ
+            foreach (var kv in ownerMea)
+            {
+                var ownerId = kv.Key;
+                var mea = kv.Value;
+
+                if (kwhAllg > 0m)
+                    AddDict(allgChfByOwner, ownerId, totalAllg * (mea / sumMea));
+
+                if (kwhHeiz > 0m)
+                    AddDict(heizChfByOwner, ownerId, totalHeiz * (mea / sumMea));
+            }
+
+            // Raw Sum pro Owner
+            var ownerAmount = new Dictionary<int, decimal>();
+            foreach (var oid in ownerMea.Keys.Union(directChfByOwner.Keys))
+            {
+                var sum = 0m;
+                if (directChfByOwner.TryGetValue(oid, out var dchf)) sum += dchf;
+                if (allgChfByOwner.TryGetValue(oid, out var achf)) sum += achf;
+                if (heizChfByOwner.TryGetValue(oid, out var hchf)) sum += hchf;
+                if (sum != 0m) ownerAmount[oid] = sum;
+            }
+
+            var sumOwner = ownerAmount.Values.Sum();
+            if (sumOwner == 0m)
+            {
+                MessageBox.Show("Es konnte kein Betrag berechnet werden (Summe = 0).",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Skala auf exaktes SetTotalSigned (weil interne Diff-Summe nicht zwingend == RechnungkWh)
+            var scale = SetTotalSigned / sumOwner;
+
+            var raw = ownerAmount.Select(kv => new RawShare
+            {
+                EigentuemerId = kv.Key,
+                BetragRaw = kv.Value * scale
+            }).ToList();
+
+            // Notizen pro Owner
+            var ownerNotiz = new Dictionary<int, string>();
+            foreach (var kv in ownerMea)
+            {
+                var oid = kv.Key;
+                var mea = kv.Value;
+
+                directKwhByOwner.TryGetValue(oid, out var dkwh);
+                directChfByOwner.TryGetValue(oid, out var dchf);
+                allgChfByOwner.TryGetValue(oid, out var achf);
+                heizChfByOwner.TryGetValue(oid, out var hchf);
+                ownerAmount.TryGetValue(oid, out var sumRaw);
+
+                var parts =
+                    $"Dir {dkwh:0.###}kWh×{preis:0.####}={dchf:0.00}"
+                    + $" | Allg {kwhAllg:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea:0.###})={achf:0.00}"
+                    + $" | Heiz {kwhHeiz:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea:0.###})={hchf:0.00}"
+                    + $" | Sum={sumRaw:0.00}"
+                    + (Math.Abs(scale - 1m) > 0.0000001m ? $" | Scale×{scale:0.######}" : "");
+
+                ownerNotiz[oid] = parts;
+            }
+
+            ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
+        }
+
+        private void ApplyEnergyAsMeaOnly()
+        {
+            var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
+                           .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
+                           .ToList();
+
+            if (units.Count == 0)
+            {
+                MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var ownerMea = new Dictionary<int, decimal>();
+            var missing = new List<string>();
+
+            foreach (var u in units)
+            {
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                if (!oid.HasValue)
+                {
+                    missing.Add(u.Bezeichnung);
+                    continue;
+                }
+
+                if (!ownerMea.ContainsKey(oid.Value))
+                    ownerMea[oid.Value] = 0m;
+
+                ownerMea[oid.Value] += (u.MeaPromille ?? 0m);
+            }
+
+            if (missing.Count > 0)
+            {
+                MessageBox.Show(
+                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    string.Join("\n• ", missing.Take(10)) +
+                    (missing.Count > 10 ? "\n…" : "") +
+                    "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
+                    "Energie berechnen",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var sumMea = ownerMea.Values.Sum();
+            if (sumMea <= 0m)
+            {
+                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
+                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var total = SetTotalSigned;
             var raw = ownerMea.Select(kv =>
             {
                 var amount = total * (kv.Value / sumMea);
                 return new RawShare { EigentuemerId = kv.Key, BetragRaw = amount };
             }).ToList();
 
-            ApplyRoundedRows(raw, "Energie (Gutschrift): nach MEA", "ENERGIE");
+            var ownerNotiz = ownerMea.ToDictionary(
+                kv => kv.Key,
+                kv => $"MEA {kv.Value:0.###}/{sumMea:0.###} → {total:0.00}");
+
+            ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
         }
+
+        // ===== Rounded Rows =====
 
         private void ApplyRoundedRows(List<RawShare> raw, string notiz, string source)
         {
@@ -603,7 +949,6 @@ namespace MyCoinFlow.Views
 
             if (diff != 0m && rounded.Count > 0)
             {
-                // Korrektur auf die betragsmässig grösste Zeile (nach Betrag-ABS)
                 var idx = rounded
                     .Select((x, i) => new { Abs = Math.Abs(x.Betrag), Index = i })
                     .OrderByDescending(x => x.Abs)
@@ -643,7 +988,6 @@ namespace MyCoinFlow.Views
 
             if (diff != 0m && rounded.Count > 0)
             {
-                // Korrektur auf die betragsmässig grösste Zeile (nach Betrag-ABS)
                 var idx = rounded
                     .Select((x, i) => new { Abs = Math.Abs(x.Betrag), Index = i })
                     .OrderByDescending(x => x.Abs)
@@ -652,11 +996,8 @@ namespace MyCoinFlow.Views
                 var item = rounded[idx];
                 rounded[idx] = new { item.EigentuemerId, Betrag = item.Betrag + diff };
 
-                // Notiz auch anpassen (Diff sichtbar machen)
                 if (ownerNotiz != null && ownerNotiz.TryGetValue(item.EigentuemerId, out var old))
-                {
                     ownerNotiz[item.EigentuemerId] = $"{old} | Diff {diff:+0.00;-0.00;0.00}";
-                }
             }
 
             Rows.Clear();
@@ -677,6 +1018,7 @@ namespace MyCoinFlow.Views
             RaiseTotals();
         }
 
+        // ===== Save =====
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
@@ -698,12 +1040,8 @@ namespace MyCoinFlow.Views
             if (!ValidateBeforeSave())
                 return false;
 
-            if (!ValidateEnergieBeforeSave())
-                return false;
-
             try
             {
-                // 1) Normale Set-Verteilung (bestehend)
                 _db.StweSetLinesDeleteBySet(_set.Id);
 
                 foreach (var r in Rows)
@@ -716,27 +1054,6 @@ namespace MyCoinFlow.Views
                         betrag: r.Betrag,
                         notiz: r.Notiz
                     );
-                }
-
-                // 2) Energie-Zählerstände (neu)
-                // Nur speichern, wenn:
-                // - mindestens ein Wert erfasst wurde ODER
-                // - es zuvor schon Energie-Daten gab (dann muss "alles leeren" auch in DB ankommen)
-                if (EnergieZaehler.Count > 0)
-                {
-                    var anyText = EnergieZaehler.Any(z =>
-                        !string.IsNullOrWhiteSpace(z.AltText) || !string.IsNullOrWhiteSpace(z.NeuText));
-
-                    if (anyText || _energieHadExisting)
-                    {
-                        var rows = EnergieZaehler
-                            .Where(z => !string.IsNullOrWhiteSpace(z.AltText) || !string.IsNullOrWhiteSpace(z.NeuText))
-                            .Select(z => (ZaehlerId: z.ZaehlerId, AltKwh: z.AltKwh, NeuKwh: z.NeuKwh))
-                            .ToList();
-
-                        _db.StweEnergieZaehlerReplace(_set.Id, rows);
-                        _energieHadExisting = rows.Count > 0;
-                    }
                 }
 
                 if (showSuccessMessage)
@@ -754,7 +1071,6 @@ namespace MyCoinFlow.Views
                 return false;
             }
         }
-
 
         private bool ValidateBeforeSave()
         {
@@ -802,7 +1118,6 @@ namespace MyCoinFlow.Views
 
             if (!IsCreditSet)
             {
-                // Belastung: Summe darf Total nicht überschreiten
                 if (sum > total + eps)
                 {
                     MessageBox.Show("Summe der Zeilen darf den Set-Betrag nicht überschreiten.",
@@ -812,8 +1127,6 @@ namespace MyCoinFlow.Views
             }
             else
             {
-                // Gutschrift (total ist negativ): Summe darf nicht "mehr negativ" sein als Total
-                // Beispiel: total = -100, sum = -110 -> zu viel verteilt
                 if (sum < total - eps)
                 {
                     MessageBox.Show("Summe der Zeilen darf den (negativen) Set-Betrag nicht unterschreiten.",
@@ -825,49 +1138,7 @@ namespace MyCoinFlow.Views
             return true;
         }
 
-        private bool ValidateEnergieBeforeSave()
-        {
-            // Kein Energie-Block im Dialog -> ok
-            if (EnergieZaehler == null || EnergieZaehler.Count == 0)
-                return true;
-
-            // Wenn der User bei einem Zähler Neu eingibt, muss Alt auch vorhanden sein.
-            // Und Neu sollte nicht kleiner als Alt sein (defensive Plausibilitätsprüfung).
-            foreach (var z in EnergieZaehler)
-            {
-                var hasAlt = !string.IsNullOrWhiteSpace(z.AltText);
-                var hasNeu = !string.IsNullOrWhiteSpace(z.NeuText);
-
-                if (hasNeu && !hasAlt)
-                {
-                    MessageBox.Show(
-                        $"Beim Zähler „{z.Name}“ ist ein Neu-Stand gesetzt, aber Alt ist leer.\n\n" +
-                        "Bitte Alt und Neu erfassen.",
-                        "Energie-Zählerstände",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return false;
-                }
-
-                if (hasAlt && hasNeu)
-                {
-                    if (z.NeuKwh < z.AltKwh)
-                    {
-                        MessageBox.Show(
-                            $"Beim Zähler „{z.Name}“ ist Neu kleiner als Alt.\n\n" +
-                            $"Alt: {z.AltKwh:0.###}  Neu: {z.NeuKwh:0.###}\n\n" +
-                            "Bitte prüfen (Tippfehler?).",
-                            "Energie-Zählerstände",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
+        // ===== Helpers =====
 
         private static string FormatChf(decimal v)
         {
@@ -886,340 +1157,5 @@ namespace MyCoinFlow.Views
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-        private void EnergieBerechnen_Click(object sender, RoutedEventArgs e)
-        {
-            if (!IsEditable) return;
-
-            if (Rows.Count > 0)
-            {
-                var res = MessageBox.Show(
-                    "Die Energie-Berechnung ersetzt die bestehenden Verteilzeilen.\n\nMöchtest du fortfahren?",
-                    "Energie berechnen",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (res != MessageBoxResult.Yes)
-                    return;
-            }
-
-            if (EnergieZaehler == null || EnergieZaehler.Count == 0)
-            {
-                MessageBox.Show("Keine Zähler gefunden.\n\nBitte Zähler unter „Liegenschaften → Zähler“ erfassen.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // Sonderfall: Gutschrift -> komplett nach MEA
-            if (IsCreditSet)
-            {
-                var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
-                               .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
-                               .ToList();
-
-                if (units.Count == 0)
-                {
-                    MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
-                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var ownerMea = new Dictionary<int, decimal>();
-                var missing = new List<string>();
-
-                foreach (var u in units)
-                {
-                    var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
-                    if (!oid.HasValue)
-                    {
-                        missing.Add(u.Bezeichnung);
-                        continue;
-                    }
-
-                    if (!ownerMea.ContainsKey(oid.Value))
-                        ownerMea[oid.Value] = 0m;
-
-                    ownerMea[oid.Value] += (u.MeaPromille ?? 0m);
-                }
-
-                if (missing.Count > 0)
-                {
-                    MessageBox.Show(
-                        $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
-                        string.Join("\n• ", missing.Take(10)) +
-                        (missing.Count > 10 ? "\n…" : "") +
-                        "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
-                        "Energie berechnen",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var sumMea = ownerMea.Values.Sum();
-                if (sumMea <= 0m)
-                {
-                    MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
-                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var rawCredit = ownerMea.Select(kv =>
-                {
-                    var amount = SetTotalSigned * (kv.Value / sumMea);
-                    return new RawShare { EigentuemerId = kv.Key, BetragRaw = amount };
-                }).ToList();
-
-                var ownerNotizCredit = ownerMea.ToDictionary(
-                    kv => kv.Key,
-                    kv => $"MEA {kv.Value:0.###}/{sumMea:0.###} → {SetTotalSigned:0.00}");
-
-                ApplyRoundedRows(rawCredit, ownerNotizCredit, "ENERGIE");
-                return;
-            }
-
-            // Interne Zähler (für Verteilung)
-            var intern = EnergieZaehler
-                .Where(z =>
-                    string.Equals(z.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(z.Typ, "ALLG", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(z.Typ, "HEIZ", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (intern.Count == 0)
-            {
-                MessageBox.Show("Keine verteilrelevanten Zähler gefunden (DIREKT/ALLG/HEIZ).",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (intern.Any(z => string.IsNullOrWhiteSpace(z.AltText) || string.IsNullOrWhiteSpace(z.NeuText)))
-            {
-                MessageBox.Show("Bitte bei allen internen Zählern (DIREKT/ALLG/HEIZ) Alt und Neu erfassen.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (intern.Any(z => z.DiffKwh < 0m))
-            {
-                MessageBox.Show("Bitte prüfen: Bei einem Zähler ist Neu kleiner als Alt (Diff < 0).",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var internKwh = intern.Sum(z => z.DiffKwh);
-            if (internKwh <= 0m)
-            {
-                MessageBox.Show("Summe interne kWh ist 0 – keine Verteilung möglich.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // EVU optional (Preis-Basis)
-            var evuList = EnergieZaehler
-                .Where(z => string.Equals(z.Typ, "EVU", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            decimal evuKwh = 0m;
-            if (evuList.Count > 0)
-            {
-                var completeEvu = evuList
-                    .Where(z => !string.IsNullOrWhiteSpace(z.AltText) && !string.IsNullOrWhiteSpace(z.NeuText))
-                    .ToList();
-
-                if (completeEvu.Count > 0)
-                    evuKwh = completeEvu.Sum(z => z.DiffKwh);
-            }
-
-            var basisKwh = evuKwh > 0m ? evuKwh : internKwh;
-            if (basisKwh <= 0m)
-            {
-                MessageBox.Show("Preis-Basis kWh ist 0 – keine Verteilung möglich.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var preis = SetTotalSigned / basisKwh;
-
-            // MEA Basis
-            var meaUnits = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
-                              .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
-                              .ToList();
-
-            if (meaUnits.Count == 0)
-            {
-                MessageBox.Show("Keine Einheiten mit MEA (‰) gefunden.\n\nBitte MEA bei den Einheiten erfassen.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var ownerMea2 = new Dictionary<int, decimal>();
-            var missing2 = new List<string>();
-
-            foreach (var u in meaUnits)
-            {
-                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
-                if (!oid.HasValue)
-                {
-                    missing2.Add(u.Bezeichnung);
-                    continue;
-                }
-
-                if (!ownerMea2.ContainsKey(oid.Value))
-                    ownerMea2[oid.Value] = 0m;
-
-                ownerMea2[oid.Value] += (u.MeaPromille ?? 0m);
-            }
-
-            if (missing2.Count > 0)
-            {
-                MessageBox.Show(
-                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
-                    string.Join("\n• ", missing2.Take(10)) +
-                    (missing2.Count > 10 ? "\n…" : "") +
-                    "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
-                    "Energie berechnen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var sumMea2 = ownerMea2.Values.Sum();
-            if (sumMea2 <= 0m)
-            {
-                MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // Sammeln (mit Detail)
-            var directKwhByOwner = new Dictionary<int, decimal>();
-            var directChfByOwner = new Dictionary<int, decimal>();
-            var allgChfByOwner = new Dictionary<int, decimal>();
-            var heizChfByOwner = new Dictionary<int, decimal>();
-
-            void AddDict(Dictionary<int, decimal> dict, int key, decimal value)
-            {
-                if (!dict.ContainsKey(key)) dict[key] = 0m;
-                dict[key] += value;
-            }
-
-            // DIREKT
-            foreach (var z in intern.Where(x => string.Equals(x.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase)))
-            {
-                if (!z.EinheitId.HasValue)
-                {
-                    MessageBox.Show($"Direkt-Zähler „{z.Name}“ hat keine EinheitId (Stammdaten prüfen).",
-                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var oid = _db.StweEigentuemerGetByEinheitAtDate(z.EinheitId.Value, _set.Datum);
-                if (!oid.HasValue)
-                {
-                    MessageBox.Show($"Für die Einheit des Zählers „{z.Name}“ ist am Datum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet.",
-                        "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var chf = z.DiffKwh * preis;
-                AddDict(directKwhByOwner, oid.Value, z.DiffKwh);
-                AddDict(directChfByOwner, oid.Value, chf);
-            }
-
-            // ALLG / HEIZ total kWh und total CHF
-            var kwhAllg = intern.Where(x => string.Equals(x.Typ, "ALLG", StringComparison.OrdinalIgnoreCase))
-                                .Sum(x => x.DiffKwh);
-            var totalAllg = kwhAllg * preis;
-
-            var kwhHeiz = intern.Where(x => string.Equals(x.Typ, "HEIZ", StringComparison.OrdinalIgnoreCase))
-                                .Sum(x => x.DiffKwh);
-            var totalHeiz = kwhHeiz * preis;
-
-            // MEA-Verteilung ALLG/HEIZ auf Owner
-            foreach (var kv in ownerMea2)
-            {
-                var ownerId = kv.Key;
-                var mea = kv.Value;
-
-                if (kwhAllg > 0m)
-                    AddDict(allgChfByOwner, ownerId, totalAllg * (mea / sumMea2));
-
-                if (kwhHeiz > 0m)
-                    AddDict(heizChfByOwner, ownerId, totalHeiz * (mea / sumMea2));
-            }
-
-            // Raw Sum
-            var ownerAmount = new Dictionary<int, decimal>();
-            foreach (var oid in ownerMea2.Keys.Union(directChfByOwner.Keys))
-            {
-                var sum = 0m;
-                if (directChfByOwner.TryGetValue(oid, out var d)) sum += d;
-                if (allgChfByOwner.TryGetValue(oid, out var a)) sum += a;
-                if (heizChfByOwner.TryGetValue(oid, out var h)) sum += h;
-                if (sum != 0m) ownerAmount[oid] = sum;
-            }
-
-            var sumOwner = ownerAmount.Values.Sum();
-            if (sumOwner == 0m)
-            {
-                MessageBox.Show("Es konnte kein Betrag berechnet werden (Summe = 0).",
-                    "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // Skala auf exaktes SetTotalSigned (wichtig bei intern != EVU)
-            var scale = SetTotalSigned / sumOwner;
-
-            var raw = ownerAmount.Select(kv => new RawShare
-            {
-                EigentuemerId = kv.Key,
-                BetragRaw = kv.Value * scale
-            }).ToList();
-
-            // Notizen pro Owner aufbauen
-            var ownerNotiz = new Dictionary<int, string>();
-            foreach (var kv in ownerMea2)
-            {
-                var oid = kv.Key;
-                var mea = kv.Value;
-
-                directKwhByOwner.TryGetValue(oid, out var dkwh);
-                directChfByOwner.TryGetValue(oid, out var dchf);
-                allgChfByOwner.TryGetValue(oid, out var achf);
-                heizChfByOwner.TryGetValue(oid, out var hchf);
-                ownerAmount.TryGetValue(oid, out var sumRaw);
-
-                // kompakt, aber nachvollziehbar
-                var parts =
-                    $"Dir {dkwh:0.###}kWh×{preis:0.####}={dchf:0.00}"
-                    + $" | Allg {kwhAllg:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea2:0.###})={achf:0.00}"
-                    + $" | Heiz {kwhHeiz:0.###}kWh×{preis:0.####}×(MEA {mea:0.###}/{sumMea2:0.###})={hchf:0.00}"
-                    + $" | Sum={sumRaw:0.00}"
-                    + (Math.Abs(scale - 1m) > 0.0000001m ? $" | Scale×{scale:0.######}" : "");
-
-                ownerNotiz[oid] = parts;
-            }
-
-            // falls jemand nur DIREKT hat und keine MEA (theoretisch), trotzdem notiz
-            foreach (var oid in ownerAmount.Keys)
-            {
-                if (!ownerNotiz.ContainsKey(oid))
-                {
-                    directKwhByOwner.TryGetValue(oid, out var dkwh);
-                    directChfByOwner.TryGetValue(oid, out var dchf);
-                    ownerAmount.TryGetValue(oid, out var sumRaw);
-
-                    var parts =
-                        $"Dir {dkwh:0.###}kWh×{preis:0.####}={dchf:0.00}"
-                        + $" | Sum={sumRaw:0.00}"
-                        + (Math.Abs(scale - 1m) > 0.0000001m ? $" | Scale×{scale:0.######}" : "");
-
-                    ownerNotiz[oid] = parts;
-                }
-            }
-
-            // Als Rows übernehmen (inkl. owner-spezifischer Notizen)
-            ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
-        }
-
-
     }
 }

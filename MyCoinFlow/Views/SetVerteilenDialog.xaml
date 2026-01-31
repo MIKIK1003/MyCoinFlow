@@ -11,7 +11,6 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
 
-
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="260"/>
@@ -77,18 +76,18 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Row="1"
-                            Style="{StaticResource MaterialDesignRaisedButton}"
+                    <!-- Energie-Berechnung -->
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
                             Click="EnergieBerechnen_Click"
                             Padding="14,8"
                             Margin="0,0,0,8"
-                            IsEnabled="{Binding IsEditable}">
+                            IsEnabled="{Binding IsEditable}"
+                            Visibility="{Binding IsEnergyVisible, Converter={StaticResource BoolToVis}}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="LightningBoltOutline" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Energie berechnen"/>
                         </StackPanel>
                     </Button>
-   
 
                     <Separator Margin="0,6,0,10"/>
 
@@ -150,7 +149,7 @@
                 <RowDefinition Height="10"/>
                 <!-- 5 -->
                 <RowDefinition Height="Auto"/>
-                <!-- 6 Energie (NEU) -->
+                <!-- 6 Energie -->
                 <RowDefinition Height="10"/>
                 <!-- 7 -->
                 <RowDefinition Height="*"/>
@@ -199,6 +198,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="260"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock VerticalAlignment="Center"
@@ -213,65 +213,100 @@
                 </Grid>
             </Border>
 
-            <!-- ENERGIE (NEU) -->
+            <!-- ENERGIE: Zählerdaten-Set auswählen -->
             <Border Grid.Row="6"
                     Background="{DynamicResource MaterialDesignPaper}"
                     CornerRadius="10"
                     Padding="12"
                     Visibility="{Binding IsEnergyVisible, Converter={StaticResource BoolToVis}}">
-
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Energie – Zählerstände (kWh)"
+                    <!-- Titel -->
+                    <TextBlock Grid.Row="0"
+                               Text="Energie – Zählerdaten"
                                FontWeight="SemiBold"
                                FontSize="14"/>
 
-                    <TextBlock Grid.Row="2"
-                               Text="Alt wird automatisch mit dem letzten Neu-Stand vorbelegt (falls vorhanden). Neu bitte eintragen."
-                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,8"/>
+                    <!-- Auswahl Zählerdaten-Set -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="320"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <DataGrid Grid.Row="2"
-                              Margin="0,28,0,0"
-                              ItemsSource="{Binding EnergieZaehler}"
+                        <TextBlock VerticalAlignment="Center"
+                                   Text="Zählerdaten-Set:"/>
+
+                        <ComboBox Grid.Column="2"
+                            ItemsSource="{Binding ZaehlerdatenSets}"
+                            SelectedItem="{Binding SelectedZaehlerdatenSet}"
+                            DisplayMemberPath="DisplayText"
+                            IsEnabled="{Binding IsEditable}"/>
+
+                        <TextBlock Grid.Column="4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                   Text="{Binding EnergieZeitraumText}"
+                                   TextWrapping="Wrap"/>
+                    </Grid>
+
+                    <!-- Notiz + Rechnung -->
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding EnergieNotizText}"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Rechnung kWh:" Margin="0,0,6,0" Opacity="0.85"/>
+                            <TextBlock Text="{Binding EnergieRechnungKwhText}" FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Gutschrift:" Margin="0,0,6,0" Opacity="0.85"/>
+                            <TextBlock Text="{Binding EnergieGutschriftChfText}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Differenzen je Zähler (Info) -->
+                    <DataGrid Grid.Row="6"
+                              ItemsSource="{Binding EnergieDiffRows}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
-                              IsReadOnly="{Binding IsReadOnlyGrid}"
+                              IsReadOnly="True"
                               HeadersVisibility="Column"
-                              MinHeight="120">
-
+                              MinHeight="120"
+                              Margin="0,6,0,0">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Typ"
-                                                Binding="{Binding Typ}"
-                                                IsReadOnly="True"
-                                                Width="90"/>
-
-                            <DataGridTextColumn Header="Zähler"
-                                                Binding="{Binding Name}"
-                                                IsReadOnly="True"
-                                                Width="*"/>
-
-                            <DataGridTextColumn Header="Alt"
-                                                Binding="{Binding AltText, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="120"/>
-
-                            <DataGridTextColumn Header="Neu"
-                                                Binding="{Binding NeuText, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="120"/>
-
-                            <DataGridTextColumn Header="Diff"
-                                                Binding="{Binding DiffKwh, StringFormat=0.###}"
-                                                IsReadOnly="True"
-                                                Width="120"/>
+                            <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="90"/>
+                            <DataGridTextColumn Header="Zähler" Binding="{Binding Name}" Width="2*"/>
+                            <DataGridTextColumn Header="EinheitId" Binding="{Binding EinheitId}" Width="100"/>
+                            <DataGridTextColumn Header="Alt" Binding="{Binding AltWert, StringFormat=0.###}" Width="120"/>
+                            <DataGridTextColumn Header="Neu" Binding="{Binding NeuWert, StringFormat=0.###}" Width="120"/>
+                            <DataGridTextColumn Header="Diff kWh" Binding="{Binding DiffKwh, StringFormat=0.###}" Width="120"/>
                         </DataGrid.Columns>
                     </DataGrid>
+
                 </Grid>
             </Border>
 
@@ -286,7 +321,6 @@
 
                 <DataGrid.Columns>
 
-                    <!-- ✅ FIX: ItemsSource muss auf DataGrid.DataContext zeigen -->
                     <DataGridComboBoxColumn Header="Eigentümer"
                                             SelectedValueBinding="{Binding EigentuemerId, UpdateSourceTrigger=PropertyChanged}"
                                             SelectedValuePath="Id"
@@ -296,7 +330,8 @@
                             <Style TargetType="ComboBox">
                                 <Setter Property="ItemsSource"
                                         Value="{Binding DataContext.Owners, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-                                <Setter Property="IsEnabled" Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                <Setter Property="IsEnabled"
+                                        Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                             </Style>
                         </DataGridComboBoxColumn.ElementStyle>
                         <DataGridComboBoxColumn.EditingElementStyle>
@@ -304,7 +339,8 @@
                                 <Setter Property="ItemsSource"
                                         Value="{Binding DataContext.Owners, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                                 <Setter Property="IsEditable" Value="False"/>
-                                <Setter Property="IsEnabled" Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                <Setter Property="IsEnabled"
+                                        Value="{Binding DataContext.IsEditable, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                             </Style>
                         </DataGridComboBoxColumn.EditingElementStyle>
                     </DataGridComboBoxColumn>

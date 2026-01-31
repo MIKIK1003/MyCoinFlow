@@ -4709,6 +4709,52 @@ BEGIN
     );
 END;
 
+-- ------------------------------------------------------------
+-- STWE: Zählerdaten (Ablesungen) – Header
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehlerdatenSet' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweZaehlerdatenSet
+    (
+        Id               INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweZaehlerdatenSet PRIMARY KEY,
+        LiegenschaftId   INT NOT NULL,
+        ErfasstAm        DATETIME2 NOT NULL,
+        RechnungKwhTotal DECIMAL(18,3) NULL,
+        GutschriftChf    DECIMAL(18,2) NULL,
+        Notiz            NVARCHAR(200) NULL,
+        UpdatedAtUtc     DATETIME2 NOT NULL CONSTRAINT DF_StweZaehlerdatenSet_Updated DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_StweZaehlerdatenSet_Liegenschaft
+            FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id)
+    );
+
+    CREATE INDEX IX_StweZaehlerdatenSet_Lid_Am ON dbo.StweZaehlerdatenSet(LiegenschaftId, ErfasstAm DESC, Id DESC);
+END;
+
+-- ------------------------------------------------------------
+-- STWE: Zählerdaten (Ablesungen) – Lines (Neuwerte je Zähler)
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehlerdatenLine' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweZaehlerdatenLine
+    (
+        Id        INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweZaehlerdatenLine PRIMARY KEY,
+        SetId     INT NOT NULL,
+        ZaehlerId INT NOT NULL,
+        NeuWert   DECIMAL(18,3) NOT NULL,
+
+        CONSTRAINT FK_StweZaehlerdatenLine_Set
+            FOREIGN KEY (SetId) REFERENCES dbo.StweZaehlerdatenSet(Id),
+
+        CONSTRAINT FK_StweZaehlerdatenLine_Zaehler
+            FOREIGN KEY (ZaehlerId) REFERENCES dbo.StweZaehler(Id),
+
+        CONSTRAINT UQ_StweZaehlerdatenLine_Set_Zaehler UNIQUE(SetId, ZaehlerId)
+    );
+
+    CREATE INDEX IX_StweZaehlerdatenLine_SetId ON dbo.StweZaehlerdatenLine(SetId);
+END;
+
 
 
 
@@ -6679,6 +6725,251 @@ ORDER BY t.Datum DESC, s.Id DESC;";
             }
 
             return list;
+        }
+
+        // ------------------------------------------------------------
+        // STWE: Zählerdaten-Sets (Ablesungen)
+        // ------------------------------------------------------------
+
+        public List<StweZaehlerdatenSet> StweZaehlerdatenSetsGetByLiegenschaft(int liegenschaftId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<StweZaehlerdatenSet>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz
+FROM dbo.StweZaehlerdatenSet
+WHERE LiegenschaftId = @lid
+ORDER BY ErfasstAm DESC, Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new StweZaehlerdatenSet
+                {
+                    Id = r.GetInt32(0),
+                    LiegenschaftId = r.GetInt32(1),
+                    ErfasstAm = r.GetDateTime(2),
+                    RechnungKwhTotal = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3),
+                    GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
+                    Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                });
+            }
+
+            return list;
+        }
+
+        public int StweZaehlerdatenSetInsert(StweZaehlerdatenSet m)
+        {
+            EnsureStweSchema();
+
+            if (m == null) throw new ArgumentNullException(nameof(m));
+            if (m.LiegenschaftId <= 0) throw new ArgumentException("LiegenschaftId fehlt.", nameof(m));
+            if (m.ErfasstAm == default) throw new ArgumentException("ErfasstAm fehlt.", nameof(m));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.StweZaehlerdatenSet (LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz)
+OUTPUT INSERTED.Id
+VALUES (@lid, @am, @rk, @gc, @n);";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", m.LiegenschaftId);
+            cmd.Parameters.AddWithValue("@am", m.ErfasstAm);
+            cmd.Parameters.AddWithValue("@rk", (object?)m.RechnungKwhTotal ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void StweZaehlerdatenSetUpdate(StweZaehlerdatenSet m)
+        {
+            EnsureStweSchema();
+
+            if (m == null) throw new ArgumentNullException(nameof(m));
+            if (m.Id <= 0) throw new ArgumentException("Id fehlt.", nameof(m));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.StweZaehlerdatenSet SET
+    ErfasstAm        = @am,
+    RechnungKwhTotal = @rk,
+    GutschriftChf    = @gc,
+    Notiz            = @n,
+    UpdatedAtUtc     = SYSUTCDATETIME()
+WHERE Id = @id;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", m.Id);
+            cmd.Parameters.AddWithValue("@am", m.ErfasstAm);
+            cmd.Parameters.AddWithValue("@rk", (object?)m.RechnungKwhTotal ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void StweZaehlerdatenSetDelete(int id)
+        {
+            EnsureStweSchema();
+            if (id <= 0) return;
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var delLines = c.CreateCommand())
+                {
+                    delLines.Transaction = tx;
+                    delLines.CommandText = "DELETE FROM dbo.StweZaehlerdatenLine WHERE SetId = @id;";
+                    delLines.Parameters.AddWithValue("@id", id);
+                    delLines.ExecuteNonQuery();
+                }
+
+                using (var delSet = c.CreateCommand())
+                {
+                    delSet.Transaction = tx;
+                    delSet.CommandText = "DELETE FROM dbo.StweZaehlerdatenSet WHERE Id = @id;";
+                    delSet.Parameters.AddWithValue("@id", id);
+                    delSet.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+        public List<StweZaehlerdatenLine> StweZaehlerdatenLinesGetBySet(int setId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<StweZaehlerdatenLine>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT Id, SetId, ZaehlerId, NeuWert
+FROM dbo.StweZaehlerdatenLine
+WHERE SetId = @sid
+ORDER BY ZaehlerId;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@sid", setId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new StweZaehlerdatenLine
+                {
+                    Id = r.GetInt32(0),
+                    SetId = r.GetInt32(1),
+                    ZaehlerId = r.GetInt32(2),
+                    NeuWert = r.GetDecimal(3)
+                });
+            }
+
+            return list;
+        }
+
+        public void StweZaehlerdatenLinesReplace(int setId, List<(int ZaehlerId, decimal NeuWert)> lines)
+        {
+            EnsureStweSchema();
+
+            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
+            lines ??= new();
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var del = c.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM dbo.StweZaehlerdatenLine WHERE SetId = @sid;";
+                    del.Parameters.AddWithValue("@sid", setId);
+                    del.ExecuteNonQuery();
+                }
+
+                foreach (var (zaehlerId, neu) in lines)
+                {
+                    using var ins = c.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = @"
+INSERT INTO dbo.StweZaehlerdatenLine (SetId, ZaehlerId, NeuWert)
+VALUES (@sid, @zid, @nw);";
+                    ins.Parameters.AddWithValue("@sid", setId);
+                    ins.Parameters.AddWithValue("@zid", zaehlerId);
+                    ins.Parameters.AddWithValue("@nw", neu);
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Liefert das direkt vorherige Zählerdaten-Set (nach ErfasstAm) innerhalb derselben Liegenschaft.
+        /// </summary>
+        public StweZaehlerdatenSet? StweZaehlerdatenGetPreviousSet(int liegenschaftId, DateTime currentErfasstAm, int currentId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP(1) Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz
+FROM dbo.StweZaehlerdatenSet
+WHERE LiegenschaftId = @lid
+  AND (ErfasstAm < @am OR (ErfasstAm = @am AND Id < @id))
+ORDER BY ErfasstAm DESC, Id DESC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@am", currentErfasstAm);
+            cmd.Parameters.AddWithValue("@id", currentId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            return new StweZaehlerdatenSet
+            {
+                Id = r.GetInt32(0),
+                LiegenschaftId = r.GetInt32(1),
+                ErfasstAm = r.GetDateTime(2),
+                RechnungKwhTotal = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3),
+                GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
+                Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+            };
         }
 
 

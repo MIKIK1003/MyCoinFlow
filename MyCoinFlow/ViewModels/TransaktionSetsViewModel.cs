@@ -79,6 +79,8 @@ namespace MyCoinFlow.ViewModels
 
         public RelayCommand SetAlsGutschriftCommand { get; }
         public RelayCommand SetAlsBelastungCommand { get; }
+        public RelayCommand ShowZaehlerdatenCommand { get; }
+
 
         public TransaktionSetsViewModel()
         {
@@ -115,6 +117,9 @@ namespace MyCoinFlow.ViewModels
 
             SetVerteilenCommand = new RelayCommand(_ => SetVerteilen(), _ => SelectedSet != null);
             ShowAuswertungCommand = new RelayCommand(_ => ShowAuswertung(), _ => SelectedLiegenschaft != null);
+
+            ShowZaehlerdatenCommand = new RelayCommand(_ => ShowZaehlerdaten(), _ => SelectedLiegenschaft != null);
+
 
             SetTitelBearbeitenCommand = new RelayCommand(_ => SetTitelBearbeiten(), _ => SelectedSet != null && !SelectedSet.IsClosed);
             SetLoeschenCommand = new RelayCommand(_ => SetLoeschen(), _ => SelectedSet != null && !SelectedSet.IsClosed);
@@ -335,5 +340,20 @@ namespace MyCoinFlow.ViewModels
             }
             catch { }
         }
+
+        private void ShowZaehlerdaten()
+        {
+            if (SelectedLiegenschaft == null) return;
+
+            var vm = new MyCoinFlow.ViewModels.ZaehlerdatenViewModel(SelectedLiegenschaft.Id, SelectedLiegenschaft.Name);
+            var win = new MyCoinFlow.Views.ZaehlerdatenWindow
+            {
+                DataContext = vm
+            };
+            TrySetOwner(win);
+            win.ShowDialog();
+        }
+
+
     }
 }

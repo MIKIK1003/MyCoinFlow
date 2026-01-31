@@ -1,0 +1,113 @@
+﻿<Window x:Class="MyCoinFlow.Views.ZaehlerdatenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Zählerdaten"
+        Width="1100"
+        Height="720"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LINKS: Aktionen -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <TextBlock Text="Aktionen"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Zählerdaten"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding NeuesSetCommand}"
+                            Padding="14,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Neu"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding BearbeitenCommand}"
+                            Padding="14,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding LoeschenCommand}"
+                            Padding="14,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Margin="0,10,0,10"/>
+
+                    <TextBlock Text="Status"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- RECHTS: Inhalt -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Text="{Binding HeaderText}"/>
+
+            <DataGrid Grid.Row="2"
+                      ItemsSource="{Binding Sets}"
+                      SelectedItem="{Binding SelectedSet}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAm}" Width="140"/>
+                    <DataGridTextColumn Header="Rechnung kWh" Binding="{Binding RechnungKwhTotal}" Width="120"/>
+                    <DataGridTextColumn Header="Gutschrift CHF" Binding="{Binding GutschriftChf}" Width="120"/>
+                    <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" Width="3*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Grid.Row="4"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Text="Neuwerte werden im Dialog „Neu/Bearbeiten“ für alle Zähler erfasst."
+                       TextWrapping="Wrap"/>
+        </Grid>
+    </Grid>
+</Window>

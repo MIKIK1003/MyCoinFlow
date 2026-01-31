@@ -1,0 +1,94 @@
+﻿<Window x:Class="MyCoinFlow.Views.ZaehlerdatenEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Zählerdaten"
+        Width="900"
+        Height="650"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Text="{Binding HeaderText}"/>
+
+        <!-- Header Felder -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="220"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Erfasst am"/>
+                <DatePicker Grid.Row="0" Grid.Column="2"
+                            SelectedDate="{Binding ModelErfasstAm, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="Rechnung kWh total"/>
+                <TextBox Grid.Row="0" Grid.Column="6"
+                         Text="{Binding RechnungKwhText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Gutschrift CHF (optional)"/>
+                <TextBox Grid.Row="2" Grid.Column="2"
+                         Text="{Binding GutschriftChfText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="4" VerticalAlignment="Top" Text="Notiz"/>
+                <TextBox Grid.Row="2" Grid.Column="6"
+                         Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         Height="60"/>
+            </Grid>
+        </Border>
+
+        <!-- Lines -->
+        <Border Grid.Row="4"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
+            <DataGrid ItemsSource="{Binding Rows}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" IsReadOnly="True" Width="90"/>
+                    <DataGridTextColumn Header="Zähler" Binding="{Binding Name}" IsReadOnly="True" Width="2*"/>
+                    <DataGridTextColumn Header="EinheitId" Binding="{Binding EinheitId}" IsReadOnly="True" Width="100"/>
+                    <DataGridTextColumn Header="Neu-Wert (kWh)" Binding="{Binding NeuText, UpdateSourceTrigger=PropertyChanged}" Width="160"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Click="Cancel_Click" Padding="14,8" Margin="0,0,10,0">
+                Abbrechen
+            </Button>
+            <Button Style="{StaticResource MaterialDesignRaisedButton}" Click="Save_Click" Padding="16,8">
+                Speichern
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>
