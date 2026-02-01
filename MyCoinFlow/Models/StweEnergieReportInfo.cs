@@ -17,9 +17,10 @@
 
         public decimal RechnungKwhTotal { get; set; }
         public decimal? GutschriftChf { get; set; }
-
+        
         /// <summary>Summe der internen kWh-Differenzen (aus den Zählerständen Set vs. Vor-Set)</summary>
         public decimal InterneKwhTotal { get; set; }
+        public decimal SolarDirektKwh { get; set; }
 
         /// <summary>Preis pro kWh gemäss Rechnung: Betrag / RechnungKwhTotal</summary>
         public decimal PreisProKwh { get; set; }

@@ -4477,6 +4477,8 @@ WHERE (@von IS NULL OR t.Datum >= @von)
             return o != null && o != DBNull.Value;
         }
 
+        
+        
         /// <summary>
         /// Legt die Tabellen für das STWE/Liegenschaften-Modul an (idempotent).
         /// Wird beim ersten Klick auf "Liegenschaften" aufgerufen.
@@ -4578,7 +4580,14 @@ BEGIN
     ADD IsCredit BIT NOT NULL CONSTRAINT DF_StweSet_IsCredit DEFAULT(0);
 END;
 
-
+-- ------------------------------------------------------------
+-- STWE: StweSet -> Referenz auf verwendetes Zählerdaten-Set (ENERGIE)
+-- ------------------------------------------------------------
+IF COL_LENGTH('dbo.StweSet', 'EnergieZaehlerdatenSetId') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweSet
+    ADD EnergieZaehlerdatenSetId INT NULL;
+END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweSetLine' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -6992,23 +7001,41 @@ ORDER BY ErfasstAm DESC, Id DESC;";
 
             var prev = StweZaehlerdatenGetPreviousSet(liegenschaftId, cur.ErfasstAm, cur.Id);
 
+            // Stammdaten: ZaehlerId -> Typ
+            var zaehlerTyp = StweZaehlerGetByLiegenschaft(liegenschaftId)
+                .ToDictionary(z => z.Id, z => (z.Typ ?? "").Trim().ToUpperInvariant());
+
             // Lines lesen
             var curLines = StweZaehlerdatenLinesGetBySet(cur.Id);
             var prevLines = prev != null ? StweZaehlerdatenLinesGetBySet(prev.Id) : new List<StweZaehlerdatenLine>();
             var prevDict = prevLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
 
+            // Interne kWh: nur DIREKT/ALLG/HEIZ (ohne EVU)
             decimal interneKwh = 0m;
             foreach (var c in curLines)
             {
+                if (!zaehlerTyp.TryGetValue(c.ZaehlerId, out var typ))
+                    continue;
+
+                if (typ != "DIREKT" && typ != "ALLG" && typ != "HEIZ")
+                    continue;
+
                 prevDict.TryGetValue(c.ZaehlerId, out var alt);
                 var diff = c.NeuWert - alt;
                 if (diff > 0m) interneKwh += diff;
             }
 
-            var preis = setTotalSigned / cur.RechnungKwhTotal.Value;
+            var rechnungKwh = cur.RechnungKwhTotal.Value;
 
-            // Wenn interneKwh==0: Scale 1 setzen (damit keine Division durch 0).
-            var scale = interneKwh <= 0m ? 1m : (setTotalSigned / (interneKwh * preis));
+            // PV-Direktverbrauch (inkl. Batterieverschiebung)
+            var solarDirekt = interneKwh - rechnungKwh;
+            if (solarDirekt < 0m) solarDirekt = 0m;
+
+            // Preis pro kWh gemäss Rechnung
+            var preis = setTotalSigned / rechnungKwh;
+
+            // Kontrollwert: Verhältnis Rechnung/Intern (nur falls intern > 0)
+            var scale = interneKwh <= 0m ? 1m : (rechnungKwh / interneKwh);
 
             return new StweEnergieReportInfo
             {
@@ -7021,13 +7048,46 @@ ORDER BY ErfasstAm DESC, Id DESC;";
                 VorherigesZaehlerdatenSetId = prev?.Id,
                 VorherigesZaehlerdatenSetDatum = prev?.ErfasstAm,
 
-                RechnungKwhTotal = cur.RechnungKwhTotal.Value,
+                RechnungKwhTotal = rechnungKwh,
                 GutschriftChf = cur.GutschriftChf,
 
                 InterneKwhTotal = interneKwh,
+                SolarDirektKwh = solarDirekt,
+
                 PreisProKwh = preis,
                 Scale = scale
             };
+        }
+
+        public int? StweSetGetEnergieZaehlerdatenSetId(int setId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT EnergieZaehlerdatenSetId FROM dbo.StweSet WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+
+            var v = cmd.ExecuteScalar();
+            if (v == null || v == DBNull.Value) return null;
+            return Convert.ToInt32(v);
+        }
+
+        public void StweSetUpdateEnergieZaehlerdatenSetId(int setId, int? zaehlerdatenSetId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.StweSet SET EnergieZaehlerdatenSetId = @zid WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+            cmd.Parameters.AddWithValue("@zid", (object?)zaehlerdatenSetId ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
         }
 
 

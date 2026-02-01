@@ -294,7 +294,9 @@ namespace MyCoinFlow.Views
                         if (info.GutschriftChf.HasValue)
                             doc.Blocks.Add(P($"Gutschrift (Info): {info.GutschriftChf.Value:0.00}", dim: true));
 
-                        doc.Blocks.Add(P($"Interne kWh (Diff): {info.InterneKwhTotal:0.###}", dim: true));
+                        doc.Blocks.Add(P($"Interne kWh (Diff, ohne EVU): {info.InterneKwhTotal:0.###}", dim: true));
+                        doc.Blocks.Add(P($"Solar direkt (kWh): {info.SolarDirektKwh:0.###}", dim: true));
+
 
                         if (Math.Abs(info.Scale - 1m) > 0.0001m)
                             doc.Blocks.Add(P($"Scale: {info.Scale:0.######}", dim: true));
