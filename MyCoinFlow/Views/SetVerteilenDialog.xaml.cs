@@ -375,6 +375,7 @@ namespace MyCoinFlow.Views
                 if (!s.RechnungKwhTotal.HasValue || s.RechnungKwhTotal.Value <= 0m)
                     label += " [kWh?]";
 
+                // WICHTIG: Wir fügen jetzt ein ZaehlerdatenSetVm hinzu (nicht das DB-Objekt direkt)
                 ZaehlerdatenSets.Add(new ZaehlerdatenSetVm
                 {
                     Model = s,
@@ -382,25 +383,7 @@ namespace MyCoinFlow.Views
                 });
             }
 
-            // 1) Wenn Set bereits gespeichert hat, welches Zählerdaten-Set verwendet wurde -> das wählen
-            int? savedId = null;
-            try
-            {
-                savedId = _db.StweSetGetEnergieZaehlerdatenSetId(_set.Id);
-            }
-            catch
-            {
-                // bewusst still: Dialog soll trotzdem funktionieren
-            }
-
-            if (savedId.HasValue)
-            {
-                SelectedZaehlerdatenSet = ZaehlerdatenSets.FirstOrDefault(x => x.Model.Id == savedId.Value)
-                                          ?? ZaehlerdatenSets.FirstOrDefault();
-                return;
-            }
-
-            // 2) sonst Default-Auswahl: neustes Set, das <= Set-Datum ist (sonst neustes insgesamt)
+            // Default-Auswahl: neustes Set, das <= Set-Datum ist (sonst neustes insgesamt)
             var best = ZaehlerdatenSets
                 .Where(x => x.Model.ErfasstAm.Date <= _set.Datum.Date)
                 .OrderByDescending(x => x.Model.ErfasstAm)
@@ -409,7 +392,6 @@ namespace MyCoinFlow.Views
 
             SelectedZaehlerdatenSet = best ?? ZaehlerdatenSets.FirstOrDefault();
         }
-
 
 
         private void UpdateEnergyVisibility()
@@ -685,17 +667,6 @@ namespace MyCoinFlow.Views
                     "Energie berechnen", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-
-            // Merken, welches Zählerdaten-Set für dieses STWE-Set verwendet wurde
-            try
-            {
-                _db.StweSetUpdateEnergieZaehlerdatenSetId(_set.Id, SelectedZaehlerdatenSet.Model.Id);
-            }
-            catch
-            {
-                // bewusst still: Berechnung soll trotzdem laufen
-            }
-
 
             if (!SelectedZaehlerdatenSet.Model.RechnungKwhTotal.HasValue || SelectedZaehlerdatenSet.Model.RechnungKwhTotal.Value <= 0m)
 

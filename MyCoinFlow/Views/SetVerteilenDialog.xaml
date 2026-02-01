@@ -206,11 +206,10 @@
                                Margin="0,0,6,0"/>
 
                     <ComboBox Grid.Column="2"
-                          ItemsSource="{Binding ZaehlerdatenSets}"
-                          SelectedItem="{Binding SelectedZaehlerdatenSet}"
-                          DisplayMemberPath="DisplayText"
-                          IsEnabled="{Binding IsEditable}"/>
-
+                              ItemsSource="{Binding Schluessel}"
+                              SelectedItem="{Binding SelectedSchluessel}"
+                              DisplayMemberPath="Name"
+                              IsEnabled="{Binding IsEditable}"/>
                 </Grid>
             </Border>
 
