@@ -247,6 +247,70 @@ namespace MyCoinFlow.Views
             doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
 
             // ─────────────────────────────────────────────
+            // Energie-Grundlagen (neu, nur wenn im Zeitraum ENERGIE vorkommt)
+            // Wir listen jede Energie-Grundlage (Zählerdaten-Set) im Zeitraum einmal auf.
+            try
+            {
+                var sets = _db.StweSetsGetByLiegenschaft(_liegenschaft.Id, Von, Bis);
+
+                // Nur Sets, die mindestens eine ENERGIE-Zeile haben
+                var energieSets = sets
+                    .Where(s =>
+                    {
+                        var lines = _db.StweSetLinesGet(s.Id);
+                        return lines.Any(l => string.Equals(l.Schluessel, "ENERGIE", StringComparison.OrdinalIgnoreCase));
+                    })
+                    .ToList();
+
+                if (energieSets.Count > 0)
+                {
+                    doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
+                    doc.Blocks.Add(P("Energie – Grundlagen", bold: true, fontSize: 13));
+                    doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+
+                    // De-dup: gleiche Zaehlerdaten-SetId nur einmal anzeigen
+                    var seen = new HashSet<int>();
+
+                    foreach (var s in energieSets.OrderBy(x => x.Datum).ThenBy(x => x.Id))
+                    {
+                        // Betrag in StweSetRow ist bei dir bereits SIGNED (Belastung + / Gutschrift -)
+                        var info = _db.StweEnergieReportInfoGet(_liegenschaft.Id, s.Datum, s.Betrag);
+                        if (info == null) continue;
+
+                        if (seen.Contains(info.ZaehlerdatenSetId))
+                            continue;
+                        seen.Add(info.ZaehlerdatenSetId);
+
+                        var notiz = string.IsNullOrWhiteSpace(info.ZaehlerdatenSetNotiz) ? "" : $" – {info.ZaehlerdatenSetNotiz}";
+                        doc.Blocks.Add(P($"Zählerdaten-Set: {info.ZaehlerdatenSetDatum:dd.MM.yyyy}{notiz}", bold: true));
+
+                        if (info.VorherigesZaehlerdatenSetDatum.HasValue)
+                            doc.Blocks.Add(P($"Zeitraum: {info.VorherigesZaehlerdatenSetDatum:dd.MM.yyyy} – {info.ZaehlerdatenSetDatum:dd.MM.yyyy}", dim: true));
+                        else
+                            doc.Blocks.Add(P($"Zeitraum: (erstes Set) – {info.ZaehlerdatenSetDatum:dd.MM.yyyy}", dim: true));
+
+                        doc.Blocks.Add(P($"Rechnung kWh total: {info.RechnungKwhTotal:0.###}    |    Preis / kWh: {info.PreisProKwh:0.####}", dim: true));
+
+                        if (info.GutschriftChf.HasValue)
+                            doc.Blocks.Add(P($"Gutschrift (Info): {info.GutschriftChf.Value:0.00}", dim: true));
+
+                        doc.Blocks.Add(P($"Interne kWh (Diff): {info.InterneKwhTotal:0.###}", dim: true));
+
+                        if (Math.Abs(info.Scale - 1m) > 0.0001m)
+                            doc.Blocks.Add(P($"Scale: {info.Scale:0.######}", dim: true));
+
+                        doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+                    }
+
+                    PageBreak();
+                }
+            }
+            catch
+            {
+                // bewusst still: Bericht soll trotzdem druckbar bleiben
+            }
+
+            // ─────────────────────────────────────────────
             // Original-Transaktionen (optional)
             if (options.MitOriginalTransaktionen)
             {
@@ -308,6 +372,7 @@ namespace MyCoinFlow.Views
 
             return doc;
         }
+
 
         // ───────────────────────────── Tables ─────────────────────────────
 

@@ -6971,6 +6971,64 @@ ORDER BY ErfasstAm DESC, Id DESC;";
                 Notiz = r.IsDBNull(5) ? null : r.GetString(5)
             };
         }
+        public StweEnergieReportInfo? StweEnergieReportInfoGet(int liegenschaftId, DateTime transaktionsDatum, decimal setTotalSigned)
+        {
+            EnsureStweSchema();
+
+            if (liegenschaftId <= 0) return null;
+
+            // Neustes Zählerdaten-Set <= Transaktionsdatum suchen
+            var sets = StweZaehlerdatenSetsGetByLiegenschaft(liegenschaftId)
+                .Where(z => z.ErfasstAm.Date <= transaktionsDatum.Date)
+                .OrderByDescending(z => z.ErfasstAm)
+                .ThenByDescending(z => z.Id)
+                .ToList();
+
+            var cur = sets.FirstOrDefault();
+            if (cur == null) return null;
+
+            if (!cur.RechnungKwhTotal.HasValue || cur.RechnungKwhTotal.Value <= 0m)
+                return null;
+
+            var prev = StweZaehlerdatenGetPreviousSet(liegenschaftId, cur.ErfasstAm, cur.Id);
+
+            // Lines lesen
+            var curLines = StweZaehlerdatenLinesGetBySet(cur.Id);
+            var prevLines = prev != null ? StweZaehlerdatenLinesGetBySet(prev.Id) : new List<StweZaehlerdatenLine>();
+            var prevDict = prevLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
+
+            decimal interneKwh = 0m;
+            foreach (var c in curLines)
+            {
+                prevDict.TryGetValue(c.ZaehlerId, out var alt);
+                var diff = c.NeuWert - alt;
+                if (diff > 0m) interneKwh += diff;
+            }
+
+            var preis = setTotalSigned / cur.RechnungKwhTotal.Value;
+
+            // Wenn interneKwh==0: Scale 1 setzen (damit keine Division durch 0).
+            var scale = interneKwh <= 0m ? 1m : (setTotalSigned / (interneKwh * preis));
+
+            return new StweEnergieReportInfo
+            {
+                LiegenschaftId = liegenschaftId,
+
+                ZaehlerdatenSetId = cur.Id,
+                ZaehlerdatenSetDatum = cur.ErfasstAm,
+                ZaehlerdatenSetNotiz = cur.Notiz,
+
+                VorherigesZaehlerdatenSetId = prev?.Id,
+                VorherigesZaehlerdatenSetDatum = prev?.ErfasstAm,
+
+                RechnungKwhTotal = cur.RechnungKwhTotal.Value,
+                GutschriftChf = cur.GutschriftChf,
+
+                InterneKwhTotal = interneKwh,
+                PreisProKwh = preis,
+                Scale = scale
+            };
+        }
 
 
 
