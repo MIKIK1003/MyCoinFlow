@@ -35,8 +35,10 @@ namespace MyCoinFlow.ViewModels
             get => _selectedGrouping;
             set
             {
+                if (_selectedGrouping == value) return;
                 _selectedGrouping = value;
                 OnPropertyChanged();
+                LoadCharts(); // wichtig: Wechsel muss Charts neu bauen
             }
         }
 
@@ -47,11 +49,17 @@ namespace MyCoinFlow.ViewModels
 
         // ===== Sidebar =====
 
-        private bool _showPercent;
+        private bool _showPercent = true; // Default: EIN
         public bool ShowPercent
         {
             get => _showPercent;
-            set { _showPercent = value; OnPropertyChanged(); }
+            set
+            {
+                if (_showPercent == value) return;
+                _showPercent = value;
+                OnPropertyChanged();
+                LoadCharts(); // wichtig: Pie-Legende/Order neu bauen
+            }
         }
 
         public ObservableCollection<NumberRangeVm> NumberRanges { get; } = new();
@@ -104,7 +112,9 @@ namespace MyCoinFlow.ViewModels
 
         public DashboardViewModel()
         {
-            SelectedGrouping = GroupingOptions.FirstOrDefault(o => o.Key == "Gruppe") ?? GroupingOptions.First();
+            // Default: Untergruppe (wie früher gewünscht)
+            SelectedGrouping = GroupingOptions.FirstOrDefault(o => o.Key == "Untergruppe")
+                               ?? GroupingOptions.First();
 
             RefreshCommand = new RelayCommand(_ => LoadAll());
             ApplyFiltersCommand = new RelayCommand(_ => LoadAll());
@@ -121,18 +131,20 @@ namespace MyCoinFlow.ViewModels
                 LoadAll();
             });
 
-            LoadNumberRanges();
+            LoadNumberRanges(); // Default: nur Einnahmen + Ausgaben
             LoadAll();
         }
 
         /// <summary>
         /// Lädt die Nummernkreise aus der DB (NumberRangeRules).
+        /// Default: Nur "Einnahmen" und "Ausgaben" sind aktiv.
+        /// Investitionen/Amortisationen/Durchlaufkonten bleiben default inaktiv,
+        /// unabhängig von "Richtung".
         /// </summary>
         private void LoadNumberRanges()
         {
             NumberRanges.Clear();
 
-            // defensiv: falls Tabelle noch nicht existiert, wird sie bei LadeNummernRegeln angelegt
             var rules = _db.LadeNummernRegeln();
 
             foreach (var r in rules.OrderBy(x => x.RangeStart))
@@ -143,9 +155,29 @@ namespace MyCoinFlow.ViewModels
 
                 NumberRanges.Add(new NumberRangeVm(r.RangeStart, r.RangeEnd, label)
                 {
-                    IsSelected = true
+                    IsSelected = IsDefaultSelectedKontenkreis(label)
                 });
             }
+
+            OnPropertyChanged(nameof(NumberRanges));
+        }
+
+        private static bool IsDefaultSelectedKontenkreis(string label)
+        {
+            var s = (label ?? "").Trim().ToLowerInvariant();
+
+            // Default aktiv: Einnahmen + Ausgaben
+            var isEinnahmen = s.Contains("einnahm");
+            var isAusgaben = s.Contains("ausgab");
+
+            if (!isEinnahmen && !isAusgaben) return false;
+
+            // Default explizit NICHT:
+            if (s.Contains("invest")) return false;
+            if (s.Contains("amort")) return false;
+            if (s.Contains("durchlauf")) return false;
+
+            return true;
         }
 
         /// <summary>
@@ -165,8 +197,8 @@ namespace MyCoinFlow.ViewModels
             OpenImportCount = _db.CountCreditCardStaging();
             BankImportItemCount = _db.CountBankImportItem();
 
-            // Zeitraumlabel (einfach, stabil)
-            ZeitraumLabel = "Aktiver Budgetzeitraum (falls vorhanden) – Stand: " + DateTime.Today.ToString("d", CultureInfo.GetCultureInfo("de-CH"));
+            ZeitraumLabel = "Aktiver Budgetzeitraum (falls vorhanden) – Stand: " +
+                            DateTime.Today.ToString("d", CultureInfo.GetCultureInfo("de-CH"));
         }
 
         /// <summary>
@@ -185,15 +217,15 @@ namespace MyCoinFlow.ViewModels
                     .ToList();
             }
 
-            string key = SelectedGrouping?.Key ?? "Gruppe";
+            string key = SelectedGrouping?.Key ?? "Untergruppe";
 
             string GroupKey(KontoplanEintrag a)
             {
                 return key switch
                 {
                     "Art" => a.Art ?? "",
-                    "Untergruppe" => a.Untergruppe ?? "",
-                    _ => a.Gruppe ?? ""
+                    "Gruppe" => a.Gruppe ?? "",
+                    _ => a.Untergruppe ?? ""
                 };
             }
 
@@ -220,19 +252,38 @@ namespace MyCoinFlow.ViewModels
             ColumnSeries.Add(new ColumnSeries<double> { Name = "Budget", Values = budgetVals });
             ColumnSeries.Add(new ColumnSeries<double> { Name = "IST", Values = istVals });
 
-            XAxes.Add(new Axis { Labels = labels });
+            // Verbesserung 1: gedrehte Beschriftung (leicht schräg)
+            XAxes.Add(new Axis { Labels = labels, LabelsRotation = 60, TextSize = 14 });
             YAxes.Add(new Axis());
 
-            ColumnChartTitle = $"Budget vs. IST ({SelectedGrouping?.Label ?? "Gruppe"})";
+            ColumnChartTitle = $"Budget vs. IST ({SelectedGrouping?.Label ?? "Untergruppe"})";
 
             // ---- Pie: IST-Verteilung ----
             PieSeries.Clear();
-            foreach (var g in groups.Where(x => x.Ist != 0))
+
+            var pieItems = groups
+                .Where(x => x.Ist != 0)
+                .Select(x => new { x.Label, Val = Math.Abs((double)x.Ist) })
+                .OrderByDescending(x => x.Val) // Verbesserung 2: nach Betrag sortieren (Legende + Segmente)
+                .ToList();
+
+            var total = pieItems.Sum(x => x.Val);
+
+            foreach (var p in pieItems)
             {
+                var name = p.Label;
+
+                // Verbesserung 3: % Anzeige muss sichtbar wirken
+                if (ShowPercent && total > 0)
+                {
+                    var pct = p.Val / total;
+                    name = $"{p.Label} ({pct:P0})";
+                }
+
                 PieSeries.Add(new PieSeries<double>
                 {
-                    Name = g.Label,
-                    Values = new[] { (double)Math.Abs(g.Ist) }
+                    Name = name,
+                    Values = new[] { p.Val }
                 });
             }
 
@@ -247,7 +298,12 @@ namespace MyCoinFlow.ViewModels
                 .Take(8)
                 .ToList();
 
-            TopDevSeries.Add(new RowSeries<double> { Name = "Abweichung", Values = top.Select(x => x.Dev).ToArray() });
+            TopDevSeries.Add(new RowSeries<double>
+            {
+                Name = "Abweichung",
+                Values = top.Select(x => x.Dev).ToArray()
+            });
+
             TopDevXAxes.Add(new Axis());
             TopDevYAxes.Add(new Axis { Labels = top.Select(x => x.Label).ToArray() });
 
@@ -257,12 +313,15 @@ namespace MyCoinFlow.ViewModels
             BankYAxes.Clear();
 
             var banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today);
+
             BankSeries.Add(new ColumnSeries<double>
             {
                 Name = "Saldo",
                 Values = banks.Select(b => (double)b.Schlussaldo).ToArray()
             });
-            BankXAxes.Add(new Axis { Labels = banks.Select(b => b.Name).ToArray() });
+
+            // Verbesserung 1 auch hier: gedrehte Labels
+            BankXAxes.Add(new Axis { Labels = banks.Select(b => b.Name).ToArray(), LabelsRotation = 60, TextSize = 12 });
             BankYAxes.Add(new Axis());
         }
 
