@@ -199,6 +199,7 @@ namespace MyCoinFlow.Views
                 PageHeight = printableHeight
             };
 
+
             Paragraph P(string text, bool bold = false, double? fontSize = null, TextAlignment? align = null, bool dim = false)
             {
                 var run = new Run(text);
@@ -245,6 +246,106 @@ namespace MyCoinFlow.Views
             doc.Blocks.Add(P(TitleText, bold: true, fontSize: 16));
             doc.Blocks.Add(P($"{ZeitraumText}   |   Erstellt: {DateTime.Now:dd.MM.yyyy HH:mm}", dim: true));
             doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
+
+            // ─────────────────────────────────────────────
+            // Energie – Grundlagen (neu: direkt aus Zählerdaten-Sets)
+            try
+            {
+                // 1) Alle STWE-Sets im Zeitraum, um die ENERGIE-Rechnungsbeträge zu kennen
+                var stweSets = _db.StweSetsGetByLiegenschaft(_liegenschaft.Id, Von, Bis);
+
+                var energieTransaktionsSets = stweSets
+                    .Where(s =>
+                    {
+                        var lines = _db.StweSetLinesGet(s.Id);
+                        return lines.Any(l => string.Equals(l.Schluessel, "ENERGIE", StringComparison.OrdinalIgnoreCase));
+                    })
+                    .ToList();
+
+                // 2) Alle Zählerdaten-Sets im Zeitraum (Von/Bis bezieht sich auf ErfasstAm)
+                var zdSets = _db.StweZaehlerdatenSetsGetByLiegenschaft(_liegenschaft.Id);
+
+                if (Von.HasValue) zdSets = zdSets.Where(z => z.ErfasstAm.Date >= Von.Value.Date).ToList();
+                if (Bis.HasValue) zdSets = zdSets.Where(z => z.ErfasstAm.Date <= Bis.Value.Date).ToList();
+
+                // Sortiert (Q1..Q4)
+                zdSets = zdSets.OrderBy(z => z.ErfasstAm).ThenBy(z => z.Id).ToList();
+
+                if (zdSets.Count > 0)
+                {
+                    doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 10, 0, 0) });
+                    doc.Blocks.Add(P("Energie – Grundlagen", bold: true, fontSize: 13));
+                    doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+
+                    foreach (var z in zdSets)
+                    {
+                        // 3) Passender Rechnungsbetrag für dieses Zählerdaten-Set:
+                        // Wir nehmen die ENERGIE-Transaktions-Sets, deren Datum zwischen previousSetDatum..currentSetDatum liegt
+                        // und summieren deren Beträge.
+                        var prev = _db.StweZaehlerdatenGetPreviousSet(_liegenschaft.Id, z.ErfasstAm, z.Id);
+                        DateTime? from = prev?.ErfasstAm.Date;
+                        DateTime to = z.ErfasstAm.Date;
+
+                        var relevantEnergySets = energieTransaktionsSets
+                            .Where(s =>
+                            {
+                                var d = s.Datum.Date;
+                                if (from.HasValue && d <= from.Value) return false;
+                                return d <= to;
+                            })
+                            .ToList();
+
+                        // Summe der Rechnungsbeträge (signed)
+                        var sumBetrag = _db.StweSetSumBetragByEnergieZaehlerdatenSetId(_liegenschaft.Id, z.Id, Von, Bis);
+
+
+                        // Jetzt Info berechnen (nutzt intern/externe kWh etc.)
+                        var info = _db.StweEnergieReportInfoGet(_liegenschaft.Id, z.ErfasstAm, sumBetrag);
+
+
+                        if (info == null)
+                        {
+                            // Falls Rechnung kWh fehlt etc., trotzdem sichtbar machen:
+                            var n0 = string.IsNullOrWhiteSpace(z.Notiz) ? "" : $" – {z.Notiz}";
+                            doc.Blocks.Add(P($"Zählerdaten-Set: {z.ErfasstAm:dd.MM.yyyy}{n0}", bold: true));
+                            doc.Blocks.Add(P("Hinweis: Rechnung kWh total fehlt (oder 0).", dim: true));
+                            doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+                            continue;
+                        }
+
+                        var notiz = string.IsNullOrWhiteSpace(info.ZaehlerdatenSetNotiz) ? "" : $" – {info.ZaehlerdatenSetNotiz}";
+                        doc.Blocks.Add(P($"Zählerdaten-Set: {info.ZaehlerdatenSetDatum:dd.MM.yyyy}{notiz}", bold: true));
+
+                        if (info.VorherigesZaehlerdatenSetDatum.HasValue)
+                            doc.Blocks.Add(P($"Zeitraum: {info.VorherigesZaehlerdatenSetDatum:dd.MM.yyyy} – {info.ZaehlerdatenSetDatum:dd.MM.yyyy}", dim: true));
+                        else
+                            doc.Blocks.Add(P($"Zeitraum: (erstes Set) – {info.ZaehlerdatenSetDatum:dd.MM.yyyy}", dim: true));
+
+                        doc.Blocks.Add(P($"Rechnung kWh total: {info.RechnungKwhTotal:0.###}    |    Preis / kWh: {info.PreisProKwh:0.####}", dim: true));
+
+                        if (info.GutschriftChf.HasValue)
+                            doc.Blocks.Add(P($"Gutschrift (Info): {info.GutschriftChf.Value:0.00}", dim: true));
+
+                        doc.Blocks.Add(P($"Interne kWh (Diff, ohne EVU): {info.InterneKwhTotal:0.###}", dim: true));
+                        doc.Blocks.Add(P($"Solar direkt (kWh): {info.SolarDirektKwh:0.###}", dim: true));
+
+                        doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+                    }
+
+                    PageBreak();
+                }
+            }
+
+            catch (Exception ex)
+            {
+                // Im Report sichtbar machen, damit du es sofort siehst statt "leere Überschrift"
+                doc.Blocks.Add(P("Hinweis: Energie-Grundlagen konnten nicht geladen werden.", dim: true));
+                doc.Blocks.Add(P(ex.Message, dim: true));
+                doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+            }
+
+
+
 
             // ─────────────────────────────────────────────
             // Original-Transaktionen (optional)

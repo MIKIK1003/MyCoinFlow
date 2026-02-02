@@ -4571,6 +4571,17 @@ BEGIN
     CREATE INDEX IX_StweSet_TransaktionId  ON dbo.StweSet(TransaktionId);
 END;
 
+-- ------------------------------------------------------------
+-- STWE: StweSet -> Referenz auf verwendetes Zählerdaten-Set (ENERGIE)
+-- ------------------------------------------------------------
+IF COL_LENGTH('dbo.StweSet', 'EnergieZaehlerdatenSetId') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweSet
+    ADD EnergieZaehlerdatenSetId INT NULL;
+END;
+
+
+
 -- NEU: Set-Typ (Gutschrift/Belastung)
 IF COL_LENGTH('dbo.StweSet', 'IsCredit') IS NULL
 BEGIN
@@ -6970,6 +6981,144 @@ ORDER BY ErfasstAm DESC, Id DESC;";
                 GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
                 Notiz = r.IsDBNull(5) ? null : r.GetString(5)
             };
+        }
+        public int? StweSetGetEnergieZaehlerdatenSetId(int setId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT EnergieZaehlerdatenSetId FROM dbo.StweSet WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+
+            var v = cmd.ExecuteScalar();
+            if (v == null || v == DBNull.Value) return null;
+            return Convert.ToInt32(v);
+        }
+
+        public void StweSetUpdateEnergieZaehlerdatenSetId(int setId, int? zaehlerdatenSetId)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.StweSet SET EnergieZaehlerdatenSetId = @zid WHERE Id = @id;";
+            cmd.Parameters.AddWithValue("@id", setId);
+            cmd.Parameters.AddWithValue("@zid", (object?)zaehlerdatenSetId ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+        public StweEnergieReportInfo? StweEnergieReportInfoGet(int liegenschaftId, System.DateTime transaktionsDatum, decimal setTotalSigned)
+        {
+            EnsureStweSchema();
+            if (liegenschaftId <= 0) return null;
+
+            // Neustes Zählerdaten-Set <= Transaktionsdatum
+            var sets = StweZaehlerdatenSetsGetByLiegenschaft(liegenschaftId)
+                .Where(z => z.ErfasstAm.Date <= transaktionsDatum.Date)
+                .OrderByDescending(z => z.ErfasstAm)
+                .ThenByDescending(z => z.Id)
+                .ToList();
+
+            var cur = sets.FirstOrDefault();
+            if (cur == null) return null;
+
+            if (!cur.RechnungKwhTotal.HasValue || cur.RechnungKwhTotal.Value <= 0m)
+                return null;
+
+            var prev = StweZaehlerdatenGetPreviousSet(liegenschaftId, cur.ErfasstAm, cur.Id);
+
+            // Stammdaten: ZaehlerId -> Typ
+            var zaehlerTyp = StweZaehlerGetByLiegenschaft(liegenschaftId)
+                .ToDictionary(z => z.Id, z => (z.Typ ?? "").Trim().ToUpperInvariant());
+
+            // Lines lesen
+            var curLines = StweZaehlerdatenLinesGetBySet(cur.Id);
+            var prevLines = prev != null ? StweZaehlerdatenLinesGetBySet(prev.Id) : new System.Collections.Generic.List<StweZaehlerdatenLine>();
+            var prevDict = prevLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
+
+            // Interne kWh: nur DIREKT/ALLG/HEIZ (EVU ignorieren)
+            decimal interneKwh = 0m;
+            foreach (var c in curLines)
+            {
+                if (!zaehlerTyp.TryGetValue(c.ZaehlerId, out var typ))
+                    continue;
+
+                if (typ != "DIREKT" && typ != "ALLG" && typ != "HEIZ")
+                    continue;
+
+                prevDict.TryGetValue(c.ZaehlerId, out var alt);
+                var diff = c.NeuWert - alt;
+                if (diff > 0m) interneKwh += diff;
+            }
+
+            var rechnungKwh = cur.RechnungKwhTotal.Value;
+
+            // PV-Direktverbrauch: interne kWh minus Rechnung kWh (nie negativ)
+            var solarDirekt = interneKwh - rechnungKwh;
+            if (solarDirekt < 0m) solarDirekt = 0m;
+
+            // Preis pro kWh gemäss Rechnung
+            var preis = setTotalSigned / rechnungKwh;
+
+            // Kontrollwert: Rechnung/Intern (nur falls intern > 0)
+            var scale = interneKwh <= 0m ? 1m : (rechnungKwh / interneKwh);
+
+            return new StweEnergieReportInfo
+            {
+                LiegenschaftId = liegenschaftId,
+
+                ZaehlerdatenSetId = cur.Id,
+                ZaehlerdatenSetDatum = cur.ErfasstAm,
+                ZaehlerdatenSetNotiz = cur.Notiz,
+
+                VorherigesZaehlerdatenSetId = prev?.Id,
+                VorherigesZaehlerdatenSetDatum = prev?.ErfasstAm,
+
+                RechnungKwhTotal = rechnungKwh,
+                GutschriftChf = cur.GutschriftChf,
+
+                InterneKwhTotal = interneKwh,
+                SolarDirektKwh = solarDirekt,
+
+                PreisProKwh = preis,
+                Scale = scale
+            };
+        }
+
+        public decimal StweSetSumBetragByEnergieZaehlerdatenSetId(int liegenschaftId, int zaehlerdatenSetId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            // Betrag und Datum kommen aus dbo.Transaktion (StweSet hat nur TransaktionId)
+            var sql = @"
+SELECT ISNULL(SUM(t.Betrag), 0)
+FROM dbo.StweSet s
+JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+WHERE s.LiegenschaftId = @lid
+  AND s.EnergieZaehlerdatenSetId = @zid";
+
+            if (von.HasValue) sql += " AND t.Datum >= @von";
+            if (bis.HasValue) sql += " AND t.Datum <= @bis";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+            cmd.Parameters.AddWithValue("@zid", zaehlerdatenSetId);
+
+            if (von.HasValue) cmd.Parameters.AddWithValue("@von", von.Value.Date);
+            if (bis.HasValue) cmd.Parameters.AddWithValue("@bis", bis.Value.Date);
+
+            var v = cmd.ExecuteScalar();
+            return Convert.ToDecimal(v);
         }
 
 

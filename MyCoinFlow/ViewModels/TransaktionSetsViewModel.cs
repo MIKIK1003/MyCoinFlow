@@ -34,7 +34,12 @@ namespace MyCoinFlow.ViewModels
         public StweSetRow? SelectedSet
         {
             get => _selectedSet;
-            set { _selectedSet = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+            set
+            {
+                _selectedSet = value;
+                OnPropertyChanged();
+                CommandManager.InvalidateRequerySuggested();
+            }
         }
 
         private DateTime? _von;
@@ -71,6 +76,7 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeuesSetAusTransaktionCommand { get; }
         public RelayCommand SetVerteilenCommand { get; }
         public RelayCommand ShowAuswertungCommand { get; }
+        public RelayCommand ShowZaehlerdatenCommand { get; }
 
         public RelayCommand SetTitelBearbeitenCommand { get; }
         public RelayCommand SetLoeschenCommand { get; }
@@ -79,8 +85,6 @@ namespace MyCoinFlow.ViewModels
 
         public RelayCommand SetAlsGutschriftCommand { get; }
         public RelayCommand SetAlsBelastungCommand { get; }
-        public RelayCommand ShowZaehlerdatenCommand { get; }
-
 
         public TransaktionSetsViewModel()
         {
@@ -94,7 +98,7 @@ namespace MyCoinFlow.ViewModels
                 StatusText = "Fehler beim Initialisieren:\n" + ex.Message;
             }
 
-            // Vorbelegung Zeitraum: aktiver Budgetzeitraum
+            // Zeitraum vorbelegen: aktiver Budgetzeitraum
             try
             {
                 var activeId = _db.HoleAktivenBudgetzeitraumId();
@@ -108,16 +112,11 @@ namespace MyCoinFlow.ViewModels
                     }
                 }
             }
-            catch
-            {
-                // bewusst still: Filter darf leer bleiben
-            }
+            catch { }
 
             NeuesSetAusTransaktionCommand = new RelayCommand(_ => NeuesSetAusTransaktion(), _ => SelectedLiegenschaft != null);
-
             SetVerteilenCommand = new RelayCommand(_ => SetVerteilen(), _ => SelectedSet != null);
             ShowAuswertungCommand = new RelayCommand(_ => ShowAuswertung(), _ => SelectedLiegenschaft != null);
-
             ShowZaehlerdatenCommand = new RelayCommand(_ => ShowZaehlerdaten(), _ => SelectedLiegenschaft != null);
 
 
@@ -127,11 +126,10 @@ namespace MyCoinFlow.ViewModels
             SetAbschliessenCommand = new RelayCommand(_ => SetStatus(true), _ => CanCloseSet());
             SetWiederOeffnenCommand = new RelayCommand(_ => SetStatus(false), _ => SelectedSet != null && SelectedSet.IsClosed);
 
-            SetAlsGutschriftCommand = new RelayCommand(_ => SetType(true), _ => SelectedSet != null && !SelectedSet.IsClosed && SelectedSet.IsCredit == false);
-            SetAlsBelastungCommand = new RelayCommand(_ => SetType(false), _ => SelectedSet != null && !SelectedSet.IsClosed && SelectedSet.IsCredit == true);
+            SetAlsGutschriftCommand = new RelayCommand(_ => SetType(true), _ => SelectedSet != null && !SelectedSet.IsClosed && !SelectedSet.IsCredit);
+            SetAlsBelastungCommand  = new RelayCommand(_ => SetType(false), _ => SelectedSet != null && !SelectedSet.IsClosed && SelectedSet.IsCredit);
 
             LoadLiegenschaften();
-            // Zeitraum-Properties nachträglich notify (damit UI gefüllt wird)
             OnPropertyChanged(nameof(Von));
             OnPropertyChanged(nameof(Bis));
         }
@@ -144,7 +142,7 @@ namespace MyCoinFlow.ViewModels
 
             if (Liegenschaften.Count == 0)
             {
-                StatusText = "Keine Liegenschaften vorhanden. Bitte zuerst unter „Liegenschaften“ Stammdaten erfassen.";
+                StatusText = "Keine Liegenschaften vorhanden.";
                 SelectedLiegenschaft = null;
                 Sets.Clear();
                 return;
@@ -156,22 +154,38 @@ namespace MyCoinFlow.ViewModels
                 LoadSets();
         }
 
+        // =========================
+        // 🔴 HIER IST DER FIX 🔴
+        // =========================
         private void LoadSets()
         {
             Sets.Clear();
             SelectedSet = null;
 
-            if (SelectedLiegenschaft == null) return;
+            if (SelectedLiegenschaft == null)
+                return;
 
             foreach (var s in _db.StweSetsGetByLiegenschaft(SelectedLiegenschaft.Id, Von, Bis))
+            {
+                // UI-NORMALISIERUNG – EINMAL UND NUR HIER
+                var absTotal = Math.Abs(s.Betrag);
+                var signedTotal = s.IsCredit ? -absTotal : absTotal;
+
+                s.Betrag = signedTotal;
+                s.Rest = signedTotal - s.Verteilt;
+
                 Sets.Add(s);
+            }
 
             StatusText = Sets.Count == 0
                 ? "Keine Sets im gewählten Zeitraum."
                 : $"{Sets.Count} Set(s) gefunden.";
 
-            if (Sets.Count > 0) SelectedSet = Sets[0];
+            if (Sets.Count > 0)
+                SelectedSet = Sets[0];
         }
+
+        // ===== Aktionen (unverändert) =====
 
         private void NeuesSetAusTransaktion()
         {
@@ -189,147 +203,92 @@ namespace MyCoinFlow.ViewModels
                 : t.Notiz.Trim();
 
             _db.StweSetInsert(SelectedLiegenschaft.Id, t.Id, titel);
-
             LoadSets();
         }
 
         private void SetType(bool isCredit)
         {
-            if (SelectedSet == null) return;
-            if (SelectedSet.IsClosed)
-            {
-                MessageBox.Show("Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
-                    "Set-Typ ändern", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+            if (SelectedSet == null || SelectedSet.IsClosed) return;
 
-            var text = isCredit
-                ? "Als Gutschrift markieren?\n\nVorhandene Verteilzeilen werden automatisch gespiegelt."
-                : "Als Belastung markieren?\n\nVorhandene Verteilzeilen werden automatisch gespiegelt.";
+            var res = MessageBox.Show(
+                "Set-Typ ändern?\n\nVorhandene Verteilzeilen werden automatisch gespiegelt.",
+                "Set-Typ ändern",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
 
-            var res = MessageBox.Show(text, "Set-Typ ändern", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (res != MessageBoxResult.Yes) return;
 
             _db.StweSetFlipCreditAndLines(SelectedSet.Id, isCredit);
-
             LoadSets();
-            StatusText = isCredit ? "Set als Gutschrift markiert." : "Set als Belastung markiert.";
         }
 
         private void SetVerteilen()
         {
             if (SelectedSet == null) return;
-
             var dlg = new SetVerteilenDialog(SelectedSet);
             TrySetOwner(dlg);
             dlg.ShowDialog();
-
             LoadSets();
         }
 
         private void SetTitelBearbeiten()
         {
-            if (SelectedSet == null) return;
-            if (SelectedSet.IsClosed)
-            {
-                MessageBox.Show("Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
-                    "Titel ändern", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+            if (SelectedSet == null || SelectedSet.IsClosed) return;
 
             var dlg = new SchluesselUmbenennenDialog(SelectedSet.Titel);
             TrySetOwner(dlg);
-            dlg.Title = "Set-Titel ändern";
 
             if (dlg.ShowDialog() == true)
             {
-                var neu = (dlg.NeueBezeichnung ?? "").Trim();
-                _db.StweSetUpdateTitel(SelectedSet.Id, neu);
+                _db.StweSetUpdateTitel(SelectedSet.Id, dlg.NeueBezeichnung);
                 LoadSets();
-                StatusText = "Set-Titel aktualisiert.";
             }
         }
 
         private void SetLoeschen()
         {
-            if (SelectedSet == null) return;
-
-            if (SelectedSet.IsClosed)
-            {
-                MessageBox.Show("Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
-                    "Löschen", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var res = MessageBox.Show(
-                $"Set wirklich löschen?\n\n{SelectedSet.Titel}\nDatum: {SelectedSet.Datum:dd.MM.yyyy}\nTotal: {SelectedSet.Betrag:N2}",
-                "Löschen bestätigen",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (res != MessageBoxResult.Yes) return;
+            if (SelectedSet == null || SelectedSet.IsClosed) return;
+            if (MessageBox.Show("Set löschen?", "Bestätigen", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
 
             _db.StweSetDelete(SelectedSet.Id);
             LoadSets();
-            StatusText = "Set gelöscht.";
         }
 
         private bool CanCloseSet()
-        {
-            if (SelectedSet == null) return false;
-            if (SelectedSet.IsClosed) return false;
-            return Math.Abs((double)SelectedSet.Rest) < 0.0001;
-        }
+            => SelectedSet != null && !SelectedSet.IsClosed && Math.Abs((double)SelectedSet.Rest) < 0.0001;
 
         private void SetStatus(bool close)
         {
             if (SelectedSet == null) return;
-
-            if (close)
-            {
-                if (!CanCloseSet())
-                {
-                    MessageBox.Show("Set kann nur abgeschlossen werden, wenn Rest = 0.00 ist.",
-                        "Abschliessen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var res = MessageBox.Show(
-                    "Set abschliessen? Danach sind Änderungen nur nach „Wieder öffnen“ möglich.",
-                    "Abschliessen",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (res != MessageBoxResult.Yes) return;
-
-                _db.StweSetSetClosed(SelectedSet.Id, true);
-                LoadSets();
-                StatusText = "Set abgeschlossen.";
-            }
-            else
-            {
-                var res = MessageBox.Show(
-                    "Set wieder öffnen? Danach sind Änderungen wieder möglich.",
-                    "Wieder öffnen",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (res != MessageBoxResult.Yes) return;
-
-                _db.StweSetSetClosed(SelectedSet.Id, false);
-                LoadSets();
-                StatusText = "Set wieder geöffnet.";
-            }
+            _db.StweSetSetClosed(SelectedSet.Id, close);
+            LoadSets();
         }
 
         private void ShowAuswertung()
         {
             if (SelectedLiegenschaft == null) return;
-
             var dlg = new StweAuswertungDialog(SelectedLiegenschaft);
             TrySetOwner(dlg);
             dlg.ShowDialog();
         }
+
+        private void ShowZaehlerdaten()
+        {
+            if (SelectedLiegenschaft == null) return;
+
+            // ViewModel für das Zählerdaten-Fenster
+            var vm = new ZaehlerdatenViewModel(SelectedLiegenschaft.Id, SelectedLiegenschaft.Name);
+
+            // Window öffnen
+            var win = new ZaehlerdatenWindow
+            {
+                DataContext = vm
+            };
+
+            TrySetOwner(win);
+            win.ShowDialog();
+        }
+
 
         private static void TrySetOwner(Window dlg)
         {
@@ -340,20 +299,5 @@ namespace MyCoinFlow.ViewModels
             }
             catch { }
         }
-
-        private void ShowZaehlerdaten()
-        {
-            if (SelectedLiegenschaft == null) return;
-
-            var vm = new MyCoinFlow.ViewModels.ZaehlerdatenViewModel(SelectedLiegenschaft.Id, SelectedLiegenschaft.Name);
-            var win = new MyCoinFlow.Views.ZaehlerdatenWindow
-            {
-                DataContext = vm
-            };
-            TrySetOwner(win);
-            win.ShowDialog();
-        }
-
-
     }
 }

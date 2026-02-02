@@ -37,7 +37,7 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeuesSetCommand { get; }
         public RelayCommand BearbeitenCommand { get; }
         public RelayCommand LoeschenCommand { get; }
-
+       
         public ZaehlerdatenViewModel(int liegenschaftId, string liegenschaftName)
         {
             _liegenschaftId = liegenschaftId;
