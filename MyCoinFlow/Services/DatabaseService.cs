@@ -7121,6 +7121,42 @@ WHERE s.LiegenschaftId = @lid
             return Convert.ToDecimal(v);
         }
 
+        public IList<StweEnergieChartPoint> StweEnergieChartGet(int liegenschaftId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            var result = new List<StweEnergieChartPoint>();
+
+            var sets = StweZaehlerdatenSetsGetByLiegenschaft(liegenschaftId)
+                .OrderBy(z => z.ErfasstAm)
+                .ToList();
+
+            if (von.HasValue)
+                sets = sets.Where(z => z.ErfasstAm.Date >= von.Value.Date).ToList();
+            if (bis.HasValue)
+                sets = sets.Where(z => z.ErfasstAm.Date <= bis.Value.Date).ToList();
+
+            foreach (var z in sets)
+            {
+                // Summe der Rechnungsbeträge, die explizit diesem Zählerdaten-Set zugeordnet sind
+                var betrag = StweSetSumBetragByEnergieZaehlerdatenSetId(
+                    liegenschaftId, z.Id, von, bis);
+
+                var info = StweEnergieReportInfoGet(liegenschaftId, z.ErfasstAm, betrag);
+                if (info == null) continue;
+
+                result.Add(new StweEnergieChartPoint
+                {
+                    Label = $"{z.ErfasstAm:MM.yyyy}",
+                    RechnungKwh = info.RechnungKwhTotal,
+                    InterneKwh = info.InterneKwhTotal,
+                    SolarDirektKwh = info.SolarDirektKwh
+                });
+            }
+
+            return result;
+        }
+
 
 
     }

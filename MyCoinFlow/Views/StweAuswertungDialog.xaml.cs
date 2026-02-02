@@ -1,6 +1,7 @@
 ﻿using MaterialDesignThemes.Wpf;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.ViewModels;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -12,6 +13,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace MyCoinFlow.Views
 {
@@ -212,6 +214,7 @@ namespace MyCoinFlow.Views
                 return para;
             }
 
+      
             void PageBreak()
             {
                 doc.Blocks.Add(new Paragraph { BreakPageBefore = true, Margin = new Thickness(0) });
@@ -328,9 +331,25 @@ namespace MyCoinFlow.Views
 
                         doc.Blocks.Add(P($"Interne kWh (Diff, ohne EVU): {info.InterneKwhTotal:0.###}", dim: true));
                         doc.Blocks.Add(P($"Solar direkt (kWh): {info.SolarDirektKwh:0.###}", dim: true));
-
                         doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
                     }
+
+                    
+                    // Charts unter dem Energie-Textblock
+                    double inner = Math.Max(450, doc.PageWidth - doc.PagePadding.Left - doc.PagePadding.Right - 8);
+
+                    try
+                    {
+                        doc.Blocks.Add(BuildEnergieChartsBlock(inner));
+                    }
+                    catch (Exception exChart)
+                    {
+                        doc.Blocks.Add(P("Hinweis: Energie-Grafik konnte nicht gerendert werden.", dim: true));
+                        doc.Blocks.Add(P(exChart.Message, dim: true));
+                        doc.Blocks.Add(new Paragraph { Margin = new Thickness(0, 6, 0, 0) });
+                    }
+
+
 
                     PageBreak();
                 }
@@ -409,6 +428,45 @@ namespace MyCoinFlow.Views
 
             return doc;
         }
+
+        private BlockUIContainer BuildEnergieChartsBlock(double widthPx)
+        {
+            // Daten direkt aus DB (wie in deinem Chart-VM)
+            var data = _db.StweEnergieChartGet(_liegenschaft.Id, Von, Bis);
+
+            int w = (int)Math.Max(650, widthPx);
+            int h1 = 260;
+            int h2 = 190;
+
+            var bmp1 = MyCoinFlow.Helpers.EnergiePrintChartRenderer.RenderKwhChart(data, w, h1);
+            var bmp2 = MyCoinFlow.Helpers.EnergiePrintChartRenderer.RenderSolarPctChart(data, w, h2);
+
+            var img1 = new Image
+            {
+                Source = bmp1,
+                Stretch = Stretch.Uniform,
+                Height = h1
+            };
+
+            var img2 = new Image
+            {
+                Source = bmp2,
+                Stretch = Stretch.Uniform,
+                Height = h2,
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+
+            var panel = new StackPanel();
+            panel.Children.Add(img1);
+            panel.Children.Add(img2);
+
+            return new BlockUIContainer(panel)
+            {
+                Margin = new Thickness(0, 8, 0, 8)
+            };
+        }
+
+
 
         // ───────────────────────────── Tables ─────────────────────────────
 
@@ -704,5 +762,10 @@ namespace MyCoinFlow.Views
                 return dtObj.ToString() ?? "—";
             }
         }
+
+
+
+
+
     }
 }

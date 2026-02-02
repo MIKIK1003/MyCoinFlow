@@ -4,6 +4,18 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Markup;
 using MyCoinFlow.Views;   // LoginWindow
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+
+public partial class App : Application
+{
+    public App()
+    {
+        LiveCharts.Configure(config =>
+            config.AddSkiaSharp());
+    }
+}
+
 
 namespace MyCoinFlow
 {
