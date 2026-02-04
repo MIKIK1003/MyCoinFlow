@@ -53,7 +53,7 @@
 
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="PlaylistPlus"
-                    Content="Transaktion Sets"
+                    Content="STWE-Sets"
                     MinHeight="50"
                     Padding="12,8"
                     Command="{Binding ShowTransaktionSetsCommand}"
