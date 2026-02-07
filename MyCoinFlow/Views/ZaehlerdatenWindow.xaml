@@ -100,6 +100,7 @@
                     <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAm}" Width="140"/>
                     <DataGridTextColumn Header="Rechnung kWh" Binding="{Binding RechnungKwhTotal}" Width="120"/>
                     <DataGridTextColumn Header="Gutschrift CHF" Binding="{Binding GutschriftChf}" Width="120"/>
+                    <DataGridTextColumn Header="Rückspeisung kWh" Binding="{Binding RueckgespeistKwh}" Width="140"/>
                     <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" Width="3*"/>
                 </DataGrid.Columns>
             </DataGrid>

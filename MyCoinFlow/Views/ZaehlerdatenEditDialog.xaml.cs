@@ -45,6 +45,18 @@ namespace MyCoinFlow.Views
             }
         }
 
+        public string RueckgespeistKwhText
+        {
+            get => Model.RueckgespeistKwh?.ToString("0.###", CultureInfo.InvariantCulture) ?? "";
+            set
+            {
+                Model.RueckgespeistKwh = ParseDecimalOrNull(value);
+                OnPropertyChanged();
+            }
+        }
+
+
+
         public sealed class RowVm : INotifyPropertyChanged
         {
             private string _neuText = "";
@@ -90,6 +102,7 @@ namespace MyCoinFlow.Views
                 Model.ErfasstAm = existing.ErfasstAm;
                 Model.RechnungKwhTotal = existing.RechnungKwhTotal;
                 Model.GutschriftChf = existing.GutschriftChf;
+                Model.RueckgespeistKwh = existing.RueckgespeistKwh;
                 Model.Notiz = existing.Notiz;
             }
             else
@@ -184,14 +197,35 @@ namespace MyCoinFlow.Views
             return true;
         }
 
-        private static decimal? ParseDecimalOrNull(string? input)
+        private decimal? ParseDecimalOrNull(string? text)
         {
-            var s = (input ?? "").Trim().Replace("’", "'").Replace(" ", "").Replace("'", "").Replace(",", ".");
-            if (string.IsNullOrWhiteSpace(s)) return null;
-            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
-                return val;
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            var s = text.Trim();
+
+            // CH / EU tolerant:
+            // 1'234.50
+            // 1’234.50
+            // 1234,50
+            // 1234.50
+            s = s.Replace("’", "'")
+                 .Replace("'", "")
+                 .Replace(" ", "")
+                 .Replace(",", ".");
+
+            if (decimal.TryParse(
+                s,
+                NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out var value))
+            {
+                return value;
+            }
+
             return null;
         }
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)

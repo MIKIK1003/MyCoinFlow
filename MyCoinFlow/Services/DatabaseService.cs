@@ -4732,6 +4732,7 @@ BEGIN
         ErfasstAm        DATETIME2 NOT NULL,
         RechnungKwhTotal DECIMAL(18,3) NULL,
         GutschriftChf    DECIMAL(18,2) NULL,
+        RueckgespeistKwh DECIMAL(18,3) NULL,
         Notiz            NVARCHAR(200) NULL,
         UpdatedAtUtc     DATETIME2 NOT NULL CONSTRAINT DF_StweZaehlerdatenSet_Updated DEFAULT SYSUTCDATETIME(),
 
@@ -4741,6 +4742,14 @@ BEGIN
 
     CREATE INDEX IX_StweZaehlerdatenSet_Lid_Am ON dbo.StweZaehlerdatenSet(LiegenschaftId, ErfasstAm DESC, Id DESC);
 END;
+
+-- Nachrüstung (bestehende DB): RueckgespeistKwh
+IF COL_LENGTH('dbo.StweZaehlerdatenSet', 'RueckgespeistKwh') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweZaehlerdatenSet
+    ADD RueckgespeistKwh DECIMAL(18,3) NULL;
+END;
+
 
 -- ------------------------------------------------------------
 -- STWE: Zählerdaten (Ablesungen) – Lines (Neuwerte je Zähler)
@@ -6751,10 +6760,10 @@ ORDER BY t.Datum DESC, s.Id DESC;";
             c.Open();
 
             const string sql = @"
-SELECT Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz
-FROM dbo.StweZaehlerdatenSet
-WHERE LiegenschaftId = @lid
-ORDER BY ErfasstAm DESC, Id DESC;";
+                SELECT Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz
+                FROM dbo.StweZaehlerdatenSet
+                WHERE LiegenschaftId = @lid
+                ORDER BY ErfasstAm DESC, Id DESC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6770,7 +6779,8 @@ ORDER BY ErfasstAm DESC, Id DESC;";
                     ErfasstAm = r.GetDateTime(2),
                     RechnungKwhTotal = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3),
                     GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                    RueckgespeistKwh = r.IsDBNull(5) ? (decimal?)null : r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6)
                 });
             }
 
@@ -6789,9 +6799,9 @@ ORDER BY ErfasstAm DESC, Id DESC;";
             c.Open();
 
             const string sql = @"
-INSERT INTO dbo.StweZaehlerdatenSet (LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz)
+INSERT INTO dbo.StweZaehlerdatenSet (LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz)
 OUTPUT INSERTED.Id
-VALUES (@lid, @am, @rk, @gc, @n);";
+VALUES (@lid, @am, @rk, @gc, @rkwh, @n);";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6799,6 +6809,7 @@ VALUES (@lid, @am, @rk, @gc, @n);";
             cmd.Parameters.AddWithValue("@am", m.ErfasstAm);
             cmd.Parameters.AddWithValue("@rk", (object?)m.RechnungKwhTotal ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rkwh", (object?)m.RueckgespeistKwh ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
@@ -6819,6 +6830,7 @@ UPDATE dbo.StweZaehlerdatenSet SET
     ErfasstAm        = @am,
     RechnungKwhTotal = @rk,
     GutschriftChf    = @gc,
+    RueckgespeistKwh = @rkwh,
     Notiz            = @n,
     UpdatedAtUtc     = SYSUTCDATETIME()
 WHERE Id = @id;";
@@ -6829,10 +6841,12 @@ WHERE Id = @id;";
             cmd.Parameters.AddWithValue("@am", m.ErfasstAm);
             cmd.Parameters.AddWithValue("@rk", (object?)m.RechnungKwhTotal ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rkwh", (object?)m.RueckgespeistKwh ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
+
 
         public void StweZaehlerdatenSetDelete(int id)
         {
@@ -6957,7 +6971,7 @@ VALUES (@sid, @zid, @nw);";
             c.Open();
 
             const string sql = @"
-SELECT TOP(1) Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, Notiz
+SELECT TOP(1) Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz
 FROM dbo.StweZaehlerdatenSet
 WHERE LiegenschaftId = @lid
   AND (ErfasstAm < @am OR (ErfasstAm = @am AND Id < @id))
@@ -6979,9 +6993,11 @@ ORDER BY ErfasstAm DESC, Id DESC;";
                 ErfasstAm = r.GetDateTime(2),
                 RechnungKwhTotal = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3),
                 GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
-                Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                RueckgespeistKwh = r.IsDBNull(5) ? (decimal?)null : r.GetDecimal(5),
+                Notiz = r.IsDBNull(6) ? null : r.GetString(6)
             };
         }
+
         public int? StweSetGetEnergieZaehlerdatenSetId(int setId)
         {
             EnsureStweSchema();

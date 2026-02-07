@@ -25,9 +25,9 @@
 
         <!-- Header Felder -->
         <Border Grid.Row="2"
-                Background="{DynamicResource MaterialDesignPaper}"
-                CornerRadius="10"
-                Padding="12">
+        Background="{DynamicResource MaterialDesignPaper}"
+        CornerRadius="10"
+        Padding="12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="170"/>
@@ -38,31 +38,42 @@
                     <ColumnDefinition Width="10"/>
                     <ColumnDefinition Width="220"/>
                 </Grid.ColumnDefinitions>
+
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <!-- Row 0 -->
                 <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Erfasst am"/>
                 <DatePicker Grid.Row="0" Grid.Column="2"
-                            SelectedDate="{Binding ModelErfasstAm, UpdateSourceTrigger=PropertyChanged}"/>
+                    SelectedDate="{Binding ModelErfasstAm, UpdateSourceTrigger=PropertyChanged}"/>
 
                 <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="Rechnung kWh total"/>
                 <TextBox Grid.Row="0" Grid.Column="6"
-                         Text="{Binding RechnungKwhText, UpdateSourceTrigger=PropertyChanged}"/>
+                 Text="{Binding RechnungKwhText, UpdateSourceTrigger=PropertyChanged}"/>
 
+                <!-- Row 2 -->
                 <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Gutschrift CHF (optional)"/>
                 <TextBox Grid.Row="2" Grid.Column="2"
-                         Text="{Binding GutschriftChfText, UpdateSourceTrigger=PropertyChanged}"/>
+                 Text="{Binding GutschriftChfText, UpdateSourceTrigger=LostFocus}"/>
 
-                <TextBlock Grid.Row="2" Grid.Column="4" VerticalAlignment="Top" Text="Notiz"/>
+                <TextBlock Grid.Row="2" Grid.Column="4" VerticalAlignment="Center" Text="Rückspeisung kWh (optional)"/>
                 <TextBox Grid.Row="2" Grid.Column="6"
-                         Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True"
-                         Height="60"/>
+                 Text="{Binding RueckgespeistKwhText, UpdateSourceTrigger=LostFocus}"/>
+
+                <!-- Row 4 -->
+                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Top" Text="Notiz"/>
+                <TextBox Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="5"
+                 Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 Height="60"/>
             </Grid>
         </Border>
+
 
         <!-- Lines -->
         <Border Grid.Row="4"
