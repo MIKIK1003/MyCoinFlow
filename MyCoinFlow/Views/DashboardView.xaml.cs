@@ -4,20 +4,43 @@ using System.Printing;
 using System.Windows.Media;
 using System.Windows.Documents;
 using System.Windows.Shapes;
+using MyCoinFlow.ViewModels;
 
 namespace MyCoinFlow.Views
 {
     public partial class DashboardView : UserControl
     {
+        private bool _isStweActive;
+
         public DashboardView()
         {
             InitializeComponent();
-            // DataContext kommt über DataTemplate (App.xaml) vom MainViewModel (CurrentViewModel)
+            SetDashboardMode(false); // Default: Budget
+        }
+
+        private void SwitchToStwe_Click(object sender, RoutedEventArgs e) => SetDashboardMode(true);
+        private void SwitchToBudget_Click(object sender, RoutedEventArgs e) => SetDashboardMode(false);
+
+        private void SetDashboardMode(bool stwe)
+        {
+            if (_isStweActive == stwe) return;
+            _isStweActive = stwe;
+
+            BudgetContentGrid.Visibility = stwe ? Visibility.Collapsed : Visibility.Visible;
+            StweContent.Visibility = stwe ? Visibility.Visible : Visibility.Collapsed;
+
+            BtnToStwe.Visibility = stwe ? Visibility.Collapsed : Visibility.Visible;
+            BtnToBudget.Visibility = stwe ? Visibility.Visible : Visibility.Collapsed;
+
+            // STWE-VM nur bei Bedarf initialisieren (Budget-VM bleibt unberührt)
+            if (stwe && StweContent.DataContext == null)
+            {
+                StweContent.DataContext = new DashboardStweViewModel();
+            }
         }
 
         private void PrintDashboard_Click(object sender, RoutedEventArgs e)
         {
-            // Druckt den Bereich x:Name="PrintScope" auf A4 quer – vollständig skaliert auf 1 Seite
             if (PrintScope is not FrameworkElement scope) return;
 
             var dlg = new PrintDialog();
