@@ -7,59 +7,46 @@ using Microsoft.Data.SqlClient;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Stellt sicher, dass auf SQL Server Express (.\SQLEXPRESS) mindestens eine Start-DB existiert.
-    /// Quelle ist ein Template-Backup (.bak) in ProgramData.
+    /// Stellt sicher, dass auf .\SQLEXPRESS mindestens eine Default-DB (MyCoinFlowDB) existiert.
+    /// Quelle ist ein Template-Backup (.bak) in ProgramData, das vom Installer bereitgestellt wird.
     ///
-    /// Standard:
-    ///  - Template:  C:\ProgramData\MyCoinFlow\Master\MyCoinFlowMaster.bak
-    ///  - Default DB: MyCoinFlowDB
+    /// Standardpfad:
+    ///   C:\ProgramData\MyCoinFlow\Master\MyCoinFlowMaster.bak
     ///
-    /// Wichtig:
-    ///  - Das Restore liest die .bak-Datei aus dem Dateisystem – SQL Server Service muss darauf zugreifen können.
+    /// Default DB:
+    ///   MyCoinFlowDB
     /// </summary>
     public sealed class SqlExpressProvisioningService
     {
-        public const string DefaultInstance = @".\SQLEXPRESS";
-        public const string DefaultDatabaseName = "MyCoinFlowDB";
-
-        public static string TemplateBakPath =>
+        public string TemplateBakPath =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "MyCoinFlow", "Master", "MyCoinFlowMaster.bak");
 
-        private static string MasterConnectionString =>
-            new SqlConnectionStringBuilder
-            {
-                DataSource = DefaultInstance,
-                InitialCatalog = "master",
-                IntegratedSecurity = true,
-                TrustServerCertificate = true,
-                Encrypt = false
-            }.ConnectionString;
-
         public async Task EnsureDefaultDatabaseExistsAsync()
         {
-            // 1) Kann ich master öffnen?
+            // 1) SQL erreichbar?
             await EnsureSqlReachableAsync().ConfigureAwait(false);
 
-            // 2) Gibt es schon eine Default DB?
-            if (await DbExistsAsync(DefaultDatabaseName).ConfigureAwait(false))
+            // 2) Default DB existiert schon?
+            if (await DbExistsAsync(ConnectionStrings.DefaultDatabaseName).ConfigureAwait(false))
                 return;
 
-            // 3) Template muss vorhanden sein
+            // 3) Template vorhanden?
             var bak = TemplateBakPath;
             if (!File.Exists(bak))
-            {
-                throw new FileNotFoundException(
-                    "Template-Datenbank (Backup) wurde nicht gefunden. Erwartet: " + bak, bak);
-            }
+                throw new FileNotFoundException("Template-Backup nicht gefunden: " + bak, bak);
 
-            // 4) Restore Default DB aus Template
-            await RestoreFromBakAsync(bak, DefaultDatabaseName).ConfigureAwait(false);
+            // 4) Restore Default DB
+            await RestoreFromBakAsync(bak, ConnectionStrings.DefaultDatabaseName).ConfigureAwait(false);
+
+            // 5) Final check
+            if (!await DbExistsAsync(ConnectionStrings.DefaultDatabaseName).ConfigureAwait(false))
+                throw new InvalidOperationException("Default-DB konnte nicht erstellt werden.");
         }
 
         private static async Task EnsureSqlReachableAsync()
         {
-            await using var c = new SqlConnection(MasterConnectionString);
+            await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync().ConfigureAwait(false);
         }
 
@@ -67,7 +54,7 @@ namespace MyCoinFlow.Services
         {
             if (string.IsNullOrWhiteSpace(dbName)) return false;
 
-            await using var c = new SqlConnection(MasterConnectionString);
+            await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync().ConfigureAwait(false);
 
             await using var cmd = c.CreateCommand();
@@ -80,18 +67,15 @@ namespace MyCoinFlow.Services
 
         private static async Task RestoreFromBakAsync(string bakPath, string targetDbName)
         {
-            // 1) Default Data/Log Pfade der Instanz ermitteln
-            var (dataDir, logDir) = await GetInstanceDefaultPathsAsync().ConfigureAwait(false);
-
-            // 2) Logische Dateinamen aus Backup lesen
+            // Logische Dateinamen aus Backup
             var (logicalData, logicalLog) = await GetLogicalNamesFromBackupAsync(bakPath).ConfigureAwait(false);
 
-            // 3) Zielpfade definieren
+            // SQL Standardpfade der Instanz
+            var (dataDir, logDir) = await GetInstanceDefaultPathsAsync().ConfigureAwait(false);
+
             var targetMdf = Path.Combine(dataDir, $"{targetDbName}.mdf");
             var targetLdf = Path.Combine(logDir, $"{targetDbName}_log.ldf");
 
-            // 4) Restore durchführen
-            //    REPLACE ist hier bewusst, damit "halb angelegte" DBs sauber überschrieben werden können.
             var sql = @"
 RESTORE DATABASE [" + targetDbName + @"]
 FROM DISK = @bak
@@ -100,21 +84,19 @@ WITH REPLACE,
      MOVE @logicalLog  TO @ldf;
 ";
 
-            await using var c = new SqlConnection(MasterConnectionString);
+            await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync().ConfigureAwait(false);
 
             await using var cmd = c.CreateCommand();
             cmd.CommandType = CommandType.Text;
             cmd.CommandText = sql;
+            cmd.CommandTimeout = 600; // Restore dauert
 
             cmd.Parameters.AddWithValue("@bak", bakPath);
             cmd.Parameters.AddWithValue("@logicalData", logicalData);
             cmd.Parameters.AddWithValue("@logicalLog", logicalLog);
             cmd.Parameters.AddWithValue("@mdf", targetMdf);
             cmd.Parameters.AddWithValue("@ldf", targetLdf);
-
-            // Restore kann dauern – Timeout erhöhen
-            cmd.CommandTimeout = 600;
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
@@ -126,8 +108,7 @@ SELECT
   CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)) AS DataPath,
   CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000)) AS LogPath;
 ";
-
-            await using var c = new SqlConnection(MasterConnectionString);
+            await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync().ConfigureAwait(false);
 
             await using var cmd = c.CreateCommand();
@@ -141,7 +122,7 @@ SELECT
             var log = (r["LogPath"] as string) ?? "";
 
             if (string.IsNullOrWhiteSpace(data) || string.IsNullOrWhiteSpace(log))
-                throw new InvalidOperationException("SQL Default-Pfade sind leer. Restore kann nicht sicher ausgeführt werden.");
+                throw new InvalidOperationException("SQL Default-Pfade sind leer. Restore nicht möglich.");
 
             return (data.Trim(), log.Trim());
         }
@@ -150,7 +131,7 @@ SELECT
         {
             const string sql = @"RESTORE FILELISTONLY FROM DISK = @bak;";
 
-            await using var c = new SqlConnection(MasterConnectionString);
+            await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync().ConfigureAwait(false);
 
             await using var cmd = c.CreateCommand();
@@ -174,7 +155,7 @@ SELECT
             }
 
             if (string.IsNullOrWhiteSpace(data) || string.IsNullOrWhiteSpace(log))
-                throw new InvalidOperationException("Konnte logische Dateinamen aus Backup nicht lesen (RESTORE FILELISTONLY).");
+                throw new InvalidOperationException("Konnte logische Dateinamen aus Backup nicht lesen.");
 
             return (data!, log!);
         }

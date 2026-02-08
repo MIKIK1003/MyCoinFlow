@@ -6,27 +6,69 @@ using Microsoft.Data.SqlClient;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Aktive DB (Mandant) zentral verwalten: ConnectionString.Current liest/schreibt den aktiven DB-Namen.
+    /// Aktive DB zentral verwalten.
+    /// Standard-Server ist SQL Server Express: .\SQLEXPRESS
     /// </summary>
     public static class ConnectionStrings
     {
+        // EIN Standard (kein entweder/oder):
+        // Wir arbeiten konsistent mit SQL Server Express (Installer installiert SQLEXPRESS).
+        private const string DefaultServer = @".\SQLEXPRESS";
+
         private const string DefaultDbName = "MyCoinFlowDB";
+
         private static string _activeDbName = DefaultDbName;
         private static bool _loaded;
 
+        /// <summary>
+        /// ConnectionString zur aktuell aktiven DB.
+        /// </summary>
         public static string Current
         {
             get
             {
                 EnsureLoaded();
-                return $@"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog={_activeDbName};";
+                return new SqlConnectionStringBuilder
+                {
+                    DataSource = DefaultServer,
+                    InitialCatalog = _activeDbName,
+                    IntegratedSecurity = true,
+                    Encrypt = false,
+                    TrustServerCertificate = true
+                }.ConnectionString;
             }
         }
 
+        /// <summary>
+        /// ConnectionString auf master (für DB-Existenzprüfung, Listing, Restore, etc.)
+        /// </summary>
+        public static string Master
+        {
+            get
+            {
+                return new SqlConnectionStringBuilder
+                {
+                    DataSource = DefaultServer,
+                    InitialCatalog = "master",
+                    IntegratedSecurity = true,
+                    Encrypt = false,
+                    TrustServerCertificate = true
+                }.ConnectionString;
+            }
+        }
+
+        /// <summary>
+        /// Nur der DB-Name der aktiven DB.
+        /// </summary>
         public static string ActiveDatabaseName
         {
             get { EnsureLoaded(); return _activeDbName; }
         }
+
+        /// <summary>
+        /// Standard-DB-Name (Default).
+        /// </summary>
+        public static string DefaultDatabaseName => DefaultDbName;
 
         public static void SetActiveDatabase(string dbName)
         {
@@ -49,12 +91,14 @@ namespace MyCoinFlow.Services
         private static void EnsureLoaded()
         {
             if (_loaded) return;
+
             try
             {
                 if (File.Exists(ConfigPath))
                 {
                     var json = File.ReadAllText(ConfigPath);
                     var cfg = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+
                     _activeDbName = string.IsNullOrWhiteSpace(cfg.ActiveDatabaseName)
                         ? DefaultDbName
                         : cfg.ActiveDatabaseName.Trim();
@@ -68,6 +112,7 @@ namespace MyCoinFlow.Services
             {
                 _activeDbName = DefaultDbName;
             }
+
             _loaded = true;
         }
 
