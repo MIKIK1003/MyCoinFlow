@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
-using Microsoft.Data.SqlClient;
 using MyCoinFlow.Services;
 
 namespace MyCoinFlow.Views
@@ -11,6 +10,7 @@ namespace MyCoinFlow.Views
     {
         private readonly AuthService _auth = new();
         private readonly MandantService _mandanten = new();
+        private readonly SqlExpressProvisioningService _provisioning = new();
 
         public LoginWindow()
         {
@@ -24,25 +24,30 @@ namespace MyCoinFlow.Views
             {
                 StatusText.Text = "";
 
+                // 0) Sicherstellen: SQL erreichbar + Default DB existiert (aus Template .bak)
+                //    -> nach Setup-Installation ist die Template-Datei in ProgramData vorhanden.
+                StatusText.Text = "Initialisiere Datenbank…";
+                await _provisioning.EnsureDefaultDatabaseExistsAsync();
+
                 // 1) Alle Mandanten-DBs ermitteln (mit dbo.Users)
                 var list = await _mandanten.GetMandantenAsync();
 
                 // 2) Aktive DB aus Persistenz holen
                 var active = ConnectionStrings.ActiveDatabaseName;
 
-                // 3) Prüfen, ob die aktive DB wirklich existiert (in master gegen DB_ID)
-                var activeExists = await DbExistsAsync(active);
+                // 3) Prüfen, ob die aktive DB wirklich existiert
+                var activeExists = await SqlExpressProvisioningService.DbExistsAsync(active);
 
                 // 4) Falls die aktive DB nicht existiert → auf sinnvolle Alternative umschalten
                 if (!activeExists)
                 {
                     string? fallback = null;
 
-                    // Bevorzugt MyCoinFlowDB, falls vorhanden
-                    if (await DbExistsAsync("MyCoinFlowDB"))
-                        fallback = "MyCoinFlowDB";
+                    // Bevorzugt MyCoinFlowDB (Default)
+                    if (await SqlExpressProvisioningService.DbExistsAsync(SqlExpressProvisioningService.DefaultDatabaseName))
+                        fallback = SqlExpressProvisioningService.DefaultDatabaseName;
                     else if (list.Count > 0)
-                        fallback = list[0]; // erste gefundene DB (mit dbo.Users)
+                        fallback = list[0];
 
                     if (fallback != null)
                     {
@@ -52,7 +57,6 @@ namespace MyCoinFlow.Views
                     }
                     else
                     {
-                        // Gar keine DB gefunden → UI im leeren Zustand belassen
                         DbCombo.ItemsSource = new List<string>();
                         StatusText.Text = "Keine Datenbank gefunden. Bitte in Admin einen Mandanten anlegen.";
                         FirstUserExpander.IsEnabled = false;
@@ -63,19 +67,16 @@ namespace MyCoinFlow.Views
 
                 // 5) Dropdown aufbauen – aktive DB aufnehmen, auch wenn (noch) kein dbo.Users existiert
                 if (!list.Contains(active))
-                {
-                    // aktive DB existiert (siehe oben), könnte aber (noch) kein dbo.Users haben → trotzdem anzeigen
                     list.Insert(0, active);
-                }
 
                 DbCombo.ItemsSource = list;
                 DbCombo.SelectedItem = active;
 
-                // Wechsel-Handler: sofort umschalten + Schema absichern
                 DbCombo.SelectionChanged -= DbCombo_SelectionChanged;
                 DbCombo.SelectionChanged += DbCombo_SelectionChanged;
 
-                // 6) Jetzt Users-Schema in der aktiven DB sichern (legt dbo.Users an, falls noch nicht da)
+                // 6) Users-Schema in der aktiven DB sichern (legt dbo.Users an, falls noch nicht da)
+                StatusText.Text = "Prüfe Benutzer-Schema…";
                 await _auth.EnsureSchemaAsync();
 
                 // 7) Erstbenutzer-Hinweis
@@ -89,7 +90,9 @@ namespace MyCoinFlow.Views
             }
             catch (Exception ex)
             {
-                StatusText.Text = "Fehler beim Start: " + ex.Message;
+                StatusText.Text =
+                    "Fehler beim Start: " + ex.Message + Environment.NewLine +
+                    "Hinweis: Prüfe, ob SQL Server Express (SQLEXPRESS) läuft und ob das Template-Backup in ProgramData vorhanden ist.";
             }
         }
 
@@ -99,23 +102,19 @@ namespace MyCoinFlow.Views
             {
                 if (DbCombo.SelectedItem is not string db) return;
 
-                // Nur reagieren, wenn sich wirklich etwas ändert
                 if (!string.Equals(db, ConnectionStrings.ActiveDatabaseName, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Existenz prüfen, bevor wir umschalten
-                    if (!await DbExistsAsync(db))
+                    if (!await SqlExpressProvisioningService.DbExistsAsync(db))
                     {
                         StatusText.Text = $"Die ausgewählte DB '{db}' existiert nicht.";
                         return;
                     }
 
-                    _mandanten.SetActive(db); // persistiert + leert Pools
+                    _mandanten.SetActive(db);
                     StatusText.Text = $"Aktive DB gewechselt zu: {db}.";
 
-                    // In der neuen DB Schema absichern
                     await _auth.EnsureSchemaAsync();
 
-                    // Erstbenutzerbereich gem. neuer DB
                     var hasUsers = await _auth.HasAnyUserAsync();
                     FirstUserExpander.IsEnabled = !hasUsers;
                     FirstUserExpander.IsExpanded = !hasUsers;
@@ -191,31 +190,6 @@ namespace MyCoinFlow.Views
             {
                 StatusText.Text = "Fehler beim Anlegen: " + ex.Message;
             }
-        }
-
-        // ---- master: DB_ID prüfen ----
-        private static async Task<bool> DbExistsAsync(string dbName)
-        {
-            if (string.IsNullOrWhiteSpace(dbName)) return false;
-
-            const string masterCs = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
-            await using var c = new SqlConnection(masterCs);
-            await c.OpenAsync();
-            await using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT DB_ID(@n)";
-            cmd.Parameters.AddWithValue("@n", dbName.Trim());
-            var id = await cmd.ExecuteScalarAsync();
-            return id != null && id != DBNull.Value;
-        }
-
-        private void StackPanel_TimeChanged(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e)
-        {
-
-        }
-
-        private void StackPanel_TimeChanged_1(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e)
-        {
-
         }
     }
 }
