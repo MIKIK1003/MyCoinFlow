@@ -13,27 +13,15 @@
         ResizeMode="CanResize"
         x:Name="RootWindow">
 
-    <!--
-        MainWindow = Shell der Anwendung:
-        - links: Navigation (Buttons -> Commands im ViewModel)
-        - rechts: ContentHost (CurrentView)
-        - unten links: Beenden + Versionsanzeige
-        Hinweis: Layout/Verhalten bewusst unverändert (keine Row-Umstellung), nur Bereinigung/Kommentierung.
-    -->
-
     <Grid>
-        <!-- Spalten: links Navigation, rechts Inhalt -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="240"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Linkes Menü (Navigation) -->
         <StackPanel Grid.Column="0"
                     Background="{DynamicResource MaterialDesignPaper}">
-            <!-- Nutzt deinen globalen Style aus App.xaml (NavIconButton / NavIconButton_Emphasis) -->
 
-            <!-- Dashboard -->
             <Button Style="{StaticResource NavIconButton}"
                     Tag="ViewDashboard"
                     Content="Dashboard"
@@ -42,7 +30,6 @@
                     Command="{Binding ShowDashboardCommand}"
                     Margin="15"/>
 
-            <!-- Transaktionen -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="SwapHorizontal"
                     Content="Transaktionen"
@@ -51,7 +38,9 @@
                     Command="{Binding ShowTransactionsCommand}"
                     Margin="15"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
+            <!-- ✅ PLUS -->
+            <Button x:Name="NavStweSetsButton"
+                    Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="PlaylistPlus"
                     Content="STWE-Sets"
                     MinHeight="50"
@@ -59,7 +48,6 @@
                     Command="{Binding ShowTransaktionSetsCommand}"
                     Margin="15"/>
 
-            <!-- Kontenplan -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="FileTreeOutline"
                     Content="Kontenplan"
@@ -68,7 +56,6 @@
                     Command="{Binding ShowAccountsCommand}"
                     Margin="15"/>
 
-            <!-- Geldinstitute -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="BankOutline"
                     Content="Geldinstitute"
@@ -77,7 +64,6 @@
                     Command="{Binding ShowInstitutionsCommand}"
                     Margin="15"/>
 
-            <!-- Adressen -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="AccountBoxOutline"
                     Content="Adressen"
@@ -86,7 +72,6 @@
                     Command="{Binding ShowAddressesCommand}"
                     Margin="15"/>
 
-            <!-- Budget -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="HandCoin"
                     Content="Budget"
@@ -95,8 +80,9 @@
                     Command="{Binding ShowBudgetsCommand}"
                     Margin="15"/>
 
-            <!-- Liegenschaften (STWE) -->
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
+            <!-- ✅ PLUS -->
+            <Button x:Name="NavLiegenschaftenButton"
+                    Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="HomeCityOutline"
                     Content="Liegenschaften"
                     MinHeight="50"
@@ -104,7 +90,6 @@
                     Command="{Binding ShowLiegenschaftenCommand}"
                     Margin="15"/>
 
-            <!-- Admin -->
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="Cog"
                     Content="Admin"
@@ -114,11 +99,9 @@
                     Margin="15"/>
         </StackPanel>
 
-        <!-- Inhalt rechts (Host für CurrentView aus dem MainViewModel) -->
         <ContentControl Grid.Column="1"
                         Content="{Binding CurrentViewModel}"/>
 
-        <!-- Unten links: Beenden-Button + Versionsanzeige -->
         <Grid Grid.Column="0"
               VerticalAlignment="Bottom"
               Margin="12,0,12,12">
@@ -127,7 +110,6 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Beenden (Event/Command wird bewusst nicht verändert; Binding/Handler ist außerhalb dieser XAML gelöst) -->
             <Button x:Name="ExitButton"
                     Padding="12,8"
                     MinHeight="36"
@@ -144,7 +126,6 @@
                 </StackPanel>
             </Button>
 
-            <!-- Version rechts klein (VersionText kommt aus Code-behind/VM; Fallbacks verhindern leere Anzeige) -->
             <TextBlock Grid.Column="1"
                        VerticalAlignment="Center"
                        Margin="12,0,0,0"

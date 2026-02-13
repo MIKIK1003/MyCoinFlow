@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Documents;
 using System.Windows.Shapes;
 using MyCoinFlow.ViewModels;
+using MyCoinFlow.Services;
 
 namespace MyCoinFlow.Views
 {
@@ -15,10 +16,43 @@ namespace MyCoinFlow.Views
         public DashboardView()
         {
             InitializeComponent();
+
+            ApplyEditionVisibility();
+
             SetDashboardMode(false); // Default: Budget
         }
 
-        private void SwitchToStwe_Click(object sender, RoutedEventArgs e) => SetDashboardMode(true);
+        private void ApplyEditionVisibility()
+        {
+            // Basic: STWE-Auswertung darf nicht anwählbar sein
+            var isPlus = AppEdition.IsPlus;
+
+            if (!isPlus)
+            {
+                // Button ausblenden
+                if (BtnToStwe != null)
+                    BtnToStwe.Visibility = Visibility.Collapsed;
+
+                // sicherstellen: Budget-Modus aktiv
+                _isStweActive = false;
+                if (BudgetContentGrid != null) BudgetContentGrid.Visibility = Visibility.Visible;
+                if (StweContent != null) StweContent.Visibility = Visibility.Collapsed;
+                if (BtnToBudget != null) BtnToBudget.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                // Plus: Button darf sichtbar sein (Budget-Modus zeigt STWE-Toggle)
+                if (BtnToStwe != null && !_isStweActive)
+                    BtnToStwe.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void SwitchToStwe_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AppEdition.IsPlus) return; // extra Sicherung
+            SetDashboardMode(true);
+        }
+
         private void SwitchToBudget_Click(object sender, RoutedEventArgs e) => SetDashboardMode(false);
 
         private void SetDashboardMode(bool stwe)
@@ -29,10 +63,18 @@ namespace MyCoinFlow.Views
             BudgetContentGrid.Visibility = stwe ? Visibility.Collapsed : Visibility.Visible;
             StweContent.Visibility = stwe ? Visibility.Visible : Visibility.Collapsed;
 
-            BtnToStwe.Visibility = stwe ? Visibility.Collapsed : Visibility.Visible;
-            BtnToBudget.Visibility = stwe ? Visibility.Visible : Visibility.Collapsed;
+            // Toggle-Buttons
+            if (AppEdition.IsPlus)
+            {
+                BtnToStwe.Visibility = stwe ? Visibility.Collapsed : Visibility.Visible;
+                BtnToBudget.Visibility = stwe ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                BtnToStwe.Visibility = Visibility.Collapsed;
+                BtnToBudget.Visibility = Visibility.Collapsed;
+            }
 
-            // STWE-VM nur bei Bedarf initialisieren (Budget-VM bleibt unberührt)
             if (stwe && StweContent.DataContext == null)
             {
                 StweContent.DataContext = new DashboardStweViewModel();
@@ -50,7 +92,7 @@ namespace MyCoinFlow.Views
             dlg.PrintTicket.PageOrientation = PageOrientation.Landscape;
             dlg.PrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
 
-            const double pageWidth = 11.69 * 96.0;   // A4 landscape in DIP
+            const double pageWidth = 11.69 * 96.0;
             const double pageHeight = 8.27 * 96.0;
             const double margin = 24.0;
 

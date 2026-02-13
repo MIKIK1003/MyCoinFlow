@@ -12,80 +12,67 @@ namespace MyCoinFlow
 {
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// Versionsanzeige für die XAML-Bindung
-        /// (ElementName=RootWindow, Path=VersionText).
-        /// Wird beim Start aus DB oder Fallback ermittelt.
-        /// </summary>
         public string VersionText { get; private set; } = "v0.0.0.0";
 
-        /// <summary>
-        /// Initialisiert das Hauptfenster.
-        /// Ablauf:
-        /// 1) Einmaliger Post-Install-Sync (JSON → DB, falls neuer)
-        /// 2) Versionsanzeige aus DB (Fallback: Assembly)
-        /// 3) UI initialisieren
-        /// 4) DataContext setzen
-        /// 5) Exit-Button verdrahten
-        /// </summary>
         public MainWindow()
         {
-            // 1) Post-Install-Sync: hebt DB-Version auf JSON-Version an
-            // Fehler werden bewusst geschluckt, um den App-Start nie zu blockieren.
-            try { PostInstallSyncFromJson(); } catch { /* still */ }
+            try { PostInstallSyncFromJson(); } catch { }
 
-            // 2) Versionsanzeige ausschließlich aus DB (Fallback: Assembly)
             VersionText = "v" + ReadInstalledVersionFromDbOrFallback();
 
-            // 3) UI initialisieren
             InitializeComponent();
 
-            // 4) DataContext setzen (historisch gewachsen, bewusst defensiv)
             if (DataContext is null) DataContext = new MyCoinFlow.ViewModels.MainViewModel();
             if (DataContext is null) DataContext = new MainViewModel();
 
-            // 5) Beenden-Button verdrahten
-            // Fehler werden bewusst ignoriert (z. B. falls Button nicht existiert).
             try
             {
                 if (ExitButton != null)
                     ExitButton.Click += (_, __) => Application.Current?.Shutdown();
             }
-            catch { /* still */ }
+            catch { }
+
+            // ✅ PLUS/BASIC anwenden (2 Buttons links)
+            ApplyEditionVisibility();
         }
 
-        /// <summary>
-        /// Hebt die in der Datenbank gespeicherte App-Version an,
-        /// wenn eine lokal verfügbare JSON-Version größer ist.
-        /// Wird einmalig pro Installation beim Start ausgeführt.
-        /// </summary>
+        private void ApplyEditionVisibility()
+        {
+            try
+            {
+                var isPlus = AppEdition.IsPlus;
+
+                if (NavStweSetsButton != null)
+                    NavStweSetsButton.Visibility = isPlus ? Visibility.Visible : Visibility.Collapsed;
+
+                if (NavLiegenschaftenButton != null)
+                    NavLiegenschaftenButton.Visibility = isPlus ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch
+            {
+                // still
+            }
+        }
+
         private static void PostInstallSyncFromJson()
         {
             var db = new DatabaseService();
 
-            // Aktuelle DB-Version lesen (kann null/leer sein)
             var dbRaw = db.GetAppSetting("InstalledVersion");
             var dbVer = ParseVerOrZero(dbRaw);
 
-            // JSON-Version aus lokalem Update-Pfad lesen
-            var jsonVerRaw = TryReadLocalJsonVersion(); // z. B. "1.2.5"
+            var jsonVerRaw = TryReadLocalJsonVersion();
             if (string.IsNullOrWhiteSpace(jsonVerRaw))
-                return; // keine JSON erreichbar → nichts zu tun
+                return;
 
             var jsonVer = ParseVerOrZero(jsonVerRaw);
 
-            // Nur anheben, wenn JSON-Version tatsächlich größer ist
             if (jsonVer > dbVer)
             {
                 db.SetAppSetting("InstalledVersion", Normalize4(jsonVerRaw));
             }
         }
 
-        /// <summary>
-        /// Liest die Versionsnummer aus einer lokalen JSON-Datei
-        /// (z. B. OneDrive Update-Verzeichnis).
-        /// Unterstützt mehrere Key-Namen und toleriert einfache Typen.
-        /// </summary>
         private static string? TryReadLocalJsonVersion()
         {
             try
@@ -100,7 +87,6 @@ namespace MyCoinFlow
 
                     var root = doc.RootElement;
 
-                    // Unterstützte Keys (case-insensitiv)
                     string[] keys =
                     {
                         "version", "fileVersion", "informationalVersion",
@@ -113,7 +99,6 @@ namespace MyCoinFlow
                             return v;
                     }
 
-                    // Optional verschachtelt: "app": { "version": "..." }
                     if (root.TryGetProperty("app", out var appNode))
                     {
                         foreach (var k in keys)
@@ -124,11 +109,10 @@ namespace MyCoinFlow
                     }
                 }
             }
-            catch { /* still */ }
+            catch { }
 
             return null;
 
-            // Lokaler Helper: tolerant gegenüber Typen und Groß-/Kleinschreibung
             static bool TryGetString(JsonElement elem, string name, out string? value)
             {
                 value = null;
@@ -158,10 +142,6 @@ namespace MyCoinFlow
             }
         }
 
-        /// <summary>
-        /// Liest die installierte Version aus der Datenbank.
-        /// Fallback ausschließlich für Anzeigezwecke: Assembly-Version.
-        /// </summary>
         private static string ReadInstalledVersionFromDbOrFallback()
         {
             try
@@ -172,15 +152,11 @@ namespace MyCoinFlow
                 if (!string.IsNullOrWhiteSpace(v))
                     return Normalize4(v);
             }
-            catch { /* still */ }
+            catch { }
 
             return GetAssemblyVersion();
         }
 
-        /// <summary>
-        /// Parst eine Versionszeichenfolge in ein Version-Objekt.
-        /// Ungültige oder leere Werte ergeben 0.0.0.0.
-        /// </summary>
         private static Version ParseVerOrZero(string? raw)
         {
             var n = Normalize4(raw ?? "0.0.0.0");
@@ -189,10 +165,6 @@ namespace MyCoinFlow
                 : new Version(0, 0, 0, 0);
         }
 
-        /// <summary>
-        /// Normalisiert eine Versionszeichenfolge auf vier Stellen (x.y.z.w).
-        /// Entfernt Präfixe, Suffixe und Zusatzinformationen.
-        /// </summary>
         private static string Normalize4(string v)
         {
             var cut = (v ?? string.Empty).Trim().TrimStart('v', 'V');
@@ -210,10 +182,6 @@ namespace MyCoinFlow
             };
         }
 
-        /// <summary>
-        /// Ermittelt die Assembly-Version als letzten Fallback.
-        /// Reihenfolge: FileVersion → InformationalVersion → AssemblyVersion.
-        /// </summary>
         private static string GetAssemblyVersion()
         {
             try
@@ -234,7 +202,7 @@ namespace MyCoinFlow
                 if (!string.IsNullOrWhiteSpace(asmVer))
                     return Normalize4(asmVer);
             }
-            catch { /* still */ }
+            catch { }
 
             return "0.0.0.0";
         }
