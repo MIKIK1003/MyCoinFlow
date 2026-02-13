@@ -7,107 +7,64 @@ using Microsoft.Data.SqlClient;
 
 namespace MyCoinFlow.Services
 {
-    /// <summary>
-    /// Mandanten = Datenbanken auf .\SQLEXPRESS.
-    /// Ein Mandant gilt als "gültig", wenn dbo.Users existiert.
-    /// Neue Mandanten werden aus dem Template-Backup (ProgramData) erstellt.
-    /// </summary>
     public sealed class MandantService
     {
         private static string TemplateBakPath =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "MyCoinFlow", "Master", "MyCoinFlowMaster.bak");
 
-        /// <summary>
-        /// Listet alle User-Datenbanken (database_id > 4), die eine dbo.Users Tabelle besitzen.
-        /// </summary>
-        public async Task<IList<string>> GetMandantenAsync()
+        public async Task<List<string>> GetAllDatabaseNamesAsync()
         {
-            var result = new List<string>();
-            var names = new List<string>();
+            var list = new List<string>();
 
-            // 1) DB-Namen aus master holen (immer .\SQLEXPRESS via ConnectionStrings.Master)
-            await using (var c = new SqlConnection(ConnectionStrings.Master))
+            await using var c = new SqlConnection(ConnectionStrings.Master);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT name
+FROM sys.databases
+WHERE database_id > 4
+ORDER BY name;";
+
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
-                await c.OpenAsync();
-                var cmd = c.CreateCommand();
-                cmd.CommandText = "SELECT name FROM sys.databases WHERE database_id > 4 ORDER BY name";
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync())
-                    names.Add(r.GetString(0));
+                var name = r.GetString(0);
+                if (!string.IsNullOrWhiteSpace(name))
+                    list.Add(name);
             }
 
-            // 2) Pro DB prüfen: dbo.Users existiert?
-            foreach (var db in names)
-            {
-                try
-                {
-                    var cs = BuildDbConnectionString(db);
-                    await using var c2 = new SqlConnection(cs);
-                    await c2.OpenAsync();
-
-                    var cmd2 = c2.CreateCommand();
-                    cmd2.CommandText = "SELECT OBJECT_ID(N'dbo.Users','U')";
-                    var obj = await cmd2.ExecuteScalarAsync();
-
-                    if (obj != null && obj != DBNull.Value)
-                        result.Add(db);
-                }
-                catch
-                {
-                    // defekte DB ignorieren
-                }
-            }
-
-            return result;
+            return list;
         }
 
-        /// <summary>
-        /// Schaltet die aktive DB (nur Name speichern).
-        /// </summary>
         public void SetActive(string dbName) => ConnectionStrings.SetActiveDatabase(dbName);
 
-        /// <summary>
-        /// Legt eine neue Mandanten-DB an (Restore aus Template .bak) und setzt sie als aktiv.
-        /// Name muss eindeutig sein.
-        /// </summary>
-        public async Task CreateMandantDatabaseFromTemplateAsync(string newDatabaseName)
+        public async Task CreateEmptyFromTemplateAsync(string newDbName)
         {
-            if (string.IsNullOrWhiteSpace(newDatabaseName))
-                throw new ArgumentException("DB-Name darf nicht leer sein.", nameof(newDatabaseName));
+            if (string.IsNullOrWhiteSpace(newDbName))
+                throw new ArgumentException("DB-Name darf nicht leer sein.", nameof(newDbName));
 
-            newDatabaseName = newDatabaseName.Trim();
+            newDbName = newDbName.Trim();
 
-            // 1) Sicherstellen: Template vorhanden
             var bak = TemplateBakPath;
             if (!File.Exists(bak))
                 throw new FileNotFoundException("Template-Backup nicht gefunden: " + bak, bak);
 
-            // 2) Existiert DB schon?
-            if (await DbExistsAsync(newDatabaseName))
-                throw new InvalidOperationException($"Die Datenbank '{newDatabaseName}' existiert bereits.");
+            if (await DbExistsAsync(newDbName))
+                throw new InvalidOperationException($"Die Datenbank '{newDbName}' existiert bereits.");
 
-            // 3) Restore aus Template
-            await RestoreFromBakAsync(bak, newDatabaseName);
+            // Restore
+            await RestoreFromBakAsync(bak, newDbName);
 
-            // 4) Danach aktiv setzen
-            ConnectionStrings.SetActiveDatabase(newDatabaseName);
+            // 🔒 WICHTIG: Template darf keine produktiven User "mitbringen"
+            await TryPurgeUsersAsync(newDbName);
+
+            // aktiv setzen
+            ConnectionStrings.SetActiveDatabase(newDbName);
         }
 
-        private static string BuildDbConnectionString(string dbName)
-        {
-            // Gleicher Server wie Master (.\SQLEXPRESS), nur anderer Catalog
-            var b = new SqlConnectionStringBuilder(ConnectionStrings.Master)
-            {
-                InitialCatalog = dbName,
-                IntegratedSecurity = true,
-                Encrypt = false,
-                TrustServerCertificate = true
-            };
-            return b.ConnectionString;
-        }
-
-        private static async Task<bool> DbExistsAsync(string dbName)
+        public static async Task<bool> DbExistsAsync(string dbName)
         {
             await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync();
@@ -120,12 +77,40 @@ namespace MyCoinFlow.Services
             return id != null && id != DBNull.Value;
         }
 
+        private static async Task TryPurgeUsersAsync(string dbName)
+        {
+            // defensiv: wenn Tabelle nicht existiert, einfach nichts machen.
+            var cs = new SqlConnectionStringBuilder(ConnectionStrings.Master)
+            {
+                InitialCatalog = dbName,
+                IntegratedSecurity = true,
+                Encrypt = false,
+                TrustServerCertificate = true
+            }.ConnectionString;
+
+            try
+            {
+                await using var c = new SqlConnection(cs);
+                await c.OpenAsync();
+
+                await using var cmd = c.CreateCommand();
+                cmd.CommandText = @"
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL
+BEGIN
+  DELETE FROM dbo.Users;
+END
+";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch
+            {
+                // still – Mandant ist trotzdem angelegt, User werden dann beim Login neu erstellt
+            }
+        }
+
         private static async Task RestoreFromBakAsync(string bakPath, string targetDbName)
         {
-            // Logische Dateinamen im Backup ermitteln
             var (logicalData, logicalLog) = await GetLogicalNamesFromBackupAsync(bakPath);
-
-            // Standardpfade der Instanz ermitteln
             var (dataDir, logDir) = await GetInstanceDefaultPathsAsync();
 
             var targetMdf = Path.Combine(dataDir, $"{targetDbName}.mdf");
@@ -136,8 +121,7 @@ RESTORE DATABASE [" + targetDbName + @"]
 FROM DISK = @bak
 WITH REPLACE,
      MOVE @logicalData TO @mdf,
-     MOVE @logicalLog  TO @ldf;
-";
+     MOVE @logicalLog  TO @ldf;";
 
             await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync();
@@ -161,8 +145,7 @@ WITH REPLACE,
             const string sql = @"
 SELECT
   CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)) AS DataPath,
-  CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000)) AS LogPath;
-";
+  CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000)) AS LogPath;";
 
             await using var c = new SqlConnection(ConnectionStrings.Master);
             await c.OpenAsync();

@@ -6,13 +6,12 @@ using Microsoft.Data.SqlClient;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Erzeugt .bak-Sicherungen von LocalDB-Datenbanken (COPY_ONLY; optional COMPRESSION).
+    /// Erzeugt .bak-Sicherungen von SQL Server Express Datenbanken (COPY_ONLY; optional COMPRESSION).
+    /// Nutzt ConnectionStrings.Master als Single Source of Truth (.\SQLEXPRESS).
     /// Fällt automatisch auf „ohne Kompression“ zurück, wenn nicht unterstützt.
     /// </summary>
     public sealed class DbBackupService
     {
-        private const string MasterCs = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
-
         public async Task BackupAsync(string dbName, string backupFilePath, bool useCompression = true)
         {
             if (string.IsNullOrWhiteSpace(dbName))
@@ -20,18 +19,21 @@ namespace MyCoinFlow.Services
             if (string.IsNullOrWhiteSpace(backupFilePath))
                 throw new ArgumentException("Zielpfad darf nicht leer sein.", nameof(backupFilePath));
 
+            dbName = dbName.Trim();
+
             // Zielordner anlegen
             var dir = Path.GetDirectoryName(backupFilePath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-            await using var conn = new SqlConnection(MasterCs);
+            // ✅ Immer Express/master (kein LocalDB hardcode)
+            await using var conn = new SqlConnection(ConnectionStrings.Master);
             await conn.OpenAsync();
 
             // Existenz der DB prüfen
             await using (var chk = conn.CreateCommand())
             {
                 chk.CommandText = "SELECT DB_ID(@n)";
-                chk.Parameters.AddWithValue("@n", dbName.Trim());
+                chk.Parameters.AddWithValue("@n", dbName);
                 var id = await chk.ExecuteScalarAsync();
                 if (id == null || id == DBNull.Value)
                     throw new InvalidOperationException($"Die Datenbank '{dbName}' wurde nicht gefunden.");
@@ -57,6 +59,7 @@ EXEC (@sql);";
                 cmd.CommandText = BuildBackupSql(useCompression);
                 cmd.Parameters.AddWithValue("@dbname", dbName);
                 cmd.Parameters.AddWithValue("@path", backupFilePath);
+                cmd.CommandTimeout = 600;
                 await cmd.ExecuteNonQueryAsync();
             }
             catch
@@ -66,6 +69,7 @@ EXEC (@sql);";
                 cmd2.CommandText = BuildBackupSql(false);
                 cmd2.Parameters.AddWithValue("@dbname", dbName);
                 cmd2.Parameters.AddWithValue("@path", backupFilePath);
+                cmd2.CommandTimeout = 600;
                 await cmd2.ExecuteNonQueryAsync();
             }
         }

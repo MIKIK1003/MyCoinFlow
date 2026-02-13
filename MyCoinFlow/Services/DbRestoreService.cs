@@ -7,138 +7,155 @@ using Microsoft.Data.SqlClient;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Stellt die AKTIVE Datenbank (ConnectionStrings.ActiveDatabaseName) aus einer .bak-Datei wieder her.
-    /// Vorgehen:
-    /// - aktive DB -> SINGLE_USER WITH ROLLBACK IMMEDIATE
-    /// - RESTORE DATABASE ... WITH REPLACE, MOVE <logical> TO <aktuelle physische Pfade>, RECOVERY
-    /// - MULTI_USER
-    /// - ClearAllPools (neue Verbindungen gegen frische Dateien)
+    /// Restore eines .bak in die aktive DB (überschreibt).
+    /// Nutzt ConnectionStrings.Master (.\SQLEXPRESS).
+    /// Robust: SINGLE_USER, REPLACE, MOVE auf SQL Default Data/Log Pfade.
+    /// Ohne QUOTENAME: DB-Name wird in C# sicher gequotet.
     /// </summary>
     public sealed class DbRestoreService
     {
-        private const string MasterCs = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
-
-        public async Task RestoreActiveAsync(string backupFilePath)
+        public async Task RestoreActiveAsync(string bakFilePath)
         {
-            if (string.IsNullOrWhiteSpace(backupFilePath))
-                throw new ArgumentException("Pfad zur .bak-Datei ist erforderlich.", nameof(backupFilePath));
-            if (!File.Exists(backupFilePath))
-                throw new FileNotFoundException("Die .bak-Datei wurde nicht gefunden.", backupFilePath);
+            if (string.IsNullOrWhiteSpace(bakFilePath))
+                throw new ArgumentException("Backup-Datei darf nicht leer sein.", nameof(bakFilePath));
 
-            var dbName = ConnectionStrings.ActiveDatabaseName;
-            if (string.IsNullOrWhiteSpace(dbName))
-                throw new InvalidOperationException("Aktiver DB-Name ist leer.");
+            bakFilePath = bakFilePath.Trim();
 
-            await using var conn = new SqlConnection(MasterCs);
-            await conn.OpenAsync();
+            if (!File.Exists(bakFilePath))
+                throw new FileNotFoundException("Backup-Datei nicht gefunden: " + bakFilePath, bakFilePath);
 
-            // 1) Aktuelle physische Dateien (MDF/LDF) der aktiven DB ermitteln
-            string mdfPath, ldfPath;
-            await using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = @"
-SELECT TOP(1) mf.physical_name
-FROM sys.master_files mf
-JOIN sys.databases d ON d.database_id = mf.database_id
-WHERE d.name = @db AND mf.type = 0; -- ROWS (DATA)
+            var targetDb = ConnectionStrings.ActiveDatabaseName;
+            if (string.IsNullOrWhiteSpace(targetDb))
+                throw new InvalidOperationException("Aktive Datenbank ist nicht gesetzt.");
+
+            var targetDbQuoted = QuoteDbName(targetDb);
+
+            await using var c = new SqlConnection(ConnectionStrings.Master);
+            await c.OpenAsync();
+
+            if (!await DbExistsAsync(c, targetDb))
+                throw new InvalidOperationException($"Datenbank '{targetDb}' wurde nicht gefunden.");
+
+            var (logicalData, logicalLog) = await GetLogicalNamesFromBackupAsync(c, bakFilePath);
+            var (dataDir, logDir) = await GetInstanceDefaultPathsAsync(c);
+
+            var targetMdf = Path.Combine(dataDir, $"{targetDb}.mdf");
+            var targetLdf = Path.Combine(logDir, $"{targetDb}_log.ldf");
+
+            // DISK/MOVE brauchen dynamisches SQL (Dateipfade als String-Literal)
+            // Wir bauen das dynamische SQL in T-SQL, aber ohne QUOTENAME.
+            var sql = @"
+DECLARE @bak nvarchar(4000) = @bakPath;
+
+-- Verbindungen kicken
+EXEC(N'ALTER DATABASE " + targetDbQuoted + @" SET SINGLE_USER WITH ROLLBACK IMMEDIATE');
+
+-- Restore
+DECLARE @sql nvarchar(max) =
+    N'RESTORE DATABASE " + targetDbQuoted + @" FROM DISK = ''' + REPLACE(@bak, '''', '''''') + N''' ' +
+    N' WITH REPLACE, ' +
+    N' MOVE ''' + REPLACE(@logicalData, '''', '''''') + N''' TO ''' + REPLACE(@mdf, '''', '''''') + N''',' +
+    N' MOVE ''' + REPLACE(@logicalLog,  '''', '''''') + N''' TO ''' + REPLACE(@ldf, '''', '''''') + N''';';
+
+EXEC(@sql);
+
+-- Zurück auf MULTI_USER
+EXEC(N'ALTER DATABASE " + targetDbQuoted + @" SET MULTI_USER');
 ";
-                cmd.Parameters.AddWithValue("@db", dbName);
-                var data = await cmd.ExecuteScalarAsync();
-                if (data == null || data == DBNull.Value)
-                    throw new InvalidOperationException($"Daten-Datei der Datenbank '{dbName}' wurde nicht gefunden.");
-                mdfPath = Convert.ToString(data)!;
-            }
-            await using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = @"
-SELECT TOP(1) mf.physical_name
-FROM sys.master_files mf
-JOIN sys.databases d ON d.database_id = mf.database_id
-WHERE d.name = @db AND mf.type = 1; -- LOG
-";
-                cmd.Parameters.AddWithValue("@db", dbName);
-                var log = await cmd.ExecuteScalarAsync();
-                if (log == null || log == DBNull.Value)
-                    throw new InvalidOperationException($"Log-Datei der Datenbank '{dbName}' wurde nicht gefunden.");
-                ldfPath = Convert.ToString(log)!;
-            }
 
-            // 2) Logical Names aus dem Backup ermitteln
-            string logicalDataName, logicalLogName;
-            await using (var fl = conn.CreateCommand())
+            await using var cmd = c.CreateCommand();
+            cmd.CommandType = CommandType.Text;
+            cmd.CommandText = sql;
+            cmd.CommandTimeout = 900;
+
+            cmd.Parameters.AddWithValue("@bakPath", bakFilePath);
+            cmd.Parameters.AddWithValue("@logicalData", logicalData);
+            cmd.Parameters.AddWithValue("@logicalLog", logicalLog);
+            cmd.Parameters.AddWithValue("@mdf", targetMdf);
+            cmd.Parameters.AddWithValue("@ldf", targetLdf);
+
+            try
             {
-                fl.CommandText = "RESTORE FILELISTONLY FROM DISK = @p";
-                fl.Parameters.AddWithValue("@p", backupFilePath);
-                await using var r = await fl.ExecuteReaderAsync();
-                string? dataName = null, logName = null;
-                while (await r.ReadAsync())
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch
+            {
+                // best effort: DB wieder MULTI_USER
+                try
                 {
-                    var type = r["Type"]?.ToString();
-                    var lname = r["LogicalName"]?.ToString();
-                    if (string.Equals(type, "D", StringComparison.OrdinalIgnoreCase))
-                        dataName = lname;
-                    else if (string.Equals(type, "L", StringComparison.OrdinalIgnoreCase))
-                        logName = lname;
+                    await using var fix = c.CreateCommand();
+                    fix.CommandText = "ALTER DATABASE " + targetDbQuoted + " SET MULTI_USER;";
+                    await fix.ExecuteNonQueryAsync();
                 }
-                if (string.IsNullOrEmpty(dataName) || string.IsNullOrEmpty(logName))
-                    throw new InvalidOperationException("Logical File Names konnten nicht aus dem Backup gelesen werden.");
-                logicalDataName = dataName!;
-                logicalLogName = logName!;
-            }
+                catch { /* ignore */ }
 
-            // 3) SINGLE_USER → RESTORE … WITH REPLACE → MULTI_USER
-            await using (var single = conn.CreateCommand())
+                throw;
+            }
+        }
+
+        private static async Task<bool> DbExistsAsync(SqlConnection masterConn, string dbName)
+        {
+            await using var cmd = masterConn.CreateCommand();
+            cmd.CommandText = "SELECT DB_ID(@n)";
+            cmd.Parameters.AddWithValue("@n", dbName);
+
+            var id = await cmd.ExecuteScalarAsync();
+            return id != null && id != DBNull.Value;
+        }
+
+        private static async Task<(string logicalData, string logicalLog)> GetLogicalNamesFromBackupAsync(SqlConnection masterConn, string bakPath)
+        {
+            await using var cmd = masterConn.CreateCommand();
+            cmd.CommandText = "RESTORE FILELISTONLY FROM DISK = @bak;";
+            cmd.Parameters.AddWithValue("@bak", bakPath);
+
+            await using var r = await cmd.ExecuteReaderAsync();
+
+            string? data = null;
+            string? log = null;
+
+            while (await r.ReadAsync())
             {
-                single.CommandText = @"
-DECLARE @db sysname = @dbname;
-DECLARE @sql nvarchar(max) =
-    N'ALTER DATABASE ' + QUOTENAME(@db) + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE';
-EXEC (@sql);";
-                single.Parameters.AddWithValue("@dbname", dbName);
-                await single.ExecuteNonQueryAsync();
+                var type = (r["Type"] as string) ?? "";
+                var logical = (r["LogicalName"] as string) ?? "";
+
+                if (type.Equals("D", StringComparison.OrdinalIgnoreCase))
+                    data ??= logical;
+                else if (type.Equals("L", StringComparison.OrdinalIgnoreCase))
+                    log ??= logical;
             }
 
-            await using (var restore = conn.CreateCommand())
-            {
-                restore.CommandText = @"
-DECLARE @db   sysname        = @dbname;
-DECLARE @bak  nvarchar(4000) = @path;
-DECLARE @ld   sysname        = @logicalData;
-DECLARE @ll   sysname        = @logicalLog;
-DECLARE @mdf  nvarchar(4000) = @mdfPath;
-DECLARE @ldf  nvarchar(4000) = @ldfPath;
+            if (string.IsNullOrWhiteSpace(data) || string.IsNullOrWhiteSpace(log))
+                throw new InvalidOperationException("Konnte logische Dateinamen aus Backup nicht lesen.");
 
-DECLARE @sql nvarchar(max) =
-N'RESTORE DATABASE ' + QUOTENAME(@db) + N'
- FROM DISK = ''' + REPLACE(@bak, '''', '''''') + N'''
- WITH REPLACE,
-      MOVE ''' + REPLACE(@ld, '''', '''''') + N''' TO ''' + REPLACE(@mdf, '''', '''''') + N''',
-      MOVE ''' + REPLACE(@ll, '''', '''''') + N''' TO ''' + REPLACE(@ldf, '''', '''''') + N''',
-      RECOVERY';
+            return (data!, log!);
+        }
 
-EXEC (@sql);";
-                restore.Parameters.AddWithValue("@dbname", dbName);
-                restore.Parameters.AddWithValue("@path", backupFilePath);
-                restore.Parameters.AddWithValue("@logicalData", logicalDataName);
-                restore.Parameters.AddWithValue("@logicalLog", logicalLogName);
-                restore.Parameters.AddWithValue("@mdfPath", mdfPath);
-                restore.Parameters.AddWithValue("@ldfPath", ldfPath);
-                await restore.ExecuteNonQueryAsync();
-            }
+        private static async Task<(string dataDir, string logDir)> GetInstanceDefaultPathsAsync(SqlConnection masterConn)
+        {
+            await using var cmd = masterConn.CreateCommand();
+            cmd.CommandText = @"
+SELECT
+  CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000)) AS DataPath,
+  CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(4000)) AS LogPath;
+";
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+                throw new InvalidOperationException("Konnte SQL Default-Pfade nicht ermitteln.");
 
-            await using (var multi = conn.CreateCommand())
-            {
-                multi.CommandText = @"
-DECLARE @db sysname = @dbname;
-DECLARE @sql nvarchar(max) =
-    N'ALTER DATABASE ' + QUOTENAME(@db) + N' SET MULTI_USER';
-EXEC (@sql);";
-                multi.Parameters.AddWithValue("@dbname", dbName);
-                await multi.ExecuteNonQueryAsync();
-            }
+            var data = (r["DataPath"] as string) ?? "";
+            var log = (r["LogPath"] as string) ?? "";
 
-            // 4) Pools leeren – neue Verbindungen sehen sofort den wiederhergestellten Stand
-            try { SqlConnection.ClearAllPools(); } catch { /* ok */ }
+            if (string.IsNullOrWhiteSpace(data) || string.IsNullOrWhiteSpace(log))
+                throw new InvalidOperationException("SQL Default-Pfade sind leer. Restore nicht möglich.");
+
+            return (data.Trim(), log.Trim());
+        }
+
+        private static string QuoteDbName(string name)
+        {
+            // SQL Identifier quoting: ] becomes ]]
+            return "[" + name.Replace("]", "]]") + "]";
         }
     }
 }

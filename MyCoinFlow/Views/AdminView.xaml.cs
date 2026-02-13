@@ -10,7 +10,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using MyCoinFlow.Models;          // <— für ImportSchema
+using MyCoinFlow.Models;          // für ImportSchema
+using System.Windows.Input;
 
 
 namespace MyCoinFlow.Views
@@ -18,13 +19,12 @@ namespace MyCoinFlow.Views
     public partial class AdminView : UserControl
     {
         private readonly DbCopyService _copy = new();
-        private readonly DbProvisioner _prov = new();
         private readonly DbBackupService _backup = new();
         private readonly DbRestoreService _restore = new();
         private readonly DatabaseService _dbSvc = new();   // für ImportSchema-Operationen
 
-
-        private const string MasterCs = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
+        // NEU: Mandanten-Service (arbeitet über ConnectionStrings.Master -> .\SQLEXPRESS)
+        private readonly MandantService _mandants = new();
 
         public AdminView()
         {
@@ -76,7 +76,6 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private FrameworkElement? TryCreateView(string fullTypeName)
         {
             try
@@ -120,13 +119,12 @@ namespace MyCoinFlow.Views
             EnsureCreditCardMappingInline();
             AttachNumberRangesView();
             EnsureUpdatesHost();
-            EnsurePathsHost(); // << NEU
+            EnsurePathsHost();
 
             await LoadCreditCardSchemasAsync();
             await LoadCopyCombosAsync();
             SetBackupDefaultPath();
         }
-
 
         private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -134,6 +132,10 @@ namespace MyCoinFlow.Views
             ShowSection(tag);
             if (string.Equals(tag, "Backup", StringComparison.OrdinalIgnoreCase))
                 SetBackupDefaultPath();
+
+            // DB-Combos aktualisieren, wenn man zu Mandanten wechselt
+            if (string.Equals(tag, "Mandanten", StringComparison.OrdinalIgnoreCase))
+                _ = LoadCopyCombosAsync();
         }
 
         private void ShowSection(string key)
@@ -164,14 +166,11 @@ namespace MyCoinFlow.Views
             if (isPfade) EnsurePathsHost();
         }
 
-
-
         // ===== Nummernkreise-Host =====
         private void AttachNumberRangesView()
         {
             try
             {
-                // Falls die View im Projekt ist, binden; sonst Host leer lassen (kein Compile-Fehler)
                 SetHostIfEmpty("NumberRangesHost", () => TryCreateView("MyCoinFlow.Views.AdminNumberRangesView"));
             }
             catch { /* still */ }
@@ -187,7 +186,6 @@ namespace MyCoinFlow.Views
 
         private void ImportExcel_Click(object sender, RoutedEventArgs e)
         {
-            // Öffnet vorhandenen Dialog per Reflection – mit robustem Owner-Handling
             try
             {
                 var t = Type.GetType("MyCoinFlow.Views.KontenplanImportDialog", throwOnError: false);
@@ -197,7 +195,6 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // Owner ermitteln: aktives Fenster > MainWindow; niemals auf sich selbst
                 Window? ResolveOwner(Window? dialogToOpen)
                 {
                     try
@@ -208,9 +205,8 @@ namespace MyCoinFlow.Views
                         if (owner != null && dialogToOpen != null && !ReferenceEquals(owner, dialogToOpen))
                             return owner;
                     }
-                    catch { /* ignore */ }
-
-                    return null; // -> CenterScreen verwenden
+                    catch { }
+                    return null;
                 }
 
                 if (typeof(Window).IsAssignableFrom(t))
@@ -232,7 +228,6 @@ namespace MyCoinFlow.Views
                 }
                 else
                 {
-                    // Falls als UserControl implementiert: in Host-Fenster zeigen
                     if (Activator.CreateInstance(t) is FrameworkElement fe)
                     {
                         var host = new Window
@@ -263,7 +258,6 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private void ExportExcel_Click(object sender, RoutedEventArgs e)
         {
             var sfd = new SaveFileDialog
@@ -278,7 +272,6 @@ namespace MyCoinFlow.Views
             {
                 try
                 {
-                    // Exporter optional per Reflection nutzen
                     var t = Type.GetType("MyCoinFlow.Importing.KontenplanExcelExporter", throwOnError: false);
                     if (t == null)
                     {
@@ -299,7 +292,6 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private async void CC_SchemaRefresh_Click(object sender, RoutedEventArgs e)
         {
             await LoadCreditCardSchemasAsync();
@@ -316,24 +308,19 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // Sicherheitsnetz: Master-Schema nie löschen
                 if (sel.IsMaster)
                 {
                     MessageBox.Show("Das Master-Schema kann nicht gelöscht werden.", "Löschen", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                var ask = MessageBox.Show(
-                    $"Schema „{sel.Name}“ wirklich löschen?",
-                    "Löschen bestätigen",
+                var ask = MessageBox.Show($"Schema „{sel.Name}“ wirklich löschen?", "Löschen bestätigen",
                     MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (ask != MessageBoxResult.Yes) return;
 
-                // Löschen – FieldMappings werden dank FK CASCADE automatisch entfernt (siehe DatabaseService)
-                _dbSvc.ImportSchemaDelete(sel.Id);  // erledigt das sauber in der DB. :contentReference[oaicite:0]{index=0}
+                _dbSvc.ImportSchemaDelete(sel.Id);
 
-                // UI refresh
                 await LoadCreditCardSchemasAsync();
                 MessageBox.Show("Schema wurde gelöscht.", "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -347,17 +334,12 @@ namespace MyCoinFlow.Views
         {
             try
             {
-                // Host sicher finden (Name oder case-insensitive)
                 var host = El<ContentControl>("CreditCardImportMappingHost")
                            ?? FindByNameCaseInsensitive<ContentControl>(this, "CreditCardImportMappingHost");
                 if (host == null) return;
 
-                // Immer frisch befüllen (falls alte View hing, räumen wir auf)
                 host.Content = null;
-                host.Content = new CreditCardImportMappingView(); // neue schlanke View
-
-                // Tipp: falls du den alten Löschen-Button irgendwo noch hast, hier wegblenden:
-                // (nicht nötig, weil wir nur noch die neue View laden)
+                host.Content = new CreditCardImportMappingView();
             }
             catch (Exception ex)
             {
@@ -366,12 +348,11 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private void OpenCreditCardMapping_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var view = new CreditCardImportMappingView(); // DataContext wird in der View gesetzt
+                var view = new CreditCardImportMappingView();
 
                 var host = new Window
                 {
@@ -390,38 +371,31 @@ namespace MyCoinFlow.Views
             }
         }
 
-        // ===== NEU: Updates-Host =====
+        // ===== Updates-Host =====
         private void EnsureUpdatesHost()
         {
             try
             {
-                SetHostIfEmpty("UpdatesHost", () =>
-                {
-                    // direkte Instanzierung (kein <local:...> im XAML)
-                    return new MyCoinFlow.Views.Admin.AdminUpdatesControl();
-                });
+                SetHostIfEmpty("UpdatesHost", () => new MyCoinFlow.Views.Admin.AdminUpdatesControl());
             }
-            catch
-            {
-                // still – Tab bleibt leer, falls Control (noch) nicht vorhanden
-            }
+            catch { }
         }
 
-        // ===== Mandanten: neue leere DB =====
+        // ===== Mandanten: neue leere DB (NEU: Template .bak, kein LocalDB, keine Quelle-DB) =====
         private async void CreateEmptyTenant_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 SetText("TenantCreateStatus", "");
                 var name = El<TextBox>("NewTenantNameBox")?.Text?.Trim() ?? "";
+
                 if (string.IsNullOrWhiteSpace(name) || name.Length < 3)
                 {
                     SetText("TenantCreateStatus", "Bitte gültigen DB-Namen eingeben (≥ 3 Zeichen).");
                     return;
                 }
 
-                await _prov.CreateDatabaseAsync(name, null);
-                await _prov.CloneSchemaFromTemplateAsync("MyCoinFlowDB", name);
+                await _mandants.CreateEmptyFromTemplateAsync(name);
 
                 SetText("TenantCreateStatus", $"Mandant '{name}' erstellt.");
                 await LoadCopyCombosAsync();
@@ -432,18 +406,20 @@ namespace MyCoinFlow.Views
             }
         }
 
-        // ===== DB-Kopie =====
-        private async Task<List<string>> ListAllLocalUserDatabasesAsync()
+        // ===== DB-Kopie: DB-Listen (NEU: aus ConnectionStrings.Master => SQLEXPRESS) =====
+        private async Task<List<string>> ListAllUserDatabasesAsync()
         {
             var result = new List<string>();
-            await using var conn = new SqlConnection(MasterCs);
+
+            await using var conn = new SqlConnection(ConnectionStrings.Master);
             await conn.OpenAsync();
 
             const string sql = @"
 SELECT name
 FROM sys.databases
-WHERE name NOT IN ('master','tempdb','model','msdb')
+WHERE database_id > 4
 ORDER BY name;";
+
             await using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = sql;
@@ -452,7 +428,6 @@ ORDER BY name;";
                     result.Add(r.GetString(0));
             }
 
-            // MyCoinFlow-* zuerst
             return result.OrderBy(n => n.StartsWith("MyCoinFlow", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                          .ThenBy(n => n, StringComparer.OrdinalIgnoreCase)
                          .ToList();
@@ -462,7 +437,7 @@ ORDER BY name;";
         {
             try
             {
-                var list = await ListAllLocalUserDatabasesAsync();
+                var list = await ListAllUserDatabasesAsync();
                 var src = El<ComboBox>("Copy_SourceDbCombo");
                 var dst = El<ComboBox>("Copy_TargetDbCombo");
                 if (src != null) src.ItemsSource = list.ToList();
@@ -523,7 +498,7 @@ ORDER BY name;";
         {
             try
             {
-                var dbName = ConnectionStrings.ActiveDatabaseName; // vorhandene Projektklasse
+                var dbName = ConnectionStrings.ActiveDatabaseName;
                 var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MyCoinFlow", "Backups");
                 Directory.CreateDirectory(dir);
                 var file = $"{dbName}_{DateTime.Now:yyyyMMdd_HHmm}.bak";
@@ -532,7 +507,7 @@ ORDER BY name;";
                     box.Text = Path.Combine(dir, file);
                 SetText("Backup_ActiveDbText", $"Aktive DB: {dbName}");
             }
-            catch { /* falls ConnectionStrings nicht existiert, einfach still lassen */ }
+            catch { }
         }
 
         private void Backup_Browse_Click(object sender, RoutedEventArgs e)
@@ -587,9 +562,12 @@ ORDER BY name;";
 
         private async void Restore_Run_Click(object sender, RoutedEventArgs e)
         {
+            var btn = sender as Button;
+
             try
             {
                 SetText("Restore_StatusText", "");
+
                 var bak = El<TextBox>("Restore_FileBox")?.Text?.Trim() ?? "";
                 if (string.IsNullOrWhiteSpace(bak))
                 {
@@ -597,7 +575,18 @@ ORDER BY name;";
                     return;
                 }
 
+                // Visuelles Feedback
+                if (btn != null) btn.IsEnabled = false;
+                Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+
+                SetText("Restore_StatusText",
+                    $"Restore läuft… Ziel: '{ConnectionStrings.ActiveDatabaseName}'. Bitte warten (kann mehrere Minuten dauern).");
+
+                // Restore ausführen
                 await _restore.RestoreActiveAsync(bak);
+
+                SetText("Restore_StatusText",
+                    $"Restore erfolgreich. Aktive DB '{ConnectionStrings.ActiveDatabaseName}' wurde überschrieben.");
 
                 MessageBox.Show(Window.GetWindow(this) ?? Application.Current.MainWindow,
                     $"Backup wurde in die aktive DB '{ConnectionStrings.ActiveDatabaseName}' zurückgespielt.",
@@ -607,22 +596,21 @@ ORDER BY name;";
             {
                 SetText("Restore_StatusText", "Restore-Fehler: " + ex.Message);
             }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+                if (btn != null) btn.IsEnabled = true;
+            }
         }
+
+
         private void EnsurePathsHost()
         {
             try
             {
-                SetHostIfEmpty("PathsHost", () =>
-                {
-                    // direkte Instanzierung (kein <local:...> im XAML)
-                    return new MyCoinFlow.Views.AdminPathsView();
-                });
+                SetHostIfEmpty("PathsHost", () => new MyCoinFlow.Views.AdminPathsView());
             }
-            catch
-            {
-                // still – Tab bleibt leer, falls Control (noch) nicht vorhanden
-            }
+            catch { }
         }
-
     }
 }
