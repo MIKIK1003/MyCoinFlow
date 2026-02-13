@@ -10,9 +10,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using MyCoinFlow.Models;          // für ImportSchema
 using System.Windows.Input;
-
+using MyCoinFlow.Models;
 
 namespace MyCoinFlow.Views
 {
@@ -21,10 +20,10 @@ namespace MyCoinFlow.Views
         private readonly DbCopyService _copy = new();
         private readonly DbBackupService _backup = new();
         private readonly DbRestoreService _restore = new();
-        private readonly DatabaseService _dbSvc = new();   // für ImportSchema-Operationen
+        private readonly DatabaseService _dbSvc = new();
 
-        // NEU: Mandanten-Service (arbeitet über ConnectionStrings.Master -> .\SQLEXPRESS)
         private readonly MandantService _mandants = new();
+        private readonly AuthService _auth = new();
 
         public AdminView()
         {
@@ -51,31 +50,6 @@ namespace MyCoinFlow.Views
             return null;
         }
 
-        private async Task LoadCreditCardSchemasAsync()
-        {
-            try
-            {
-                // alle Schemas, Master ausblenden (nur benutzerdefinierte sind löschbar)
-                var all = _dbSvc.ImportSchemasGetAll();  // liefert Id, Name, IsMaster
-                var list = all.Where(s => !s.IsMaster)
-                              .OrderBy(s => s.Name)
-                              .ToList();
-
-                var cb = El<ComboBox>("CC_SchemaCombo");
-                if (cb != null)
-                {
-                    cb.ItemsSource = list;
-                    if (cb.Items.Count > 0 && cb.SelectedItem == null)
-                        cb.SelectedIndex = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Schemas konnten nicht geladen werden:\n" + ex.Message,
-                                "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         private FrameworkElement? TryCreateView(string fullTypeName)
         {
             try
@@ -100,7 +74,7 @@ namespace MyCoinFlow.Views
         // ===== Loaded / Navigation =====
         private async void AdminView_Loaded(object sender, RoutedEventArgs e)
         {
-            try { new DatabaseService().EnsureNumberRangeRulesTable(); } catch { /* still */ }
+            try { new DatabaseService().EnsureNumberRangeRulesTable(); } catch { }
 
             var nav = El<ListBox>("NavList");
             if (nav != null)
@@ -114,7 +88,6 @@ namespace MyCoinFlow.Views
             }
             ShowSection("Kontenplan");
 
-            // Hosts füllen (ohne <local:...> im XAML)
             EnsureKontenHosts();
             EnsureCreditCardMappingInline();
             AttachNumberRangesView();
@@ -124,18 +97,20 @@ namespace MyCoinFlow.Views
             await LoadCreditCardSchemasAsync();
             await LoadCopyCombosAsync();
             SetBackupDefaultPath();
+
+            await LoadUsersAsync();
         }
 
         private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var tag = ((El<ListBox>("NavList")?.SelectedItem as ListBoxItem)?.Tag as string) ?? "Kontenplan";
             ShowSection(tag);
+
             if (string.Equals(tag, "Backup", StringComparison.OrdinalIgnoreCase))
                 SetBackupDefaultPath();
 
-            // DB-Combos aktualisieren, wenn man zu Mandanten wechselt
             if (string.Equals(tag, "Mandanten", StringComparison.OrdinalIgnoreCase))
-                _ = LoadCopyCombosAsync();
+                _ = LoadUsersAsync();
         }
 
         private void ShowSection(string key)
@@ -169,11 +144,8 @@ namespace MyCoinFlow.Views
         // ===== Nummernkreise-Host =====
         private void AttachNumberRangesView()
         {
-            try
-            {
-                SetHostIfEmpty("NumberRangesHost", () => TryCreateView("MyCoinFlow.Views.AdminNumberRangesView"));
-            }
-            catch { /* still */ }
+            try { SetHostIfEmpty("NumberRangesHost", () => TryCreateView("MyCoinFlow.Views.AdminNumberRangesView")); }
+            catch { }
         }
 
         // ===== Kontenplan: Hosts / Import / Export =====
@@ -201,7 +173,6 @@ namespace MyCoinFlow.Views
                     {
                         var active = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
                         var owner = active ?? Application.Current?.MainWindow;
-
                         if (owner != null && dialogToOpen != null && !ReferenceEquals(owner, dialogToOpen))
                             return owner;
                     }
@@ -219,10 +190,8 @@ namespace MyCoinFlow.Views
                     }
 
                     var owner = ResolveOwner(dlg);
-                    if (owner != null)
-                        dlg.Owner = owner;
-                    else
-                        dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    if (owner != null) dlg.Owner = owner;
+                    else dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
                     dlg.ShowDialog();
                 }
@@ -239,10 +208,8 @@ namespace MyCoinFlow.Views
                         };
 
                         var owner = ResolveOwner(host);
-                        if (owner != null)
-                            host.Owner = owner;
-                        else
-                            host.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                        if (owner != null) host.Owner = owner;
+                        else host.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
                         host.ShowDialog();
                     }
@@ -292,41 +259,27 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private async void CC_SchemaRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            await LoadCreditCardSchemasAsync();
-        }
-
-        private async void CC_SchemaDelete_Click(object sender, RoutedEventArgs e)
+        private async Task LoadCreditCardSchemasAsync()
         {
             try
             {
+                var all = _dbSvc.ImportSchemasGetAll();
+                var list = all.Where(s => !s.IsMaster)
+                              .OrderBy(s => s.Name)
+                              .ToList();
+
                 var cb = El<ComboBox>("CC_SchemaCombo");
-                if (cb?.SelectedItem is not ImportSchema sel)
+                if (cb != null)
                 {
-                    MessageBox.Show("Bitte zuerst ein Schema wählen.", "Löschen", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
+                    cb.ItemsSource = list;
+                    if (cb.Items.Count > 0 && cb.SelectedItem == null)
+                        cb.SelectedIndex = 0;
                 }
-
-                if (sel.IsMaster)
-                {
-                    MessageBox.Show("Das Master-Schema kann nicht gelöscht werden.", "Löschen", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                var ask = MessageBox.Show($"Schema „{sel.Name}“ wirklich löschen?", "Löschen bestätigen",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (ask != MessageBoxResult.Yes) return;
-
-                _dbSvc.ImportSchemaDelete(sel.Id);
-
-                await LoadCreditCardSchemasAsync();
-                MessageBox.Show("Schema wurde gelöscht.", "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Löschen fehlgeschlagen:\n" + ex.Message, "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Schemas konnten nicht geladen werden:\n" + ex.Message,
+                                "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -348,47 +301,25 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void OpenCreditCardMapping_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var view = new CreditCardImportMappingView();
-
-                var host = new Window
-                {
-                    Title = "Kreditkarten-Mapping",
-                    Content = view,
-                    SizeToContent = SizeToContent.WidthAndHeight,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Owner = Application.Current.MainWindow
-                };
-                host.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Mapping konnte nicht geöffnet werden:\n" + ex.Message,
-                                "Kreditkarten", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        // ===== Updates-Host =====
         private void EnsureUpdatesHost()
         {
-            try
-            {
-                SetHostIfEmpty("UpdatesHost", () => new MyCoinFlow.Views.Admin.AdminUpdatesControl());
-            }
+            try { SetHostIfEmpty("UpdatesHost", () => new MyCoinFlow.Views.Admin.AdminUpdatesControl()); }
             catch { }
         }
 
-        // ===== Mandanten: neue leere DB (NEU: Template .bak, kein LocalDB, keine Quelle-DB) =====
+        private void EnsurePathsHost()
+        {
+            try { SetHostIfEmpty("PathsHost", () => new MyCoinFlow.Views.AdminPathsView()); }
+            catch { }
+        }
+
+        // ===== Mandanten: neue leere DB =====
         private async void CreateEmptyTenant_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 SetText("TenantCreateStatus", "");
                 var name = El<TextBox>("NewTenantNameBox")?.Text?.Trim() ?? "";
-
                 if (string.IsNullOrWhiteSpace(name) || name.Length < 3)
                 {
                     SetText("TenantCreateStatus", "Bitte gültigen DB-Namen eingeben (≥ 3 Zeichen).");
@@ -399,6 +330,7 @@ namespace MyCoinFlow.Views
 
                 SetText("TenantCreateStatus", $"Mandant '{name}' erstellt.");
                 await LoadCopyCombosAsync();
+                await LoadUsersAsync();
             }
             catch (Exception ex)
             {
@@ -406,7 +338,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        // ===== DB-Kopie: DB-Listen (NEU: aus ConnectionStrings.Master => SQLEXPRESS) =====
+        // ===== DB-Kopie =====
         private async Task<List<string>> ListAllUserDatabasesAsync()
         {
             var result = new List<string>();
@@ -536,14 +468,25 @@ ORDER BY name;";
                     return;
                 }
 
+                var btn = sender as Button;
+                if (btn != null) btn.IsEnabled = false;
+                Mouse.OverrideCursor = Cursors.Wait;
+                SetText("Backup_StatusText", $"Backup läuft… DB '{db}'. Bitte warten.");
+
                 await _backup.BackupAsync(db, path, useCompression: true);
 
+                SetText("Backup_StatusText", $"Backup erstellt: {path}");
                 MessageBox.Show(Window.GetWindow(this) ?? Application.Current.MainWindow,
                     $"Backup erstellt:\n{path}", "Backup", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 SetText("Backup_StatusText", "Backup-Fehler: " + ex.Message);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+                if (sender is Button b) b.IsEnabled = true;
             }
         }
 
@@ -567,7 +510,6 @@ ORDER BY name;";
             try
             {
                 SetText("Restore_StatusText", "");
-
                 var bak = El<TextBox>("Restore_FileBox")?.Text?.Trim() ?? "";
                 if (string.IsNullOrWhiteSpace(bak))
                 {
@@ -575,14 +517,12 @@ ORDER BY name;";
                     return;
                 }
 
-                // Visuelles Feedback
                 if (btn != null) btn.IsEnabled = false;
-                Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+                Mouse.OverrideCursor = Cursors.Wait;
 
                 SetText("Restore_StatusText",
                     $"Restore läuft… Ziel: '{ConnectionStrings.ActiveDatabaseName}'. Bitte warten (kann mehrere Minuten dauern).");
 
-                // Restore ausführen
                 await _restore.RestoreActiveAsync(bak);
 
                 SetText("Restore_StatusText",
@@ -603,14 +543,230 @@ ORDER BY name;";
             }
         }
 
+        // ===== Benutzerverwaltung (aktive DB) =====
 
-        private void EnsurePathsHost()
+        private async Task LoadUsersAsync()
         {
             try
             {
-                SetHostIfEmpty("PathsHost", () => new MyCoinFlow.Views.AdminPathsView());
+                Users_ActiveDbText.Text = $"Aktive DB: {ConnectionStrings.ActiveDatabaseName}";
+                Users_StatusText.Text = "";
+
+                await _auth.EnsureSchemaAsync();
+                var users = await _auth.GetUsersAsync();
+
+                UsersGrid.ItemsSource = users;
+
+                Users_StatusText.Text = users.Count == 0
+                    ? "Noch keine Benutzer vorhanden. (Erster Benutzer wird beim Login angelegt.)"
+                    : $"{users.Count} Benutzer geladen.";
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Users_StatusText.Text = "Fehler beim Laden der Benutzer: " + ex.Message;
+            }
+        }
+
+        private async void Users_Refresh_Click(object sender, RoutedEventArgs e)
+            => await LoadUsersAsync();
+
+        private async void Users_Add_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Users_StatusText.Text = "";
+
+                var dlg = CreateAddUserDialog(out var tbUser, out var tbEmail, out var pw1, out var pw2, out var cbAdmin);
+                var res = dlg.ShowDialog();
+                if (res != true) return;
+
+                var username = (tbUser.Text ?? "").Trim();
+                var email = string.IsNullOrWhiteSpace(tbEmail.Text) ? null : tbEmail.Text.Trim();
+                var p1 = pw1.Password ?? "";
+                var p2 = pw2.Password ?? "";
+                var isAdmin = cbAdmin.IsChecked == true;
+
+                if (p1 != p2)
+                {
+                    Users_StatusText.Text = "Die Passwörter stimmen nicht überein.";
+                    return;
+                }
+
+                await _auth.CreateUserAsync(username, p1, email, isAdmin);
+                Users_StatusText.Text = $"Benutzer '{username}' wurde angelegt.";
+                await LoadUsersAsync();
+            }
+            catch (Exception ex)
+            {
+                Users_StatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
+
+        private async void Users_ResetPassword_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Users_StatusText.Text = "";
+
+                if (UsersGrid.SelectedItem is not AuthService.UserRow u)
+                {
+                    Users_StatusText.Text = "Bitte zuerst einen Benutzer auswählen.";
+                    return;
+                }
+
+                var dlg = CreateResetPasswordDialog(u.Username, out var pw1, out var pw2);
+                var res = dlg.ShowDialog();
+                if (res != true) return;
+
+                var p1 = pw1.Password ?? "";
+                var p2 = pw2.Password ?? "";
+                if (p1 != p2)
+                {
+                    Users_StatusText.Text = "Die Passwörter stimmen nicht überein.";
+                    return;
+                }
+
+                await _auth.ResetPasswordAsync(u.Id, p1);
+                Users_StatusText.Text = $"Passwort für '{u.Username}' wurde zurückgesetzt.";
+            }
+            catch (Exception ex)
+            {
+                Users_StatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
+
+        private async void Users_ToggleActive_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Users_StatusText.Text = "";
+
+                if (UsersGrid.SelectedItem is not AuthService.UserRow u)
+                {
+                    Users_StatusText.Text = "Bitte zuerst einen Benutzer auswählen.";
+                    return;
+                }
+
+                var newActive = !u.IsActive;
+                await _auth.SetUserActiveAsync(u.Id, newActive);
+
+                Users_StatusText.Text = newActive
+                    ? $"Benutzer '{u.Username}' ist wieder aktiv."
+                    : $"Benutzer '{u.Username}' wurde deaktiviert.";
+
+                await LoadUsersAsync();
+            }
+            catch (Exception ex)
+            {
+                Users_StatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
+
+        private async void Users_ToggleAdmin_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Users_StatusText.Text = "";
+
+                if (UsersGrid.SelectedItem is not AuthService.UserRow u)
+                {
+                    Users_StatusText.Text = "Bitte zuerst einen Benutzer auswählen.";
+                    return;
+                }
+
+                var newAdmin = !u.IsAdmin;
+                await _auth.SetUserAdminAsync(u.Id, newAdmin);
+
+                Users_StatusText.Text = newAdmin
+                    ? $"Benutzer '{u.Username}' ist jetzt Admin."
+                    : $"Benutzer '{u.Username}' ist jetzt Standard-Benutzer.";
+
+                await LoadUsersAsync();
+            }
+            catch (Exception ex)
+            {
+                Users_StatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
+
+
+
+        private static Window CreateAddUserDialog(
+            out TextBox tbUser, out TextBox tbEmail, out PasswordBox pw1, out PasswordBox pw2, out CheckBox cbAdmin)
+        {
+            tbUser = new TextBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+            tbEmail = new TextBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+            pw1 = new PasswordBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+            pw2 = new PasswordBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+            cbAdmin = new CheckBox { Content = "Ist Admin", Margin = new Thickness(0, 0, 0, 8) };
+
+            var ok = new Button { Content = "OK", Width = 90, Margin = new Thickness(0, 0, 8, 0) };
+            var cancel = new Button { Content = "Abbrechen", Width = 90 };
+
+            var grid = new StackPanel { Margin = new Thickness(12) };
+            grid.Children.Add(new TextBlock { Text = "Username" });
+            grid.Children.Add(tbUser);
+            grid.Children.Add(new TextBlock { Text = "Email (optional)" });
+            grid.Children.Add(tbEmail);
+            grid.Children.Add(new TextBlock { Text = "Passwort" });
+            grid.Children.Add(pw1);
+            grid.Children.Add(new TextBlock { Text = "Passwort (wiederholen)" });
+            grid.Children.Add(pw2);
+            grid.Children.Add(cbAdmin);
+
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            buttons.Children.Add(ok);
+            buttons.Children.Add(cancel);
+            grid.Children.Add(buttons);
+
+            var w = new Window
+            {
+                Title = "Neuer Benutzer",
+                Content = grid,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            ok.Click += (_, __) => { w.DialogResult = true; w.Close(); };
+            cancel.Click += (_, __) => { w.DialogResult = false; w.Close(); };
+
+            return w;
+        }
+
+        private static Window CreateResetPasswordDialog(string username, out PasswordBox pw1, out PasswordBox pw2)
+        {
+            pw1 = new PasswordBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+            pw2 = new PasswordBox { MinWidth = 280, Margin = new Thickness(0, 0, 0, 8) };
+
+            var ok = new Button { Content = "OK", Width = 90, Margin = new Thickness(0, 0, 8, 0) };
+            var cancel = new Button { Content = "Abbrechen", Width = 90 };
+
+            var grid = new StackPanel { Margin = new Thickness(12) };
+            grid.Children.Add(new TextBlock { Text = $"Passwort zurücksetzen für: {username}", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
+            grid.Children.Add(new TextBlock { Text = "Neues Passwort" });
+            grid.Children.Add(pw1);
+            grid.Children.Add(new TextBlock { Text = "Neues Passwort (wiederholen)" });
+            grid.Children.Add(pw2);
+
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            buttons.Children.Add(ok);
+            buttons.Children.Add(cancel);
+            grid.Children.Add(buttons);
+
+            var w = new Window
+            {
+                Title = "Passwort zurücksetzen",
+                Content = grid,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            ok.Click += (_, __) => { w.DialogResult = true; w.Close(); };
+            cancel.Click += (_, __) => { w.DialogResult = false; w.Close(); };
+
+            return w;
         }
     }
 }

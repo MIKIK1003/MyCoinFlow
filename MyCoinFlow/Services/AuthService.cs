@@ -1,182 +1,272 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
 namespace MyCoinFlow.Services
 {
-    /// <summary>
-    /// Auth-Service: sorgt für Users-Schema (Username-Login), legt Erstuser an, validiert Login.
-    /// Email bleibt optional (Altbestand).
-    /// </summary>
     public sealed class AuthService
     {
-        private string _cs => ConnectionStrings.Current;
-
+        /// <summary>
+        /// Stellt dbo.Users sicher (inkl. IsAdmin).
+        /// Idempotent: kann beliebig oft aufgerufen werden.
+        /// </summary>
         public async Task EnsureSchemaAsync()
         {
-            await using var c = new SqlConnection(_cs);
+            await using var c = new SqlConnection(ConnectionStrings.Current);
             await c.OpenAsync();
 
-            // Tabelle anlegen
-            await ExecAsync(c, @"
+            var sql = @"
 IF OBJECT_ID(N'dbo.Users', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.Users
     (
         Id           INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
-        Username     NVARCHAR(100)     NULL,   -- wird gleich NOT NULL
-        PasswordHash NVARCHAR(400)     NOT NULL,
-        IsActive     BIT               NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT(1),
-        CreatedAt    DATETIME2(7)      NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT(SYSUTCDATETIME()),
-        Email        NVARCHAR(320)     NULL
+        Username     NVARCHAR(64) NOT NULL CONSTRAINT UQ_Users_Username UNIQUE,
+        PasswordHash NVARCHAR(400) NOT NULL,
+        IsActive     BIT NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT(1),
+        IsAdmin      BIT NOT NULL CONSTRAINT DF_Users_IsAdmin DEFAULT(0),
+        CreatedAt    DATETIME2 NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT(SYSDATETIME()),
+        Email        NVARCHAR(256) NULL
     );
-END");
+END;
 
-            // Username-Spalte, falls fehlt
-            await ExecAsync(c, @"
-IF COL_LENGTH(N'dbo.Users', N'Username') IS NULL
-    ALTER TABLE dbo.Users ADD Username NVARCHAR(100) NULL;");
-
-            // Username füllen, wo leer
-            await ExecAsync(c, @"
-UPDATE u
-   SET Username = CASE
-                      WHEN u.Email IS NULL OR LTRIM(RTRIM(u.Email)) = '' THEN u.Username
-                      WHEN CHARINDEX('@', u.Email) > 0 THEN LEFT(u.Email, CHARINDEX('@', u.Email) - 1)
-                      ELSE u.Email
-                  END
-FROM dbo.Users u
-WHERE (u.Username IS NULL OR LTRIM(RTRIM(u.Username)) = '');");
-
-            // Username NOT NULL
-            await ExecAsync(c, @"
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = N'Username' AND is_nullable = 1)
-    ALTER TABLE dbo.Users ALTER COLUMN Username NVARCHAR(100) NOT NULL;");
-
-            // Unique-Index
-            await ExecAsync(c, @"
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_Users_Username' AND object_id = OBJECT_ID(N'dbo.Users'))
-    CREATE UNIQUE INDEX UX_Users_Username ON dbo.Users(Username);");
-
-            // Email NULL-able (Alt-DB absichern)
-            await ExecAsync(c, @"
-IF COL_LENGTH(N'dbo.Users', N'Email') IS NOT NULL
+-- Spalte IsAdmin nachziehen, falls alte DB
+IF COL_LENGTH('dbo.Users','IsAdmin') IS NULL
 BEGIN
-    DECLARE @isNullable bit;
-    SELECT @isNullable = is_nullable
-      FROM sys.columns
-     WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = N'Email';
-    IF @isNullable = 0
-        ALTER TABLE dbo.Users ALTER COLUMN Email NVARCHAR(320) NULL;
-END");
-        }
-
-        public async Task<bool> HasAnyUserAsync()
-        {
-            await using var c = new SqlConnection(_cs);
-            await c.OpenAsync();
-            await EnsureSchemaAsync();
-
-            await using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.Users) THEN 1 ELSE 0 END;";
-            var x = await cmd.ExecuteScalarAsync();
-            return ToInt32Safe(x) == 1;
-        }
-
-        public async Task CreateFirstUserAsync(string username, string password)
-        {
-            if (!IsValidUsername(username))
-                throw new ArgumentException("Ungültiger Benutzername. Erlaubt: 3–32 Zeichen (A-Z, a-z, 0-9, ., _, -).");
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
-                throw new ArgumentException("Das Passwort muss mindestens 6 Zeichen haben.");
-
-            await using var c = new SqlConnection(_cs);
-            await c.OpenAsync();
-            await EnsureSchemaAsync();
-
-            if (await HasAnyInternalAsync(c))
-                throw new InvalidOperationException("Es existiert bereits ein Benutzer.");
-
-            await using (var cmd = c.CreateCommand())
-            {
-                cmd.CommandText = "SELECT COUNT(1) FROM dbo.Users WHERE LOWER(Username)=LOWER(@u);";
-                cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
-                var cntObj = await cmd.ExecuteScalarAsync();
-                var cnt = ToInt32Safe(cntObj);
-                if (cnt > 0) throw new InvalidOperationException("Dieser Benutzername ist bereits vergeben.");
-            }
-
-            var hash = PasswordHasher.Hash(password);
-
-            await using (var cmd = c.CreateCommand())
-            {
-                cmd.CommandText = "INSERT INTO dbo.Users(Username, PasswordHash, Email) VALUES(@u,@p,@e);";
-                cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
-                cmd.Parameters.Add(new SqlParameter("@p", SqlDbType.NVarChar, 400) { Value = hash });
-                cmd.Parameters.Add(new SqlParameter("@e", SqlDbType.NVarChar, 320) { Value = username.Trim() + "@local" });
-                await cmd.ExecuteNonQueryAsync();
-            }
-        }
-
-        public async Task<bool> ValidateUserAsync(string username, string password)
-        {
-            if (!IsValidUsername(username) || string.IsNullOrWhiteSpace(password))
-                return false;
-
-            await using var c = new SqlConnection(_cs);
-            await c.OpenAsync();
-            await EnsureSchemaAsync();
-
-            await using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT TOP(1) PasswordHash, IsActive FROM dbo.Users WHERE LOWER(Username)=LOWER(@u);";
-            cmd.Parameters.Add(new SqlParameter("@u", SqlDbType.NVarChar, 100) { Value = username.Trim() });
-
-            await using var r = await cmd.ExecuteReaderAsync();
-            if (!await r.ReadAsync()) return false;
-
-            var hash = r.GetString(0);
-            var active = r.GetBoolean(1);
-            if (!active) return false;
-
-            return PasswordHasher.Verify(password, hash);
-        }
-
-        // helpers
-        private static async Task ExecAsync(SqlConnection c, string sql)
-        {
+    ALTER TABLE dbo.Users ADD IsAdmin BIT NOT NULL CONSTRAINT DF_Users_IsAdmin2 DEFAULT(0);
+END;
+";
             await using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
             await cmd.ExecuteNonQueryAsync();
         }
 
-        private static async Task<bool> HasAnyInternalAsync(SqlConnection c)
+        public async Task<bool> HasAnyUserAsync()
         {
+            await EnsureSchemaAsync();
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
             await using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.Users) THEN 1 ELSE 0 END;";
-            var x = await cmd.ExecuteScalarAsync();
-            return ToInt32Safe(x) == 1;
+            cmd.CommandText = "SELECT TOP 1 1 FROM dbo.Users;";
+            var v = await cmd.ExecuteScalarAsync();
+            return v != null && v != DBNull.Value;
         }
 
-        // Sichere Konvertierung für ExecuteScalar-Ergebnisse (NULL/DBNull -> 0)
-        private static int ToInt32Safe(object? value)
+        public async Task<bool> ValidateUserAsync(string username, string password)
         {
-            if (value is null || value is DBNull) return 0;
-            try
-            {
-                return Convert.ToInt32(value);
-            }
-            catch
-            {
-                // Defensive: im Zweifel lieber 0 als Crash bei fehlerhaftem Scalar-Rückgabewert
-                return 0;
-            }
+            await EnsureSchemaAsync();
+
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
+                return false;
+
+            username = username.Trim();
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT PasswordHash, IsActive
+FROM dbo.Users
+WHERE Username = @u;";
+            cmd.Parameters.AddWithValue("@u", username);
+
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+                return false;
+
+            var hash = r.GetString(0);
+            var isActive = r.GetBoolean(1);
+            if (!isActive) return false;
+
+            return PasswordHasher.Verify(password, hash);
         }
 
-        private static bool IsValidUsername(string username)
-            => !string.IsNullOrWhiteSpace(username) &&
-               username.Length >= 3 && username.Length <= 32 &&
-               Regex.IsMatch(username, @"^[A-Za-z0-9._-]+$");
+        /// <summary>
+        /// Ersten User anlegen: wird immer Admin.
+        /// </summary>
+        public async Task CreateFirstUserAsync(string username, string password, string? email = null)
+        {
+            await EnsureSchemaAsync();
+
+            username = (username ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("Username leer.");
+            if (string.IsNullOrEmpty(password) || password.Length < 6)
+                throw new ArgumentException("Passwort zu kurz (mind. 6).");
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            // Nur wenn wirklich noch kein User existiert
+            await using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = "SELECT COUNT(1) FROM dbo.Users;";
+                var count = Convert.ToInt32(await chk.ExecuteScalarAsync());
+                if (count > 0)
+                    throw new InvalidOperationException("Es existiert bereits ein Benutzer in dieser Datenbank.");
+            }
+
+            var hash = PasswordHasher.Hash(password);
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO dbo.Users (Username, PasswordHash, IsActive, IsAdmin, CreatedAt, Email)
+VALUES (@u, @p, 1, 1, SYSDATETIME(), @e);";
+            cmd.Parameters.AddWithValue("@u", username);
+            cmd.Parameters.AddWithValue("@p", hash);
+            cmd.Parameters.AddWithValue("@e", (object?)email ?? DBNull.Value);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // ===== Admin-Funktionen =====
+
+        public sealed class UserRow
+        {
+            public int Id { get; set; }
+            public string Username { get; set; } = "";
+            public string? Email { get; set; }
+            public bool IsActive { get; set; }
+            public bool IsAdmin { get; set; }
+            public DateTime CreatedAt { get; set; }
+        }
+
+        public async Task<List<UserRow>> GetUsersAsync()
+        {
+            await EnsureSchemaAsync();
+
+            var list = new List<UserRow>();
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, Username, Email, IsActive, IsAdmin, CreatedAt
+FROM dbo.Users
+ORDER BY Username;";
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                list.Add(new UserRow
+                {
+                    Id = r.GetInt32(0),
+                    Username = r.GetString(1),
+                    Email = r.IsDBNull(2) ? null : r.GetString(2),
+                    IsActive = r.GetBoolean(3),
+                    IsAdmin = r.GetBoolean(4),
+                    CreatedAt = r.GetDateTime(5)
+                });
+            }
+            return list;
+        }
+
+        public async Task CreateUserAsync(string username, string password, string? email, bool isAdmin)
+        {
+            await EnsureSchemaAsync();
+
+            username = (username ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(username) || username.Length < 3 || username.Length > 64)
+                throw new ArgumentException("Username ungültig (3–64).");
+            if (string.IsNullOrEmpty(password) || password.Length < 6)
+                throw new ArgumentException("Passwort zu kurz (mind. 6).");
+
+            var hash = PasswordHasher.Hash(password);
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO dbo.Users (Username, PasswordHash, IsActive, IsAdmin, CreatedAt, Email)
+VALUES (@u, @p, 1, @a, SYSDATETIME(), @e);";
+            cmd.Parameters.AddWithValue("@u", username);
+            cmd.Parameters.AddWithValue("@p", hash);
+            cmd.Parameters.AddWithValue("@a", isAdmin ? 1 : 0);
+            cmd.Parameters.AddWithValue("@e", (object?)email ?? DBNull.Value);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task ResetPasswordAsync(int userId, string newPassword)
+        {
+            await EnsureSchemaAsync();
+
+            if (userId <= 0) throw new ArgumentException("UserId ungültig.");
+            if (string.IsNullOrEmpty(newPassword) || newPassword.Length < 6)
+                throw new ArgumentException("Passwort zu kurz (mind. 6).");
+
+            var hash = PasswordHasher.Hash(newPassword);
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.Users SET PasswordHash=@p WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@p", hash);
+            cmd.Parameters.AddWithValue("@id", userId);
+
+            var n = await cmd.ExecuteNonQueryAsync();
+            if (n != 1) throw new InvalidOperationException("User nicht gefunden.");
+        }
+
+        public async Task SetUserActiveAsync(int userId, bool isActive)
+        {
+            await EnsureSchemaAsync();
+
+            if (userId <= 0) throw new ArgumentException("UserId ungültig.");
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.Users SET IsActive=@a WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@a", isActive ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", userId);
+
+            var n = await cmd.ExecuteNonQueryAsync();
+            if (n != 1) throw new InvalidOperationException("User nicht gefunden.");
+        }
+
+        public async Task SetUserAdminAsync(int userId, bool isAdmin)
+        {
+            await EnsureSchemaAsync();
+
+            if (userId <= 0) throw new ArgumentException("UserId ungültig.");
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            // Sicherheitsnetz: Mindestens ein Admin muss übrig bleiben.
+            if (!isAdmin)
+            {
+                await using var chk = c.CreateCommand();
+                chk.CommandText = @"
+SELECT COUNT(1)
+FROM dbo.Users
+WHERE IsAdmin = 1 AND IsActive = 1 AND Id <> @id;";
+                chk.Parameters.AddWithValue("@id", userId);
+
+                var remaining = Convert.ToInt32(await chk.ExecuteScalarAsync());
+                if (remaining <= 0)
+                    throw new InvalidOperationException("Es muss mindestens ein aktiver Admin bestehen bleiben.");
+            }
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE dbo.Users SET IsAdmin=@a WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@a", isAdmin ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", userId);
+
+            var n = await cmd.ExecuteNonQueryAsync();
+            if (n != 1) throw new InvalidOperationException("User nicht gefunden.");
+        }
+
+
+
     }
 }
