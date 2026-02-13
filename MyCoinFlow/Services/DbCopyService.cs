@@ -5,14 +5,8 @@ using Microsoft.Data.SqlClient;
 
 namespace MyCoinFlow.Services
 {
-    /// <summary>
-    /// Kopiert Grunddaten von Source-DB nach Target-DB (LocalDB). Arbeitet transaktional.
-    /// Zieltabellen werden nur befüllt, wenn sie leer sind.
-    /// </summary>
     public sealed class DbCopyService
     {
-        private const string MasterConn = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
-
         public async Task CopyAsync(string sourceDb, string targetDb, DbCopyOptions opt, bool createTargetIfMissing)
         {
             if (string.IsNullOrWhiteSpace(sourceDb)) throw new ArgumentException("Source-DB fehlt.");
@@ -22,19 +16,28 @@ namespace MyCoinFlow.Services
 
             if (createTargetIfMissing && !await DbExistsAsync(targetDb))
             {
-                var prov = new DbProvisioner();
-                await prov.CreateDatabaseAsync(targetDb, null);
-                await prov.CloneSchemaFromTemplateAsync("MyCoinFlowDB", targetDb); // Schema-only
+                var mand = new MandantService();
+                await mand.CreateEmptyFromTemplateAsync(targetDb);
             }
 
-            var csTarget = $@"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog={targetDb};";
+            var csTarget = new SqlConnectionStringBuilder(ConnectionStrings.Master)
+            {
+                InitialCatalog = targetDb,
+                IntegratedSecurity = true,
+                Encrypt = false,
+                TrustServerCertificate = true
+            }.ConnectionString;
+
             await using var conn = new SqlConnection(csTarget);
             await conn.OpenAsync();
             DbTransaction tx = await conn.BeginTransactionAsync();
 
             try
             {
-                // Kontenstruktur
+                // --- (deine bisherigen Blöcke: Kontenstruktur/Adressen/Aliase/Geldinstitute/Nummernkreise/Budgetzeitraum) ---
+                // Ich lasse sie unverändert, nur Import-Schema & Mapping ist jetzt robust.
+
+                // Kontenstruktur (unverändert)
                 if (opt.CopyKontenstruktur)
                 {
                     await Exec(conn, tx, $@"
@@ -83,7 +86,7 @@ BEGIN
 END");
                 }
 
-                // Adressen
+                // Adressen (unverändert)
                 if (opt.CopyAdressen)
                 {
                     await Exec(conn, tx, $@"
@@ -99,7 +102,7 @@ BEGIN
 END");
                 }
 
-                // Aliase
+                // Aliase (unverändert)
                 if (opt.CopyAliase)
                 {
                     await Exec(conn, tx, $@"
@@ -121,7 +124,7 @@ BEGIN
 END");
                 }
 
-                // Geldinstitute
+                // Geldinstitute (unverändert)
                 if (opt.CopyGeldinstitute)
                 {
                     await Exec(conn, tx, $@"
@@ -137,57 +140,15 @@ BEGIN
 END");
                 }
 
-                // Import-Schema & Mapping
+                // ✅ FIX: Import-Schema & Mapping FK-sicher kopieren
                 if (opt.CopyImportSchemas)
                 {
-                    await Exec(conn, tx, $@"
-IF OBJECT_ID(N'[{sourceDb}].dbo.ImportSchema','U') IS NOT NULL
-AND OBJECT_ID(N'dbo.ImportSchema','U') IS NOT NULL
-AND NOT EXISTS(SELECT 1 FROM dbo.ImportSchema)
-BEGIN
-    DECLARE @hasIsMaster bit =
-      CASE WHEN EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ImportSchema' AND COLUMN_NAME='IsMaster') THEN 1 ELSE 0 END;
-
-    IF @hasIsMaster = 1
-    BEGIN
-        DECLARE @srcHasIsMaster bit =
-          CASE WHEN EXISTS(SELECT 1 FROM [{sourceDb}].INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ImportSchema' AND COLUMN_NAME='IsMaster') THEN 1 ELSE 0 END;
-
-        SET IDENTITY_INSERT dbo.ImportSchema ON;
-        IF @srcHasIsMaster = 1
-            INSERT INTO dbo.ImportSchema (Id, Name, IsMaster)
-            SELECT Id, Name, IsMaster FROM [{sourceDb}].dbo.ImportSchema;
-        ELSE
-            INSERT INTO dbo.ImportSchema (Id, Name, IsMaster)
-            SELECT Id, Name, CAST(0 AS bit) FROM [{sourceDb}].dbo.ImportSchema;
-        SET IDENTITY_INSERT dbo.ImportSchema OFF;
-    END
-    ELSE
-    BEGIN
-        SET IDENTITY_INSERT dbo.ImportSchema ON;
-        INSERT INTO dbo.ImportSchema (Id, Name)
-        SELECT Id, Name FROM [{sourceDb}].dbo.ImportSchema;
-        SET IDENTITY_INSERT dbo.ImportSchema OFF;
-    END
-END");
-
-                    await Exec(conn, tx, $@"
-IF OBJECT_ID(N'[{sourceDb}].dbo.ImportFieldMapping','U') IS NOT NULL
-AND OBJECT_ID(N'dbo.ImportFieldMapping','U') IS NOT NULL
-AND NOT EXISTS(SELECT 1 FROM dbo.ImportFieldMapping)
-BEGIN
-    SET IDENTITY_INSERT dbo.ImportFieldMapping ON;
-    INSERT INTO dbo.ImportFieldMapping (Id, SchemaId, MasterHeader, SourceHeader, DefaultValue)
-    SELECT Id, SchemaId, MasterHeader, SourceHeader, DefaultValue
-    FROM   [{sourceDb}].dbo.ImportFieldMapping;
-    SET IDENTITY_INSERT dbo.ImportFieldMapping OFF;
-END");
+                    await CopyImportSchemasAndMappingsAsync(conn, tx, sourceDb);
                 }
 
-                // NEU: Nummernkreise (NumberRangeRules)
+                // Nummernkreise (unverändert)
                 if (opt.CopyNumberRanges)
                 {
-                    // Ziel-Tabelle sicherstellen (falls Template sie nicht enthält)
                     await Exec(conn, tx, @"
 IF OBJECT_ID(N'dbo.NumberRangeRules','U') IS NULL
 BEGIN
@@ -204,7 +165,6 @@ BEGIN
         CREATE INDEX IX_NumberRangeRules_Range ON [dbo].[NumberRangeRules]([RangeStart],[RangeEnd]);
 END");
 
-                    // Kopieren (nur wenn Ziel leer ist)
                     await Exec(conn, tx, $@"
 IF OBJECT_ID(N'[{sourceDb}].dbo.NumberRangeRules','U') IS NOT NULL
 AND OBJECT_ID(N'dbo.NumberRangeRules','U') IS NOT NULL
@@ -218,7 +178,7 @@ BEGIN
 END");
                 }
 
-                // Budgetzeitraum
+                // Budgetzeitraum (unverändert)
                 if (opt.CreateBudgetzeitraum)
                 {
                     var start = new DateTime(opt.BudgetYear, 1, 1);
@@ -244,7 +204,74 @@ IF NOT EXISTS(SELECT 1 FROM dbo.Budgetzeitraum WHERE Bezeichnung=@bez)
             }
         }
 
-        // helpers
+        private static async Task CopyImportSchemasAndMappingsAsync(SqlConnection conn, DbTransaction tx, string sourceDb)
+        {
+            // Wir erstellen im Ziel eine Mapping-Tabelle: SourceSchemaId -> TargetSchemaId (per Name gematcht)
+            // Dann fügen wir ImportFieldMapping mit gemappten SchemaIds ein.
+            var sql = $@"
+IF OBJECT_ID(N'[{sourceDb}].dbo.ImportSchema','U') IS NULL OR OBJECT_ID(N'[{sourceDb}].dbo.ImportFieldMapping','U') IS NULL
+    RETURN;
+
+IF OBJECT_ID(N'dbo.ImportSchema','U') IS NULL OR OBJECT_ID(N'dbo.ImportFieldMapping','U') IS NULL
+    RETURN;
+
+-- Temp-Map
+IF OBJECT_ID('tempdb..#SchemaMap') IS NOT NULL DROP TABLE #SchemaMap;
+CREATE TABLE #SchemaMap (
+    SourceId INT NOT NULL,
+    TargetId INT NOT NULL
+);
+
+-- 1) Stelle sicher, dass alle Schema-Namen aus Source in Target existieren
+--    (Target kann bereits Schemas haben, IDs können abweichen)
+INSERT INTO dbo.ImportSchema (Name{(HasColumn(conn, tx, "ImportSchema", "IsMaster") ? ", IsMaster" : "")})
+SELECT s.Name{(HasColumn(conn, tx, "ImportSchema", "IsMaster") ? ", CAST(0 AS bit)" : "")}
+FROM   [{sourceDb}].dbo.ImportSchema s
+WHERE  NOT EXISTS (SELECT 1 FROM dbo.ImportSchema t WHERE t.Name = s.Name);
+
+-- 2) Map SourceId -> TargetId über Name
+INSERT INTO #SchemaMap (SourceId, TargetId)
+SELECT s.Id, t.Id
+FROM   [{sourceDb}].dbo.ImportSchema s
+JOIN   dbo.ImportSchema t ON t.Name = s.Name;
+
+-- 3) Insert ImportFieldMapping (nur wenn Ziel leer)
+IF NOT EXISTS (SELECT 1 FROM dbo.ImportFieldMapping)
+BEGIN
+    SET IDENTITY_INSERT dbo.ImportFieldMapping ON;
+
+    INSERT INTO dbo.ImportFieldMapping (Id, SchemaId, MasterHeader, SourceHeader, DefaultValue)
+    SELECT m.Id,
+           map.TargetId,
+           m.MasterHeader,
+           m.SourceHeader,
+           m.DefaultValue
+    FROM   [{sourceDb}].dbo.ImportFieldMapping m
+    JOIN   #SchemaMap map ON map.SourceId = m.SchemaId;
+
+    SET IDENTITY_INSERT dbo.ImportFieldMapping OFF;
+END
+";
+
+            await Exec(conn, tx, sql);
+        }
+
+        // helper: check column existence inside current transaction
+        private static bool HasColumn(SqlConnection conn, DbTransaction tx, string table, string column)
+        {
+            var sqlTx = tx as SqlTransaction ?? throw new InvalidOperationException("Erwartete SqlTransaction.");
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = sqlTx;
+            cmd.CommandText = @"
+SELECT 1
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=@t AND COLUMN_NAME=@c";
+            cmd.Parameters.AddWithValue("@t", table);
+            cmd.Parameters.AddWithValue("@c", column);
+            var r = cmd.ExecuteScalar();
+            return r != null;
+        }
+
         private static async Task Exec(SqlConnection conn, DbTransaction tx, string sql, params SqlParameter[] p)
         {
             var sqlTx = tx as SqlTransaction ?? throw new InvalidOperationException("Erwartete SqlTransaction.");
@@ -257,7 +284,7 @@ IF NOT EXISTS(SELECT 1 FROM dbo.Budgetzeitraum WHERE Bezeichnung=@bez)
 
         private static async Task<bool> DbExistsAsync(string dbName)
         {
-            await using var conn = new SqlConnection(MasterConn);
+            await using var conn = new SqlConnection(ConnectionStrings.Master);
             await conn.OpenAsync();
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT DB_ID(@n)";

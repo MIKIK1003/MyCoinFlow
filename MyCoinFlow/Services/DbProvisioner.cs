@@ -11,18 +11,22 @@ using Microsoft.SqlServer.Management.Smo;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Erstellt LocalDB-Datenbanken und klont das Schema (ohne Daten) aus einer Vorlage-DB.
+    /// Erstellt Datenbanken auf SQL Server Express (.\SQLEXPRESS) und kann (optional) Schema klonen.
+    /// Standardweg im Projekt ist Template-Backup (.bak) -> MandantService.
+    /// Diese Klasse bleibt für bestehende Calls kompatibel.
     /// </summary>
     public sealed class DbProvisioner
     {
-        private const string LocalDbInstance = @"(localdb)\MSSQLLocalDB";
-        private const string MasterConnStr = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Initial Catalog=master;";
+        // Single Source of Truth: ConnectionStrings.Master (.\SQLEXPRESS)
+        private static string MasterConnStr => ConnectionStrings.Master;
 
         public async Task CreateDatabaseAsync(string dbName, string? basePath = null)
         {
             ValidateDbName(dbName);
             string? mdf = null, ldf = null;
 
+            // basePath optional: wenn angegeben, versuchen wir Create Database mit festen Files.
+            // Standard ist: SQL Default-Pfade verwenden (basePath = null).
             if (!string.IsNullOrWhiteSpace(basePath))
             {
                 var folder = NormalizeAndEnsureBasePath(basePath!);
@@ -50,7 +54,7 @@ BEGIN
     DECLARE @ldfLit nvarchar(4000) = N'''' + REPLACE(@ldf, N'''', N'''''''') + N'''';
     SET @sql = N'CREATE DATABASE ' + QUOTENAME(@dbname) + N'
         ON (NAME=' + QUOTENAME(@dbname, '''') + N', FILENAME=' + @mdfLit + N')
-       LOG ON (NAME=' + QUOTENAME(@dbname + N'_log', '''') + N', FILENAME=' + @ldfLit + N')';
+       LOG ON (NAME=' + QUOTENAME(@dbname + N''_log'', '''') + N', FILENAME=' + @ldfLit + N')';
     EXEC (@sql);
 END";
             cmd.Parameters.AddWithValue("@dbname", dbName);
@@ -61,11 +65,15 @@ END";
 
         public async Task CloneSchemaFromTemplateAsync(string sourceDbName, string targetDbName)
         {
+            // ⚠️ Hinweis: Standardweg im Projekt ist Restore aus Template-.bak (MandantService).
+            // Diese Methode bleibt für alte Aufrufer verfügbar und klont Schema via SMO.
+
             ValidateDbName(sourceDbName);
             ValidateDbName(targetDbName);
 
             await using var sqlConn = new SqlConnection(MasterConnStr);
             await sqlConn.OpenAsync();
+
             var server = new Server(new ServerConnection(sqlConn));
 
             var src = server.Databases[sourceDbName]
@@ -109,7 +117,7 @@ END";
                 }
             };
 
-            var script = transfer.ScriptTransfer(); // StringCollection
+            var script = transfer.ScriptTransfer();
             var batches = new List<string>(script.Count);
             foreach (string batch in script)
             {
@@ -117,7 +125,14 @@ END";
                     batches.Add(batch);
             }
 
-            var targetConnStr = $@"Server={LocalDbInstance};Integrated Security=true;Initial Catalog={targetDbName};";
+            var targetConnStr = new SqlConnectionStringBuilder(MasterConnStr)
+            {
+                InitialCatalog = targetDbName,
+                IntegratedSecurity = true,
+                Encrypt = false,
+                TrustServerCertificate = true
+            }.ConnectionString;
+
             await using var targetConn = new SqlConnection(targetConnStr);
             await targetConn.OpenAsync();
 
