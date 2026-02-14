@@ -150,7 +150,9 @@
 
                 <!-- ===== STWE-Dashboard (neu, default hidden) ===== -->
                 <views:DashboardStweView x:Name="StweContent"
-                                         Visibility="Collapsed"/>
+                         Visibility="Collapsed"/>
+
+
             </Grid>
         </Border>
 

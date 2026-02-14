@@ -92,7 +92,7 @@
 
             <Button Style="{StaticResource NavIconButton_Emphasis}"
                     Tag="Cog"
-                    Content="Admin"
+                    Content="Einstellungen"
                     MinHeight="50"
                     Padding="12,8"
                     Command="{Binding ShowAdminCommand}"

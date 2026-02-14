@@ -87,7 +87,7 @@ namespace MyCoinFlow.Views
                 nav.SelectedItem = start ?? nav.Items.OfType<ListBoxItem>().FirstOrDefault();
             }
             ShowSection("Kontenplan");
-
+            ApplyRoleVisibility();
             EnsureKontenHosts();
             EnsureCreditCardMappingInline();
             AttachNumberRangesView();
@@ -105,6 +105,17 @@ namespace MyCoinFlow.Views
         {
             var tag = ((El<ListBox>("NavList")?.SelectedItem as ListBoxItem)?.Tag as string) ?? "Kontenplan";
             ShowSection(tag);
+
+            // Nicht-Admin darf Mandanten/Update nicht öffnen
+            if (!AdminMode.IsAdmin &&
+                (string.Equals(tag, "Mandanten", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(tag, "Update", StringComparison.OrdinalIgnoreCase)))
+            {
+                // auf Kontenplan zurück
+                ShowSection("Kontenplan");
+                return;
+            }
+
 
             if (string.Equals(tag, "Backup", StringComparison.OrdinalIgnoreCase))
                 SetBackupDefaultPath();
@@ -768,5 +779,51 @@ ORDER BY name;";
 
             return w;
         }
+
+        private void ApplyRoleVisibility()
+        {
+            // Quelle: dein bestehender Status (aktuell via JSON True/False)
+            // -> wir nutzen das, was du bereits hast (z. B. AppEdition/Config/CurrentUserContext).
+            // Für jetzt: ConnectionStrings / Config ist egal, Hauptsache bool isAdmin ist korrekt.
+
+            bool isAdmin = AdminMode.IsAdmin;
+
+
+            // NavList ist dein ListBox im XAML
+            if (NavList == null) return;
+
+            foreach (var item in NavList.Items.OfType<ListBoxItem>())
+            {
+                var tag = (item.Tag as string) ?? "";
+
+                if (tag.Equals("Mandanten", StringComparison.OrdinalIgnoreCase) ||
+                    tag.Equals("Update", StringComparison.OrdinalIgnoreCase))
+                {
+                    item.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
+            // Wenn Nicht-Admin gerade auf Mandanten/Update steht, automatisch auf Kontenplan wechseln
+            if (!isAdmin)
+            {
+                var selected = NavList.SelectedItem as ListBoxItem;
+                var selTag = (selected?.Tag as string) ?? "";
+
+                if (selTag.Equals("Mandanten", StringComparison.OrdinalIgnoreCase) ||
+                    selTag.Equals("Update", StringComparison.OrdinalIgnoreCase))
+                {
+                    var fallback = NavList.Items.OfType<ListBoxItem>()
+                        .FirstOrDefault(i => string.Equals(i.Tag as string, "Kontenplan", StringComparison.OrdinalIgnoreCase))
+                        ?? NavList.Items.OfType<ListBoxItem>().FirstOrDefault(i => i.Visibility == Visibility.Visible);
+
+                    if (fallback != null)
+                        NavList.SelectedItem = fallback;
+                }
+            }
+        }
+
+
+
+
     }
 }

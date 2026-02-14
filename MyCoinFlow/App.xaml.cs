@@ -40,6 +40,7 @@ namespace MyCoinFlow
 
             // ✅ NEU: Edition (Basic/Plus) laden
             AppEdition.Load();
+            MyCoinFlow.Services.AdminMode.Load();
 
             var login = new LoginWindow();
             login.Show();

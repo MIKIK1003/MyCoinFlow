@@ -74,11 +74,7 @@ namespace MyCoinFlow.Views
                 BtnToStwe.Visibility = Visibility.Collapsed;
                 BtnToBudget.Visibility = Visibility.Collapsed;
             }
-
-            if (stwe && StweContent.DataContext == null)
-            {
-                StweContent.DataContext = new DashboardStweViewModel();
-            }
+                        
         }
 
         private void PrintDashboard_Click(object sender, RoutedEventArgs e)
@@ -131,5 +127,6 @@ namespace MyCoinFlow.Views
 
             dlg.PrintDocument(document.DocumentPaginator, "MyCoinFlow Dashboard");
         }
+
     }
 }
