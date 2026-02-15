@@ -107,6 +107,14 @@ namespace MyCoinFlow.Views
             var tag = ((El<ListBox>("NavList")?.SelectedItem as ListBoxItem)?.Tag as string) ?? "Kontenplan";
             ShowSection(tag);
 
+            if (string.Equals(tag, "Lizenz", StringComparison.OrdinalIgnoreCase))
+            {
+                var lic = new LicenseService();
+                lic.TryLoadAndApply(out var msg);
+                LicenseInfoText.Text = msg;
+            }
+
+
             // Nicht-Admin darf Mandanten/Update nicht öffnen
             if (!CurrentUserContext.IsAdmin &&
                 (string.Equals(tag, "Mandanten", StringComparison.OrdinalIgnoreCase) ||
@@ -141,6 +149,9 @@ namespace MyCoinFlow.Views
             bool isBackup = string.Equals(key, "Backup", StringComparison.OrdinalIgnoreCase);
             bool isPfade = string.Equals(key, "Pfade", StringComparison.OrdinalIgnoreCase);
 
+            bool isLiz = string.Equals(key, "Lizenz", StringComparison.OrdinalIgnoreCase);
+
+
             SetVis("SecNummernkreise", isNum);
             SetVis("SecKontenplan", isKonten);
             SetVis("SecKreditkarten", isKredit);
@@ -148,6 +159,8 @@ namespace MyCoinFlow.Views
             SetVis("SecUpdate", isUpdate);
             SetVis("SecBackup", isBackup);
             SetVis("SecPfade", isPfade);
+            SetVis("SecLizenz", isLiz);
+
 
             if (isKredit) EnsureCreditCardMappingInline();
             if (isPfade) EnsurePathsHost();
@@ -823,6 +836,41 @@ ORDER BY name;";
             }
         }
 
+        private void License_Save_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LicenseStatusText.Text = "";
+
+                var key = (LicenseKeyBox.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    LicenseStatusText.Text = "Bitte Lizenzschlüssel eingeben.";
+                    return;
+                }
+
+                var lic = new LicenseService();
+
+                if (!lic.TryValidate(key, out var payload, out var err))
+                {
+                    LicenseStatusText.Text = "Ungültige Lizenz: " + err;
+                    return;
+                }
+
+                lic.SaveKey(key);
+
+                // Info anzeigen – wirksam beim nächsten Start (wie gewünscht)
+                LicenseStatusText.Text = "Lizenz gespeichert. Wirksam beim nächsten Start.";
+                LicenseInfoText.Text =
+                    $"Edition: {payload.Edition}\n" +
+                    $"Kunde: {payload.Customer}\n" +
+                    $"Ablauf: {(payload.ExpiresUtc.HasValue ? payload.ExpiresUtc.Value.ToString("yyyy-MM-dd") : "kein Ablauf")}";
+            }
+            catch (Exception ex)
+            {
+                LicenseStatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
 
 
 

@@ -79,6 +79,16 @@
                         </StackPanel>
                     </ListBoxItem>
 
+                    <ListBoxItem Tag="Lizenz">
+                        <StackPanel Orientation="Horizontal" Margin="8,4">
+                            <materialDesign:PackIcon Kind="KeyVariant"
+                                 Style="{StaticResource DefaultIconStyle.Nav}"/>
+                            <TextBlock Text="Lizenz" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+
+
+
                 </ListBox>
             </StackPanel>
         </Border>
@@ -404,6 +414,42 @@
 
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"/>
             </Grid>
+
+            <!-- LIZENZ -->
+            <Grid x:Name="SecLizenz" Visibility="Collapsed">
+                <Border Padding="12" CornerRadius="8" Background="{DynamicResource MaterialDesignCardBackground}">
+                    <StackPanel>
+                        <TextBlock Text="Lizenz"
+                       FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                        <TextBlock x:Name="LicenseInfoText"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Margin="0,0,0,12"/>
+
+                        <DockPanel>
+                            <TextBox x:Name="LicenseKeyBox"
+                         materialDesign:HintAssist.Hint="Lizenzschlüssel (MCF1-...)"
+                         Width="520"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                        Click="License_Save_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="KeyPlus"
+                        Content="Speichern"/>
+                        </DockPanel>
+
+                        <TextBlock x:Name="LicenseStatusText"
+                       TextWrapping="Wrap"
+                       Margin="0,10,0,0"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+
+
+
         </Grid>
     </Grid>
 </UserControl>
