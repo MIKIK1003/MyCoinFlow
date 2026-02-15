@@ -129,12 +129,19 @@ namespace MyCoinFlow.Views
             try
             {
                 StatusText.Text = "";
-                var ok = await _auth.ValidateUserAsync(LoginUserBox.Text, LoginPwdBox.Password);
+
+                var username = (LoginUserBox.Text ?? "").Trim();
+
+                var ok = await _auth.ValidateUserAsync(username, LoginPwdBox.Password);
                 if (!ok)
                 {
                     StatusText.Text = "Ungültige Anmeldedaten.";
                     return;
                 }
+
+                // ✅ Admin-Rolle aus DB holen und in Session ablegen
+                var isAdmin = await _auth.GetIsAdminAsync(username);
+                CurrentUserContext.SignIn(username, isAdmin);
 
                 var main = new MyCoinFlow.MainWindow();
                 main.Show();
@@ -145,6 +152,7 @@ namespace MyCoinFlow.Views
                 StatusText.Text = "Login-Fehler: " + ex.Message;
             }
         }
+
 
         private async void CreateFirstUser_Click(object sender, RoutedEventArgs e)
         {

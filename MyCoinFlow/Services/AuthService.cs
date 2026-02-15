@@ -86,6 +86,29 @@ WHERE Username = @u;";
             return PasswordHasher.Verify(password, hash);
         }
 
+        public async Task<bool> GetIsAdminAsync(string username)
+        {
+            await EnsureSchemaAsync();
+
+            if (string.IsNullOrWhiteSpace(username))
+                return false;
+
+            username = username.Trim();
+
+            await using var c = new SqlConnection(ConnectionStrings.Current);
+            await c.OpenAsync();
+
+            await using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT IsAdmin FROM dbo.Users WHERE Username = @u;";
+            cmd.Parameters.AddWithValue("@u", username);
+
+            var v = await cmd.ExecuteScalarAsync();
+            if (v == null || v == DBNull.Value) return false;
+
+            return Convert.ToBoolean(v);
+        }
+
+
         /// <summary>
         /// Ersten User anlegen: wird immer Admin.
         /// </summary>

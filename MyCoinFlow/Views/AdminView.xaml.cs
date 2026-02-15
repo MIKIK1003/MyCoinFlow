@@ -87,6 +87,7 @@ namespace MyCoinFlow.Views
                 nav.SelectedItem = start ?? nav.Items.OfType<ListBoxItem>().FirstOrDefault();
             }
             ShowSection("Kontenplan");
+            RoleHeaderText.Text = CurrentUserContext.IsAdmin ? "Einstellungen (Admin)" : "Einstellungen (User)";
             ApplyRoleVisibility();
             EnsureKontenHosts();
             EnsureCreditCardMappingInline();
@@ -107,7 +108,7 @@ namespace MyCoinFlow.Views
             ShowSection(tag);
 
             // Nicht-Admin darf Mandanten/Update nicht öffnen
-            if (!AdminMode.IsAdmin &&
+            if (!CurrentUserContext.IsAdmin &&
                 (string.Equals(tag, "Mandanten", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(tag, "Update", StringComparison.OrdinalIgnoreCase)))
             {
@@ -786,7 +787,7 @@ ORDER BY name;";
             // -> wir nutzen das, was du bereits hast (z. B. AppEdition/Config/CurrentUserContext).
             // Für jetzt: ConnectionStrings / Config ist egal, Hauptsache bool isAdmin ist korrekt.
 
-            bool isAdmin = AdminMode.IsAdmin;
+            bool isAdmin = CurrentUserContext.IsAdmin;
 
 
             // NavList ist dein ListBox im XAML

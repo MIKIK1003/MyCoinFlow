@@ -6,7 +6,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="260"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -14,7 +14,7 @@
         <Border Grid.Column="0" Background="{DynamicResource MaterialDesignCardBackground}" Margin="12"
                 CornerRadius="8" Padding="8">
             <StackPanel>
-                <TextBlock Text="Admin" FontSize="20" FontWeight="SemiBold" Margin="8,4,8,12"/>
+                <TextBlock x:Name="RoleHeaderText" Text="Einstellungen" FontSize="20" FontWeight="SemiBold" Margin="8,4,8,12"/>
                 <ListBox x:Name="NavList" SelectionChanged="NavList_SelectionChanged">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
