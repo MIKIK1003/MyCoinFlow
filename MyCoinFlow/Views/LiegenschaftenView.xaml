@@ -103,6 +103,16 @@
                                Margin="0,10,0,6"/>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                                Command="{Binding NeueEigentuemerCommand}"
+                                Padding="12,8"
+                                Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Erfassen"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
                             Command="{Binding EigentuemerBearbeitenCommand}"
                             Padding="12,8"
                             Margin="0,0,0,8">
