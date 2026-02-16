@@ -157,6 +157,43 @@
                                Margin="0,8,0,0"
                                Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
 
+
+                    <!-- 3b) Lizenz (nur wenn nötig) -->
+                    <Border x:Name="LicensePanel"
+                                Width="350"
+                                Background="{DynamicResource MaterialDesignCardBackground}"
+                                CornerRadius="8"
+                                Padding="12"
+                                Margin="0,8,0,0"
+                                Visibility="Collapsed">
+                        <StackPanel Margin="0">
+                            <TextBlock Text="Lizenz erforderlich"
+                                FontWeight="SemiBold"
+                                Margin="0,0,0,8"/>
+
+                            <TextBox x:Name="LicenseKeyBox"
+                                Width="350"
+                                HorizontalAlignment="Left"
+                                materialDesign:HintAssist.Hint="Lizenzschlüssel (MCF1-...)"
+                                Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+
+                            <Button x:Name="SaveLicenseButton"
+                                Width="350"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource IconTextButton}"
+                                Tag="KeyPlus"
+                                Content="Lizenz speichern"
+                                Margin="0,8,0,0"
+                                Click="SaveLicenseButton_Click"/>
+                            <TextBlock x:Name="LicenseStatusText"
+                   Width="320"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+
                     <!-- 4) Erstbenutzer (zusätzlicher Abstand oben) -->
                     <Expander Header="Ersten Benutzer anlegen"
                               x:Name="FirstUserExpander"

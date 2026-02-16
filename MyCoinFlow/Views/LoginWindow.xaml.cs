@@ -11,6 +11,8 @@ namespace MyCoinFlow.Views
     {
         private readonly AuthService _auth = new();
         private readonly SqlExpressProvisioningService _provisioning = new();
+        private readonly LicenseService _license = new();
+
 
         public LoginWindow()
         {
@@ -23,6 +25,18 @@ namespace MyCoinFlow.Views
             try
             {
                 StatusText.Text = "";
+
+                // --- Lizenz-Gate: ohne gültige Lizenz keine Nutzung ---
+                if (!_license.TryLoadAndApply(out var licMsg))
+                {
+                    StatusText.Text = "Lizenz erforderlich: " + licMsg;
+                    ShowLicenseUiAndLock();
+                    return;
+                }
+
+                // Lizenz ok -> Login normal
+                HideLicenseUiAndUnlock();
+
 
                 // PHASE 4: Auf frischen PCs sicherstellen, dass es mindestens eine Default-DB gibt.
                 StatusText.Text = "Initialisiere Datenbank…";
@@ -62,6 +76,7 @@ namespace MyCoinFlow.Views
                         return;
                     }
                 }
+
 
                 // Dropdown
                 if (!list.Contains(active))
@@ -243,5 +258,82 @@ ORDER BY name;
 
         private void StackPanel_TimeChanged(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e) { }
         private void StackPanel_TimeChanged_1(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e) { }
+
+        private void ShowLicenseUiAndLock()
+        {
+            // Lizenzbereich anzeigen
+            LicensePanel.Visibility = Visibility.Visible;
+
+            // Login sperren
+            DbCombo.IsEnabled = false;
+            LoginUserBox.IsEnabled = false;
+            LoginPwdBox.IsEnabled = false;
+            LoginButton.IsEnabled = false;
+
+            FirstUserExpander.IsEnabled = false;
+            FirstUserExpander.IsExpanded = false;
+
+            // Lizenz-Eingabe aktiv
+            LicenseKeyBox.IsEnabled = true;
+            SaveLicenseButton.IsEnabled = true;
+        }
+
+        private void HideLicenseUiAndUnlock()
+        {
+            LicensePanel.Visibility = Visibility.Collapsed;
+            LicenseStatusText.Text = "";
+
+            // Login wieder aktiv
+            DbCombo.IsEnabled = true;
+            LoginUserBox.IsEnabled = true;
+            LoginPwdBox.IsEnabled = true;
+            LoginButton.IsEnabled = true;
+
+            // Erstbenutzer wird später in InitializeAsync() anhand HasAnyUser gesetzt
+        }
+
+        private async void SaveLicenseButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LicenseStatusText.Text = "";
+
+                var key = (LicenseKeyBox.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    LicenseStatusText.Text = "Bitte Lizenzschlüssel eingeben.";
+                    return;
+                }
+
+                if (!_license.TryValidate(key, out var payload, out var err))
+                {
+                    LicenseStatusText.Text = "Ungültige Lizenz: " + err;
+                    return;
+                }
+
+                _license.SaveKey(key);
+
+                // Nach Speichern nochmals prüfen/anwenden
+                if (!_license.TryLoadAndApply(out var msg))
+                {
+                    LicenseStatusText.Text = "Lizenz gespeichert, aber ungültig: " + msg;
+                    ShowLicenseUiAndLock();
+                    return;
+                }
+
+                LicenseStatusText.Text = $"Lizenz OK ({payload.Edition}).";
+                HideLicenseUiAndUnlock();
+
+                // Jetzt den normalen Startablauf nochmals ausführen (DB/Users etc.)
+                await InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                LicenseStatusText.Text = "Fehler: " + ex.Message;
+            }
+        }
+
+
+
     }
 }
