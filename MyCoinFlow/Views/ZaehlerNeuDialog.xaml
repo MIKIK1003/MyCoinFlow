@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Zähler"
         Width="520"
-        Height="470"
+        Height="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
@@ -61,23 +61,33 @@
                           SelectedItem="{Binding SelectedTyp}"
                           Margin="0,2,0,0"/>
 
-                <!-- Schlüssel (NEU) -->
-                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Schlüssel"/>
-                <ComboBox Grid.Row="4" Grid.Column="2"
-                          ItemsSource="{Binding SchluesselOptions}"
-                          SelectedItem="{Binding SelectedSchluessel}"
-                          DisplayMemberPath="Name"
-                          Margin="0,2,0,0"/>
-
                 <!-- Einheit -->
-                <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Einheit"
+                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Einheit"
                            Opacity="{Binding EinheitOpacity}"/>
-                <ComboBox Grid.Row="6" Grid.Column="2"
+                <ComboBox Grid.Row="4" Grid.Column="2"
                           ItemsSource="{Binding Einheiten}"
                           SelectedItem="{Binding SelectedEinheit}"
                           DisplayMemberPath="Bezeichnung"
                           IsEnabled="{Binding IsEinheitEnabled}"
                           Margin="0,2,0,0"/>
+
+                <!-- Verteilung (NEU) -->
+                <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Verteilung"/>
+                <StackPanel Grid.Row="6" Grid.Column="2" Orientation="Horizontal">
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="EditLines_Click"
+                            Padding="12,6"
+                            Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlaylistEdit" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeilen bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Text="{Binding LinesInfo}"/>
+                </StackPanel>
 
                 <!-- Notiz -->
                 <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Top" Text="Notiz"/>
@@ -92,7 +102,7 @@
                 <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3"
                            Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                            TextWrapping="Wrap"
-                           Text="DIREKT: Zähler ist einer Einheit zugeordnet (Wohnungszähler). ALLG/HEIZ/EVU: ohne Einheit. Schlüssel: wird für die Energie-Verteilung verwendet."
+                           Text="DIREKT: Zähler ist einer Einheit zugeordnet. ALLG/HEIZ/EVU: ohne Einheit. Verteilung: Eigentümer-Quoten für diesen Zähler (Summe 100%)."
                            Margin="0,6,0,0"/>
             </Grid>
         </Border>

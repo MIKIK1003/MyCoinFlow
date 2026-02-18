@@ -4679,6 +4679,34 @@ BEGIN
 
 END;
 
+
+-- ------------------------------------------------------------
+-- ENERGIE: Zähler-Verteilzeilen (Eigentümer-Quoten pro Zähler)
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehlerLine' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweZaehlerLine
+    (
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweZaehlerLine PRIMARY KEY,
+        ZaehlerId      INT NOT NULL,
+        EigentuemerId  INT NOT NULL,
+        AnteilProzent  DECIMAL(18,6) NOT NULL,
+
+        CONSTRAINT FK_StweZaehlerLine_Zaehler
+            FOREIGN KEY (ZaehlerId) REFERENCES dbo.StweZaehler(Id),
+
+        CONSTRAINT FK_StweZaehlerLine_Eigentuemer
+            FOREIGN KEY (EigentuemerId) REFERENCES dbo.StweEigentuemer(Id),
+
+        CONSTRAINT UQ_StweZaehlerLine_Zaehler_Eigentuemer
+            UNIQUE (ZaehlerId, EigentuemerId)
+    );
+
+    CREATE INDEX IX_StweZaehlerLine_ZaehlerId ON dbo.StweZaehlerLine(ZaehlerId);
+END;
+
+
+
 -- Nachmigration: SchluesselId nachziehen (wenn DB schon existiert)
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehler' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -4804,13 +4832,7 @@ BEGIN
 END;
 
 
-
-
 ";
-
-        
-
-
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
             cmd.ExecuteNonQuery();
@@ -5408,6 +5430,90 @@ ORDER BY e.Name;";
             return list;
         }
 
+        public List<StweZaehlerLine> StweZaehlerLinesGet(int zaehlerId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<StweZaehlerLine>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT l.Id, l.ZaehlerId, l.EigentuemerId, o.Name, l.AnteilProzent
+FROM dbo.StweZaehlerLine l
+JOIN dbo.StweEigentuemer o ON o.Id = l.EigentuemerId
+WHERE l.ZaehlerId = @zid
+ORDER BY o.Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@zid", zaehlerId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new StweZaehlerLine
+                {
+                    Id = r.GetInt32(0),
+                    ZaehlerId = r.GetInt32(1),
+                    EigentuemerId = r.GetInt32(2),
+                    EigentuemerName = r.IsDBNull(3) ? "" : r.GetString(3),
+                    AnteilProzent = r.GetDecimal(4)
+                });
+            }
+
+            return list;
+        }
+
+        public void StweZaehlerLinesReplace(int zaehlerId, List<(int EigentuemerId, decimal AnteilProzent)> lines)
+        {
+            EnsureStweSchema();
+
+            if (zaehlerId <= 0) throw new ArgumentException("zaehlerId muss > 0 sein.", nameof(zaehlerId));
+            if (lines == null) throw new ArgumentNullException(nameof(lines));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var tx = c.BeginTransaction();
+            try
+            {
+                // delete old
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM dbo.StweZaehlerLine WHERE ZaehlerId = @zid;";
+                    cmd.Parameters.AddWithValue("@zid", zaehlerId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // insert new
+                foreach (var (oid, pct) in lines)
+                {
+                    using var cmd = c.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+INSERT INTO dbo.StweZaehlerLine (ZaehlerId, EigentuemerId, AnteilProzent)
+VALUES (@zid, @oid, @pct);";
+                    cmd.Parameters.AddWithValue("@zid", zaehlerId);
+                    cmd.Parameters.AddWithValue("@oid", oid);
+                    cmd.Parameters.AddWithValue("@pct", pct);
+                    cmd.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+
+
+
+
         public void StweSchluesselLinesReplace(int schluesselId, List<(int EigentuemerId, decimal AnteilProzent)> lines)
         {
             EnsureStweSchema();
@@ -5674,6 +5780,19 @@ WHERE ZaehlerId = @id;";
                     cmd.Parameters.AddWithValue("@id", zaehlerId);
                     cmd.ExecuteNonQuery();
                 }
+
+
+                // 0) Zähler-Verteilzeilen löschen
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM dbo.StweZaehlerLine WHERE ZaehlerId = @id;";
+                    cmd.Parameters.AddWithValue("@id", zaehlerId);
+                    cmd.ExecuteNonQuery();
+                }
+
+
+
 
                 // Optional/defensiv: falls es weitere Tabellen gibt, die direkt auf ZaehlerId zeigen,
                 // dann hier ebenfalls vor dem Stamm löschen.

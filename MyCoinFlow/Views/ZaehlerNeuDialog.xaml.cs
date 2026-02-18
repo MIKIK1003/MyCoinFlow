@@ -1,5 +1,6 @@
 ﻿using MyCoinFlow.Models;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -12,7 +13,22 @@ namespace MyCoinFlow.Views
     {
         public StweZaehler Model { get; } = new();
 
+        // Wird vom Caller nach dem Dialog gespeichert (Replace)
+        public List<(int EigentuemerId, decimal AnteilProzent)> ResultLines { get; private set; } = new();
+
+        private readonly ObservableCollection<StweEigentuemer> _owners = new();
+
         public string HeaderText => Model.Id > 0 ? "Zähler bearbeiten" : "Zähler neu";
+
+        public string LinesInfo
+        {
+            get
+            {
+                if (ResultLines.Count == 0) return "keine Zeilen";
+                var sum = ResultLines.Sum(x => x.AnteilProzent);
+                return $"{ResultLines.Count} Zeile(n), Summe {sum:N4}%";
+            }
+        }
 
         public ObservableCollection<string> TypOptions { get; } = new()
         {
@@ -23,9 +39,6 @@ namespace MyCoinFlow.Views
         };
 
         public ObservableCollection<StweEinheit> Einheiten { get; } = new();
-
-        // NEU: Schlüssel-Liste für die Energie-Verteilung
-        public ObservableCollection<StweSchluessel> SchluesselOptions { get; } = new();
 
         private string _selectedTyp = "DIREKT";
         public string SelectedTyp
@@ -39,7 +52,6 @@ namespace MyCoinFlow.Views
                 OnPropertyChanged(nameof(IsEinheitEnabled));
                 OnPropertyChanged(nameof(EinheitOpacity));
 
-                // Wenn nicht DIREKT -> Einheit leeren
                 if (!IsEinheitEnabled)
                 {
                     SelectedEinheit = null;
@@ -60,49 +72,31 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private StweSchluessel? _selectedSchluessel;
-        public StweSchluessel? SelectedSchluessel
-        {
-            get => _selectedSchluessel;
-            set
-            {
-                _selectedSchluessel = value;
-                OnPropertyChanged();
-                Model.SchluesselId = _selectedSchluessel?.Id;
-            }
-        }
-
         public bool IsEinheitEnabled => string.Equals(SelectedTyp, "DIREKT", StringComparison.OrdinalIgnoreCase);
         public double EinheitOpacity => IsEinheitEnabled ? 1.0 : 0.5;
 
         public ZaehlerNeuDialog(int liegenschaftId,
                                 ObservableCollection<StweEinheit> einheiten,
-                                ObservableCollection<StweSchluessel> schluessel)
+                                ObservableCollection<StweEigentuemer> owners,
+                                IEnumerable<StweZaehlerLine>? existingLines = null)
         {
             InitializeComponent();
 
-            // Einheiten kopieren (defensiv, damit Dialog unabhängig bleibt)
             if (einheiten != null)
-            {
-                foreach (var e in einheiten)
-                    Einheiten.Add(e);
-            }
+                foreach (var e in einheiten) Einheiten.Add(e);
 
-            // Schlüssel kopieren (defensiv)
-            if (schluessel != null)
-            {
-                foreach (var s in schluessel)
-                    SchluesselOptions.Add(s);
-            }
+            if (owners != null)
+                foreach (var o in owners) _owners.Add(o);
 
             Model.LiegenschaftId = liegenschaftId;
             Model.Typ = "DIREKT";
             _selectedTyp = "DIREKT";
 
-            // Default: erster Schlüssel, wenn vorhanden
-            SelectedSchluessel = SchluesselOptions.FirstOrDefault();
+            if (existingLines != null)
+                ResultLines = existingLines.Select(x => (x.EigentuemerId, x.AnteilProzent)).ToList();
 
             DataContext = this;
+            OnPropertyChanged(nameof(LinesInfo));
         }
 
         // Für Bearbeiten: Model-Werte übernehmen
@@ -115,7 +109,6 @@ namespace MyCoinFlow.Views
             Model.Name = existing.Name ?? "";
             Model.Typ = (existing.Typ ?? "").Trim().ToUpperInvariant();
             Model.EinheitId = existing.EinheitId;
-            Model.SchluesselId = existing.SchluesselId;
             Model.Notiz = existing.Notiz;
 
             SelectedTyp = string.IsNullOrWhiteSpace(Model.Typ) ? "DIREKT" : Model.Typ;
@@ -125,12 +118,35 @@ namespace MyCoinFlow.Views
             else
                 SelectedEinheit = null;
 
-            if (Model.SchluesselId.HasValue)
-                SelectedSchluessel = SchluesselOptions.FirstOrDefault(x => x.Id == Model.SchluesselId.Value);
-            else
-                SelectedSchluessel = SchluesselOptions.FirstOrDefault();
-
             OnPropertyChanged(nameof(HeaderText));
+        }
+
+        private void EditLines_Click(object sender, RoutedEventArgs e)
+        {
+            if (_owners.Count == 0)
+            {
+                MessageBox.Show("Keine Eigentümer vorhanden. Bitte zuerst Eigentümer erfassen.",
+                    "Zähler", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // SchluesselZeilenDialog erwartet StweSchluesselLine – wir mappen die Zählerzeilen darauf.
+            var existing = ResultLines.Select(x => new StweSchluesselLine
+            {
+                SchluesselId = 0,
+                EigentuemerId = x.EigentuemerId,
+                EigentuemerName = _owners.FirstOrDefault(o => o.Id == x.EigentuemerId)?.Name ?? "",
+                AnteilProzent = x.AnteilProzent
+            }).ToList();
+
+            var dlg = new SchluesselZeilenDialog($"Zähler: {Model.Name}", _owners, existing);
+            TrySetOwner(dlg);
+
+            if (dlg.ShowDialog() == true)
+            {
+                ResultLines = dlg.Rows.Select(r => (r.EigentuemerId, r.AnteilProzent)).ToList();
+                OnPropertyChanged(nameof(LinesInfo));
+            }
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
@@ -153,7 +169,8 @@ namespace MyCoinFlow.Views
 
             if (string.IsNullOrWhiteSpace(Model.Name))
             {
-                MessageBox.Show("Bitte einen Namen erfassen.", "Zähler", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Bitte einen Namen erfassen.", "Zähler",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
 
@@ -175,19 +192,45 @@ namespace MyCoinFlow.Views
             }
             else
             {
-                // ALLG/HEIZ/EVU -> EinheitId muss leer sein
                 Model.EinheitId = null;
             }
 
-            // Schlüssel ist für die Energie-Verteilung nötig -> Pflicht
-            if (!Model.SchluesselId.HasValue || Model.SchluesselId.Value <= 0)
+            // Verteilzeilen sind für Energie zwingend (kein stilles Fallback)
+            if (ResultLines.Count == 0)
             {
-                MessageBox.Show("Bitte einen Schlüssel wählen (für die Energie-Verteilung).", "Zähler",
+                MessageBox.Show("Bitte Verteilzeilen erfassen (Summe 100%).", "Zähler",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+
+            var sum = ResultLines.Sum(x => x.AnteilProzent);
+            if (Math.Abs((double)(sum - 100m)) > 0.0001)
+            {
+                MessageBox.Show($"Summe der Verteilzeilen muss 100.0000% ergeben. Aktuell: {sum:N4}%.", "Zähler",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+
+            // Doppelte Eigentümer verhindern
+            var dup = ResultLines.GroupBy(x => x.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
+            if (dup != null)
+            {
+                MessageBox.Show("Ein Eigentümer darf im Zähler nur einmal vorkommen.", "Zähler",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
 
             return true;
+        }
+
+        private static void TrySetOwner(Window dlg)
+        {
+            try
+            {
+                if (Application.Current?.MainWindow != null)
+                    dlg.Owner = Application.Current.MainWindow;
+            }
+            catch { }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -589,24 +589,26 @@ namespace MyCoinFlow.ViewModels
         {
             if (SelectedLiegenschaft == null) return;
 
-            // Einheiten müssen verfügbar sein für DIREKT-Zähler
             if (Einheiten.Count == 0)
                 LoadEinheiten();
 
-            // Schlüssel müssen verfügbar sein für die Energie-Verteilung
-            if (Schluessel.Count == 0)
-                LoadSchluessel();
+            // Eigentümer müssen geladen sein (für Zeilen)
+            if (Eigentuemer.Count == 0)
+                LoadEigentuemer();
 
-            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten, Schluessel);
+            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten, Eigentuemer);
             TrySetOwner(dlg);
 
             if (dlg.ShowDialog() == true)
             {
-                _db.StweZaehlerInsert(dlg.Model);
+                var id = _db.StweZaehlerInsert(dlg.Model);
+                _db.StweZaehlerLinesReplace(id, dlg.ResultLines);
+
                 LoadZaehler();
                 StatusText = "Zähler gespeichert.";
             }
         }
+
 
         private void ZaehlerBearbeiten()
         {
@@ -615,10 +617,12 @@ namespace MyCoinFlow.ViewModels
             if (Einheiten.Count == 0 && SelectedLiegenschaft != null)
                 LoadEinheiten();
 
-            if (Schluessel.Count == 0 && SelectedLiegenschaft != null)
-                LoadSchluessel();
+            if (Eigentuemer.Count == 0)
+                LoadEigentuemer();
 
-            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten, Schluessel);
+            var existingLines = _db.StweZaehlerLinesGet(SelectedZaehler.Id);
+
+            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten, Eigentuemer, existingLines);
             TrySetOwner(dlg);
 
             dlg.SetModel(SelectedZaehler);
@@ -626,10 +630,13 @@ namespace MyCoinFlow.ViewModels
             if (dlg.ShowDialog() == true)
             {
                 _db.StweZaehlerUpdate(dlg.Model);
+                _db.StweZaehlerLinesReplace(SelectedZaehler.Id, dlg.ResultLines);
+
                 LoadZaehler();
                 StatusText = "Zähler aktualisiert.";
             }
         }
+
 
 
         private void ZaehlerLoeschen()

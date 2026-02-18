@@ -732,7 +732,7 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // Für MEA-Verteilung (falls Schlüssel Modus = MEA)
+            // ===== MEA-Basis vorbereiten (wie bisher), wird für Plausibilitäten/Notizen weiter genutzt =====
             var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
                            .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
                            .ToList();
@@ -782,8 +782,7 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // --- Neu: Verteilung pro Zähler über den zugewiesenen Schlüssel ---
-            // Sammeln: ownerAmountRaw = CHF vor Skalierung
+            // ===== Neu: Verteilung pro Zähler über ZÄHLER-ZEILEN (StweZaehlerLine) =====
             var ownerAmountRaw = new Dictionary<int, decimal>();
             var ownerNotizParts = new Dictionary<int, List<string>>();
 
@@ -796,112 +795,40 @@ namespace MyCoinFlow.Views
                 ownerNotizParts[ownerId].Add(notizPart);
             }
 
-            // Cache: Schlüssel + Lines
-            var schluesselById = _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId)
-                                    .ToDictionary(x => x.Id, x => x);
-
             foreach (var d in EnergieDiffRows)
             {
                 var diff = d.DiffKwh;
                 if (diff <= 0m) continue;
 
-                // EVU ist typischerweise Hauptzähler/Analyse – falls du EVU künftig auch verteilen willst,
-                // einfach ebenfalls einen Schlüssel zuweisen und nicht skippen.
-                // Ich skippe EVU NICHT automatisch, sondern verlange wie bei allen anderen: Schlüssel muss gesetzt sein.
-                if (!d.SchluesselId.HasValue || d.SchluesselId.Value <= 0)
-                {
-                    MessageBox.Show(
-                        $"Zähler „{d.Name}“ hat keinen zugewiesenen Schlüssel.\n\n" +
-                        "Bitte beim Zähler-Stammdatensatz einen Schlüssel auswählen (z.B. DIREKT/ALLG/HEIZ oder dein eigenes Schema).",
-                        "Energie berechnen",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                var sid = d.SchluesselId.Value;
-                if (!schluesselById.TryGetValue(sid, out var schl))
-                {
-                    MessageBox.Show(
-                        $"Zähler „{d.Name}“ verweist auf einen nicht existierenden Schlüssel (Id={sid}).\n\n" +
-                        "Bitte Zähler-Stammdaten prüfen.",
-                        "Energie berechnen",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
                 var chfTotalForZaehler = diff * preis;
 
-                // MEA-Schlüssel: verteile nach MEA (wie bisher ALLG/HEIZ)
-                if (string.Equals(schl.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
-                {
-                    foreach (var kv in ownerMea)
-                    {
-                        var ownerId = kv.Key;
-                        var mea = kv.Value;
+                // Zähler-Quoten holen
+                var zLines = _db.StweZaehlerLinesGet(d.ZaehlerId);
+                var zSumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
 
-                        var part = chfTotalForZaehler * (mea / sumMea);
-                        if (part == 0m) continue;
-
-                        AddAmount(
-                            ownerId,
-                            part,
-                            $"{d.Name}: {diff:0.###}kWh×{preis:0.####} (MEA {mea:0.###}/{sumMea:0.###}) = {part:0.00}"
-                        );
-                    }
-
-                    continue;
-                }
-
-                // ENERGIE oder FIX → müssen Zeilen/Quoten haben (defensiv)
-                var modus = (schl.Modus ?? "").Trim();
-
-                if (!string.Equals(modus, "MEA", StringComparison.OrdinalIgnoreCase))
-                {
-                    var quotaLines = _db.StweSchluesselLinesGet(sid);
-                    var quotaSumPct = quotaLines.Sum(x => Math.Max(0m, x.AnteilProzent));
-
-                    if (quotaSumPct <= 0m)
-                    {
-                        MessageBox.Show(
-                            $"Schlüssel „{schl.Name}“ (Modus: {modus}) hat keine gültigen Zeilen/Quoten.\n\n" +
-                            "Bitte unter „Liegenschaften → Schlüssel → Zeilen bearbeiten“ die Eigentümer-Quoten erfassen.",
-                            "Energie berechnen",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                        return;
-                    }
-                }
-
-
-
-                // FIX-Schlüssel: verteile nach Schlüsselzeilen (AnteilProzent)
-                var lines = _db.StweSchluesselLinesGet(sid);
-                var sumPct = lines.Sum(x => Math.Max(0m, x.AnteilProzent));
-                if (sumPct <= 0m)
+                if (zSumPct <= 0m)
                 {
                     MessageBox.Show(
-                        $"Schlüssel „{schl.Name}“ hat keine gültigen Anteile.\n\n" +
-                        "Bitte unter „Schlüssel-Zeilen bearbeiten“ Quoten erfassen (Summe > 0).",
+                        $"Zähler „{d.Name}“ hat keine gültigen Verteilzeilen.\n\n" +
+                        "Bitte beim Zähler unter „Zeilen bearbeiten“ die Eigentümer-Quoten erfassen (Summe > 0, ideal 100%).",
                         "Energie berechnen",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
                 }
 
-                foreach (var ln in lines)
+                foreach (var ln in zLines)
                 {
                     var pct = Math.Max(0m, ln.AnteilProzent);
                     if (pct <= 0m) continue;
 
-                    var part = chfTotalForZaehler * (pct / sumPct);
+                    var part = chfTotalForZaehler * (pct / zSumPct);
                     if (part == 0m) continue;
 
                     AddAmount(
                         ln.EigentuemerId,
                         part,
-                        $"{d.Name}: {diff:0.###}kWh×{preis:0.####} × ({pct:0.###}/{sumPct:0.###}) = {part:0.00} [{schl.Name}]"
+                        $"{d.Name}: {diff:0.###}kWh×{preis:0.####} × ({pct:0.###}/{zSumPct:0.###}) = {part:0.00}"
                     );
                 }
             }
@@ -943,6 +870,7 @@ namespace MyCoinFlow.Views
 
             ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
         }
+
 
 
         private void ApplyEnergyAsMeaOnly()
