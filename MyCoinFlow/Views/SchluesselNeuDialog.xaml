@@ -32,11 +32,17 @@
                   materialDesign:HintAssist.Hint="Modus">
             <ComboBoxItem Content="Fix % (manuell)" Tag="FIX"/>
             <ComboBoxItem Content="MEA (automatisch)" Tag="MEA"/>
+            <ComboBoxItem Content="Energie (Zählerbasiert)" Tag="ENERGIE"/>
         </ComboBox>
 
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Margin="0,0,10,0" Style="{StaticResource MaterialDesignOutlinedButton}" Content="Abbrechen" Click="Abbrechen_Click"/>
-            <Button Style="{StaticResource MaterialDesignRaisedButton}" Content="Speichern" Click="Speichern_Click"/>
+            <Button Margin="0,0,10,0"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    Click="Abbrechen_Click"/>
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    Content="Speichern"
+                    Click="Speichern_Click"/>
         </StackPanel>
     </Grid>
 </Window>

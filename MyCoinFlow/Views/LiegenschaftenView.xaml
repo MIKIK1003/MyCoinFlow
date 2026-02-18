@@ -197,6 +197,17 @@
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Command="{Binding SchluesselLoeschenCommand}"
+                            Padding="12,8"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <TextBlock Text="Löschen"/>
+                        </StackPanel>
+                    </Button>
+
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
                             Command="{Binding SchluesselZeilenBearbeitenCommand}"
                             Padding="12,8"
                             Margin="0,0,0,8">

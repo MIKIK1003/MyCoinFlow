@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Zähler"
         Width="520"
-        Height="420"
+        Height="470"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
@@ -39,6 +39,8 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="140"/>
@@ -59,10 +61,18 @@
                           SelectedItem="{Binding SelectedTyp}"
                           Margin="0,2,0,0"/>
 
-                <!-- Einheit -->
-                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Einheit"
-                           Opacity="{Binding EinheitOpacity}"/>
+                <!-- Schlüssel (NEU) -->
+                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Schlüssel"/>
                 <ComboBox Grid.Row="4" Grid.Column="2"
+                          ItemsSource="{Binding SchluesselOptions}"
+                          SelectedItem="{Binding SelectedSchluessel}"
+                          DisplayMemberPath="Name"
+                          Margin="0,2,0,0"/>
+
+                <!-- Einheit -->
+                <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Einheit"
+                           Opacity="{Binding EinheitOpacity}"/>
+                <ComboBox Grid.Row="6" Grid.Column="2"
                           ItemsSource="{Binding Einheiten}"
                           SelectedItem="{Binding SelectedEinheit}"
                           DisplayMemberPath="Bezeichnung"
@@ -70,8 +80,8 @@
                           Margin="0,2,0,0"/>
 
                 <!-- Notiz -->
-                <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Top" Text="Notiz"/>
-                <TextBox Grid.Row="6" Grid.Column="2"
+                <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Top" Text="Notiz"/>
+                <TextBox Grid.Row="8" Grid.Column="2"
                          Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -79,10 +89,10 @@
                          Height="90"/>
 
                 <!-- Info -->
-                <TextBlock Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3"
+                <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3"
                            Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                            TextWrapping="Wrap"
-                           Text="DIREKT: Zähler ist einer Einheit zugeordnet (Wohnungszähler). ALLG/HEIZ/EVU: ohne Einheit."
+                           Text="DIREKT: Zähler ist einer Einheit zugeordnet (Wohnungszähler). ALLG/HEIZ/EVU: ohne Einheit. Schlüssel: wird für die Energie-Verteilung verwendet."
                            Margin="0,6,0,0"/>
             </Grid>
         </Border>

@@ -4659,6 +4659,7 @@ BEGIN
         Name           NVARCHAR(120) NOT NULL,
         Typ            NVARCHAR(12) NOT NULL,   -- 'DIREKT' | 'ALLG' | 'HEIZ' | 'EVU'
         EinheitId      INT NULL,                -- nur bei DIREKT
+        SchluesselId   INT NULL,                -- optional: Verteil-Schlüssel für diesen Zähler
         Notiz          NVARCHAR(200) NULL,
         CreatedAtUtc   DATETIME2 NOT NULL CONSTRAINT DF_StweZaehler_Created DEFAULT SYSUTCDATETIME(),
 
@@ -4666,12 +4667,39 @@ BEGIN
             FOREIGN KEY (LiegenschaftId) REFERENCES dbo.StweLiegenschaft(Id),
 
         CONSTRAINT FK_StweZaehler_Einheit
-            FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id)
+            FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id)        ,
+        CONSTRAINT FK_StweZaehler_Schluessel
+            FOREIGN KEY (SchluesselId) REFERENCES dbo.StweSchluessel(Id)
+
     );
 
     CREATE INDEX IX_StweZaehler_LiegenschaftId ON dbo.StweZaehler(LiegenschaftId);
     CREATE INDEX IX_StweZaehler_EinheitId      ON dbo.StweZaehler(EinheitId);
+    CREATE INDEX IX_StweZaehler_SchluesselId   ON dbo.StweZaehler(SchluesselId);
+
 END;
+
+-- Nachmigration: SchluesselId nachziehen (wenn DB schon existiert)
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehler' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    IF COL_LENGTH('dbo.StweZaehler', 'SchluesselId') IS NULL
+    BEGIN
+        ALTER TABLE dbo.StweZaehler ADD SchluesselId INT NULL;
+    END;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_StweZaehler_Schluessel')
+    BEGIN
+        ALTER TABLE dbo.StweZaehler WITH CHECK
+        ADD CONSTRAINT FK_StweZaehler_Schluessel
+        FOREIGN KEY (SchluesselId) REFERENCES dbo.StweSchluessel(Id);
+    END;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StweZaehler_SchluesselId' AND object_id = OBJECT_ID('dbo.StweZaehler'))
+    BEGIN
+        CREATE INDEX IX_StweZaehler_SchluesselId ON dbo.StweZaehler(SchluesselId);
+    END;
+END;
+
 
 -- ------------------------------------------------------------
 -- ENERGIE: Zählerstände je Set (Alt/Neu)
@@ -5509,7 +5537,7 @@ ORDER BY Id;";
             c.Open();
 
             const string sql = @"
-SELECT Id, LiegenschaftId, Name, Typ, EinheitId, Notiz
+SELECT Id, LiegenschaftId, Name, Typ, EinheitId, SchluesselId, Notiz
 FROM dbo.StweZaehler
 WHERE LiegenschaftId = @lid
 ORDER BY Typ, Name, Id;";
@@ -5528,7 +5556,8 @@ ORDER BY Typ, Name, Id;";
                     Name = r.GetString(2),
                     Typ = r.GetString(3),
                     EinheitId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5)
+                    SchluesselId = r.IsDBNull(5) ? (int?)null : r.GetInt32(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6)
                 });
             }
 
@@ -5550,9 +5579,9 @@ ORDER BY Typ, Name, Id;";
             c.Open();
 
             const string sql = @"
-INSERT INTO dbo.StweZaehler (LiegenschaftId, Name, Typ, EinheitId, Notiz)
+INSERT INTO dbo.StweZaehler (LiegenschaftId, Name, Typ, EinheitId, SchluesselId, Notiz)
 OUTPUT INSERTED.Id
-VALUES (@lid, @n, @t, @eid, @no);";
+VALUES (@lid, @n, @t, @eid, @sid, @no);";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -5560,10 +5589,12 @@ VALUES (@lid, @n, @t, @eid, @no);";
             cmd.Parameters.AddWithValue("@n", z.Name.Trim());
             cmd.Parameters.AddWithValue("@t", z.Typ);
             cmd.Parameters.AddWithValue("@eid", (object?)z.EinheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@sid", (object?)z.SchluesselId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@no", (object?)z.Notiz ?? DBNull.Value);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
+
         public void StweZaehlerUpdate(StweZaehler z)
         {
             EnsureStweSchema();
@@ -5585,6 +5616,7 @@ UPDATE dbo.StweZaehler SET
     Name           = @n,
     Typ            = @t,
     EinheitId      = @eid,
+    SchluesselId   = @sid,
     Notiz          = @no
 WHERE Id = @id;";
 
@@ -5595,6 +5627,7 @@ WHERE Id = @id;";
             cmd.Parameters.AddWithValue("@n", z.Name.Trim());
             cmd.Parameters.AddWithValue("@t", z.Typ);
             cmd.Parameters.AddWithValue("@eid", (object?)z.EinheitId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@sid", (object?)z.SchluesselId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@no", (object?)z.Notiz ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
@@ -5617,32 +5650,57 @@ WHERE Id = @id;";
             return v != null && v != DBNull.Value;
         }
 
-        public void StweZaehlerDelete(int id)
+        public void StweZaehlerDelete(int zaehlerId)
         {
             EnsureStweSchema();
 
-            if (id <= 0) return;
-
-            // Harte Regel: nicht löschen, wenn bereits in Energie-Sets verwendet
-            if (StweZaehlerUsedInEnergieSets(id))
-            {
-                System.Windows.MessageBox.Show(
-                    "Dieser Zähler kann nicht gelöscht werden,\n" +
-                    "weil er bereits in Energie-Sets (Zählerständen) verwendet wird.",
-                    "Löschen nicht möglich",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
-                return;
-            }
+            if (zaehlerId <= 0)
+                throw new ArgumentException("zaehlerId muss > 0 sein.", nameof(zaehlerId));
 
             using var c = CreateConnection();
             c.Open();
 
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "DELETE FROM dbo.StweZaehler WHERE Id = @id;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.ExecuteNonQuery();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // 1) Abhängige Zählerdaten-Lines löschen
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+DELETE FROM dbo.StweZaehlerdatenLine
+WHERE ZaehlerId = @id;";
+                    cmd.Parameters.AddWithValue("@id", zaehlerId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Optional/defensiv: falls es weitere Tabellen gibt, die direkt auf ZaehlerId zeigen,
+                // dann hier ebenfalls vor dem Stamm löschen.
+
+                // 2) Zähler-Stamm löschen
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+DELETE FROM dbo.StweZaehler
+WHERE Id = @id;";
+                    cmd.Parameters.AddWithValue("@id", zaehlerId);
+
+                    var affected = cmd.ExecuteNonQuery();
+                    if (affected != 1)
+                        throw new InvalidOperationException($"Zähler (Id={zaehlerId}) konnte nicht gelöscht werden (affected={affected}).");
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { /* ignore */ }
+                throw;
+            }
         }
+
 
         public List<(int ZaehlerId, decimal AltKwh, decimal NeuKwh)> StweEnergieZaehlerGetBySet(int setId)
         {
@@ -6499,6 +6557,71 @@ WHERE Id = @id;";
                     System.Windows.MessageBoxImage.Error);
             }
         }
+
+        public void StweSchluesselDelete(int schluesselId)
+        {
+            EnsureStweSchema();
+
+            if (schluesselId <= 0)
+                throw new ArgumentException("schluesselId muss > 0 sein.", nameof(schluesselId));
+
+            using var c = CreateConnection();
+            c.Open();
+
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // 1) Prüfen, ob dieser Schlüssel bei Zählern verwendet wird (nur wenn Spalte existiert)
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+IF COL_LENGTH('dbo.StweZaehler', 'SchluesselId') IS NOT NULL
+BEGIN
+    SELECT COUNT(1) FROM dbo.StweZaehler WHERE SchluesselId = @sid;
+END
+ELSE
+BEGIN
+    SELECT 0;
+END";
+                    var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; cmd.Parameters.Add(p);
+
+                    var usedCount = Convert.ToInt32(cmd.ExecuteScalar());
+                    if (usedCount > 0)
+                        throw new InvalidOperationException("Dieser Schlüssel kann nicht gelöscht werden, weil mindestens ein Zähler darauf verweist. Bitte zuerst beim Zähler einen anderen Schlüssel wählen.");
+                }
+
+                // 2) Schlüsselzeilen löschen (FK-Abhängigkeit)
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM dbo.StweSchluesselLine WHERE SchluesselId = @sid;";
+                    var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; cmd.Parameters.Add(p);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 3) Schlüssel selbst löschen
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM dbo.StweSchluessel WHERE Id = @sid;";
+                    var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; cmd.Parameters.Add(p);
+
+                    var affected = cmd.ExecuteNonQuery();
+                    if (affected != 1)
+                        throw new InvalidOperationException("Schlüssel konnte nicht gelöscht werden (nicht gefunden oder bereits gelöscht).");
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { /* ignore */ }
+                throw;
+            }
+        }
+
 
         public void StweSchluesselRename(int schluesselId, string newName)
         {

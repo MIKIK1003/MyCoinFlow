@@ -24,6 +24,9 @@ namespace MyCoinFlow.Views
 
         public ObservableCollection<StweEinheit> Einheiten { get; } = new();
 
+        // NEU: Schlüssel-Liste für die Energie-Verteilung
+        public ObservableCollection<StweSchluessel> SchluesselOptions { get; } = new();
+
         private string _selectedTyp = "DIREKT";
         public string SelectedTyp
         {
@@ -57,10 +60,24 @@ namespace MyCoinFlow.Views
             }
         }
 
+        private StweSchluessel? _selectedSchluessel;
+        public StweSchluessel? SelectedSchluessel
+        {
+            get => _selectedSchluessel;
+            set
+            {
+                _selectedSchluessel = value;
+                OnPropertyChanged();
+                Model.SchluesselId = _selectedSchluessel?.Id;
+            }
+        }
+
         public bool IsEinheitEnabled => string.Equals(SelectedTyp, "DIREKT", StringComparison.OrdinalIgnoreCase);
         public double EinheitOpacity => IsEinheitEnabled ? 1.0 : 0.5;
 
-        public ZaehlerNeuDialog(int liegenschaftId, ObservableCollection<StweEinheit> einheiten)
+        public ZaehlerNeuDialog(int liegenschaftId,
+                                ObservableCollection<StweEinheit> einheiten,
+                                ObservableCollection<StweSchluessel> schluessel)
         {
             InitializeComponent();
 
@@ -71,9 +88,19 @@ namespace MyCoinFlow.Views
                     Einheiten.Add(e);
             }
 
+            // Schlüssel kopieren (defensiv)
+            if (schluessel != null)
+            {
+                foreach (var s in schluessel)
+                    SchluesselOptions.Add(s);
+            }
+
             Model.LiegenschaftId = liegenschaftId;
             Model.Typ = "DIREKT";
             _selectedTyp = "DIREKT";
+
+            // Default: erster Schlüssel, wenn vorhanden
+            SelectedSchluessel = SchluesselOptions.FirstOrDefault();
 
             DataContext = this;
         }
@@ -88,6 +115,7 @@ namespace MyCoinFlow.Views
             Model.Name = existing.Name ?? "";
             Model.Typ = (existing.Typ ?? "").Trim().ToUpperInvariant();
             Model.EinheitId = existing.EinheitId;
+            Model.SchluesselId = existing.SchluesselId;
             Model.Notiz = existing.Notiz;
 
             SelectedTyp = string.IsNullOrWhiteSpace(Model.Typ) ? "DIREKT" : Model.Typ;
@@ -96,6 +124,11 @@ namespace MyCoinFlow.Views
                 SelectedEinheit = Einheiten.FirstOrDefault(x => x.Id == Model.EinheitId.Value);
             else
                 SelectedEinheit = null;
+
+            if (Model.SchluesselId.HasValue)
+                SelectedSchluessel = SchluesselOptions.FirstOrDefault(x => x.Id == Model.SchluesselId.Value);
+            else
+                SelectedSchluessel = SchluesselOptions.FirstOrDefault();
 
             OnPropertyChanged(nameof(HeaderText));
         }
@@ -144,6 +177,14 @@ namespace MyCoinFlow.Views
             {
                 // ALLG/HEIZ/EVU -> EinheitId muss leer sein
                 Model.EinheitId = null;
+            }
+
+            // Schlüssel ist für die Energie-Verteilung nötig -> Pflicht
+            if (!Model.SchluesselId.HasValue || Model.SchluesselId.Value <= 0)
+            {
+                MessageBox.Show("Bitte einen Schlüssel wählen (für die Energie-Verteilung).", "Zähler",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
             }
 
             return true;

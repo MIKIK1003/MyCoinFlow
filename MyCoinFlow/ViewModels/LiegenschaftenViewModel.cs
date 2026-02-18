@@ -69,7 +69,15 @@ namespace MyCoinFlow.ViewModels
         public StweSchluessel? SelectedSchluessel
         {
             get => _selectedSchluessel;
-            set { _selectedSchluessel = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+            set
+            {
+                _selectedSchluessel = value;
+                OnPropertyChanged();
+
+                // wichtig: Button-Enable neu bewerten
+                SchluesselZeilenBearbeitenCommand?.RaiseCanExecuteChanged();
+            }
+
         }
 
         private StweZaehler? _selectedZaehler;
@@ -107,6 +115,8 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeuerSchluesselCommand { get; }
         public RelayCommand SchluesselZeilenBearbeitenCommand { get; }
         public RelayCommand SchluesselUmbenennenCommand { get; }
+        public RelayCommand SchluesselLoeschenCommand { get; }   // NEU
+
 
         // NEU: Zähler
         public RelayCommand NeuerZaehlerCommand { get; }
@@ -144,9 +154,12 @@ namespace MyCoinFlow.ViewModels
             NeuerSchluesselCommand = new RelayCommand(_ => NeuerSchluessel(), _ => SelectedLiegenschaft != null);
             SchluesselZeilenBearbeitenCommand = new RelayCommand(
                 _ => SchluesselZeilenBearbeiten(),
-                _ => SelectedSchluessel != null && SelectedSchluessel.Modus == "FIX"
-            );
+                _ => SelectedSchluessel != null
+                && (
+                string.Equals(SelectedSchluessel.Modus?.Trim(), "FIX", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(SelectedSchluessel.Modus?.Trim(), "ENERGIE", StringComparison.OrdinalIgnoreCase)));
 
+            SchluesselLoeschenCommand = new RelayCommand(_ => SchluesselLoeschen(), _ => SelectedSchluessel != null);
             SchluesselUmbenennenCommand = new RelayCommand(_ => SchluesselUmbenennen(), _ => SelectedSchluessel != null);
 
             // NEU: Zähler Commands
@@ -482,20 +495,58 @@ namespace MyCoinFlow.ViewModels
         {
             if (SelectedLiegenschaft == null) return;
 
-            var dlg = new SchluesselNeuDialog();
+            // ✅ Dialog braucht die LiegenschaftId
+            var dlg = new SchluesselNeuDialog(SelectedLiegenschaft.Id);
             TrySetOwner(dlg);
 
             if (dlg.ShowDialog() == true)
             {
+                // dlg.Model enthält Name + Modus (FIX/MEA/ENERGIE) bereits korrekt.
                 _db.StweSchluesselInsert(SelectedLiegenschaft.Id, dlg.Model.Name, dlg.Model.Modus);
                 LoadSchluessel();
             }
         }
 
+        private void SchluesselLoeschen()
+        {
+            if (SelectedSchluessel == null)
+                return;
+
+            var s = SelectedSchluessel;
+
+            var res = MessageBox.Show(
+                $"Schlüssel wirklich löschen?\n\nName: {s.Name}\nModus: {s.Modus}\n\nHinweis: Wenn ein Zähler auf diesen Schlüssel zeigt, wird das Löschen verhindert.",
+                "Schlüssel löschen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                _db.StweSchluesselDelete(s.Id);
+                LoadSchluessel();
+                StatusText = "Schlüssel gelöscht.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Schlüssel löschen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+
+
         private void SchluesselZeilenBearbeiten()
         {
-            if (SelectedSchluessel == null || SelectedSchluessel.Modus != "FIX")
+            if (SelectedSchluessel == null)
                 return;
+
+            var modus = (SelectedSchluessel.Modus ?? "").Trim();
+            if (!string.Equals(modus, "FIX", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(modus, "ENERGIE", StringComparison.OrdinalIgnoreCase))
+                return;
+
 
             LoadEigentuemer();
 
@@ -539,11 +590,14 @@ namespace MyCoinFlow.ViewModels
             if (SelectedLiegenschaft == null) return;
 
             // Einheiten müssen verfügbar sein für DIREKT-Zähler
-            // (Einheiten ist bereits geladen, aber defensiv: falls leer -> LoadEinheiten)
             if (Einheiten.Count == 0)
                 LoadEinheiten();
 
-            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten);
+            // Schlüssel müssen verfügbar sein für die Energie-Verteilung
+            if (Schluessel.Count == 0)
+                LoadSchluessel();
+
+            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten, Schluessel);
             TrySetOwner(dlg);
 
             if (dlg.ShowDialog() == true)
@@ -561,7 +615,10 @@ namespace MyCoinFlow.ViewModels
             if (Einheiten.Count == 0 && SelectedLiegenschaft != null)
                 LoadEinheiten();
 
-            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten);
+            if (Schluessel.Count == 0 && SelectedLiegenschaft != null)
+                LoadSchluessel();
+
+            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten, Schluessel);
             TrySetOwner(dlg);
 
             dlg.SetModel(SelectedZaehler);
@@ -573,6 +630,7 @@ namespace MyCoinFlow.ViewModels
                 StatusText = "Zähler aktualisiert.";
             }
         }
+
 
         private void ZaehlerLoeschen()
         {
