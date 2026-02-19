@@ -6,7 +6,6 @@
              xmlns:views="clr-namespace:MyCoinFlow.Views">
     <Application.Resources>
 
-
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!-- Material Design Theme -->
@@ -49,10 +48,36 @@
                 <views:TransaktionSetsView />
             </DataTemplate>
 
+            <!-- ======= Design Tokens (nur Optik, keine Logik) ======= -->
+            <Thickness x:Key="AppSpacingXS">6</Thickness>
+            <Thickness x:Key="AppSpacingS">8</Thickness>
+            <Thickness x:Key="AppSpacingM">12</Thickness>
+            <Thickness x:Key="AppSpacingL">16</Thickness>
 
+
+            <CornerRadius x:Key="AppCornerRadius.Card">10</CornerRadius>
 
             <!-- ======= Brand ======= -->
+            <!-- Bleibt bewusst Coral (dein aktuelles Branding). Icons in Buttons folgen dem Button-Foreground. -->
             <SolidColorBrush x:Key="AppBrandBrush" Color="Coral"/>
+
+            <!-- ======= Reusable Layout Styles (optional für Views) ======= -->
+            <Style x:Key="SidebarCard" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="CornerRadius" Value="{StaticResource AppCornerRadius.Card}"/>
+                <Setter Property="Padding" Value="{StaticResource AppSpacingM}"/>
+            </Style>
+
+            <Style x:Key="SidebarSectionHeader" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="18"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,0,0,10"/>
+            </Style>
+
+            <Style x:Key="SidebarGroupHeader" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="0,10,0,6"/>
+            </Style>
 
             <!-- ======= Globale PackIcon-Styles (Buttons, Grids, etc.) ======= -->
             <Style TargetType="materialDesign:PackIcon" x:Key="DefaultIconStyle">
@@ -60,6 +85,7 @@
                 <Setter Property="Height" Value="20"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
+                <!-- Default bleibt Brand. In Buttons überschreiben wir Foreground bewusst über den Button. -->
                 <Setter Property="Foreground" Value="{StaticResource AppBrandBrush}"/>
             </Style>
 
@@ -67,7 +93,7 @@
             <Style x:Key="DefaultIconStyle.Nav" TargetType="materialDesign:PackIcon">
                 <Setter Property="Width" Value="35"/>
                 <Setter Property="Height" Value="35"/>
-                <Setter Property="Margin" Value="0,0,10,0"/>
+                <Setter Property="Margin" Value="0,0,25,0"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="Foreground" Value="{StaticResource AppBrandBrush}"/>
             </Style>
@@ -77,12 +103,15 @@
                    TargetType="Button"
                    BasedOn="{StaticResource MaterialDesignRaisedButton}">
                 <Setter Property="Padding" Value="12,8"/>
+                <Setter Property="MinHeight" Value="40"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="ContentTemplate">
                     <Setter.Value>
                         <DataTemplate>
                             <DockPanel LastChildFill="True" VerticalAlignment="Center">
                                 <materialDesign:PackIcon
                                     Style="{StaticResource DefaultIconStyle}"
+                                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
                                     Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"
                                     DockPanel.Dock="Left"/>
                                 <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
@@ -117,6 +146,7 @@
             <!-- ======= Navigation: Icon links, Text rechts, Flat ======= -->
             <Style x:Key="NavIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
                 <Setter Property="Padding" Value="15,0"/>
+                <Setter Property="MinHeight" Value="52"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="FontSize" Value="20"/>
                 <Setter Property="Background" Value="Transparent"/>
@@ -127,6 +157,7 @@
                             <DockPanel LastChildFill="True" VerticalAlignment="Center">
                                 <materialDesign:PackIcon DockPanel.Dock="Left"
                                     Style="{StaticResource DefaultIconStyle.Nav}"
+                                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
                                     Kind="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Tag}"/>
                                 <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
                             </DockPanel>
@@ -162,7 +193,7 @@
                    TargetType="Button"
                    BasedOn="{StaticResource NavIconButton}">
                 <Setter Property="Padding" Value="16,10"/>
-                <Setter Property="MinHeight" Value="40"/>
+                <Setter Property="MinHeight" Value="60"/>
                 <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="0"/>
 
                 <Style.Triggers>

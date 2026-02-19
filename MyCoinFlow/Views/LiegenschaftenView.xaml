@@ -5,358 +5,238 @@
 
     <Grid Margin="24">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="280"/>
             <ColumnDefinition Width="16"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- LINKS: Aktionen -->
         <Border Grid.Column="0"
-                Background="{DynamicResource MaterialDesignPaper}"
-                CornerRadius="10"
-                Padding="12">
+                Style="{StaticResource SidebarCard}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
 
                     <TextBlock Text="Aktionen"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,10"/>
+                               Style="{StaticResource SidebarSectionHeader}"/>
 
                     <!-- Liegenschaften -->
                     <TextBlock Text="Liegenschaften"
-                               FontWeight="SemiBold"
-                               Margin="0,6,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding NeueLiegenschaftCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="HomePlusOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Neu"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="HomePlusOutline"
+                            Content="Neu"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding LiegenschaftBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding LiegenschaftLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            Margin="0,0,0,8"/>
 
                     <Separator Margin="0,6,0,10"/>
 
                     <!-- Einheiten -->
                     <TextBlock Text="Einheiten"
-                               FontWeight="SemiBold"
-                               Margin="0,10,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding NeueEinheitCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Einheit hinzufügen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="Plus"
+                            Content="Einheit hinzufügen"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding EinheitBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding EinheitLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            Margin="0,0,0,8"/>
 
                     <Separator Margin="0,6,0,10"/>
 
                     <!-- Eigentümer -->
                     <TextBlock Text="Eigentümer"
-                               FontWeight="SemiBold"
-                               Margin="0,10,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
-                                Command="{Binding NeueEigentuemerCommand}"
-                                Padding="12,8"
-                                Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Erfassen"/>
-                        </StackPanel>
-                    </Button>
+                    <Button Style="{StaticResource IconTextButton}"
+                            Command="{Binding NeueEigentuemerCommand}"
+                            Tag="Plus"
+                            Content="Erfassen"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding EigentuemerBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding EigentuemerLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,12">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            Margin="0,0,0,12"/>
 
                     <Separator Margin="0,6,0,10"/>
 
                     <!-- Zuordnungen -->
                     <TextBlock Text="Zuordnungen"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding EigentumZuordnenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="LinkVariant" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zuordnen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="LinkVariant"
+                            Content="Zuordnen"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding ZuordnungBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="CalendarEdit" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zuordnung bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="CalendarEdit"
+                            Content="Zuordnung bearbeiten"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding ZuordnungLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="LinkOff" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zuordnung löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="LinkOff"
+                            Content="Zuordnung löschen"
+                            Margin="0,0,0,8"/>
 
                     <Separator Margin="0,6,0,10"/>
 
                     <!-- Schlüssel -->
                     <TextBlock Text="Schlüssel"
-                               FontWeight="SemiBold"
-                               Margin="0,10,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding NeuerSchluesselCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Schlüssel neu"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PlusCircleOutline"
+                            Content="Schlüssel neu"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding SchluesselUmbenennenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="RenameBox" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Umbenennen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="RenameBox"
+                            Content="Umbenennen"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding SchluesselLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            Margin="0,0,0,8"/>
 
-
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding SchluesselZeilenBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PlaylistEdit" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zeilen bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PlaylistEdit"
+                            Content="Zeilen bearbeiten"
+                            Margin="0,0,0,8"/>
 
                     <Separator Margin="0,6,0,10"/>
 
-                    <!-- Zähler (NEU) -->
+                    <!-- Zähler -->
                     <TextBlock Text="Zähler"
-                               FontWeight="SemiBold"
-                               Margin="0,10,0,6"/>
+                               Style="{StaticResource SidebarGroupHeader}"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding NeuerZaehlerCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="MeterElectricOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Zähler neu"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="MeterElectricOutline"
+                            Content="Zähler neu"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding ZaehlerBearbeitenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Bearbeiten"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            Margin="0,0,0,8"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    <Button Style="{StaticResource IconTextButton}"
                             Command="{Binding ZaehlerLoeschenCommand}"
-                            Padding="12,8"
-                            Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Löschen"/>
-                        </StackPanel>
-                    </Button>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            Margin="0,0,0,8"/>
 
                     <TextBlock Text="Status"
-                               FontWeight="SemiBold"
+                               Style="{StaticResource SidebarGroupHeader}"
                                Margin="0,16,0,6"/>
 
                     <TextBlock Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                                Text="{Binding StatusText}"
                                TextWrapping="Wrap"/>
+
                 </StackPanel>
             </ScrollViewer>
         </Border>
 
-        <!-- RECHTS: Inhalt -->
+        <!-- RECHTS: Inhalt (unverändert) -->
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
-                <!-- Titel + Status -->
                 <RowDefinition Height="Auto"/>
-                <!-- 0 -->
                 <RowDefinition Height="8"/>
-                <!-- 1 -->
                 <RowDefinition Height="Auto"/>
-                <!-- 2 -->
                 <RowDefinition Height="18"/>
-                <!-- 3 -->
 
-                <!-- Liegenschaften -->
                 <RowDefinition Height="Auto"/>
-                <!-- 4 -->
                 <RowDefinition Height="10"/>
-                <!-- 5 -->
                 <RowDefinition Height="220"/>
-                <!-- 6 -->
                 <RowDefinition Height="18"/>
-                <!-- 7 -->
 
-                <!-- Einheiten -->
                 <RowDefinition Height="Auto"/>
-                <!-- 8 -->
                 <RowDefinition Height="10"/>
-                <!-- 9 -->
                 <RowDefinition Height="200"/>
-                <!-- 10 -->
                 <RowDefinition Height="18"/>
-                <!-- 11 -->
 
-                <!-- Eigentümer -->
                 <RowDefinition Height="Auto"/>
-                <!-- 12 -->
                 <RowDefinition Height="10"/>
-                <!-- 13 -->
                 <RowDefinition Height="160"/>
-                <!-- 14 -->
                 <RowDefinition Height="18"/>
-                <!-- 15 -->
 
-                <!-- Zuordnungen -->
                 <RowDefinition Height="Auto"/>
-                <!-- 16 -->
                 <RowDefinition Height="10"/>
-                <!-- 17 -->
                 <RowDefinition Height="160"/>
-                <!-- 18 -->
                 <RowDefinition Height="18"/>
-                <!-- 19 -->
 
-                <!-- Schlüssel -->
                 <RowDefinition Height="Auto"/>
-                <!-- 20 -->
                 <RowDefinition Height="10"/>
-                <!-- 21 -->
                 <RowDefinition Height="180"/>
-                <!-- 22 -->
                 <RowDefinition Height="18"/>
-                <!-- 23 -->
 
-                <!-- Zähler -->
                 <RowDefinition Height="Auto"/>
-                <!-- 24 -->
                 <RowDefinition Height="10"/>
-                <!-- 25 -->
                 <RowDefinition Height="180"/>
-                <!-- 26 -->
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
-               FontSize="26"
-               FontWeight="SemiBold"
-               Text="Liegenschaften (STWE)"/>
+                       FontSize="26"
+                       FontWeight="SemiBold"
+                       Text="Liegenschaften (STWE)"/>
 
             <TextBlock Grid.Row="2"
-               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-               Text="{Binding StatusText}"
-               TextWrapping="Wrap"/>
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Text="{Binding StatusText}"
+                       TextWrapping="Wrap"/>
 
             <!-- Liegenschaften -->
             <TextBlock Grid.Row="4" FontSize="18" FontWeight="SemiBold" Text="Liegenschaften"/>
             <DataGrid Grid.Row="6"
-              ItemsSource="{Binding Liegenschaften}"
-              SelectedItem="{Binding SelectedLiegenschaft}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="220">
+                      ItemsSource="{Binding Liegenschaften}"
+                      SelectedItem="{Binding SelectedLiegenschaft}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="220">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Strasse" Binding="{Binding Strasse}" Width="2*"/>
@@ -368,13 +248,13 @@
             <!-- Einheiten -->
             <TextBlock Grid.Row="8" FontSize="18" FontWeight="SemiBold" Text="Einheiten"/>
             <DataGrid Grid.Row="10"
-              ItemsSource="{Binding Einheiten}"
-              SelectedItem="{Binding SelectedEinheit}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="200">
+                      ItemsSource="{Binding Einheiten}"
+                      SelectedItem="{Binding SelectedEinheit}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="200">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="2*"/>
                     <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>
@@ -386,13 +266,13 @@
             <!-- Eigentümer -->
             <TextBlock Grid.Row="12" FontSize="18" FontWeight="SemiBold" Text="Eigentümer"/>
             <DataGrid Grid.Row="14"
-              ItemsSource="{Binding Eigentuemer}"
-              SelectedItem="{Binding SelectedEigentuemer}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="160">
+                      ItemsSource="{Binding Eigentuemer}"
+                      SelectedItem="{Binding SelectedEigentuemer}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="160">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="E-Mail" Binding="{Binding Email}" Width="2*"/>
@@ -403,13 +283,13 @@
             <!-- Zuordnungen -->
             <TextBlock Grid.Row="16" FontSize="18" FontWeight="SemiBold" Text="Zuordnungen"/>
             <DataGrid Grid.Row="18"
-              ItemsSource="{Binding EigentumRows}"
-              SelectedItem="{Binding SelectedEigentumRow}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="160">
+                      ItemsSource="{Binding EigentumRows}"
+                      SelectedItem="{Binding SelectedEigentumRow}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="160">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Eigentümer" Binding="{Binding EigentuemerName}" Width="2*"/>
                     <DataGridTextColumn Header="Von" Binding="{Binding GueltigVon}" Width="*"/>
@@ -420,13 +300,13 @@
             <!-- Schlüssel -->
             <TextBlock Grid.Row="20" FontSize="18" FontWeight="SemiBold" Text="Schlüssel (Verteilpläne)"/>
             <DataGrid Grid.Row="22"
-              ItemsSource="{Binding Schluessel}"
-              SelectedItem="{Binding SelectedSchluessel}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="180">
+                      ItemsSource="{Binding Schluessel}"
+                      SelectedItem="{Binding SelectedSchluessel}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="180">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="*"/>
@@ -436,13 +316,13 @@
             <!-- Zähler -->
             <TextBlock Grid.Row="24" FontSize="18" FontWeight="SemiBold" Text="Zähler (Strom)"/>
             <DataGrid Grid.Row="26"
-              ItemsSource="{Binding Zaehler}"
-              SelectedItem="{Binding SelectedZaehler}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              Margin="0,6,0,0"
-              Height="180">
+                      ItemsSource="{Binding Zaehler}"
+                      SelectedItem="{Binding SelectedZaehler}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      Margin="0,6,0,0"
+                      Height="180">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="*"/>

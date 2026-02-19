@@ -15,124 +15,127 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="320" MinWidth="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Column="0"
-                    Background="{DynamicResource MaterialDesignPaper}">
+        <!-- LINKS: Hauptmenü (optisch vereinheitlicht) -->
+        <Border Grid.Column="0"
+                Style="{StaticResource SidebarCard}"
+                Margin="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <Button Style="{StaticResource NavIconButton}"
-                    Tag="ViewDashboard"
-                    Content="Dashboard"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowDashboardCommand}"
-                    Margin="15"/>
+                <!-- Menü -->
+                <ScrollViewer Grid.Row="0"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="SwapHorizontal"
-                    Content="Transaktionen"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowTransactionsCommand}"
-                    Margin="15"/>
+                        <TextBlock Text="MyCoinFlow"
+                                   Style="{StaticResource SidebarSectionHeader}"/>
 
-            <!-- ✅ PLUS -->
-            <Button x:Name="NavStweSetsButton"
-                    Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="PlaylistPlus"
-                    Content="STWE-Sets"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowTransaktionSetsCommand}"
-                    Margin="15"/>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="ViewDashboard"
+                                Content="Dashboard"
+                                Command="{Binding ShowDashboardCommand}"
+                                Margin="0,0,0,8"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="FileTreeOutline"
-                    Content="Kontenplan"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowAccountsCommand}"
-                    Margin="15"/>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="SwapHorizontal"
+                                Content="Transaktionen"
+                                Command="{Binding ShowTransactionsCommand}"
+                                Margin="0,0,0,8"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="BankOutline"
-                    Content="Geldinstitute"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowInstitutionsCommand}"
-                    Margin="15"/>
+                        <!-- ✅ PLUS -->
+                        <Button x:Name="NavStweSetsButton"
+                                Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="PlaylistPlus"
+                                Content="STWE-Sets"
+                                Command="{Binding ShowTransaktionSetsCommand}"
+                                Margin="0,0,0,8"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="AccountBoxOutline"
-                    Content="Adressen"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowAddressesCommand}"
-                    Margin="15"/>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="FileTreeOutline"
+                                Content="Kontenplan"
+                                Command="{Binding ShowAccountsCommand}"
+                                Margin="0,0,0,8"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="HandCoin"
-                    Content="Budget"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowBudgetsCommand}"
-                    Margin="15"/>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="BankOutline"
+                                Content="Geldinstitute"
+                                Command="{Binding ShowInstitutionsCommand}"
+                                Margin="0,0,0,8"/>
 
-            <!-- ✅ PLUS -->
-            <Button x:Name="NavLiegenschaftenButton"
-                    Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="HomeCityOutline"
-                    Content="Liegenschaften"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowLiegenschaftenCommand}"
-                    Margin="15"/>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="AccountBoxOutline"
+                                Content="Adressen"
+                                Command="{Binding ShowAddressesCommand}"
+                                Margin="0,0,0,8"/>
 
-            <Button Style="{StaticResource NavIconButton_Emphasis}"
-                    Tag="Cog"
-                    Content="Einstellungen"
-                    MinHeight="50"
-                    Padding="12,8"
-                    Command="{Binding ShowAdminCommand}"
-                    Margin="15"/>
-        </StackPanel>
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="HandCoin"
+                                Content="Budget"
+                                Command="{Binding ShowBudgetsCommand}"
+                                Margin="0,0,0,8"/>
 
+                        <!-- ✅ PLUS -->
+                        <Button x:Name="NavLiegenschaftenButton"
+                                Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="HomeCityOutline"
+                                Content="Liegenschaften"
+                                Command="{Binding ShowLiegenschaftenCommand}"
+                                Margin="0,0,0,8"/>
+
+                        <Button Style="{StaticResource NavIconButton_Emphasis}"
+                                Tag="Cog"
+                                Content="Einstellungen"
+                                Command="{Binding ShowAdminCommand}"
+                                Margin="0,0,0,8"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Footer -->
+                <Grid Grid.Row="1"
+                      Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="ExitButton"
+                            Style="{StaticResource IconTextButton.Danger}"
+                            Tag="Power"
+                            Content="Beenden"
+                            ToolTip="MyCoinFlow beenden"/>
+
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               FontSize="11"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Text="{Binding ElementName=RootWindow, Path=VersionText,
+                                              FallbackValue=v0.0.0, TargetNullValue=v0.0.0}"/>
+                </Grid>
+
+            </Grid>
+        </Border>
+
+        <!-- RECHTS: Inhalt (unverändert) -->
         <ContentControl Grid.Column="1"
-                        Content="{Binding CurrentViewModel}"/>
+                        Content="{Binding CurrentViewModel}" RenderTransformOrigin="0.5,0.5">
+            <ContentControl.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform/>
+                    <SkewTransform AngleY="0.073"/>
+                    <RotateTransform/>
+                    <TranslateTransform Y="-0.999"/>
+                </TransformGroup>
+            </ContentControl.RenderTransform>
+        </ContentControl>
 
-        <Grid Grid.Column="0"
-              VerticalAlignment="Bottom"
-              Margin="12,0,12,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <Button x:Name="ExitButton"
-                    Padding="12,8"
-                    MinHeight="36"
-                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                    ToolTip="MyCoinFlow beenden">
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="Power"
-                                             Width="18"
-                                             Height="18"
-                                             Margin="0,0,8,0"
-                                             Foreground="{DynamicResource MaterialDesignValidationErrorBrush}"/>
-                    <TextBlock Text="Beenden"/>
-                </StackPanel>
-            </Button>
-
-            <TextBlock Grid.Column="1"
-                       VerticalAlignment="Center"
-                       Margin="12,0,0,0"
-                       FontSize="11"
-                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                       Text="{Binding ElementName=RootWindow, Path=VersionText,
-                                      FallbackValue=v0.0.0, TargetNullValue=v0.0.0}"/>
-        </Grid>
     </Grid>
 </Window>
