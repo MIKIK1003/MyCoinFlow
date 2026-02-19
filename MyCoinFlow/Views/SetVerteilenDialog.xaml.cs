@@ -292,27 +292,34 @@ namespace MyCoinFlow.Views
             }
         }
 
-
         private void LoadSchluessel()
         {
             Schluessel.Clear();
+
+            // 0) Pseudo-Schlüssel für Energie (Zähler) – nur UI, nie DB
+            var energieUi = new StweSchluessel
+            {
+                Id = -1,
+                LiegenschaftId = _set.LiegenschaftId,
+                Name = "Energie (Zähler)",
+                Modus = "ENERGIE"
+            };
+            Schluessel.Add(energieUi);
+
+            // 1) echte Schlüssel aus DB
             foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
                 Schluessel.Add(s);
 
-            // Standard: MEA (meist verwendet), dann FIX, sonst erster
-            // Wenn schon verteilt wurde: den verwendeten Schlüssel anzeigen (z.B. ENERGIE)
-            // sonst Standard: MEA → FIX → erster
+            // 2) Wenn schon verteilt wurde: verwendeten Schlüssel anzeigen (z.B. ENERGIE)
+            // sonst Standard: MEA → FIX → erster echter → Energie
             if (!string.IsNullOrWhiteSpace(_lastUsedSourceFromRows))
             {
-                // ENERGIE ist Modus, aber Source ist "ENERGIE"
                 if (string.Equals(_lastUsedSourceFromRows, "ENERGIE", StringComparison.OrdinalIgnoreCase))
                 {
-                    SelectedSchluessel = Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase))
-                                         ?? Schluessel.FirstOrDefault();
+                    SelectedSchluessel = energieUi;
                 }
                 else if (_lastUsedSourceFromRows.StartsWith("MEA:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Source "MEA:<id>"
                     if (int.TryParse(_lastUsedSourceFromRows.Substring(4), out var id))
                         SelectedSchluessel = Schluessel.FirstOrDefault(x => x.Id == id) ?? Schluessel.FirstOrDefault();
                     else
@@ -320,7 +327,6 @@ namespace MyCoinFlow.Views
                 }
                 else if (_lastUsedSourceFromRows.StartsWith("FIX:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Source "FIX:<id>"
                     if (int.TryParse(_lastUsedSourceFromRows.Substring(4), out var id))
                         SelectedSchluessel = Schluessel.FirstOrDefault(x => x.Id == id) ?? Schluessel.FirstOrDefault();
                     else
@@ -328,11 +334,11 @@ namespace MyCoinFlow.Views
                 }
                 else
                 {
-                    // unbekannter Source -> Standard
                     SelectedSchluessel =
                         Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
                         ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
-                        ?? Schluessel.FirstOrDefault();
+                        ?? Schluessel.FirstOrDefault(x => x.Id != -1)
+                        ?? energieUi;
                 }
             }
             else
@@ -340,14 +346,14 @@ namespace MyCoinFlow.Views
                 SelectedSchluessel =
                     Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "MEA", StringComparison.OrdinalIgnoreCase))
                     ?? Schluessel.FirstOrDefault(x => string.Equals(x.Modus, "FIX", StringComparison.OrdinalIgnoreCase))
-                    ?? Schluessel.FirstOrDefault();
+                    ?? Schluessel.FirstOrDefault(x => x.Id != -1)
+                    ?? energieUi;
             }
 
             UpdateEnergyVisibility();
-
-
-            UpdateEnergyVisibility();
         }
+
+
 
         private void LoadZaehlerdatenSets()
         {
@@ -416,7 +422,8 @@ namespace MyCoinFlow.Views
 
         private void UpdateEnergyVisibility()
         {
-            IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus, "ENERGIE", StringComparison.OrdinalIgnoreCase);
+            IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus?.Trim(), "ENERGIE", StringComparison.OrdinalIgnoreCase);
+
         }
 
         private void RefreshEnergieInfo()
@@ -799,6 +806,8 @@ namespace MyCoinFlow.Views
             {
                 var diff = d.DiffKwh;
                 if (diff <= 0m) continue;
+
+                if (string.Equals(d.Typ?.Trim(), "EVU", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var chfTotalForZaehler = diff * preis;
 

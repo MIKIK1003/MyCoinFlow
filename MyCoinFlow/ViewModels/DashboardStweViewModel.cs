@@ -182,7 +182,6 @@ namespace MyCoinFlow.ViewModels
             SolarAnteilXAxes = new[] { new Axis { Labels = qLabels } };
             SolarAnteilYAxes = new[] { new Axis { MinLimit = 0, MaxLimit = 100 } };
 
-            // Default: 0-Werte
             double[] rechnungDelta = new double[4];
             double[] interneDelta = new double[4];
             double[] solarDelta = new double[4];
@@ -199,58 +198,82 @@ namespace MyCoinFlow.ViewModels
                 return;
             }
 
-            // 1) Aus DB: Punkte (Label = "MM.yyyy") -> pro Quartal den *letzten* Stand nehmen
-            var points = _db.StweEnergieChartGet(_liegenschaftId, _von, _bis);
+            // Zählerstamm (Typ) + ZählerdatenSets im Zeitraum (+ 1 Set davor als Basis)
+            var zaehler = _db.StweZaehlerGetByLiegenschaft(_liegenschaftId);
+            var zaehlerById = zaehler.ToDictionary(z => z.Id);
 
-            // Quartal -> letzter Stand (nicht Summe!)
-            double?[] rechnungStand = new double?[4];
-            double?[] interneStand = new double?[4];
-            double?[] solarStand = new double?[4];
-            DateTime?[] lastDt = new DateTime?[4];
+            var setsAll = _db.StweZaehlerdatenSetsGetByLiegenschaft(_liegenschaftId)
+                .OrderBy(s => s.ErfasstAm)
+                .ThenBy(s => s.Id)
+                .ToList();
 
-            foreach (var p in points)
+            if (setsAll.Count == 0) return;
+
+            // Wir wollen Delta-Werte im Zeitraum: dafür brauchen wir das letzte Set vor _von als Startbasis.
+            var inRange = setsAll.Where(s => s.ErfasstAm.Date >= _von.Date && s.ErfasstAm.Date <= _bis.Date).ToList();
+            if (inRange.Count == 0) return;
+
+            var baseSet = setsAll.LastOrDefault(s => s.ErfasstAm.Date < _von.Date) ?? inRange.First();
+
+            // Wir berechnen Deltas zwischen aufeinanderfolgenden Sets, und addieren sie ins Quartal des "aktuellen" Sets.
+            StweZaehlerdatenSet? prev = null;
+            foreach (var cur in setsAll)
             {
-                if (!DateTime.TryParseExact("01." + (p.Label ?? ""), "dd.MM.yyyy",
-                    CultureInfo.GetCultureInfo("de-CH"), DateTimeStyles.None, out var dt))
-                    continue;
-
-                if (dt.Date < _von.Date || dt.Date > _bis.Date) continue;
-
-                int q = (dt.Month - 1) / 3; // 0..3
-
-                // "letzter" Stand pro Quartal = Datum max
-                if (!lastDt[q].HasValue || dt > lastDt[q].Value)
+                if (cur.Id == baseSet.Id)
                 {
-                    lastDt[q] = dt;
-                    rechnungStand[q] = (double)p.RechnungKwh;
-                    interneStand[q] = (double)p.InterneKwh;
-                    solarStand[q] = (double)p.SolarDirektKwh;
+                    prev = cur;
+                    continue;
                 }
-            }
 
-            // 2) Delta-Logik pro Quartal (kumulativ -> Verbrauch im Quartal)
-            // Q1 = Stand(Q1)
-            // Q2 = Stand(Q2) - Stand(Q1)
-            // Q3 = Stand(Q3) - Stand(Q2)
-            // Q4 = Stand(Q4) - Stand(Q3)
-            for (int i = 0; i < 4; i++)
-            {
-                double curR = rechnungStand[i] ?? 0d;
-                double curI = interneStand[i] ?? 0d;
-                double curS = solarStand[i] ?? 0d;
+                // Nur Deltas zählen, deren "cur" im Zeitraum liegt
+                if (cur.ErfasstAm.Date < _von.Date || cur.ErfasstAm.Date > _bis.Date)
+                {
+                    prev = cur;
+                    continue;
+                }
 
-                double prevR = (i == 0) ? 0d : (rechnungStand[i - 1] ?? 0d);
-                double prevI = (i == 0) ? 0d : (interneStand[i - 1] ?? 0d);
-                double prevS = (i == 0) ? 0d : (solarStand[i - 1] ?? 0d);
+                if (prev == null)
+                {
+                    prev = cur;
+                    continue;
+                }
 
-                var dR = curR - prevR;
-                var dI = curI - prevI;
-                var dS = curS - prevS;
+                int q = (cur.ErfasstAm.Month - 1) / 3; // 0..3
 
-                // defensiv: keine negativen Verbräuche anzeigen (z.B. Reset/fehlender Stand)
-                rechnungDelta[i] = dR < 0 ? 0 : dR;
-                interneDelta[i] = dI < 0 ? 0 : dI;
-                solarDelta[i] = dS < 0 ? 0 : dS;
+                var curLines = _db.StweZaehlerdatenLinesGetBySet(cur.Id).ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
+                var prevLines = _db.StweZaehlerdatenLinesGetBySet(prev.Id).ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
+
+                decimal evu = 0m;
+                decimal internSum = 0m;
+
+                foreach (var kv in curLines)
+                {
+                    var zaehlerId = kv.Key;
+                    var curVal = kv.Value;
+                    prevLines.TryGetValue(zaehlerId, out var prevVal);
+
+                    var diff = curVal - prevVal;
+                    if (diff <= 0m) continue;
+
+                    if (!zaehlerById.TryGetValue(zaehlerId, out var z))
+                        continue;
+
+                    var typ = (z.Typ ?? "").Trim().ToUpperInvariant();
+
+                    if (typ == "EVU")
+                        evu += diff;
+                    else
+                        internSum += diff;
+                }
+
+                // Solar direkt ist nur der Überschuss, wenn intern > EVU
+                var solar = Math.Max(0m, internSum - evu);
+
+                rechnungDelta[q] += (double)evu;
+                interneDelta[q] += (double)internSum;
+                solarDelta[q] += (double)solar;
+
+                prev = cur;
             }
 
             EnergieKwhSeries = new ISeries[]
@@ -260,18 +283,16 @@ namespace MyCoinFlow.ViewModels
         new ColumnSeries<double> { Name = "Solar direkt", Values = solarDelta }
             };
 
-            // 3) Solar-Anteil % pro Quartal aus *Quartalswerten* (nicht aus kumulierten Ständen!)
             double[] solarPct = new double[4];
             for (int i = 0; i < 4; i++)
-            {
                 solarPct[i] = interneDelta[i] <= 0d ? 0d : (solarDelta[i] / interneDelta[i] * 100d);
-            }
 
             SolarAnteilSeries = new ISeries[]
             {
         new LineSeries<double> { Values = solarPct }
             };
         }
+
 
 
         private void LoadKwhProOwner()
@@ -282,73 +303,53 @@ namespace MyCoinFlow.ViewModels
 
             if (_liegenschaftId <= 0) return;
 
+            // Zeitraum: wir nehmen "letztes Set <= bis" und "Set davor als Start"
             var sets = _db.StweZaehlerdatenSetsGetByLiegenschaft(_liegenschaftId)
-                .OrderByDescending(s => s.ErfasstAm)
-                .ThenByDescending(s => s.Id)
+                .OrderBy(s => s.ErfasstAm)
+                .ThenBy(s => s.Id)
                 .ToList();
 
-            var endSet = sets.FirstOrDefault(s => s.ErfasstAm.Date <= _bis.Date);
+            var endSet = sets.LastOrDefault(s => s.ErfasstAm.Date <= _bis.Date);
             if (endSet == null) return;
 
-            var startCandidate = sets.FirstOrDefault(s => s.ErfasstAm.Date < _von.Date);
-            var startSet = startCandidate ?? _db.StweZaehlerdatenGetPreviousSet(_liegenschaftId, endSet.ErfasstAm, endSet.Id);
+            var startSet = sets.LastOrDefault(s => s.ErfasstAm.Date < _von.Date)
+                           ?? _db.StweZaehlerdatenGetPreviousSet(_liegenschaftId, endSet.ErfasstAm, endSet.Id);
+
+            if (startSet == null) return;
 
             var endLines = _db.StweZaehlerdatenLinesGetBySet(endSet.Id);
-            var startLines = startSet != null ? _db.StweZaehlerdatenLinesGetBySet(startSet.Id) : new List<StweZaehlerdatenLine>();
+            var startLines = _db.StweZaehlerdatenLinesGetBySet(startSet.Id);
             var startDict = startLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
 
             var zaehler = _db.StweZaehlerGetByLiegenschaft(_liegenschaftId);
             var zaehlerDict = zaehler.ToDictionary(z => z.Id);
 
-            var schluessel = _db.StweSchluesselGetByLiegenschaft(_liegenschaftId)
-                .OrderBy(s => s.Id)
-                .FirstOrDefault();
-
-            var schluesselLines = schluessel != null
-                ? _db.StweSchluesselLinesGet(schluessel.Id)
-                : new List<MyCoinFlow.Models.StweSchluesselLine>();
-
             var ownerKwh = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            decimal allgHeizTotal = 0m;
 
             foreach (var l in endLines)
             {
                 if (!zaehlerDict.TryGetValue(l.ZaehlerId, out var z))
                     continue;
 
+                var typ = (z.Typ ?? "").Trim().ToUpperInvariant();
+                if (typ == "EVU") continue; // EVU ist Referenz, wird nicht verteilt
+
                 startDict.TryGetValue(l.ZaehlerId, out var startVal);
                 var diff = l.NeuWert - startVal;
                 if (diff <= 0m) continue;
 
-                var typ = (z.Typ ?? "").Trim().ToUpperInvariant();
+                // NEU: Verteilung immer über Zähler-Zeilen (StweZaehlerLine)
+                var zLines = _db.StweZaehlerLinesGet(z.Id);
+                var sumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
+                if (sumPct <= 0m) continue;
 
-                if (typ == "DIREKT")
+                foreach (var zl in zLines)
                 {
-                    if (!z.EinheitId.HasValue || z.EinheitId.Value <= 0) continue;
+                    var pct = Math.Max(0m, zl.AnteilProzent);
+                    if (pct <= 0m) continue;
 
-                    var owners = _db.StweEinheitEigentumGetByEinheit(z.EinheitId.Value)
-                        .Where(o => o.GueltigVon.Date <= endSet.ErfasstAm.Date
-                                 && (!o.GueltigBis.HasValue || o.GueltigBis.Value.Date >= endSet.ErfasstAm.Date))
-                        .ToList();
-
-                    var owner = owners.FirstOrDefault();
-                    if (owner == null) continue;
-
-                    Add(ownerKwh, owner.EigentuemerName, diff);
-                }
-                else if (typ == "ALLG" || typ == "HEIZ")
-                {
-                    allgHeizTotal += diff;
-                }
-            }
-
-            if (allgHeizTotal > 0m && schluesselLines.Count > 0)
-            {
-                foreach (var sl in schluesselLines)
-                {
-                    if (sl.AnteilProzent <= 0m) continue;
-                    var part = allgHeizTotal * (sl.AnteilProzent / 100m);
-                    Add(ownerKwh, sl.EigentuemerName, part);
+                    var part = diff * (pct / sumPct);
+                    Add(ownerKwh, zl.EigentuemerName, part);
                 }
             }
 
@@ -356,12 +357,12 @@ namespace MyCoinFlow.ViewModels
 
             KwhProOwnerSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "kWh", Values = ordered.Select(x => (double)x.Value).ToArray() }
+        new ColumnSeries<double> { Name = "kWh", Values = ordered.Select(x => (double)x.Value).ToArray() }
             };
             KwhProOwnerXAxes = new[]
             {
-                new Axis { Labels = ordered.Select(x => x.Key).ToArray(), LabelsRotation = 60, TextSize = 12 }
-            };
+        new Axis { Labels = ordered.Select(x => x.Key).ToArray(), LabelsRotation = 60, TextSize = 12 }
+    };
         }
 
         private void LoadChfProOwner()

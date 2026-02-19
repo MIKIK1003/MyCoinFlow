@@ -14,6 +14,7 @@ namespace MyCoinFlow.ViewModels
     {
         private readonly DatabaseService _db = new();
 
+
         // ===== Listen =====
         public ObservableCollection<StweLiegenschaft> Liegenschaften { get; } = new();
         public ObservableCollection<StweEinheit> Einheiten { get; } = new();
@@ -596,7 +597,8 @@ namespace MyCoinFlow.ViewModels
             if (Eigentuemer.Count == 0)
                 LoadEigentuemer();
 
-            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, Einheiten, Eigentuemer);
+            var dlg = new ZaehlerNeuDialog(SelectedLiegenschaft.Id, DateTime.Today, Einheiten, Eigentuemer);
+
             TrySetOwner(dlg);
 
             if (dlg.ShowDialog() == true)
@@ -622,7 +624,8 @@ namespace MyCoinFlow.ViewModels
 
             var existingLines = _db.StweZaehlerLinesGet(SelectedZaehler.Id);
 
-            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, Einheiten, Eigentuemer, existingLines);
+            var dlg = new ZaehlerNeuDialog(SelectedZaehler.LiegenschaftId, DateTime.Today, Einheiten, Eigentuemer, existingLines);
+
             TrySetOwner(dlg);
 
             dlg.SetModel(SelectedZaehler);

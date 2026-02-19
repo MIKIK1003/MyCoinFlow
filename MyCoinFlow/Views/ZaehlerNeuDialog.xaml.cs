@@ -1,4 +1,5 @@
 ﻿using MyCoinFlow.Models;
+using MyCoinFlow.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,6 +12,9 @@ namespace MyCoinFlow.Views
 {
     public partial class ZaehlerNeuDialog : Window, INotifyPropertyChanged
     {
+        private readonly DatabaseService _db = new();
+        private readonly DateTime _stichtag;
+
         public StweZaehler Model { get; } = new();
 
         // Wird vom Caller nach dem Dialog gespeichert (Replace)
@@ -57,6 +61,9 @@ namespace MyCoinFlow.Views
                     SelectedEinheit = null;
                     Model.EinheitId = null;
                 }
+
+                // Best-Workflow: bei DIREKT ggf. 100%-Zeile automatisch setzen
+                EnsureDirectAutoLinesIfPossible();
             }
         }
 
@@ -69,18 +76,28 @@ namespace MyCoinFlow.Views
                 _selectedEinheit = value;
                 OnPropertyChanged();
                 Model.EinheitId = _selectedEinheit?.Id;
+
+                // Best-Workflow: bei DIREKT + Einheit ggf. 100%-Zeile automatisch setzen
+                EnsureDirectAutoLinesIfPossible();
             }
         }
 
         public bool IsEinheitEnabled => string.Equals(SelectedTyp, "DIREKT", StringComparison.OrdinalIgnoreCase);
         public double EinheitOpacity => IsEinheitEnabled ? 1.0 : 0.5;
 
+        /// <summary>
+        /// Stichtag wird für die automatische Eigentümer-Ermittlung bei DIREKT-Zählern verwendet.
+        /// Best-Workflow: Heute.
+        /// </summary>
         public ZaehlerNeuDialog(int liegenschaftId,
+                                DateTime stichtag,
                                 ObservableCollection<StweEinheit> einheiten,
                                 ObservableCollection<StweEigentuemer> owners,
                                 IEnumerable<StweZaehlerLine>? existingLines = null)
         {
             InitializeComponent();
+
+            _stichtag = stichtag.Date;
 
             if (einheiten != null)
                 foreach (var e in einheiten) Einheiten.Add(e);
@@ -97,6 +114,9 @@ namespace MyCoinFlow.Views
 
             DataContext = this;
             OnPropertyChanged(nameof(LinesInfo));
+
+            // falls DIREKT+Einheit bereits vorbelegt wäre
+            EnsureDirectAutoLinesIfPossible();
         }
 
         // Für Bearbeiten: Model-Werte übernehmen
@@ -119,6 +139,9 @@ namespace MyCoinFlow.Views
                 SelectedEinheit = null;
 
             OnPropertyChanged(nameof(HeaderText));
+
+            // Bei Bearbeiten nie überschreiben, falls Zeilen existieren – Methode ist defensiv.
+            EnsureDirectAutoLinesIfPossible();
         }
 
         private void EditLines_Click(object sender, RoutedEventArgs e)
@@ -195,32 +218,79 @@ namespace MyCoinFlow.Views
                 Model.EinheitId = null;
             }
 
-            // Verteilzeilen sind für Energie zwingend (kein stilles Fallback)
-            if (ResultLines.Count == 0)
-            {
-                MessageBox.Show("Bitte Verteilzeilen erfassen (Summe 100%).", "Zähler",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
-            }
+            // Best-Workflow: falls DIREKT + Einheit, aber User hat keine Zeilen erfasst -> automatisch setzen
+            EnsureDirectAutoLinesIfPossible();
 
-            var sum = ResultLines.Sum(x => x.AnteilProzent);
-            if (Math.Abs((double)(sum - 100m)) > 0.0001)
+            // Verteilzeilen:
+            // - EVU: keine Zeilen nötig (nur Statistik / Referenz)
+            // - alle anderen: Zeilen Pflicht (Summe 100%)
+            if (!string.Equals(Model.Typ, "EVU", StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show($"Summe der Verteilzeilen muss 100.0000% ergeben. Aktuell: {sum:N4}%.", "Zähler",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
-            }
+                if (ResultLines.Count == 0)
+                {
+                    MessageBox.Show("Bitte Verteilzeilen erfassen (Summe 100%).", "Zähler",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
 
-            // Doppelte Eigentümer verhindern
-            var dup = ResultLines.GroupBy(x => x.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
-            if (dup != null)
-            {
-                MessageBox.Show("Ein Eigentümer darf im Zähler nur einmal vorkommen.", "Zähler",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
+                var sumPct = ResultLines.Sum(x => x.AnteilProzent);
+                if (Math.Abs((double)(sumPct - 100m)) > 0.0001)
+                {
+                    MessageBox.Show($"Summe der Verteilzeilen muss 100.0000% ergeben. Aktuell: {sumPct:N4}%.", "Zähler",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+
+                // Doppelte Eigentümer verhindern
+                var dupOwner = ResultLines.GroupBy(x => x.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
+                if (dupOwner != null)
+                {
+                    MessageBox.Show("Ein Eigentümer darf im Zähler nur einmal vorkommen.", "Zähler",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Best-Workflow:
+        /// Wenn Typ DIREKT und Einheit gewählt ist, und noch keine Zeilen vorhanden sind,
+        /// dann setzen wir automatisch 100% auf den Eigentümer dieser Einheit am Stichtag.
+        /// Überschreibt nie bestehende Zeilen.
+        /// </summary>
+        private void EnsureDirectAutoLinesIfPossible()
+        {
+            if (!string.Equals(Model.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (!Model.EinheitId.HasValue || Model.EinheitId.Value <= 0)
+                return;
+
+            // User hat schon Zeilen erfasst -> nichts anfassen
+            if (ResultLines != null && ResultLines.Count > 0)
+                return;
+
+            int? ownerId = null;
+            try
+            {
+                ownerId = _db.StweEigentuemerGetByEinheitAtDate(Model.EinheitId.Value, _stichtag);
+            }
+            catch
+            {
+                ownerId = null;
+            }
+
+            if (!ownerId.HasValue)
+                return;
+
+            ResultLines = new List<(int EigentuemerId, decimal AnteilProzent)>
+            {
+                (ownerId.Value, 100m)
+            };
+
+            OnPropertyChanged(nameof(LinesInfo));
         }
 
         private static void TrySetOwner(Window dlg)
