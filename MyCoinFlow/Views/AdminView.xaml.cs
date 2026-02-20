@@ -176,10 +176,42 @@ namespace MyCoinFlow.Views
         // ===== Kontenplan: Hosts / Import / Export =====
         private void EnsureKontenHosts()
         {
-            try { SetHostIfEmpty("KontenArtHost", () => TryCreateView("MyCoinFlow.Views.KontenArtView")); } catch { }
+            try
+            {
+                // 1) Alte Gesamtsicht erzeugen (nur um DataContext zu holen)
+                var fullView = TryCreateView("MyCoinFlow.Views.KontenArtView");
+                if (fullView != null)
+                {
+                    var vm = fullView.DataContext;
+
+                    // Liste rechts
+                    var listView = TryCreateView("MyCoinFlow.Views.KontenArtListView");
+                    if (listView != null)
+                        listView.DataContext = vm;
+
+                    var listHost = El<ContentControl>("KontenArtListHost");
+                    if (listHost != null)
+                        listHost.Content = listView;
+
+                    // Actions links
+                    var actionsView = TryCreateView("MyCoinFlow.Views.KontenArtActionsView");
+                    if (actionsView != null)
+                        actionsView.DataContext = vm;
+
+                    var actionsHost = El<ContentControl>("KontenplanActionsHost");
+                    if (actionsHost != null)
+                        actionsHost.Content = actionsView;
+                }
+            }
+            catch { }
+
+            // Gruppe / Untergruppe bleiben wie bisher
             try { SetHostIfEmpty("KontenGruppeHost", () => TryCreateView("MyCoinFlow.Views.KontenGruppeView")); } catch { }
             try { SetHostIfEmpty("KontenUnterGruppeHost", () => TryCreateView("MyCoinFlow.Views.KontenUnterGruppeView")); } catch { }
         }
+
+
+
 
         private void ImportExcel_Click(object sender, RoutedEventArgs e)
         {
@@ -871,6 +903,52 @@ ORDER BY name;";
                 LicenseStatusText.Text = "Fehler: " + ex.Message;
             }
         }
+
+        private void KontenplanTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (sender is not TabControl tc) return;
+
+                // Linker Actions-Host in der Sidebar
+                var actionsHost = El<ContentControl>("KontenplanActionsHost")
+                                  ?? FindByNameCaseInsensitive<ContentControl>(this, "KontenplanActionsHost");
+                if (actionsHost == null) return;
+
+                // Wir nehmen den DataContext aus der Liste (KontenArtListHost), das ist unser "Source of Truth"
+                var artListHost = El<ContentControl>("KontenArtListHost")
+                                  ?? FindByNameCaseInsensitive<ContentControl>(this, "KontenArtListHost");
+                var vm = (artListHost?.Content as FrameworkElement)?.DataContext;
+
+                // TabIndex: 0=Art, 1=Gruppe, 2=Untergruppe
+                if (tc.SelectedIndex == 0)
+                {
+                    var v = TryCreateView("MyCoinFlow.Views.KontenArtActionsView");
+                    if (v != null) v.DataContext = vm;   // ✅ wichtig!
+                    actionsHost.Content = v;
+                }
+                else if (tc.SelectedIndex == 1)
+                {
+                    actionsHost.Content = new TextBlock
+                    {
+                        Text = "Aktionen für Konten-Gruppe folgen.",
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = (Brush)Application.Current.FindResource(SystemColors.GrayTextBrushKey)
+                    };
+                }
+                else
+                {
+                    actionsHost.Content = new TextBlock
+                    {
+                        Text = "Aktionen für Konten-Untergruppe folgen.",
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = (Brush)Application.Current.FindResource(SystemColors.GrayTextBrushKey)
+                    };
+                }
+            }
+            catch { }
+        }
+
 
 
 

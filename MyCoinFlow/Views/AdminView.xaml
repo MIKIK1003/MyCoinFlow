@@ -156,58 +156,69 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- LINKS: Kontenplan-Aktionen -->
+                    <!-- LINKS: Kontenplan Sidebar (Import/Export + tab-abhängige Aktionen) -->
                     <Border Grid.Column="0"
-                       Style="{StaticResource SidebarCard}">
-                        <StackPanel>
+            Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
 
-                            <TextBlock Text="Kontenplan"
-                       Style="{StaticResource SidebarSectionHeader}"/>
+                                <TextBlock Text="Kontenplan"
+                           Style="{StaticResource SidebarSectionHeader}"/>
 
-                            <TextBlock Text="Aktionen"
-                       Style="{StaticResource SidebarGroupHeader}"
-                       Margin="0,0,0,8"/>
+                                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
 
-                            <Button Click="ImportExcel_Click"
-                    Style="{StaticResource IconTextButton}"
-                    Tag="FileImport"
-                    Content="Import (Excel)"
-                    MinHeight="40"
-                    Margin="0,0,0,10"/>
+                                <Button Click="ImportExcel_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="FileImport"
+                        Content="Import (Excel)"
+                        MinHeight="40"
+                        Margin="0,0,0,10"/>
 
-                            <Button Click="ExportExcel_Click"
-                    Style="{StaticResource IconTextButton}"
-                    Tag="FileExport"
-                    Content="Export (Excel)"
-                    MinHeight="40"/>
+                                <Button Click="ExportExcel_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="FileExport"
+                        Content="Export (Excel)"
+                        MinHeight="40"/>
 
-                            <Separator Margin="0,14,0,12"/>
+                                <Separator Margin="0,14,0,12"/>
 
-                            <TextBlock Text="Hinweis"
-                       Style="{StaticResource SidebarGroupHeader}"
-                       Margin="0,0,0,6"/>
+                                <!-- ✅ HIER kommen jetzt die tab-spezifischen Eingaben/Buttons rein -->
+                                <ContentControl x:Name="KontenplanActionsHost"
+                                Margin="0,0,0,12"/>
 
-                            <TextBlock Text="Art/Gruppe/Untergruppe werden über die Tabs verwaltet. Die jeweiligen Funktionen bleiben im eingebetteten Bereich."
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <Separator Margin="0,2,0,12"/>
 
-                        </StackPanel>
+                                <TextBlock Text="Hinweis"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,6"/>
+
+                                <TextBlock Text="Wähle rechts den Tab (Art/Gruppe/Untergruppe). Links erscheinen die passenden Eingaben und Aktionen. Rechts ist nur die Liste."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
 
-                    <!-- RECHTS: Inhalte -->
+                    <!-- RECHTS: Inhalte (nur Listen) -->
                     <Border Grid.Column="2"
             CornerRadius="{StaticResource AppCornerRadius.Card}"
             Background="{DynamicResource MaterialDesignPaper}"
             Padding="12">
 
-                        <TabControl>
+                        <TabControl x:Name="KontenplanTab"
+                    SelectionChanged="KontenplanTab_SelectionChanged">
+                            <!-- TAB: Konten-Art -->
                             <TabItem Header="Konten-Art">
                                 <Border Padding="10" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
-                                    <ContentControl x:Name="KontenArtHost"/>
+                                    <ContentControl x:Name="KontenArtListHost"/>
                                 </Border>
                             </TabItem>
 
+                            <!-- TAB: Konten-Gruppe -->
                             <TabItem Header="Konten-Gruppe">
                                 <Border Padding="10" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
@@ -215,6 +226,7 @@
                                 </Border>
                             </TabItem>
 
+                            <!-- TAB: Konten-Untergruppe -->
                             <TabItem Header="Konten-Untergruppe">
                                 <Border Padding="10" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
@@ -225,6 +237,7 @@
 
                     </Border>
                 </Grid>
+
 
                 <!-- KREDITKARTEN -->
                 <Grid x:Name="SecKreditkarten" Visibility="Collapsed">
