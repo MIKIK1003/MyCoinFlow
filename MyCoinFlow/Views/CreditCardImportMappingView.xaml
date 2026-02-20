@@ -5,123 +5,167 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              MinHeight="360" MinWidth="760">
 
-    <Grid Margin="8">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- Titel -->
-            <RowDefinition Height="Auto"/>
-            <!-- Kopfzeile -->
-            <RowDefinition Height="*"/>
-            <!-- Tabelle -->
-            <RowDefinition Height="Auto"/>
-            <!-- Hinweis -->
-        </Grid.RowDefinitions>
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Titel -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <materialDesign:PackIcon Kind="CreditCardOutline"
-                                     Width="24" Height="24"
-                                     Foreground="{DynamicResource PrimaryHueMidBrush}"
-                                     Margin="0,0,8,0"/>
-            <TextBlock Text="Kreditkarten-Import – Schema"
-                       VerticalAlignment="Center"
-                       FontSize="18" FontWeight="SemiBold"/>
-        </DockPanel>
+        <!-- ================== LINKS: SIDEBAR ================== -->
+        <Border Grid.Column="0"
+                Style="{StaticResource SidebarCard}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-        <!-- Kopfzeile: Schema-Auswahl | Schema-Name | Neu | Speichern | Löschen -->
-        <Grid Grid.Row="1" Margin="0,0,0,4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="280"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+                    <TextBlock Text="Kreditkarten"
+                               Style="{StaticResource SidebarSectionHeader}"/>
 
-            <TextBlock Grid.Column="0" Text="Schema:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox  Grid.Column="1"
-                       x:Name="SchemaCombo"
-                       IsEditable="False"
-                       DisplayMemberPath="Name"
-                       SelectedValuePath="Id"
-                       SelectionChanged="SchemaCombo_SelectionChanged"
-                       Style="{StaticResource MaterialDesignOutlinedComboBox}"/>
+                    <TextBlock Text="Schema"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,6"/>
 
-            <TextBox   Grid.Column="3"
-                       x:Name="SchemaNameBox"
-                       materialDesign:HintAssist.Hint="Schema-Name"
-                       Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                       TextChanged="SchemaNameBox_TextChanged"/>
+                    <TextBlock Text="Schema auswählen"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,6"/>
 
-            <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Click="NewSchema_Click"
-                        Style="{StaticResource IconTextButton}"
-                        Tag="Plus"
-                        Content="Neu"
-                        Margin="0,0,8,0"/>
-                <Button x:Name="SaveButton"
-                        Click="SaveSchema_Click"
-                        Style="{StaticResource IconTextButton}"
-                        Tag="ContentSave"
-                        Content="Speichern"
-                        Margin="0,0,8,0"/>
-                <Button x:Name="DeleteButton"
-                        Click="DeleteSchema_Click"
-                        Style="{StaticResource IconTextButton}"
-                        Tag="DeleteForever"
-                        Content="Löschen"/>
-            </StackPanel>
-        </Grid>
+                    <!-- Schema -->
+                    <ComboBox x:Name="SchemaCombo"
+                              IsEditable="False"
+                              DisplayMemberPath="Name"
+                              SelectedValuePath="Id"
+                              SelectionChanged="SchemaCombo_SelectionChanged"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              MinHeight="36"/>
 
-        <!-- Mapping-Tabelle -->
-        <DataGrid Grid.Row="2"
-                  x:Name="GridMappings"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="True"
-                  CanUserDeleteRows="True"
-                  HeadersVisibility="Column"
-                  Margin="0,8,0,8"
-                  RowHeaderWidth="0"
-                  IsReadOnly="False"
-                  ItemsSource="{Binding Rows, ElementName=Root}">
-            <DataGrid.Columns>
-                <!-- Masterfeld: Dropdown (sichtbar + editierbar) -->
-                <DataGridComboBoxColumn Header="Masterfeld"
-                                        Width="2*"
-                                        SelectedItemBinding="{Binding MasterHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                    <DataGridComboBoxColumn.ElementStyle>
-                        <Style TargetType="ComboBox">
-                            <Setter Property="ItemsSource" Value="{Binding MasterHeaders, ElementName=Root}"/>
-                            <Setter Property="IsHitTestVisible" Value="False"/>
-                            <Setter Property="Focusable" Value="False"/>
-                        </Style>
-                    </DataGridComboBoxColumn.ElementStyle>
-                    <DataGridComboBoxColumn.EditingElementStyle>
-                        <Style TargetType="ComboBox">
-                            <Setter Property="ItemsSource" Value="{Binding MasterHeaders, ElementName=Root}"/>
-                            <Setter Property="IsEditable" Value="False"/>
-                        </Style>
-                    </DataGridComboBoxColumn.EditingElementStyle>
-                </DataGridComboBoxColumn>
+                    <!-- Schema-Name -->
+                    <TextBox x:Name="SchemaNameBox"
+                             Margin="0,12,0,0"
+                             materialDesign:HintAssist.Hint="Schema-Name"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             TextChanged="SchemaNameBox_TextChanged"/>
 
-                <!-- Quelldatei-Feld -->
-                <DataGridTextColumn Header="Quelldatei-Feld"
-                                    Width="2*"
-                                    Binding="{Binding SourceHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Separator Margin="0,14,0,12"/>
 
-                <!-- Fallback -->
-                <DataGridTextColumn Header="Fallback"
-                                    Width="2*"
-                                    Binding="{Binding DefaultValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            </DataGrid.Columns>
-        </DataGrid>
+                    <TextBlock Text="Aktionen"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
 
-        <TextBlock Grid.Row="3"
-                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                   TextWrapping="Wrap"
-                   Text="Masterfelder per Dropdown wählen. Speichern legt/überschreibt die Mappings zum gewählten Schema."/>
+                    <Button Click="NewSchema_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="Plus"
+                            Content="Neu"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                    <Button x:Name="SaveButton"
+                            Click="SaveSchema_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="ContentSave"
+                            Content="Speichern"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                    <Button x:Name="DeleteButton"
+                            Click="DeleteSchema_Click"
+                            Style="{StaticResource IconTextButton.Danger}"
+                            Tag="DeleteForever"
+                            Content="Löschen"
+                            MinHeight="40"/>
+
+                    <Separator Margin="0,14,0,12"/>
+
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                 Style="{StaticResource DefaultIconStyle}"
+                                                 VerticalAlignment="Top"
+                                                 Margin="0,1,8,0"/>
+                        <TextBlock Text="Masterfelder per Dropdown wählen. Speichern legt oder überschreibt die Mappings zum gewählten Schema."
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ================== RECHTS: CONTENT ================== -->
+        <Border Grid.Column="2"
+                CornerRadius="{StaticResource AppCornerRadius.Card}"
+                Background="{DynamicResource MaterialDesignPaper}"
+                Padding="12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Titel rechts (wie vorher, nur sauber) -->
+                <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                    <materialDesign:PackIcon Kind="CreditCardOutline"
+                                             Width="24" Height="24"
+                                             Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                             Margin="0,0,8,0"/>
+                    <TextBlock Text="Kreditkarten-Import – Schema"
+                               VerticalAlignment="Center"
+                               FontSize="18"
+                               FontWeight="SemiBold"/>
+                </DockPanel>
+
+                <!-- Mapping-Tabelle (unverändert) -->
+                <DataGrid Grid.Row="1"
+                          x:Name="GridMappings"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="True"
+                          CanUserDeleteRows="True"
+                          HeadersVisibility="Column"
+                          Margin="0"
+                          RowHeaderWidth="0"
+                          IsReadOnly="False"
+                          ItemsSource="{Binding Rows, ElementName=Root}"
+                          materialDesign:DataGridAssist.CellPadding="8"
+                          materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                          RowHeight="40"
+                          Background="White"
+                          RowBackground="White"
+                          AlternatingRowBackground="{x:Null}">
+                    <DataGrid.Columns>
+
+                        <!-- Masterfeld: Dropdown (sichtbar + editierbar) -->
+                        <DataGridComboBoxColumn Header="Masterfeld"
+                                                Width="2*"
+                                                SelectedItemBinding="{Binding MasterHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                            <DataGridComboBoxColumn.ElementStyle>
+                                <Style TargetType="ComboBox">
+                                    <Setter Property="ItemsSource" Value="{Binding MasterHeaders, ElementName=Root}"/>
+                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                    <Setter Property="Focusable" Value="False"/>
+                                </Style>
+                            </DataGridComboBoxColumn.ElementStyle>
+                            <DataGridComboBoxColumn.EditingElementStyle>
+                                <Style TargetType="ComboBox">
+                                    <Setter Property="ItemsSource" Value="{Binding MasterHeaders, ElementName=Root}"/>
+                                    <Setter Property="IsEditable" Value="False"/>
+                                </Style>
+                            </DataGridComboBoxColumn.EditingElementStyle>
+                        </DataGridComboBoxColumn>
+
+                        <!-- Quelldatei-Feld -->
+                        <DataGridTextColumn Header="Quelldatei-Feld"
+                                            Width="2*"
+                                            Binding="{Binding SourceHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <!-- Fallback -->
+                        <DataGridTextColumn Header="Fallback"
+                                            Width="2*"
+                                            Binding="{Binding DefaultValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+            </Grid>
+        </Border>
+
     </Grid>
 </UserControl>
