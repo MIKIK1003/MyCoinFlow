@@ -134,19 +134,17 @@
                                 Command="{Binding NeuerEintragCommand}"/>
 
                         <Button Style="{StaticResource IconTextButton}"
-                                Tag="invoicetextedit"
-                                Content="Bearbeiten"
-                                MinHeight="40"
-                                Margin="0,0,0,10"
-                                Command="{Binding BearbeitenEintragCommand}"
-                                CommandParameter="{Binding SelectedItem, ElementName=AccountsGrid}"/>
+        Tag="invoicetextedit"
+        Content="Bearbeiten"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding BearbeitenEintragCommand}"/>
 
                         <Button Style="{StaticResource IconTextButton.Danger}"
-                                Tag="invoicetextremove"
-                                Content="Löschen"
-                                MinHeight="40"
-                                Command="{Binding LoeschenEintragCommand}"
-                                CommandParameter="{Binding SelectedItem, ElementName=AccountsGrid}"/>
+        Tag="invoicetextremove"
+        Content="Löschen"
+        MinHeight="40"
+        Command="{Binding LoeschenEintragCommand}"/>
                     </StackPanel>
 
                 </StackPanel>

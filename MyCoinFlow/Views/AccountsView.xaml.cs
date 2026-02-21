@@ -181,10 +181,26 @@ namespace MyCoinFlow.Views
         // -------- TreeView: bestehende Logik beibehalten --------
         private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (this.DataContext is AccountsViewModel vm && e.NewValue is KontoplanKnoten knoten)
+            if (this.DataContext is not AccountsViewModel vm)
+                return;
+
+            // Knoten immer spiegeln (auch Gruppen-Knoten)
+            vm.AusgewaehlterKnoten = e.NewValue;
+
+            // WICHTIG: Grid-Auswahl darf nicht "kleben bleiben".
+            // Wenn im Tree ein Leaf-Knoten gewählt ist, hat er OriginalEintrag.
+            // Wenn nicht: Eintrag auf null setzen, damit Bearbeiten/Löschen deaktivieren.
+            if (e.NewValue is KontoplanKnoten knoten && knoten.OriginalEintrag != null)
             {
-                vm.AusgewaehlterKnoten = knoten;
+                vm.AusgewaehlterEintrag = knoten.OriginalEintrag;
             }
+            else
+            {
+                vm.AusgewaehlterEintrag = null;
+            }
+
+            // Buttons sofort korrekt (de)aktivieren
+            CommandManager.InvalidateRequerySuggested();
         }
 
         private void OpenKontoTransaktionen_Click(object sender, RoutedEventArgs e)
