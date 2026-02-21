@@ -178,37 +178,50 @@ namespace MyCoinFlow.Views
         {
             try
             {
-                // 1) Alte Gesamtsicht erzeugen (nur um DataContext zu holen)
-                var fullView = TryCreateView("MyCoinFlow.Views.KontenArtView");
-                if (fullView != null)
+                // ===== Konten-Art =====
+                var fullArt = TryCreateView("MyCoinFlow.Views.KontenArtView");
+                if (fullArt != null)
                 {
-                    var vm = fullView.DataContext;
+                    var vm = fullArt.DataContext;
 
-                    // Liste rechts
                     var listView = TryCreateView("MyCoinFlow.Views.KontenArtListView");
-                    if (listView != null)
-                        listView.DataContext = vm;
-
+                    if (listView != null) listView.DataContext = vm;
                     var listHost = El<ContentControl>("KontenArtListHost");
-                    if (listHost != null)
-                        listHost.Content = listView;
+                    if (listHost != null) listHost.Content = listView;
 
-                    // Actions links
                     var actionsView = TryCreateView("MyCoinFlow.Views.KontenArtActionsView");
-                    if (actionsView != null)
-                        actionsView.DataContext = vm;
-
+                    if (actionsView != null) actionsView.DataContext = vm;
                     var actionsHost = El<ContentControl>("KontenplanActionsHost");
-                    if (actionsHost != null)
-                        actionsHost.Content = actionsView;
+                    if (actionsHost != null) actionsHost.Content = actionsView;
+                }
+
+                // ===== Konten-Gruppe =====
+                var fullGrp = TryCreateView("MyCoinFlow.Views.KontenGruppeView");
+                if (fullGrp != null)
+                {
+                    var vm = fullGrp.DataContext;
+
+                    var listView = TryCreateView("MyCoinFlow.Views.KontenGruppeListView");
+                    if (listView != null) listView.DataContext = vm;
+                    var listHost = El<ContentControl>("KontenGruppeListHost");
+                    if (listHost != null) listHost.Content = listView;
+                }
+
+                // ===== Konten-Untergruppe =====
+                var fullUg = TryCreateView("MyCoinFlow.Views.KontenUnterGruppeView");
+                if (fullUg != null)
+                {
+                    var vm = fullUg.DataContext;
+
+                    var listView = TryCreateView("MyCoinFlow.Views.KontenUnterGruppeListView");
+                    if (listView != null) listView.DataContext = vm;
+                    var listHost = El<ContentControl>("KontenUnterGruppeListHost");
+                    if (listHost != null) listHost.Content = listView;
                 }
             }
             catch { }
-
-            // Gruppe / Untergruppe bleiben wie bisher
-            try { SetHostIfEmpty("KontenGruppeHost", () => TryCreateView("MyCoinFlow.Views.KontenGruppeView")); } catch { }
-            try { SetHostIfEmpty("KontenUnterGruppeHost", () => TryCreateView("MyCoinFlow.Views.KontenUnterGruppeView")); } catch { }
         }
+
 
 
 
@@ -929,22 +942,27 @@ ORDER BY name;";
                 }
                 else if (tc.SelectedIndex == 1)
                 {
-                    actionsHost.Content = new TextBlock
-                    {
-                        Text = "Aktionen für Konten-Gruppe folgen.",
-                        TextWrapping = TextWrapping.Wrap,
-                        Foreground = (Brush)Application.Current.FindResource(SystemColors.GrayTextBrushKey)
-                    };
+                    // DataContext aus Gruppen-Liste holen
+                    var grpListHost = El<ContentControl>("KontenGruppeListHost")
+                                      ?? FindByNameCaseInsensitive<ContentControl>(this, "KontenGruppeListHost");
+                    var vm2 = (grpListHost?.Content as FrameworkElement)?.DataContext;
+
+                    var v = TryCreateView("MyCoinFlow.Views.KontenGruppeActionsView");
+                    if (v != null) v.DataContext = vm2;
+                    actionsHost.Content = v;
                 }
                 else
                 {
-                    actionsHost.Content = new TextBlock
-                    {
-                        Text = "Aktionen für Konten-Untergruppe folgen.",
-                        TextWrapping = TextWrapping.Wrap,
-                        Foreground = (Brush)Application.Current.FindResource(SystemColors.GrayTextBrushKey)
-                    };
+                    // DataContext aus Untergruppen-Liste holen
+                    var ugListHost = El<ContentControl>("KontenUnterGruppeListHost")
+                                     ?? FindByNameCaseInsensitive<ContentControl>(this, "KontenUnterGruppeListHost");
+                    var vm3 = (ugListHost?.Content as FrameworkElement)?.DataContext;
+
+                    var v = TryCreateView("MyCoinFlow.Views.KontenUnterGruppeActionsView");
+                    if (v != null) v.DataContext = vm3;
+                    actionsHost.Content = v;
                 }
+
             }
             catch { }
         }

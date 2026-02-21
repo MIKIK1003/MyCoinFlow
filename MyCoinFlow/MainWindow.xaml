@@ -2,7 +2,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:views="clr-namespace:MyCoinFlow.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -13,13 +12,71 @@
         ResizeMode="CanResize"
         x:Name="RootWindow">
 
+    <Window.Resources>
+
+        <!-- Ruhige Hauptnavigation (hell/grau, Text/Icons dunkel) -->
+        <Style x:Key="NavTileButton"
+               TargetType="Button"
+               BasedOn="{StaticResource MaterialDesignFlatButton}">
+            <Setter Property="Padding" Value="12,12"/>
+            <Setter Property="MinHeight" Value="60"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                                <Setter Property="Opacity" Value="0.95"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- kleines Helfer-Layout für Icon + Text -->
+        <Style x:Key="NavTileIcon" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="35"/>
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Margin" Value="0,0,16,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+        </Style>
+
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="320" MinWidth="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- LINKS: Hauptmenü (optisch vereinheitlicht) -->
+        <!-- LINKS: Hauptmenü -->
         <Border Grid.Column="0"
                 Style="{StaticResource SidebarCard}"
                 Margin="12">
@@ -29,78 +86,109 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Menü -->
-                <ScrollViewer Grid.Row="0"
-                              VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 
                         <TextBlock Text="MyCoinFlow"
                                    Style="{StaticResource SidebarSectionHeader}"/>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="ViewDashboard"
-                                Content="Dashboard"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowDashboardCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="ViewDashboard"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="SwapHorizontal"
-                                Content="Transaktionen"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowTransactionsCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="SwapHorizontal"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Transaktionen" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <!-- ✅ PLUS -->
                         <Button x:Name="NavStweSetsButton"
-                                Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="PlaylistPlus"
-                                Content="STWE-Sets"
+                                Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowTransaktionSetsCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="PlaylistPlus"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="STWE-Sets" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="FileTreeOutline"
-                                Content="Kontenplan"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowAccountsCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="FileTreeOutline"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Kontenplan" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="BankOutline"
-                                Content="Geldinstitute"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowInstitutionsCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="BankOutline"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Geldinstitute" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="AccountBoxOutline"
-                                Content="Adressen"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowAddressesCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="AccountBoxOutline"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Adressen" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="HandCoin"
-                                Content="Budget"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowBudgetsCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="HandCoin"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Budget" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <!-- ✅ PLUS -->
                         <Button x:Name="NavLiegenschaftenButton"
-                                Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="HomeCityOutline"
-                                Content="Liegenschaften"
+                                Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowLiegenschaftenCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="HomeCityOutline"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Liegenschaften" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
-                        <Button Style="{StaticResource NavIconButton_Emphasis}"
-                                Tag="Cog"
-                                Content="Einstellungen"
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowAdminCommand}"
-                                Margin="0,0,0,8"/>
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="Cog"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Einstellungen" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
 
                     </StackPanel>
                 </ScrollViewer>
 
                 <!-- Footer -->
-                <Grid Grid.Row="1"
-                      Margin="0,12,0,0">
+                <Grid Grid.Row="1" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -124,9 +212,10 @@
             </Grid>
         </Border>
 
-        <!-- RECHTS: Inhalt (unverändert) -->
+        <!-- RECHTS: Inhalt -->
         <ContentControl Grid.Column="1"
-                        Content="{Binding CurrentViewModel}" RenderTransformOrigin="0.5,0.5">
+                        Content="{Binding CurrentViewModel}"
+                        RenderTransformOrigin="0.5,0.5">
             <ContentControl.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform/>

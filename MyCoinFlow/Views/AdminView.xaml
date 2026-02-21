@@ -32,33 +32,66 @@
                         <!-- Einheitlicher Item-Style (nur Optik) -->
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
-                                <Setter Property="Margin" Value="0,4,0,4"/>
-                                <Setter Property="Padding" Value="8,10"/>
+
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Padding" Value="0"/>
                                 <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                                 <Setter Property="Cursor" Value="Hand"/>
+
+                                <!-- 🔴 WICHTIG: Text + Icons standardmäßig dunkel -->
+                                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+
+
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Bd"
-                                                    CornerRadius="10"
-                                                    Background="{TemplateBinding Background}">
-                                                <ContentPresenter />
+                            Background="{DynamicResource MaterialDesignPaper}"
+                            CornerRadius="10"
+                            Padding="12,10"
+                            BorderBrush="Transparent"
+                            BorderThickness="1">
+
+                                                <!-- Foreground hier weitergeben -->
+                                                <ContentPresenter
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            RecognizesAccessKey="True"
+                            />
+
                                             </Border>
+
                                             <ControlTemplate.Triggers>
+
+                                                <!-- Hover -->
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                                    <Setter TargetName="Bd" Property="Background"
+                                    Value="{DynamicResource MaterialDesignSelection}"/>
                                                 </Trigger>
+
+                                                <!-- Selected -->
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+                                                    <!-- dezenter, nicht akzentfarbig -->
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
                                                 </Trigger>
+
+
+                                                <!-- Disabled -->
                                                 <Trigger Property="IsEnabled" Value="False">
                                                     <Setter Property="Opacity" Value="0.55"/>
                                                 </Trigger>
+
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
+
                             </Style>
                         </ListBox.ItemContainerStyle>
 
@@ -66,66 +99,92 @@
                         <ListBoxItem Tag="Nummernkreise">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FormatListNumbered"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Nummernkreise" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Nummernkreise"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Kontenplan">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ClipboardListOutline"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Kontenplan" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Kontenplan"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Kreditkarten">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CreditCardOutline"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Kreditkarten" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Kreditkarten"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Mandanten">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="AccountMultiplePlusOutline"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Mandanten" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Mandanten"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Update">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Update" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Update"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Backup">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Database"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Backup" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Backup"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Pfade">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FolderArrowUpDown"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Dateianhänge und OCR" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Dateianhänge und OCR"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Lizenz">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="KeyVariant"
-                                                         Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                <TextBlock Text="Lizenz" VerticalAlignment="Center"/>
+                                 Style="{StaticResource DefaultIconStyle.Nav}"
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                <TextBlock Text="Lizenz"
+                   VerticalAlignment="Center"
+                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                             </StackPanel>
                         </ListBoxItem>
+
+
 
                     </ListBox>
                 </StackPanel>
@@ -222,7 +281,7 @@
                             <TabItem Header="Konten-Gruppe">
                                 <Border Padding="10" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
-                                    <ContentControl x:Name="KontenGruppeHost"/>
+                                    <ContentControl x:Name="KontenGruppeListHost"/>
                                 </Border>
                             </TabItem>
 
@@ -230,7 +289,7 @@
                             <TabItem Header="Konten-Untergruppe">
                                 <Border Padding="10" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
-                                    <ContentControl x:Name="KontenUnterGruppeHost"/>
+                                    <ContentControl x:Name="KontenUnterGruppeListHost"/>
                                 </Border>
                             </TabItem>
                         </TabControl>
