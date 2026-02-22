@@ -66,7 +66,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void Save_Click(object sender, RoutedEventArgs e)
+        public void Save_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -102,7 +102,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void SaveOcr_Click(object sender, RoutedEventArgs e)
+        public void SaveOcr_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -135,7 +135,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void BrowseTesseract_Click(object? sender, RoutedEventArgs e)
+        public void BrowseTesseract_Click(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -156,7 +156,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void OpenInExplorer_Click(object? sender, RoutedEventArgs e)
+        public void OpenInExplorer_Click(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -174,7 +174,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void CreateFolder_Click(object? sender, RoutedEventArgs e)
+        public void CreateFolder_Click(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -193,7 +193,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private void RefreshDbStats_Click(object sender, RoutedEventArgs e) => LoadDbStats();
+        public void RefreshDbStats_Click(object sender, RoutedEventArgs e) => LoadDbStats();
 
         private void LoadDbStats()
         {
@@ -222,7 +222,7 @@ namespace MyCoinFlow.Views
             }
         }
 
-        private async void Reindex_Click(object sender, RoutedEventArgs e)
+        public async void Reindex_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -249,10 +249,16 @@ namespace MyCoinFlow.Views
             }
             finally
             {
-                if (BtnReindex != null) BtnReindex.IsEnabled = true;
+                //
             }
         }
 
+        public void ShowSection(int index)
+        {
+            PanelAttach.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PanelOcr.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            PanelDb.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
 
         private void Status(string text) => StatusText.Text = text ?? "";

@@ -275,8 +275,126 @@
                     <ContentControl x:Name="NumberRangesHost"/>
                 </Grid>
 
+                <!-- PFAD / OCR -->
                 <Grid x:Name="SecPfade" Visibility="Collapsed">
-                    <ContentControl x:Name="PathsHost"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="270"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- LINKS: Aktionen je Tab -->
+                    <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+
+                                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarSectionHeader}"/>
+
+                                <TextBlock Text="Dateianhänge und OCR"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                                <!-- Panel 0: Verzeichnisse -->
+                                <StackPanel x:Name="PathsActionsAttachPanel" Visibility="Visible">
+                                    <TextBlock Text="Verzeichnisse"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="FolderPlus"
+                            Content="Ordner erstellen"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Click="Paths_CreateFolder_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="FolderOpen"
+                            Content="Im Explorer öffnen"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Click="Paths_OpenExplorer_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="ContentSave"
+                            Content="Speichern"
+                            MinHeight="40"
+                            Click="Paths_Save_Click"/>
+                                </StackPanel>
+
+                                <!-- Panel 1: OCR -->
+                                <StackPanel x:Name="PathsActionsOcrPanel" Visibility="Collapsed">
+                                    <TextBlock Text="OCR"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="FileFind"
+                            Content="Durchsuchen…"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Click="Paths_BrowseTesseract_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="ContentSave"
+                            Content="OCR speichern"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Click="Paths_SaveOcr_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Magnify"
+                            Content="Index aktualisieren"
+                            MinHeight="40"
+                            Click="Paths_Reindex_Click"/>
+                                </StackPanel>
+
+                                <!-- Panel 2: Datenbank -->
+                                <StackPanel x:Name="PathsActionsDbPanel" Visibility="Collapsed">
+                                    <TextBlock Text="Datenbank"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Refresh"
+                            Content="Aktualisieren"
+                            MinHeight="40"
+                            Click="Paths_RefreshDb_Click"/>
+                                </StackPanel>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- RECHTS: Tabs + Arbeitsfeld -->
+                    <Border Grid.Column="2"
+            CornerRadius="{StaticResource AppCornerRadius.Card}"
+            Background="{DynamicResource MaterialDesignPaper}"
+            Padding="12">
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TabControl x:Name="PathsTab"
+                        SelectionChanged="PathsTab_SelectionChanged">
+                                <TabItem Header="Verzeichnisse"/>
+                                <TabItem Header="OCR"/>
+                                <TabItem Header="Datenbank"/>
+                            </TabControl>
+
+                            <Border Grid.Row="2"
+                    Padding="12"
+                    CornerRadius="10"
+                    Background="{DynamicResource MaterialDesignCardBackground}">
+                                <ContentControl x:Name="PathsHost"/>
+                            </Border>
+                        </Grid>
+
+                    </Border>
                 </Grid>
 
                 <!-- KONTENPLAN -->

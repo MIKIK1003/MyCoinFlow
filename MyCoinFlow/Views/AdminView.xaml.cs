@@ -96,6 +96,7 @@ namespace MyCoinFlow.Views
             EnsurePathsHost();
             MandantenTab_SelectionChanged(MandantenTab, null);
             BackupTab_SelectionChanged(BackupTab, null);
+            PathsTab_SelectionChanged(PathsTab, null);
 
             await LoadCreditCardSchemasAsync();
             await LoadCopyCombosAsync();
@@ -1027,6 +1028,37 @@ ORDER BY name;";
             var btn = FindByNameCaseInsensitive<Button>(uc, "UpdateButton");
             btn?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         }
+
+        private AdminPathsView? GetPathsView()
+        {
+            var host = El<ContentControl>("PathsHost") ?? FindByNameCaseInsensitive<ContentControl>(this, "PathsHost");
+            return host?.Content as AdminPathsView;
+        }
+
+        private void PathsTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (sender is not TabControl tc) return;
+
+                PathsActionsAttachPanel.Visibility = tc.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+                PathsActionsOcrPanel.Visibility = tc.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+                PathsActionsDbPanel.Visibility = tc.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+                // rechts Panel umschalten
+                GetPathsView()?.ShowSection(tc.SelectedIndex);
+            }
+            catch { }
+        }
+
+        private void Paths_CreateFolder_Click(object sender, RoutedEventArgs e) => GetPathsView()?.CreateFolder_Click(sender, e);
+        private void Paths_OpenExplorer_Click(object sender, RoutedEventArgs e) => GetPathsView()?.OpenInExplorer_Click(sender, e);
+        private void Paths_Save_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Save_Click(sender, e);
+        private void Paths_BrowseTesseract_Click(object sender, RoutedEventArgs e) => GetPathsView()?.BrowseTesseract_Click(sender, e);
+        private void Paths_SaveOcr_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SaveOcr_Click(sender, e);
+        private void Paths_Reindex_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Reindex_Click(sender, e);
+        private void Paths_RefreshDb_Click(object sender, RoutedEventArgs e) => GetPathsView()?.RefreshDbStats_Click(sender, e);
+
 
     }
 }
