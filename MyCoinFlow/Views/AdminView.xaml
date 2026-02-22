@@ -386,151 +386,142 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- LINKS: 3. Sidebar (Untermenü Mandanten) -->
-                    <Border Grid.Column="0"
-                        Style="{StaticResource SidebarCard}">
-                        <StackPanel>
+                    <!-- LINKS: 3. Sidebar (Aktionen je Tab) -->
+                    <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
 
-                            <TextBlock Text="Mandanten"
-                       Style="{StaticResource SidebarSectionHeader}"/>
+                                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarSectionHeader}"/>
 
-                            <TextBlock Text="Unterkategorien"
-                       Style="{StaticResource SidebarGroupHeader}"
-                       Margin="0,0,0,8"/>
+                                <TextBlock Text="Mandanten"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
 
-                            <!-- Reine UI-Navigation ohne Code-behind: TabControl steuern wir via Name -->
-                            <ListBox x:Name="MandantenSubNav"
-                     SelectedIndex="0"
-                     BorderThickness="0"
-                     Background="Transparent"
-                     HorizontalContentAlignment="Stretch">
+                                <!-- ===== Panel 1: Neu anlegen ===== -->
+                                <StackPanel x:Name="MandantenActionsNeuPanel" Visibility="Visible">
 
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="Margin" Value="0,4,0,4"/>
-                                        <Setter Property="Padding" Value="8,10"/>
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Cursor" Value="Hand"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="ListBoxItem">
-                                                    <Border x:Name="Bd" CornerRadius="10" Background="{TemplateBinding Background}">
-                                                        <ContentPresenter />
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
-                                                        </Trigger>
-                                                        <Trigger Property="IsSelected" Value="True">
-                                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
+                                    <TextBlock Text="Neu anlegen"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
 
-                                <ListBoxItem>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="DatabasePlus"
-                                                 Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                        <TextBlock Text="Neu anlegen" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </ListBoxItem>
+                                    <Button Click="CreateEmptyTenant_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="DatabasePlus"
+                            Content="Anlegen (leer)"
+                            MinHeight="40"/>
+                                </StackPanel>
 
-                                <ListBoxItem>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="DatabaseSyncOutline"
-                                                 Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                        <TextBlock Text="Daten kopieren" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </ListBoxItem>
+                                <!-- ===== Panel 2: Daten kopieren ===== -->
+                                <StackPanel x:Name="MandantenActionsCopyPanel" Visibility="Collapsed">
 
-                                <ListBoxItem>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="AccountMultipleOutline"
-                                                 Style="{StaticResource DefaultIconStyle.Nav}"/>
-                                        <TextBlock Text="Benutzer" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </ListBoxItem>
+                                    <TextBlock Text="Daten kopieren"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
 
-                            </ListBox>
+                                    <!-- Checkboxen (untereinander, wie gewünscht) -->
+                                    <CheckBox x:Name="Copy_CbNummernkreise" Content="Nummernkreise" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbKonten"  Content="Kontenstruktur" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbAdressen" Content="Adressen" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbAliase"   Content="Aliase" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbGeldinst" Content="Geldinstitute (ohne Anfangsbestand)" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbImport"   Content="Import-Schema und Mapping" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbKatMap"   Content="Kategorie→Konto" IsChecked="True" Margin="0,0,0,6"/>
+                                    <CheckBox x:Name="Copy_CbBudget"   Content="Budgetzeitraum (aktuelles Jahr)" IsChecked="True" Margin="0,0,0,12"/>
 
-                            <Separator Margin="0,14,0,12"/>
+                                    <Button Click="Copy_Run_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="PlayCircle"
+                            Content="Ausführen"
+                            MinHeight="40"/>
+                                </StackPanel>
 
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="InformationOutline"
-                                         Style="{StaticResource DefaultIconStyle}"
-                                         VerticalAlignment="Top"
-                                         Margin="0,1,8,0"/>
-                                <TextBlock Text="Wähle links die Unterkategorie. Rechts erscheinen die Details."
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <!-- ===== Panel 3: Benutzer ===== -->
+                                <StackPanel x:Name="MandantenActionsUsersPanel" Visibility="Collapsed">
+
+                                    <TextBlock Text="Benutzer"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Click="Users_Refresh_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="Refresh"
+                            Content="Aktualisieren"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Users_Add_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="AccountPlus"
+                            Content="Neuer Benutzer"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Users_ResetPassword_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="Key"
+                            Content="Passwort zurücksetzen"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Users_ToggleActive_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="AccountOffOutline"
+                            Content="Aktiv/Inaktiv"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Users_ToggleAdmin_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="ShieldAccountOutline"
+                            Content="Admin/Standard"
+                            MinHeight="40"/>
+                                </StackPanel>
+
                             </StackPanel>
-
-                        </StackPanel>
+                        </ScrollViewer>
                     </Border>
 
-                    <!-- RECHTS: Detailbereich -->
+                    <!-- RECHTS: Tabs oben + Arbeitsfeld -->
                     <Border Grid.Column="2"
             CornerRadius="{StaticResource AppCornerRadius.Card}"
             Background="{DynamicResource MaterialDesignPaper}"
             Padding="12">
 
-                        <!-- Tabs nur als Container – Navigation über ListBox (SelectedIndex Binding) -->
-                        <TabControl SelectedIndex="{Binding SelectedIndex, ElementName=MandantenSubNav}"
-                    BorderThickness="0"
-                    Background="Transparent">
+                        <TabControl x:Name="MandantenTab"
+                    SelectionChanged="MandantenTab_SelectionChanged">
 
-                            <!-- TAB 0: Neu -->
-                            <TabItem>
-                                <TabItem.Header>
-                                    <TextBlock Text=""/>
-                                </TabItem.Header>
-
+                            <!-- TAB 0: Neu anlegen -->
+                            <TabItem Header="Neu anlegen">
                                 <Border Padding="12" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
                                     <StackPanel>
                                         <TextBlock Text="Neuen Mandanten anlegen (leer – Schema nur)"
                                    FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
-                                        <WrapPanel>
-                                            <TextBox x:Name="NewTenantNameBox"
-                                     materialDesign:HintAssist.Hint="Neuer DB-Name (z. B. MyCoinFlow_Test)"
-                                     Width="320"
-                                     Margin="0,0,10,10"
-                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
-
-                                            <Button Click="CreateEmptyTenant_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="DatabasePlus"
-                                    Content="Anlegen (leer)"
-                                    MinHeight="40"
-                                    Margin="0,0,0,10"/>
-                                        </WrapPanel>
+                                        <!-- Eingabefeld rechts im Arbeitsfeld (wie gewünscht) -->
+                                        <TextBox x:Name="NewTenantNameBox"
+                                        materialDesign:HintAssist.Hint="Neuer DB-Name (z. B. MyCoinFlow_Test)"
+                                        HorizontalAlignment="Stretch"
+                                        Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
 
                                         <TextBlock x:Name="TenantCreateStatus"
                                    TextWrapping="Wrap"
-                                   Margin="0,4,0,0"
+                                   Margin="0,10,0,0"
                                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                                     </StackPanel>
                                 </Border>
                             </TabItem>
 
-                            <!-- TAB 1: Kopieren -->
-                            <TabItem>
-                                <TabItem.Header>
-                                    <TextBlock Text=""/>
-                                </TabItem.Header>
-
+                            <!-- TAB 1: Daten kopieren -->
+                            <TabItem Header="Daten kopieren">
                                 <Border Padding="12" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
                                     <StackPanel>
                                         <TextBlock Text="Daten zwischen Datenbanken kopieren (Quelle → Ziel)"
                                    FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
+                                        <!-- Quelle/Ziel rechts im Arbeitsfeld (wie gewünscht) -->
                                         <Grid Margin="0,0,0,10">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -554,27 +545,6 @@
                                             </StackPanel>
                                         </Grid>
 
-                                        <TextBlock Text="Welche Daten kopieren?" FontWeight="SemiBold" Margin="0,0,0,8"/>
-
-                                        <WrapPanel Margin="0,0,0,10">
-                                            <CheckBox x:Name="Copy_CbNummernkreise" Content="Nummernkreise" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbKonten"  Content="Kontenstruktur" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbAdressen" Content="Adressen" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbAliase"   Content="Aliase" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbGeldinst" Content="Geldinstitute (ohne Anfangsbestand)" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbImport"   Content="Import-Schema und Mapping" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbKatMap"   Content="Kategorie→Konto" IsChecked="True" Margin="0,0,16,8"/>
-                                            <CheckBox x:Name="Copy_CbBudget"   Content="Budgetzeitraum (aktuelles Jahr)" IsChecked="True" Margin="0,0,16,8"/>
-                                        </WrapPanel>
-
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,6">
-                                            <Button Click="Copy_Run_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="PlayCircle"
-                                    Content="Ausführen"
-                                    MinHeight="40"/>
-                                        </StackPanel>
-
                                         <TextBlock x:Name="Copy_StatusText"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
@@ -583,11 +553,7 @@
                             </TabItem>
 
                             <!-- TAB 2: Benutzer -->
-                            <TabItem>
-                                <TabItem.Header>
-                                    <TextBlock Text=""/>
-                                </TabItem.Header>
-
+                            <TabItem Header="Benutzer">
                                 <Border Padding="12" CornerRadius="10"
                         Background="{DynamicResource MaterialDesignCardBackground}">
                                     <StackPanel>
@@ -598,39 +564,7 @@
                                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                                    Margin="0,0,0,10"/>
 
-                                        <WrapPanel Margin="0,0,0,10">
-                                            <Button Click="Users_Refresh_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="Refresh"
-                                    Content="Aktualisieren"
-                                    MinHeight="40"
-                                    Margin="0,0,10,10"/>
-                                            <Button Click="Users_Add_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="AccountPlus"
-                                    Content="Neuer Benutzer"
-                                    MinHeight="40"
-                                    Margin="0,0,10,10"/>
-                                            <Button Click="Users_ResetPassword_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="Key"
-                                    Content="Passwort zurücksetzen"
-                                    MinHeight="40"
-                                    Margin="0,0,10,10"/>
-                                            <Button Click="Users_ToggleActive_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="AccountOffOutline"
-                                    Content="Aktiv/Inaktiv"
-                                    MinHeight="40"
-                                    Margin="0,0,10,10"/>
-                                            <Button Click="Users_ToggleAdmin_Click"
-                                    Style="{StaticResource IconTextButton}"
-                                    Tag="ShieldAccountOutline"
-                                    Content="Admin/Standard"
-                                    MinHeight="40"
-                                    Margin="0,0,10,10"/>
-                                        </WrapPanel>
-
+                                        <!-- Grid rechts im Arbeitsfeld (wie gewünscht) -->
                                         <Border Padding="10" CornerRadius="10"
                                 Background="{DynamicResource MaterialDesignPaper}">
                                             <DataGrid x:Name="UsersGrid"
@@ -668,8 +602,9 @@
 
                         </TabControl>
                     </Border>
-
                 </Grid>
+
+
 
                 <!-- UPDATE -->
                 <Grid x:Name="SecUpdate" Visibility="Collapsed">
@@ -682,72 +617,153 @@
 
                 <!-- BACKUP -->
                 <Grid x:Name="SecBackup" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="270"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Backup und Restore (aktive DB)" FontSize="16" FontWeight="SemiBold"/>
+                    <!-- LINKS: 3. Sidebar (Aktionen je Tab) -->
+                    <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
 
-                    <Border Grid.Row="1" Margin="0,12,0,0" Padding="12" CornerRadius="10"
-                            Background="{DynamicResource MaterialDesignCardBackground}">
-                        <StackPanel>
-                            <StackPanel.Resources>
-                                <Style TargetType="FrameworkElement">
-                                    <Setter Property="Margin" Value="0,0,0,8"/>
-                                </Style>
-                            </StackPanel.Resources>
+                                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarSectionHeader}"/>
 
-                            <TextBlock x:Name="Backup_ActiveDbText" />
-                            <DockPanel>
-                                <TextBox x:Name="BackupFileBox"
-                                         materialDesign:HintAssist.Hint="Ziel-Datei (*.bak)"
-                                         Width="380"
-                                         Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
-                                <Button DockPanel.Dock="Right" Margin="8,0,0,0"
-                                        Click="Backup_Browse_Click"
-                                        Style="{StaticResource IconTextButton}"
-                                        Tag="FolderSearchOutline"
-                                        Content="Ziel wählen"/>
-                            </DockPanel>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Click="Backup_Run_Click"
-                                        Style="{StaticResource IconTextButton}"
-                                        Tag="DatabaseArrowDown"
-                                        Content="Backup erstellen"/>
+                                <TextBlock Text="Backup"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                                <!-- Panel Backup -->
+                                <StackPanel x:Name="BackupActionsBackupPanel" Visibility="Visible">
+                                    <TextBlock Text="Backup"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Click="Backup_Run_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="DatabaseArrowDown"
+                            Content="Backup erstellen"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Backup_Browse_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="FolderSearchOutline"
+                            Content="Ziel wählen"
+                            MinHeight="40"/>
+                                </StackPanel>
+
+                                <!-- Panel Restore -->
+                                <StackPanel x:Name="BackupActionsRestorePanel" Visibility="Collapsed">
+                                    <TextBlock Text="Restore"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                                    <Button Click="Restore_Run_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="DatabaseRefresh"
+                            Content="Wiederherstellen"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                                    <Button Click="Restore_BrowseBak_Click"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="FileSearchOutline"
+                            Content="Quelle wählen"
+                            MinHeight="40"/>
+                                </StackPanel>
+
+                                <Separator Margin="0,14,0,12"/>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="InformationOutline"
+                                             Style="{StaticResource DefaultIconStyle}"
+                                             VerticalAlignment="Top"
+                                             Margin="0,1,8,0"/>
+                                    <TextBlock Text="Backup erstellt eine .bak-Datei. Restore überschreibt die aktive Datenbank."
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                </StackPanel>
+
                             </StackPanel>
-                            <TextBlock x:Name="Backup_StatusText"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
-
-                            <Separator Margin="0,12,0,12"/>
-
-                            <TextBlock Text="Backup zurückspielen (überschreibt aktive DB)" FontWeight="SemiBold"/>
-                            <DockPanel>
-                                <TextBox x:Name="Restore_FileBox"
-                                         materialDesign:HintAssist.Hint="Quelle (*.bak)"
-                                         Width="380"
-                                         Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
-                                <Button DockPanel.Dock="Right" Margin="8,0,0,0"
-                                        Click="Restore_BrowseBak_Click"
-                                        Style="{StaticResource IconTextButton}"
-                                        Tag="FileSearchOutline"
-                                        Content="Quelle wählen"/>
-                            </DockPanel>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Click="Restore_Run_Click"
-                                        Style="{StaticResource IconTextButton}"
-                                        Tag="DatabaseRefresh"
-                                        Content="Wiederherstellen"/>
-                            </StackPanel>
-                            <TextBlock x:Name="Restore_StatusText"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
-                        </StackPanel>
+                        </ScrollViewer>
                     </Border>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"/>
+                    <!-- RECHTS: Tabs + Arbeitsfeld -->
+                    <Border Grid.Column="2"
+            CornerRadius="{StaticResource AppCornerRadius.Card}"
+            Background="{DynamicResource MaterialDesignPaper}"
+            Padding="12">
+
+                        <TabControl x:Name="BackupTab"
+                    SelectionChanged="BackupTab_SelectionChanged">
+
+                            <!-- TAB: Backup -->
+                            <TabItem Header="Backup">
+                                <Border Padding="12" CornerRadius="10"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                                    <StackPanel>
+                                        <TextBlock Text="Backup (aktive DB)"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                                        <TextBlock x:Name="Backup_ActiveDbText"
+                                   Margin="0,0,0,10"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                                        <TextBlock Text="Ziel-Datei (.bak)"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+
+                                        <!-- Nur Anzeige: Code-behind schreibt hier hinein -->
+                                        <TextBox x:Name="BackupFileBox"
+                                 IsReadOnly="True"
+                                 materialDesign:HintAssist.Hint="Ziel-Datei (*.bak)"
+                                 HorizontalAlignment="Stretch"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+
+                                        <TextBlock x:Name="Backup_StatusText"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </TabItem>
+
+                            <!-- TAB: Restore -->
+                            <TabItem Header="Restore">
+                                <Border Padding="12" CornerRadius="10"
+                        Background="{DynamicResource MaterialDesignCardBackground}">
+                                    <StackPanel>
+                                        <TextBlock Text="Restore (aktive DB überschreiben)"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Quelle-Datei (.bak)"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+
+                                        <!-- Nur Anzeige: Code-behind schreibt hier hinein -->
+                                        <TextBox x:Name="Restore_FileBox"
+                                 IsReadOnly="True"
+                                 materialDesign:HintAssist.Hint="Quelle (*.bak)"
+                                 HorizontalAlignment="Stretch"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+
+                                        <TextBlock x:Name="Restore_StatusText"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </TabItem>
+
+                        </TabControl>
+                    </Border>
                 </Grid>
 
                 <!-- LIZENZ -->

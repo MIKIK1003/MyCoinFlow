@@ -94,6 +94,8 @@ namespace MyCoinFlow.Views
             AttachNumberRangesView();
             EnsureUpdatesHost();
             EnsurePathsHost();
+            MandantenTab_SelectionChanged(MandantenTab, null);
+            BackupTab_SelectionChanged(BackupTab, null);
 
             await LoadCreditCardSchemasAsync();
             await LoadCopyCombosAsync();
@@ -967,8 +969,31 @@ ORDER BY name;";
             catch { }
         }
 
+        private void MandantenTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (sender is not TabControl tc) return;
 
+                // 0=Neu, 1=Copy, 2=Users
+                MandantenActionsNeuPanel.Visibility = tc.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+                MandantenActionsCopyPanel.Visibility = tc.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+                MandantenActionsUsersPanel.Visibility = tc.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch { }
+        }
+        private void BackupTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (sender is not TabControl tc) return;
 
+                // 0=Backup, 1=Restore
+                BackupActionsBackupPanel.Visibility = tc.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+                BackupActionsRestorePanel.Visibility = tc.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch { }
+        }
 
     }
 }
