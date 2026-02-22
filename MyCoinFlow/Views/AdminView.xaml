@@ -604,16 +604,62 @@
                     </Border>
                 </Grid>
 
-
-
                 <!-- UPDATE -->
                 <Grid x:Name="SecUpdate" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <ContentControl x:Name="UpdatesHost" Grid.Row="1" Margin="0,16,0,0"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="270"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- LINKS: Aktionen -->
+                    <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+
+                                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarSectionHeader}"/>
+
+                                <TextBlock Text="Update"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                                <Button Click="Updates_Search_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="shieldsearch"
+                        Content="Suchen"
+                        MinHeight="40"
+                        Margin="0,0,0,10"/>
+
+                                <Button Click="Updates_Backup_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="databaseexport"
+                        Content="Sichern"
+                        MinHeight="40"
+                        Margin="0,0,0,10"/>
+
+                                <Button Click="Updates_Update_Click"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="update"
+                        Content="Updaten"
+                        MinHeight="40"/>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- RECHTS: Infos -->
+                    <Border Grid.Column="2"
+            CornerRadius="{StaticResource AppCornerRadius.Card}"
+            Background="{DynamicResource MaterialDesignPaper}"
+            Padding="12">
+                        <Border Padding="12" CornerRadius="10"
+                Background="{DynamicResource MaterialDesignCardBackground}">
+                            <ContentControl x:Name="UpdatesHost"/>
+                        </Border>
+                    </Border>
                 </Grid>
+
 
                 <!-- BACKUP -->
                 <Grid x:Name="SecBackup" Visibility="Collapsed">
@@ -637,7 +683,7 @@
 
                                 <!-- Panel Backup -->
                                 <StackPanel x:Name="BackupActionsBackupPanel" Visibility="Visible">
-                                    <TextBlock Text="Backup"
+                                    <TextBlock Text="Sicherung der Daten"
                                Style="{StaticResource SidebarGroupHeader}"
                                Margin="0,0,0,8"/>
 
@@ -657,7 +703,7 @@
 
                                 <!-- Panel Restore -->
                                 <StackPanel x:Name="BackupActionsRestorePanel" Visibility="Collapsed">
-                                    <TextBlock Text="Restore"
+                                    <TextBlock Text="Zurückholen einer Sicherung"
                                Style="{StaticResource SidebarGroupHeader}"
                                Margin="0,0,0,8"/>
 
@@ -679,12 +725,14 @@
 
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="InformationOutline"
-                                             Style="{StaticResource DefaultIconStyle}"
-                                             VerticalAlignment="Top"
-                                             Margin="0,1,8,0"/>
+                             Style="{StaticResource DefaultIconStyle}"
+                             VerticalAlignment="Top"
+                             Margin="0,2,8,0"/>
+
                                     <TextBlock Text="Backup erstellt eine .bak-Datei. Restore überschreibt die aktive Datenbank."
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+               TextWrapping="Wrap"
+               Width="180"
+               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                                 </StackPanel>
 
                             </StackPanel>

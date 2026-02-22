@@ -68,7 +68,7 @@
                              IsIndeterminate="False"/>
 
                 <!-- Aktionen: Buttons nach Standard = IconTextButton (Icon via Tag, Text via Content) -->
-                <StackPanel Grid.Row="6" Orientation="Horizontal">
+                <StackPanel Grid.Row="6" Orientation="Horizontal" Visibility="Collapsed">
 
                     <!-- Nach Updates suchen -->
                     <Button x:Name="CheckButton"

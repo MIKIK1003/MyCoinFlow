@@ -995,5 +995,38 @@ ORDER BY name;";
             catch { }
         }
 
+        private MyCoinFlow.Views.Admin.AdminUpdatesControl? GetUpdatesControl()
+        {
+            var host = El<ContentControl>("UpdatesHost") ?? FindByNameCaseInsensitive<ContentControl>(this, "UpdatesHost");
+            return host?.Content as MyCoinFlow.Views.Admin.AdminUpdatesControl;
+        }
+
+        private void Updates_Search_Click(object sender, RoutedEventArgs e)
+        {
+            var uc = GetUpdatesControl();
+            if (uc == null) return;
+
+            var btn = FindByNameCaseInsensitive<Button>(uc, "CheckButton");
+            btn?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+
+        private void Updates_Backup_Click(object sender, RoutedEventArgs e)
+        {
+            var uc = GetUpdatesControl();
+            if (uc == null) return;
+
+            var btn = FindByNameCaseInsensitive<Button>(uc, "BackupButton");
+            btn?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+
+        private void Updates_Update_Click(object sender, RoutedEventArgs e)
+        {
+            var uc = GetUpdatesControl();
+            if (uc == null) return;
+
+            var btn = FindByNameCaseInsensitive<Button>(uc, "UpdateButton");
+            btn?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+
     }
 }
