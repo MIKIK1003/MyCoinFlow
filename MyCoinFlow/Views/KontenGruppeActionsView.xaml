@@ -4,43 +4,45 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <StackPanel>
+        <StackPanel.Resources>
+            <Style TargetType="FrameworkElement">
+                <Setter Property="Margin" Value="0,0,0,10"/>
+            </Style>
+        </StackPanel.Resources>
 
         <TextBlock Text="Konten-Gruppe"
                    Style="{StaticResource SidebarGroupHeader}"
                    Margin="0,0,0,8"/>
 
-        <!-- Neu -->
         <TextBox Text="{Binding NeueBezeichnung, UpdateSourceTrigger=PropertyChanged}"
                  Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                 materialDesign:HintAssist.Hint="Neue Bezeichnung"
-                 Margin="0,0,0,10"/>
+                 materialDesign:HintAssist.Hint="Neue Bezeichnung"/>
 
         <Button Style="{StaticResource IconTextButton}"
                 Tag="PlusCircleOutline"
                 Content="Hinzufügen"
                 Command="{Binding HinzufuegenCommand}"
-                MinHeight="40"
-                Margin="0,0,0,14"/>
+                MinHeight="40"/>
 
-        <!-- Ändern -->
+        <Separator Margin="0,6,0,10"/>
+
         <TextBox Text="{Binding BearbeiteteBezeichnung, UpdateSourceTrigger=PropertyChanged}"
                  Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                 materialDesign:HintAssist.Hint="Bezeichnung ändern"
-                 Margin="0,0,0,10"/>
+                 materialDesign:HintAssist.Hint="Bezeichnung ändern"/>
 
         <Button Style="{StaticResource IconTextButton}"
                 Tag="Pencil"
                 Content="Ändern"
                 Command="{Binding BearbeitenCommand}"
-                MinHeight="40"
-                Margin="0,0,0,14"/>
+                MinHeight="40"/>
 
-        <!-- Löschen -->
+        <Separator Margin="0,6,0,10"/>
+
         <Button Style="{StaticResource IconTextButton.Danger}"
                 Tag="DeleteForever"
                 Content="Löschen"
                 Command="{Binding LoeschenCommand}"
-                MinHeight="40"/>
-
+                MinHeight="40"
+                Margin="0"/>
     </StackPanel>
 </UserControl>

@@ -50,10 +50,10 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Bd"
                             Background="{DynamicResource MaterialDesignPaper}"
-                            CornerRadius="10"
+                            CornerRadius="5"
                             Padding="12,10"
                             BorderBrush="Transparent"
-                            BorderThickness="1">
+                            BorderThickness="2">
 
                                                 <!-- Foreground hier weitergeben -->
                                                 <ContentPresenter
@@ -100,7 +100,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FormatListNumbered"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.7"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Nummernkreise"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -111,7 +120,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ClipboardListOutline"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Kontenplan"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -122,7 +140,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CreditCardOutline"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Kreditkarten"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -133,7 +160,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="AccountMultiplePlusOutline"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Mandanten"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -144,7 +180,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Update"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -155,7 +200,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Database"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Backup"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -166,7 +220,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FolderArrowUpDown"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Dateianhänge und OCR"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -177,7 +240,16 @@
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="KeyVariant"
                                  Style="{StaticResource DefaultIconStyle.Nav}"
-                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                 Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}" RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
                                 <TextBlock Text="Lizenz"
                    VerticalAlignment="Center"
                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
@@ -221,12 +293,12 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
 
-                                <TextBlock Text="Kontenplan"
-                           Style="{StaticResource SidebarSectionHeader}"/>
-
                                 <TextBlock Text="Aktionen"
-                           Style="{StaticResource SidebarGroupHeader}"
-                           Margin="0,0,0,8"/>
+           Style="{StaticResource SidebarSectionHeader}"/>
+
+                                <TextBlock Text="Kontenplan"
+           Style="{StaticResource SidebarGroupHeader}"
+           Margin="0,0,0,8"/>
 
                                 <Button Click="ImportExcel_Click"
                         Style="{StaticResource IconTextButton}"
@@ -300,8 +372,8 @@
 
                 <!-- KREDITKARTEN -->
                 <Grid x:Name="SecKreditkarten" Visibility="Collapsed">
-                    <Border Padding="10" CornerRadius="10"
-                            Background="{DynamicResource MaterialDesignCardBackground}">
+                    <Border CornerRadius="{StaticResource AppCornerRadius.Card}"
+                        Background="{DynamicResource MaterialDesignPaper}">
                         <ContentControl x:Name="CreditCardImportMappingHost"/>
                     </Border>
                 </Grid>

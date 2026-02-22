@@ -5,7 +5,8 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              MinHeight="360" MinWidth="760">
 
-    <Grid Margin="16">
+    <!-- Wichtig: kein Außen-Margin, damit kein zusätzlicher „Layer“ entsteht -->
+    <Grid Margin="0">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="270"/>
             <ColumnDefinition Width="16"/>
@@ -14,75 +15,76 @@
 
         <!-- ================== LINKS: SIDEBAR ================== -->
         <Border Grid.Column="0"
-                Style="{StaticResource SidebarCard}">
+        Style="{StaticResource SidebarCard}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
 
-                    <TextBlock Text="Kreditkarten"
-                               Style="{StaticResource SidebarSectionHeader}"/>
+                    <!-- exakt wie Kontenplan -->
+                    <TextBlock Text="Aktionen"
+                       Style="{StaticResource SidebarSectionHeader}"/>
 
+                    <TextBlock Text="Kreditkarten"
+                       Style="{StaticResource SidebarGroupHeader}"
+                       Margin="0,0,0,8"/>
+
+                    <!-- Schema (kein GroupHeader mehr, damit es nicht „tiefer“ wirkt als Kontenplan) -->
                     <TextBlock Text="Schema"
-                               Style="{StaticResource SidebarGroupHeader}"
-                               Margin="0,0,0,6"/>
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,6"/>
 
                     <TextBlock Text="Schema auswählen"
-                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                               Margin="0,0,0,6"/>
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                       Margin="0,0,0,6"/>
 
-                    <!-- Schema -->
                     <ComboBox x:Name="SchemaCombo"
-                              IsEditable="False"
-                              DisplayMemberPath="Name"
-                              SelectedValuePath="Id"
-                              SelectionChanged="SchemaCombo_SelectionChanged"
-                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                              MinHeight="36"/>
+                      IsEditable="False"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Id"
+                      SelectionChanged="SchemaCombo_SelectionChanged"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      MinHeight="36"/>
 
-                    <!-- Schema-Name -->
                     <TextBox x:Name="SchemaNameBox"
-                             Margin="0,12,0,0"
-                             materialDesign:HintAssist.Hint="Schema-Name"
-                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                             TextChanged="SchemaNameBox_TextChanged"/>
+                     Margin="0,12,0,0"
+                     materialDesign:HintAssist.Hint="Schema-Name"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     TextChanged="SchemaNameBox_TextChanged"/>
 
                     <Separator Margin="0,14,0,12"/>
 
-                    <TextBlock Text="Aktionen"
-                               Style="{StaticResource SidebarGroupHeader}"
-                               Margin="0,0,0,8"/>
-
+                    <!-- Aktionen (ohne zweite Überschrift "Aktionen") -->
                     <Button Click="NewSchema_Click"
-                            Style="{StaticResource IconTextButton}"
-                            Tag="Plus"
-                            Content="Neu"
-                            MinHeight="40"
-                            Margin="0,0,0,10"/>
+                    Style="{StaticResource IconTextButton}"
+                    Tag="Plus"
+                    Content="Neu"
+                    MinHeight="40"
+                    Margin="0,0,0,10"/>
 
                     <Button x:Name="SaveButton"
-                            Click="SaveSchema_Click"
-                            Style="{StaticResource IconTextButton}"
-                            Tag="ContentSave"
-                            Content="Speichern"
-                            MinHeight="40"
-                            Margin="0,0,0,10"/>
+                    Click="SaveSchema_Click"
+                    Style="{StaticResource IconTextButton}"
+                    Tag="ContentSave"
+                    Content="Speichern"
+                    MinHeight="40"
+                    Margin="0,0,0,10"/>
 
                     <Button x:Name="DeleteButton"
-                            Click="DeleteSchema_Click"
-                            Style="{StaticResource IconTextButton.Danger}"
-                            Tag="DeleteForever"
-                            Content="Löschen"
-                            MinHeight="40"/>
+                    Click="DeleteSchema_Click"
+                    Style="{StaticResource IconTextButton.Danger}"
+                    Tag="DeleteForever"
+                    Content="Löschen"
+                    MinHeight="40"/>
 
                     <Separator Margin="0,14,0,12"/>
 
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="InformationOutline"
-                                                 Style="{StaticResource DefaultIconStyle}"
-                                                 VerticalAlignment="Top"
-                                                 Margin="0,1,8,0"/>
+                                         Style="{StaticResource DefaultIconStyle}"
+                                         VerticalAlignment="Top"
+                                         Margin="0,1,8,0"/>
                         <TextBlock Text="Masterfelder per Dropdown wählen. Speichern legt oder überschreibt die Mappings zum gewählten Schema."
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                     </StackPanel>
 
                 </StackPanel>
@@ -101,7 +103,6 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- Titel rechts (wie vorher, nur sauber) -->
                 <DockPanel Grid.Row="0" Margin="0,0,0,10">
                     <materialDesign:PackIcon Kind="CreditCardOutline"
                                              Width="24" Height="24"
@@ -113,7 +114,6 @@
                                FontWeight="SemiBold"/>
                 </DockPanel>
 
-                <!-- Mapping-Tabelle (unverändert) -->
                 <DataGrid Grid.Row="1"
                           x:Name="GridMappings"
                           AutoGenerateColumns="False"
@@ -127,12 +127,11 @@
                           materialDesign:DataGridAssist.CellPadding="8"
                           materialDesign:DataGridAssist.ColumnHeaderPadding="8"
                           RowHeight="40"
-                          Background="White"
-                          RowBackground="White"
+                          Background="{DynamicResource MaterialDesignPaper}"
+                          RowBackground="{DynamicResource MaterialDesignPaper}"
                           AlternatingRowBackground="{x:Null}">
                     <DataGrid.Columns>
 
-                        <!-- Masterfeld: Dropdown (sichtbar + editierbar) -->
                         <DataGridComboBoxColumn Header="Masterfeld"
                                                 Width="2*"
                                                 SelectedItemBinding="{Binding MasterHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
@@ -151,12 +150,10 @@
                             </DataGridComboBoxColumn.EditingElementStyle>
                         </DataGridComboBoxColumn>
 
-                        <!-- Quelldatei-Feld -->
                         <DataGridTextColumn Header="Quelldatei-Feld"
                                             Width="2*"
                                             Binding="{Binding SourceHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                        <!-- Fallback -->
                         <DataGridTextColumn Header="Fallback"
                                             Width="2*"
                                             Binding="{Binding DefaultValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
