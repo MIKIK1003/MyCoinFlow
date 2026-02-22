@@ -199,7 +199,6 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             c.Open();
 
             // 1) Preflight: Wer referenziert dbo.Kontenplan(Id)?
-            //    (nutzt die bereits bei Adresse eingeführten Helper: GetReferencingCounts / ShowDeleteBlockedMessage)
             var refs = GetReferencingCounts("dbo", "Kontenplan", "Id", id);
 
             // 1a) "Weiche" Verweise (Mappings) zählen
@@ -225,9 +224,8 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
                     System.Windows.MessageBoxImage.Question);
 
                 if (choice != System.Windows.MessageBoxResult.Yes)
-                    return; // Nutzer lehnt ab → ruhig zurück
+                    return;
 
-                // Mappings löschen
                 try
                 {
                     LoescheKategorieMappingsFuerKonto(id);
@@ -243,14 +241,93 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
                 refs = GetReferencingCounts("dbo", "Kontenplan", "Id", id);
             }
 
-            // 3) Harte Blocker verbleiben? (Transaktion.VonKontoId/NachKontoId, BudgetDetail.KontoId, …)
+            // 3) Spezialfall: Adresse.DefaultKontoId darf "weggeschaltet" werden
+            refs.TryGetValue("dbo.Adresse", out int adresseCount);
+
+            // Alles außer dbo.Adresse sind harte Blocker
+            bool hasHardBlockers = refs.Any(kv => !kv.Key.Equals("dbo.Adresse", StringComparison.OrdinalIgnoreCase));
+
+            if (adresseCount > 0 && !hasHardBlockers)
+            {
+                // Beispiele anzeigen, damit klar ist welche Adressen gemeint sind
+                var beispiele = GetAdressenMitDefaultKonto(id, take: 6);
+                var lines = new List<string>();
+
+                lines.Add(adresseCount == 1
+                    ? "1 Adresse referenziert dieses Konto als DefaultKontoId."
+                    : $"{adresseCount} Adressen referenzieren dieses Konto als DefaultKontoId.");
+
+                if (beispiele.Count > 0)
+                {
+                    lines.Add("");
+                    lines.Add("Beispiele:");
+                    foreach (var a in beispiele)
+                        lines.Add($"• #{a.Id}: {a.Name}");
+                }
+
+                lines.Add("");
+                lines.Add("Soll bei diesen Adressen DefaultKontoId auf (leer) gesetzt werden, damit das Konto gelöscht werden kann?");
+                lines.Add("Die Adressen selbst werden nicht gelöscht.");
+
+                var choice = System.Windows.MessageBox.Show(
+                    string.Join(Environment.NewLine, lines),
+                    "DefaultKontoId lösen?",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question);
+
+                if (choice != System.Windows.MessageBoxResult.Yes)
+                    return;
+
+                try
+                {
+                    NullDefaultKontoInAdressen(id);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show("DefaultKontoId konnte bei den Adressen nicht gelöst werden:\n" + ex.Message,
+                        "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
+
+                // Nach dem Lösen erneut prüfen
+                refs = GetReferencingCounts("dbo", "Kontenplan", "Id", id);
+            }
+
+            // 4) Harte Blocker verbleiben? → blockieren, aber mit Adress-Beispielen falls vorhanden
             if (refs.Count > 0)
             {
+                if (refs.TryGetValue("dbo.Adresse", out int adrCnt) && adrCnt > 0)
+                {
+                    var beispiele = GetAdressenMitDefaultKonto(id, take: 6);
+
+                    var info = new List<string>
+            {
+                "Zusatzinfo zu dbo.Adresse (DefaultKontoId):",
+                adrCnt == 1 ? "• 1 Adresse betroffen" : $"• {adrCnt} Adressen betroffen"
+            };
+
+                    if (beispiele.Count > 0)
+                    {
+                        info.Add("Beispiele:");
+                        foreach (var a in beispiele)
+                            info.Add($"• #{a.Id}: {a.Name}");
+                    }
+
+                    info.Add("");
+                    info.Add("Weitere Verweise verhindern das Löschen weiterhin.");
+
+                    System.Windows.MessageBox.Show(
+                        string.Join(Environment.NewLine, info),
+                        "Hinweis",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                }
+
                 ShowDeleteBlockedMessage("Kontenplan-Eintrag", refs);
                 return;
             }
 
-            // 4) Konto löschen
+            // 5) Konto löschen
             try
             {
                 using var del = new SqlCommand("DELETE FROM dbo.Kontenplan WHERE Id = @Id", c);
@@ -259,14 +336,55 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
             catch (Exception ex)
             {
-                // FK-Fehler freundlich abfangen (falls Race-Condition o. ä.)
                 if (HandleSqlDeleteException(ex, "Kontenplan-Eintrag")) return;
 
                 System.Windows.MessageBox.Show("Kontenplan-Eintrag konnte nicht gelöscht werden:\n" + ex.Message,
                     "Löschen fehlgeschlagen", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                // kein throw → kein Programmstop
             }
         }
+
+        // Liefert ein paar Beispiele der Adressen, die DefaultKontoId = kontoId haben
+        private List<(int Id, string Name)> GetAdressenMitDefaultKonto(int kontoId, int take = 6)
+        {
+            var list = new List<(int, string)>();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+SELECT TOP (@take) Id, Name
+FROM dbo.Adresse
+WHERE DefaultKontoId = @id
+ORDER BY Name;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@take", take);
+            cmd.Parameters.AddWithValue("@id", kontoId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                int id = r.GetInt32(0);
+                string name = r.IsDBNull(1) ? "(ohne Name)" : r.GetString(1);
+                list.Add((id, name));
+            }
+
+            return list;
+        }
+
+        // Setzt DefaultKontoId auf NULL für alle Adressen, die dieses Konto referenzieren
+        private int NullDefaultKontoInAdressen(int kontoId)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"UPDATE dbo.Adresse SET DefaultKontoId = NULL WHERE DefaultKontoId = @id;";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", kontoId);
+
+            return cmd.ExecuteNonQuery();
+        }
+
 
 
         // Löscht alle Kategorie→Konto-Mappings für ein Konto (weiche Verknüpfungen).

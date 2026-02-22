@@ -7,6 +7,7 @@ using System.Windows.Input;
 using MyCoinFlow.Models;      // KontenGruppe
 using MyCoinFlow.Helpers;     // RelayCommand, UiEvents
 using MyCoinFlow.Services;    // DatabaseService
+using System.Linq;
 
 namespace MyCoinFlow.ViewModels
 {
@@ -70,9 +71,32 @@ namespace MyCoinFlow.ViewModels
         private void LadeDaten()
         {
             KontenGruppen.Clear();
+
             var db = new DatabaseService();
-            foreach (var g in db.LadeKontenGruppen())
+            var list = db.LadeKontenGruppen();
+
+            foreach (var g in list
+                .OrderBy(x => TrailingNumberOrMax(x?.Bezeichnung))
+                .ThenBy(x => x?.Bezeichnung ?? string.Empty, StringComparer.CurrentCultureIgnoreCase))
+            {
                 KontenGruppen.Add(g);
+            }
+        }
+
+        private static int TrailingNumberOrMax(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return int.MaxValue;
+
+            text = text.Trim();
+            int i = text.Length - 1;
+
+            while (i >= 0 && char.IsDigit(text[i]))
+                i--;
+
+            if (i == text.Length - 1) return int.MaxValue;
+
+            var numStr = text.Substring(i + 1);
+            return int.TryParse(numStr, out var n) ? n : int.MaxValue;
         }
 
         private void Hinzufuegen()

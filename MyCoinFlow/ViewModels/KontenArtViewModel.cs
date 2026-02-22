@@ -7,6 +7,7 @@ using System.Windows.Input;
 using MyCoinFlow.Models;
 using MyCoinFlow.Helpers;   // UiEvents
 using MyCoinFlow.Services; // DatabaseService
+using System.Linq;
 
 namespace MyCoinFlow.ViewModels
 {
@@ -73,9 +74,34 @@ namespace MyCoinFlow.ViewModels
         private void LadeDaten()
         {
             KontenArten.Clear();
+
             var db = new DatabaseService();
-            foreach (var art in db.LadeKontenArten())
+            var list = db.LadeKontenArten();
+
+            foreach (var art in list
+                .OrderBy(a => TrailingNumberOrMax(a?.Bezeichnung))
+                .ThenBy(a => a?.Bezeichnung ?? string.Empty, StringComparer.CurrentCultureIgnoreCase))
+            {
                 KontenArten.Add(art);
+            }
+        }
+
+        private static int TrailingNumberOrMax(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return int.MaxValue;
+
+            text = text.Trim();
+            int i = text.Length - 1;
+
+            // von rechts: alle Ziffern einsammeln
+            while (i >= 0 && char.IsDigit(text[i]))
+                i--;
+
+            // keine Ziffer am Ende gefunden
+            if (i == text.Length - 1) return int.MaxValue;
+
+            var numStr = text.Substring(i + 1);
+            return int.TryParse(numStr, out var n) ? n : int.MaxValue;
         }
 
         private void Hinzufuegen()

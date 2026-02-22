@@ -134,21 +134,6 @@ namespace MyCoinFlow.ViewModels
         private void BearbeitenEintrag(object? parameter)
         {
             var eintrag = ResolveSelectedEintrag(parameter);
-
-            var p = parameter?.GetType().FullName ?? "(null)";
-            var n = AusgewaehlterKnoten?.GetType().FullName ?? "(null)";
-            var e = AusgewaehlterEintrag?.Id.ToString() ?? "(null)";
-            MessageBox.Show($"PARAM={p}\nNODE={n}\nAusgewEntryId={e}", "DEBUG Auswahl");
-
-
-
-            MessageBox.Show(
-    $"Bearbeiten: Id={eintrag?.Id}, Nr={eintrag?.Kontonummer}, Detail={eintrag?.Detail}",
-    "DEBUG",
-    MessageBoxButton.OK,
-    MessageBoxImage.Information);
-
-
             if (eintrag == null) return;
 
             var dlg = new NeuerEintragDialog(eintrag);
