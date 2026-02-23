@@ -63,8 +63,11 @@
                 </DataGridTemplateColumn>
 
                 <DataGridTextColumn Header="Anteil (%)"
-                                    Binding="{Binding AnteilProzent, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="*"/>
+                    Binding="{Binding AnteilProzent,
+                                      UpdateSourceTrigger=LostFocus,
+                                      ConverterCulture=de-CH,
+                                      StringFormat={}{0:0.####}}"
+                    Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
 
