@@ -141,14 +141,22 @@ namespace MyCoinFlow.ViewModels
         /// Investitionen/Amortisationen/Durchlaufkonten bleiben default inaktiv,
         /// unabhängig von "Richtung".
         /// </summary>
-        private void LoadNumberRanges()
+        void LoadNumberRanges()
         {
             NumberRanges.Clear();
 
             var rules = _db.LadeNummernRegeln();
 
+            // Kontenplan einmal laden, damit wir Nummernkreise ohne Treffer ausblenden können
+            var accounts = _db.LadeKontenplan();
+
             foreach (var r in rules.OrderBy(x => x.RangeStart))
             {
+                // Nur Regeln anzeigen, die im aktuellen Mandanten mindestens 1 Konto treffen
+                bool hasHit = accounts.Any(a => a.Kontonummer >= r.RangeStart && a.Kontonummer <= r.RangeEnd);
+                if (!hasHit)
+                    continue;
+
                 var label = !string.IsNullOrWhiteSpace(r.Bezeichnung)
                     ? r.Bezeichnung!
                     : $"{r.Richtung} {r.RangeStart}-{r.RangeEnd}";
@@ -212,9 +220,14 @@ namespace MyCoinFlow.ViewModels
             var selectedRanges = NumberRanges.Where(x => x.IsSelected).ToList();
             if (selectedRanges.Count > 0)
             {
-                allAccounts = allAccounts
+                var filtered = allAccounts
                     .Where(a => selectedRanges.Any(r => a.Kontonummer >= r.Start && a.Kontonummer <= r.End))
                     .ToList();
+
+                // Wichtig: Wenn Filter 0 Konten liefert, NICHT alles "verschwinden" lassen.
+                // Fallback auf ungefilterte Darstellung (robust für neue Mandanten / falsche Nummernkreise).
+                if (filtered.Count > 0)
+                    allAccounts = filtered;
             }
 
             string key = SelectedGrouping?.Key ?? "Untergruppe";
