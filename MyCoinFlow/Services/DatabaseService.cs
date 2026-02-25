@@ -5277,6 +5277,7 @@ WHERE Id = @id;";
         {
             // Wir nutzen die bestehende Tabelle Transaktion.
             // Minimal: letzte N Transaktionen für Auswahl im Dialog.
+            // Erweiterung: Blende Transaktionen aus, die bereits in dbo.StweSet verarbeitet wurden (TransaktionId vorhanden).
             var list = new List<MyCoinFlow.Models.Transaktion>();
 
             using var c = CreateConnection();
@@ -5292,6 +5293,11 @@ SELECT TOP ({top})
 FROM dbo.Transaktion t
 LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.StweSet s
+    WHERE s.TransaktionId = t.Id
+)
 ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var cmd = c.CreateCommand();
@@ -5365,20 +5371,57 @@ WHERE t.Id = @id;";
             using var c = CreateConnection();
             c.Open();
 
-            const string sql = @"
+            // Defensiver Doppelverarbeitungs-Schutz:
+            // - innerhalb einer serialisierbaren Transaktion prüfen
+            // - wenn bereits vorhanden: harte Exception (UI fängt ab)
+            using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+
+            try
+            {
+                const string sqlCheck = @"
+SELECT TOP (1) Id
+FROM dbo.StweSet
+WHERE TransaktionId = @tid;";
+
+                using (var cmdCheck = c.CreateCommand())
+                {
+                    cmdCheck.Transaction = tx;
+                    cmdCheck.CommandText = sqlCheck;
+                    cmdCheck.Parameters.AddWithValue("@tid", transaktionId);
+
+                    var existing = cmdCheck.ExecuteScalar();
+                    if (existing != null && existing != DBNull.Value)
+                    {
+                        tx.Rollback();
+                        throw new InvalidOperationException(
+                            $"Diese Transaktion wurde bereits in einem STWE-Set verarbeitet (SetId {Convert.ToInt32(existing)}).");
+                    }
+                }
+
+                const string sqlInsert = @"
 INSERT INTO dbo.StweSet (LiegenschaftId, TransaktionId, Titel, IsCredit)
 OUTPUT INSERTED.Id
 VALUES (@lid, @tid, @t, @ic);";
 
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
+                using var cmd = c.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = sqlInsert;
 
-            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
-            cmd.Parameters.AddWithValue("@tid", transaktionId);
-            cmd.Parameters.AddWithValue("@t", (object?)titel ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@ic", isCredit ? 1 : 0);
+                cmd.Parameters.AddWithValue("@lid", liegenschaftId);
+                cmd.Parameters.AddWithValue("@tid", transaktionId);
+                cmd.Parameters.AddWithValue("@t", (object?)titel ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@ic", isCredit ? 1 : 0);
 
-            return Convert.ToInt32(cmd.ExecuteScalar());
+                var newId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                tx.Commit();
+                return newId;
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { /* defensiv */ }
+                throw;
+            }
         }
 
 

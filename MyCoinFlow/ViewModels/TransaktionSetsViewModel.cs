@@ -202,8 +202,16 @@ namespace MyCoinFlow.ViewModels
                 ? (t.AdresseName ?? "(ohne Text)")
                 : t.Notiz.Trim();
 
-            _db.StweSetInsert(SelectedLiegenschaft.Id, t.Id, titel);
-            LoadSets();
+            try
+            {
+                _db.StweSetInsert(SelectedLiegenschaft.Id, t.Id, titel);
+                LoadSets();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "Set erstellen",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void SetType(bool isCredit)
