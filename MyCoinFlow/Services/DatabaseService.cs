@@ -6374,6 +6374,63 @@ ORDER BY o.Name;";
 
             return list;
         }
+
+        public List<MyCoinFlow.Models.StweOwnerSummaryRow> StweReportOwnerSummaryNr2Ausgaben(
+    int liegenschaftId, DateTime? von, DateTime? bis)
+        {
+            EnsureStweSchema();
+
+            var list = new List<MyCoinFlow.Models.StweOwnerSummaryRow>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    o.Id AS EigentuemerId,
+    o.Name AS EigentuemerName,
+    SUM(l.Betrag) AS Summe
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s           ON s.Id = l.SetId
+JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
+JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
+LEFT JOIN dbo.Kontenplan kv  ON kv.Id = t.VonKontoId
+LEFT JOIN dbo.Kontenplan kn  ON kn.Id = t.NachKontoId
+WHERE s.LiegenschaftId = @lid
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (
+        (kn.Kontonummer BETWEEN @kStart AND @kEnd)
+     OR (kv.Kontonummer BETWEEN @kStart AND @kEnd)
+  )
+GROUP BY o.Id, o.Name
+ORDER BY o.Name;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@lid"; p1.Value = liegenschaftId; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@von"; p2.Value = (object?)von?.Date ?? DBNull.Value; cmd.Parameters.Add(p2);
+            var p3 = cmd.CreateParameter(); p3.ParameterName = "@bis"; p3.Value = (object?)bis?.Date ?? DBNull.Value; cmd.Parameters.Add(p3);
+
+            var p4 = cmd.CreateParameter(); p4.ParameterName = "@kStart"; p4.Value = 20000; cmd.Parameters.Add(p4);
+            var p5 = cmd.CreateParameter(); p5.ParameterName = "@kEnd"; p5.Value = 29999; cmd.Parameters.Add(p5);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new MyCoinFlow.Models.StweOwnerSummaryRow
+                {
+                    EigentuemerId = r.GetInt32(0),
+                    EigentuemerName = r.GetString(1),
+                    Summe = r.GetDecimal(2)
+                });
+            }
+
+            return list;
+        }
+
+
+
         public List<MyCoinFlow.Models.StweOwnerDetailRow> StweReportOwnerDetails(
     int liegenschaftId, int eigentuemerId, DateTime? von, DateTime? bis)
         {

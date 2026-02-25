@@ -373,17 +373,19 @@ namespace MyCoinFlow.ViewModels
 
             if (_liegenschaftId <= 0) return;
 
-            var rows = _db.StweReportOwnerSummary(_liegenschaftId, _von, _bis);
+            // NUR Nummernkreis 2 (Ausgaben): Kontonummer 20000–29999
+            var rows = _db.StweReportOwnerSummaryNr2Ausgaben(_liegenschaftId, _von, _bis);
             var ordered = rows.OrderByDescending(r => Math.Abs(r.Summe)).ToList();
 
             ChfProOwnerSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "CHF", Values = ordered.Select(r => (double)r.Summe).ToArray() }
+        new ColumnSeries<double> { Name = "CHF", Values = ordered.Select(r => (double)r.Summe).ToArray() }
             };
+
             ChfProOwnerXAxes = new[]
             {
-                new Axis { Labels = ordered.Select(r => r.EigentuemerName).ToArray(), LabelsRotation = 60, TextSize = 12 }
-            };
+        new Axis { Labels = ordered.Select(r => r.EigentuemerName).ToArray(), LabelsRotation = 60, TextSize = 12 }
+    };
         }
 
         private static void Add(Dictionary<string, decimal> dict, string key, decimal value)
