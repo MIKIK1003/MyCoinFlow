@@ -293,77 +293,123 @@ namespace MyCoinFlow.ViewModels
             };
         }
 
-
-
         private void LoadKwhProOwner()
+{
+    // X-Achse (Labels)
+    KwhProOwnerXAxes = new[]
+    {
+        new Axis
         {
-            KwhProOwnerXAxes = new[] { new Axis { Labels = Array.Empty<string>(), LabelsRotation = 60, TextSize = 12 } };
-            KwhProOwnerYAxes = new[] { new Axis() };
-            KwhProOwnerSeries = new ISeries[] { new ColumnSeries<double> { Values = Array.Empty<double>() } };
-
-            if (_liegenschaftId <= 0) return;
-
-            // Zeitraum: wir nehmen "letztes Set <= bis" und "Set davor als Start"
-            var sets = _db.StweZaehlerdatenSetsGetByLiegenschaft(_liegenschaftId)
-                .OrderBy(s => s.ErfasstAm)
-                .ThenBy(s => s.Id)
-                .ToList();
-
-            var endSet = sets.LastOrDefault(s => s.ErfasstAm.Date <= _bis.Date);
-            if (endSet == null) return;
-
-            var startSet = sets.LastOrDefault(s => s.ErfasstAm.Date < _von.Date)
-                           ?? _db.StweZaehlerdatenGetPreviousSet(_liegenschaftId, endSet.ErfasstAm, endSet.Id);
-
-            if (startSet == null) return;
-
-            var endLines = _db.StweZaehlerdatenLinesGetBySet(endSet.Id);
-            var startLines = _db.StweZaehlerdatenLinesGetBySet(startSet.Id);
-            var startDict = startLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
-
-            var zaehler = _db.StweZaehlerGetByLiegenschaft(_liegenschaftId);
-            var zaehlerDict = zaehler.ToDictionary(z => z.Id);
-
-            var ownerKwh = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var l in endLines)
-            {
-                if (!zaehlerDict.TryGetValue(l.ZaehlerId, out var z))
-                    continue;
-
-                var typ = (z.Typ ?? "").Trim().ToUpperInvariant();
-                if (typ == "EVU") continue; // EVU ist Referenz, wird nicht verteilt
-
-                startDict.TryGetValue(l.ZaehlerId, out var startVal);
-                var diff = l.NeuWert - startVal;
-                if (diff <= 0m) continue;
-
-                // NEU: Verteilung immer über Zähler-Zeilen (StweZaehlerLine)
-                var zLines = _db.StweZaehlerLinesGet(z.Id);
-                var sumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
-                if (sumPct <= 0m) continue;
-
-                foreach (var zl in zLines)
-                {
-                    var pct = Math.Max(0m, zl.AnteilProzent);
-                    if (pct <= 0m) continue;
-
-                    var part = diff * (pct / sumPct);
-                    Add(ownerKwh, zl.EigentuemerName, part);
-                }
-            }
-
-            var ordered = ownerKwh.OrderByDescending(kv => kv.Value).ToList();
-
-            KwhProOwnerSeries = new ISeries[]
-            {
-        new ColumnSeries<double> { Name = "kWh", Values = ordered.Select(x => (double)x.Value).ToArray() }
-            };
-            KwhProOwnerXAxes = new[]
-            {
-        new Axis { Labels = ordered.Select(x => x.Key).ToArray(), LabelsRotation = 60, TextSize = 12 }
-    };
+            Labels = Array.Empty<string>(),
+            LabelsRotation = 60,
+            TextSize = 12
         }
+    };
+
+    // Y-Achse: immer bei 0 starten
+    KwhProOwnerYAxes = new[]
+    {
+        new Axis
+        {
+            MinLimit = 0
+        }
+    };
+
+    // Default: leer
+    KwhProOwnerSeries = new ISeries[]
+    {
+        new ColumnSeries<double>
+        {
+            Values = Array.Empty<double>()
+        }
+    };
+
+    if (_liegenschaftId <= 0) return;
+
+    // Zeitraum: wir nehmen "letztes Set <= bis" und "Set davor als Start"
+    var sets = _db.StweZaehlerdatenSetsGetByLiegenschaft(_liegenschaftId)
+        .OrderBy(s => s.ErfasstAm)
+        .ThenBy(s => s.Id)
+        .ToList();
+
+    var endSet = sets.LastOrDefault(s => s.ErfasstAm.Date <= _bis.Date);
+    if (endSet == null) return;
+
+    var startSet = sets.LastOrDefault(s => s.ErfasstAm.Date < _von.Date)
+                   ?? _db.StweZaehlerdatenGetPreviousSet(_liegenschaftId, endSet.ErfasstAm, endSet.Id);
+
+    if (startSet == null) return;
+
+    var endLines = _db.StweZaehlerdatenLinesGetBySet(endSet.Id);
+    var startLines = _db.StweZaehlerdatenLinesGetBySet(startSet.Id);
+    var startDict = startLines.ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
+
+    var zaehler = _db.StweZaehlerGetByLiegenschaft(_liegenschaftId);
+    var zaehlerDict = zaehler.ToDictionary(z => z.Id);
+
+    var ownerKwh = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var l in endLines)
+    {
+        if (!zaehlerDict.TryGetValue(l.ZaehlerId, out var z))
+            continue;
+
+        var typ = (z.Typ ?? "").Trim().ToUpperInvariant();
+        if (typ == "EVU") continue; // EVU ist Referenz, wird nicht verteilt
+
+        startDict.TryGetValue(l.ZaehlerId, out var startVal);
+        var diff = l.NeuWert - startVal;
+        if (diff <= 0m) continue;
+
+        // Verteilung immer über Zähler-Zeilen (StweZaehlerLine)
+        var zLines = _db.StweZaehlerLinesGet(z.Id);
+        var sumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
+        if (sumPct <= 0m) continue;
+
+        foreach (var zl in zLines)
+        {
+            var pct = Math.Max(0m, zl.AnteilProzent);
+            if (pct <= 0m) continue;
+
+            var part = diff * (pct / sumPct);
+            Add(ownerKwh, zl.EigentuemerName, part);
+        }
+    }
+
+    var ordered = ownerKwh.OrderByDescending(kv => kv.Value).ToList();
+
+    KwhProOwnerSeries = new ISeries[]
+    {
+        new ColumnSeries<double>
+        {
+            Name = "kWh",
+            Values = ordered.Select(x => (double)x.Value).ToArray(),
+
+            // ---- WERTE AUF DEN BALKEN ----
+            DataLabelsPaint = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(
+                new SkiaSharp.SKColor(0, 0, 0)),
+
+            DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+
+            DataLabelsFormatter = point =>
+                point.Coordinate.PrimaryValue.ToString(
+                    "N0",
+                    CultureInfo.GetCultureInfo("de-CH")
+                ) + " kWh"
+        }
+    };
+
+    KwhProOwnerXAxes = new[]
+    {
+        new Axis
+        {
+            Labels = ordered.Select(x => x.Key).ToArray(),
+            LabelsRotation = 60,
+            TextSize = 12
+        }
+    };
+}
+        
 
 
         private void LoadChfProOwner()

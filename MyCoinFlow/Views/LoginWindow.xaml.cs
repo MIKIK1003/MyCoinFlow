@@ -12,6 +12,7 @@ namespace MyCoinFlow.Views
         private readonly AuthService _auth = new();
         private readonly SqlExpressProvisioningService _provisioning = new();
         private readonly LicenseService _license = new();
+        private readonly DatabaseService _db = new();
 
 
         public LoginWindow()

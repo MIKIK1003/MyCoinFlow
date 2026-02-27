@@ -7757,6 +7757,8 @@ WHERE s.LiegenschaftId = @lid
             return result;
         }
 
+        
+
 
 
     }
