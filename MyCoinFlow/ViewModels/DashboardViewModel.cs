@@ -327,15 +327,38 @@ namespace MyCoinFlow.ViewModels
 
             var banks = _db.LadeGeldinstituteMitSaldo(DateTime.Today);
 
+            // X-Achse: Labels
+            BankXAxes.Add(new Axis
+            {
+                Labels = banks.Select(b => b.Name).ToArray(),
+                LabelsRotation = 60,
+                TextSize = 12
+            });
+
+            // Y-Achse: immer bei 0 starten
+            BankYAxes.Add(new Axis
+            {
+                MinLimit = 0
+            });
+
+            // Series inkl. Werte auf Balken
             BankSeries.Add(new ColumnSeries<double>
             {
                 Name = "Saldo",
-                Values = banks.Select(b => (double)b.Schlussaldo).ToArray()
-            });
+                Values = banks.Select(b => (double)b.Schlussaldo).ToArray(),
 
-            // Verbesserung 1 auch hier: gedrehte Labels
-            BankXAxes.Add(new Axis { Labels = banks.Select(b => b.Name).ToArray(), LabelsRotation = 60, TextSize = 12 });
-            BankYAxes.Add(new Axis());
+                DataLabelsPaint = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(
+                    new SkiaSharp.SKColor(0, 0, 0)
+                ),
+
+                DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+
+                DataLabelsFormatter = point =>
+                    point.Coordinate.PrimaryValue.ToString(
+                        "N0",
+                        CultureInfo.GetCultureInfo("de-CH")
+                    )
+            });
         }
 
         // ===== kleine Hilfsklassen =====

@@ -365,28 +365,76 @@ namespace MyCoinFlow.ViewModels
     };
         }
 
+
         private void LoadChfProOwner()
         {
-            ChfProOwnerXAxes = new[] { new Axis { Labels = Array.Empty<string>(), LabelsRotation = 60, TextSize = 12 } };
-            ChfProOwnerYAxes = new[] { new Axis() };
-            ChfProOwnerSeries = new ISeries[] { new ColumnSeries<double> { Values = Array.Empty<double>() } };
+            ChfProOwnerXAxes = new[]
+            {
+        new Axis
+        {
+            Labels = Array.Empty<string>(),
+            LabelsRotation = 60,
+            TextSize = 12
+        }
+    };
 
-            if (_liegenschaftId <= 0) return;
-
-            // NUR Nummernkreis 2 (Ausgaben): Kontonummer 20000–29999
-            var rows = _db.StweReportOwnerSummaryNr2Ausgaben(_liegenschaftId, _von, _bis);
-            var ordered = rows.OrderByDescending(r => Math.Abs(r.Summe)).ToList();
+            // Y-Achse startet bei 0
+            ChfProOwnerYAxes = new[]
+            {
+        new Axis
+        {
+            MinLimit = 0
+        }
+    };
 
             ChfProOwnerSeries = new ISeries[]
             {
-        new ColumnSeries<double> { Name = "CHF", Values = ordered.Select(r => (double)r.Summe).ToArray() }
+        new ColumnSeries<double>
+        {
+            Values = Array.Empty<double>()
+        }
+            };
+
+            if (_liegenschaftId <= 0) return;
+
+            var rows = _db.StweReportOwnerSummaryNr2Ausgaben(_liegenschaftId, _von, _bis);
+            var ordered = rows
+                .OrderByDescending(r => Math.Abs(r.Summe))
+                .ToList();
+
+            ChfProOwnerSeries = new ISeries[]
+            {
+        new ColumnSeries<double>
+        {
+            Name = "CHF",
+            Values = ordered.Select(r => (double)r.Summe).ToArray(),
+
+            // ---- WERTE AUF DEN BALKEN ----
+            DataLabelsPaint = new LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint(
+                new SkiaSharp.SKColor(0, 0, 0)),
+
+            DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+
+            DataLabelsFormatter = point =>
+                point.Coordinate.PrimaryValue.ToString(
+                    "N0",
+                    System.Globalization.CultureInfo.GetCultureInfo("de-CH")
+                ) + " CHF"
+        }
             };
 
             ChfProOwnerXAxes = new[]
             {
-        new Axis { Labels = ordered.Select(r => r.EigentuemerName).ToArray(), LabelsRotation = 60, TextSize = 12 }
+        new Axis
+        {
+            Labels = ordered.Select(r => r.EigentuemerName).ToArray(),
+            LabelsRotation = 60,
+            TextSize = 12
+        }
     };
         }
+
+
 
         private static void Add(Dictionary<string, decimal> dict, string key, decimal value)
         {
