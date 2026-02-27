@@ -185,28 +185,13 @@ namespace MyCoinFlow.ViewModels
                 // (2) BANK -> KONTO: Von = NULL, Nach = Konto
                 else if (t.VonKontoId == null && t.NachKontoId == _kontoId)
                 {
-                    // Ausnahme: "Standard-Einnahme"-Adresse -> Einnahme
-                    bool istStandardEinnahme = false;
-                    if (t.AdresseId.HasValue)
-                    {
-                        var adr = LoadAdresse(t.AdresseId.Value);
-                        if (adr?.StandardEinnahmenKontoId == _kontoId || adr?.IstBudgetiert == true)
-                            istStandardEinnahme = true;
-                    }
-
-                    if (istStandardEinnahme)
-                    {
-                        ein = t.Betrag; // unverändert: explizit Einnahme
-                    }
+                    // NEU: Bank → Konto ist:
+                    //      - für Einnahmenkonten eine Einnahme (z.B. budgetierte Einnahme Adresse→Bank führt auf Einnahmenkonto)
+                    //      - für Ausgabenkonten eine Ausgabe (normale Debit-Zahlung)
+                    if (_isIncomeAccount)
+                        ein = t.Betrag;  // NEU
                     else
-                    {
-                        // NEU: Konto-Detail soll wie Adressen-Detail klassifizieren:
-                        // Einnahmenkonto => Einnahme, sonst Ausgabe.
-                        if (_isIncomeAccount)
-                            ein = t.Betrag; // NEU
-                        else
-                            aus = t.Betrag; // unverändert
-                    }
+                        aus = t.Betrag;  // unverändert für Ausgabenkonten
                 }
                 // (3) Rest inkl. Konto->Konto (KK-Detailverteilung Durchlauf -> Budget)
                 else

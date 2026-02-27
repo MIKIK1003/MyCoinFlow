@@ -4476,8 +4476,8 @@ LEFT JOIN dbo.Kontenplan kn ON kn.Id = t.NachKontoId
 WHERE 1=1
 ");
 
-            if (vonDatum.HasValue) sb.AppendLine("  AND t.Datum >= @von");
-            if (bisDatum.HasValue) sb.AppendLine("  AND t.Datum <= @bis");
+            if (vonDatum.HasValue) sb.AppendLine("  AND ISNULL(t.BudgetDatum, t.Datum) >= @von"); // NEU
+            if (bisDatum.HasValue) sb.AppendLine("  AND ISNULL(t.BudgetDatum, t.Datum) <= @bis"); // NEU
             if (!string.IsNullOrWhiteSpace(addressTerm))
                 sb.AppendLine("  AND a.Name LIKE @addr COLLATE Latin1_General_CI_AI");
 
@@ -4539,8 +4539,6 @@ WHERE 1=1
 
             return list;
         }
-
-
 
         /// <summary>
         /// Liefert (TotalAttachments, FileNameHits, OcrTextHits) für eine Transaktion,
@@ -5325,14 +5323,29 @@ WHERE Id = @id;";
             // Wir nutzen die bestehende Tabelle Transaktion.
             // Minimal: letzte N Transaktionen für Auswahl im Dialog.
             // Erweiterung: Blende Transaktionen aus, die bereits in dbo.StweSet verarbeitet wurden (TransaktionId vorhanden).
+            // NEU: Zeige nur Transaktionen im aktiven Budgetzeitraum anhand ISNULL(BudgetDatum, Datum).
             var list = new List<MyCoinFlow.Models.Transaktion>();
 
             using var c = CreateConnection();
             c.Open();
 
+            // NEU: aktiven Zeitraum laden (wie in anderen Bereichen)
+            var activeId = HoleAktivenBudgetzeitraumId();
+            DateTime? start = null;
+            DateTime? end = null;
+            if (activeId.HasValue)
+            {
+                var bz = HoleBudgetzeitraum(activeId.Value);
+                if (bz != null)
+                {
+                    start = bz.Startdatum.Date;
+                    end = bz.Enddatum.Date;
+                }
+            }
+
             var sql = $@"
 SELECT TOP ({top})
-    t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+    t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
     t.Betrag, t.Notiz,
     t.AdresseId, a.Name as AdresseName,
     t.GeldinstitutId, g.Name as BankName,
@@ -5345,10 +5358,23 @@ WHERE NOT EXISTS (
     FROM dbo.StweSet s
     WHERE s.TransaktionId = t.Id
 )
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)  -- NEU
 ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
+
+            // NEU: Zeitraumparameter (wenn kein aktiver Zeitraum: null => keine Einschränkung)
+            var pVon = cmd.CreateParameter();
+            pVon.ParameterName = "@von";
+            pVon.Value = (object?)start ?? DBNull.Value;
+            cmd.Parameters.Add(pVon);
+
+            var pBis = cmd.CreateParameter();
+            pBis.ParameterName = "@bis";
+            pBis.Value = (object?)end ?? DBNull.Value;
+            cmd.Parameters.Add(pBis);
 
             using var r = cmd.ExecuteReader();
             while (r.Read())
@@ -5357,15 +5383,18 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                 {
                     Id = r.GetInt32(0),
                     Datum = r.GetDateTime(1),
-                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                    Betrag = r.GetDecimal(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
-                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
-                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
-                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2), // NEU
+
+                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
                 });
             }
 
@@ -5377,19 +5406,20 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             using var c = CreateConnection();
             c.Open();
 
-            // Regel:
-            // 1) VonKontoId != NULL => Gutschrift (Rückvergütung etc.)
-            // 2) sonst wenn Adresse.IstBudgetiert = 1 => Einzahlung Eigentümer
-            // 3) sonst => Belastung (Rechnung)
+            // Regel (NEU, nur für STWE-Set-Initialtyp):
+            // 1) Bank -> Konto (Von NULL, Nach NOT NULL) => Belastung (0), unabhängig von Adresse
+            // 2) Notiz == "Budgetierte Einnahme" => Gutschrift (1)
+            // 3) Konto -> Bank (Von NOT NULL, Nach NULL) => Gutschrift (1)
+            // 4) sonst => Belastung (0)
             const string sql = @"
 SELECT TOP(1)
     CASE 
-        WHEN t.VonKontoId IS NOT NULL THEN 1
-        WHEN ISNULL(a.IstBudgetiert, 0) = 1 THEN 1
+        WHEN t.VonKontoId IS NULL AND t.NachKontoId IS NOT NULL THEN 0 -- NEU: Bank -> Konto immer Belastung
+        WHEN LTRIM(RTRIM(ISNULL(t.Notiz,''))) = N'Budgetierte Einnahme' THEN 1 -- NEU: budgetierte Einnahme
+        WHEN t.VonKontoId IS NOT NULL AND t.NachKontoId IS NULL THEN 1 -- unverändert Idee: Rückvergütung etc.
         ELSE 0
     END AS IsCredit
 FROM dbo.Transaktion t
-LEFT JOIN dbo.Adresse a ON a.Id = t.AdresseId
 WHERE t.Id = @id;";
 
             using var cmd = c.CreateCommand();
@@ -7222,8 +7252,8 @@ OUTER APPLY (
     WHERE l.SetId = s.Id
 ) x
 WHERE s.LiegenschaftId = @lid
-  AND (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)  -- NEU
 ORDER BY t.Datum DESC, s.Id DESC;";
 
             using var cmd = c.CreateCommand();
