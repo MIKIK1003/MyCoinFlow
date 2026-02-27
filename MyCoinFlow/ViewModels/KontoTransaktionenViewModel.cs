@@ -196,11 +196,16 @@ namespace MyCoinFlow.ViewModels
 
                     if (istStandardEinnahme)
                     {
-                        ein = t.Betrag;         // explizit Einnahme
+                        ein = t.Betrag; // unverändert: explizit Einnahme
                     }
                     else
                     {
-                        aus = t.Betrag;         // **fix**: echte Bankzahlung ist Ausgabe
+                        // NEU: Konto-Detail soll wie Adressen-Detail klassifizieren:
+                        // Einnahmenkonto => Einnahme, sonst Ausgabe.
+                        if (_isIncomeAccount)
+                            ein = t.Betrag; // NEU
+                        else
+                            aus = t.Betrag; // unverändert
                     }
                 }
                 // (3) Rest inkl. Konto->Konto (KK-Detailverteilung Durchlauf -> Budget)
