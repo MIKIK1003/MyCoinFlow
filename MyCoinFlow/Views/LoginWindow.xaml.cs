@@ -38,7 +38,6 @@ namespace MyCoinFlow.Views
                 // Lizenz ok -> Login normal
                 HideLicenseUiAndUnlock();
 
-
                 // PHASE 4: Auf frischen PCs sicherstellen, dass es mindestens eine Default-DB gibt.
                 StatusText.Text = "Initialisiere Datenbank…";
                 await _provisioning.EnsureDefaultDatabaseExistsAsync();
@@ -78,7 +77,6 @@ namespace MyCoinFlow.Views
                     }
                 }
 
-
                 // Dropdown
                 if (!list.Contains(active))
                     list.Insert(0, active);
@@ -88,6 +86,10 @@ namespace MyCoinFlow.Views
 
                 DbCombo.SelectionChanged -= DbCombo_SelectionChanged;
                 DbCombo.SelectionChanged += DbCombo_SelectionChanged;
+
+                // ========= WICHTIG: Schema-Update Transaktion (BudgetDatum) =========
+                StatusText.Text = "Aktualisiere Schema (BudgetDatum)…";
+                _db.EnsureTransaktionBudgetDatumColumn();
 
                 // Users-Schema sicherstellen (legt dbo.Users an, falls noch nicht da)
                 StatusText.Text = "Prüfe Benutzer-Schema…";
@@ -126,6 +128,10 @@ namespace MyCoinFlow.Views
 
                     ConnectionStrings.SetActiveDatabase(db);
                     StatusText.Text = $"Aktive DB gewechselt zu: {db}.";
+
+                    // ========= WICHTIG: Schema-Update Transaktion (BudgetDatum) =========
+                    StatusText.Text = "Aktualisiere Schema (BudgetDatum)…";
+                    _db.EnsureTransaktionBudgetDatumColumn();
 
                     await _auth.EnsureSchemaAsync();
 

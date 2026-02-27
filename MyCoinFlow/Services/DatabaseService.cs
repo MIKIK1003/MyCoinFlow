@@ -7757,8 +7757,24 @@ WHERE s.LiegenschaftId = @lid
             return result;
         }
 
-        
 
+        public void EnsureTransaktionBudgetDatumColumn()
+        {
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(ConnectionStrings.Current);
+            conn.Open();
+
+            const string sql = @"
+IF COL_LENGTH('dbo.Transaktion', 'BudgetDatum') IS NULL
+BEGIN
+    ALTER TABLE dbo.Transaktion
+    ADD BudgetDatum date NULL;
+END
+";
+
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, conn);
+            cmd.CommandTimeout = 30;
+            cmd.ExecuteNonQuery();
+        }
 
 
     }
