@@ -43,6 +43,11 @@ namespace MyCoinFlow.ViewModels
         public bool HasMultipleAttachments => AttachmentCount > 1;
 
         public string? SearchHitInfo { get; set; } // „Treffer in: …“
+
+        public bool HasBudgetDatumOverride { get; set; }      // NEU: Icon sichtbar
+        public string? BudgetDatumTooltip { get; set; }       // NEU: Tooltip
+
+
     }
 
     public class TransactionsViewModel : INotifyPropertyChanged
@@ -75,6 +80,10 @@ namespace MyCoinFlow.ViewModels
         private string? _searchText;
 
         private DateTime? _filterVon;
+
+        private DateTime? _activeStart; // NEU
+        private DateTime? _activeEnd;   // NEU
+
         public DateTime? FilterVon
         {
             get => _filterVon;
@@ -181,6 +190,11 @@ namespace MyCoinFlow.ViewModels
                     {
                         FilterVon = bz.Startdatum.Date;
                         FilterBis = bz.Enddatum.Date;
+
+                        // NEU: aktiven Zeitraum merken (für Zeilen-Icon)
+                        _activeStart = bz.Startdatum.Date;
+                        _activeEnd = bz.Enddatum.Date;
+
                         return;
                     }
                 }
@@ -189,12 +203,20 @@ namespace MyCoinFlow.ViewModels
                 // Filter bewusst leer lassen (zeigt alle Daten)
                 FilterVon = null;
                 FilterBis = null;
+
+                // NEU: kein aktiver Zeitraum => kein Override-Icon
+                _activeStart = null;
+                _activeEnd = null;
             }
             catch
             {
                 // defensiv: Filter leer lassen
                 FilterVon = null;
                 FilterBis = null;
+
+                // NEU
+                _activeStart = null;
+                _activeEnd = null;
             }
         }
 
@@ -371,6 +393,18 @@ namespace MyCoinFlow.ViewModels
                     Datum = t.Datum,
 
                     BudgetDatum = t.BudgetDatum, // NEU: Budgetdatum aus DB übernehmen
+
+                    // NEU: Icon, wenn Bankdatum außerhalb aktivem Zeitraum liegt, aber BudgetDatum gesetzt ist
+                    HasBudgetDatumOverride =
+                    t.BudgetDatum.HasValue
+                    && _activeStart.HasValue && _activeEnd.HasValue
+                    && (t.Datum.Date < _activeStart.Value || t.Datum.Date > _activeEnd.Value),
+
+                    // NEU: Tooltip
+                    BudgetDatumTooltip =
+                    t.BudgetDatum.HasValue
+                    ? $"Budgetdatum: {t.BudgetDatum:dd.MM.yyyy}\nBankdatum: {t.Datum:dd.MM.yyyy}"
+                    : null,
 
                     VonAnzeige = von,
                     NachAnzeige = nach,
