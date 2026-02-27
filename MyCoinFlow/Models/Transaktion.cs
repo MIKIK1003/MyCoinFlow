@@ -7,6 +7,9 @@ namespace MyCoinFlow.Models
         public int Id { get; set; }
         public DateTime Datum { get; set; }
 
+        // NEU: Optionales Budgetdatum (für Abgrenzung im Budget; Bankdatum bleibt Datum)
+        public DateTime? BudgetDatum { get; set; }
+
         public int? VonKontoId { get; set; }
         public int? NachKontoId { get; set; }
 
@@ -23,4 +26,3 @@ namespace MyCoinFlow.Models
         public string? ImportQuelle { get; set; }
     }
 }
-

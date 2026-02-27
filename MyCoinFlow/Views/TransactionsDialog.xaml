@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="Neue Buchung"
-        Height="800" Width="770"
+        Height="880" Width="770"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Loaded="Window_Loaded">
@@ -209,11 +209,40 @@
 
                         <!-- Datum -->
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Datum" Style="{StaticResource FieldLabel}"/>
-                        <DatePicker x:Name="DatumBox"
-                                    Grid.Row="0" Grid.Column="1"
-                                    Margin="0,0,0,8"
-                                    materialDesign:HintAssist.Hint="Buchungsdatum"
-                                    SelectedDate="{x:Null}"/>
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
+                            <DatePicker x:Name="DatumBox"
+                Margin="0,0,0,6"
+                materialDesign:HintAssist.Hint="Bankdatum (Buchungsdatum)"
+                SelectedDate="{x:Null}"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- NEU: Zeilenlabel links -->
+                                <TextBlock Grid.Column="0"
+               Text="Budgetdatum"
+               Style="{StaticResource FieldLabel}"
+               Margin="0,6,0,0"/>
+
+                                <DockPanel Grid.Column="1" LastChildFill="True">
+                                    <Button DockPanel.Dock="Right"
+                ToolTip="Budgetdatum löschen"
+                Style="{StaticResource MaterialDesignToolButton}"
+                Padding="4"
+                Click="BudgetDatumClear_Click">
+                                        <materialDesign:PackIcon Kind="CloseCircleOutline" Width="18" Height="18"/>
+                                    </Button>
+
+                                    <DatePicker x:Name="BudgetDatumBox"
+                    materialDesign:HintAssist.Hint="Budgetdatum (optional)"
+                    Margin="0,2,0,0" SelectedDate="{x:Null}"/>
+                                </DockPanel>
+                            </Grid>
+                        </StackPanel>
 
                         <!-- Betrag -->
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Betrag" Style="{StaticResource FieldLabel}"/>

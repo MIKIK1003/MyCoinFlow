@@ -21,6 +21,7 @@ namespace MyCoinFlow.Views
         private int? _prefGeldinstitutId;
         private int? _prefAdresseId;
         private DateTime? _prefDatum;
+        private DateTime? _prefBudgetDatum;
         private decimal? _prefBetrag;
         private string? _prefNotiz;
         private string? _prefTypName;
@@ -36,6 +37,9 @@ namespace MyCoinFlow.Views
 
             _editId = t.Id;
             _prefDatum = t.Datum;
+
+            _prefBudgetDatum = t.BudgetDatum; // NEU: Budgetdatum für Edit-Vorbelegung merken
+
             _prefVonKontoId = t.VonKontoId;
             _prefNachKontoId = t.NachKontoId;
             _prefGeldinstitutId = t.GeldinstitutId;
@@ -72,6 +76,10 @@ namespace MyCoinFlow.Views
 
                 // Vorbelegung
                 if (_prefDatum.HasValue) DatumBox.SelectedDate = _prefDatum.Value;
+
+                // NEU: Budgetdatum (Override) vorbefüllen
+                if (_prefBudgetDatum.HasValue) BudgetDatumBox.SelectedDate = _prefBudgetDatum.Value;
+
                 if (_prefBetrag.HasValue) BetragBox.Text = _prefBetrag.Value.ToString("N2", CultureInfo.CurrentCulture);
                 if (!string.IsNullOrWhiteSpace(_prefNotiz)) NotizBox.Text = _prefNotiz;
                 if (_prefVonKontoId.HasValue) VonKontoBox.SelectedValue = _prefVonKontoId.Value;
@@ -177,6 +185,7 @@ namespace MyCoinFlow.Views
             bool Safe(Func<bool> f) { try { return f(); } catch { return false; } }
         }
 
+
         private void TxnType_Checked(object sender, RoutedEventArgs e) => UpdateUiForType();
         private void BudgetCheck_Changed(object sender, RoutedEventArgs e) => UpdateUiForType();
 
@@ -227,6 +236,11 @@ namespace MyCoinFlow.Views
             {
                 var datum = DatumBox.SelectedDate ?? DateTime.Today;
 
+                // NEU: Budgetdatum (optional) einlesen
+                DateTime? budgetDatum = BudgetDatumBox?.SelectedDate; // NEU
+                if (budgetDatum.HasValue && budgetDatum.Value.Date == datum.Date)
+                    budgetDatum = null; // NEU: gleiches Datum nicht als Override speichern
+
                 if (!decimal.TryParse(BetragBox.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out var betrag) || betrag <= 0m)
                 {
                     MessageBox.Show("Bitte einen Betrag > 0 eingeben.", "Hinweis",
@@ -271,7 +285,7 @@ namespace MyCoinFlow.Views
                                     MessageBoxButton.OK, MessageBoxImage.Information);
                                 return;
                             }
-                            _db.AktualisiereTransaktion(_editId.Value, datum, vonKontoId, nachKontoId, betrag, notiz, adresseId, null);
+                            _db.AktualisiereTransaktion(_editId.Value, datum, vonKontoId, nachKontoId, betrag, notiz, adresseId, null, budgetDatum); // NEU
                             break;
 
                         case "Konto → Bank":
@@ -281,7 +295,7 @@ namespace MyCoinFlow.Views
                                     MessageBoxButton.OK, MessageBoxImage.Information);
                                 return;
                             }
-                            _db.AktualisiereTransaktion(_editId.Value, datum, vonKontoId, null, betrag, notiz, adresseId, bankId);
+                            _db.AktualisiereTransaktion(_editId.Value, datum, vonKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                             break;
 
                         case "Adresse → Bank":
@@ -304,7 +318,7 @@ namespace MyCoinFlow.Views
                                     var not = string.IsNullOrWhiteSpace(notiz) ? "Budgetierte Einnahme" : notiz;
 
                                     _db.AktualisiereTransaktion(_editId.Value, datum,
-                                        null, nachKontoId, betrag, not, adresseId, bankId);
+                                        null, nachKontoId, betrag, not, adresseId, bankId, budgetDatum); // NEU
                                 }
                                 else
                                 {
@@ -316,7 +330,7 @@ namespace MyCoinFlow.Views
                                     }
 
                                     _db.AktualisiereTransaktion(_editId.Value, datum,
-                                        nachKontoId, null, betrag, notiz, adresseId, bankId);
+                                        nachKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                                 }
                                 break;
                             }
@@ -328,7 +342,7 @@ namespace MyCoinFlow.Views
                                     MessageBoxButton.OK, MessageBoxImage.Information);
                                 return;
                             }
-                            _db.AktualisiereTransaktion(_editId.Value, datum, null, nachKontoId, betrag, notiz, adresseId, bankId);
+                            _db.AktualisiereTransaktion(_editId.Value, datum, null, nachKontoId, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                             break;
                     }
 
@@ -346,7 +360,7 @@ namespace MyCoinFlow.Views
                                 MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
-                        _db.SpeichereTransaktion(datum, vonKontoId, nachKontoId, betrag, notiz, adresseId, null);
+                        _db.SpeichereTransaktion(datum, vonKontoId, nachKontoId, betrag, notiz, adresseId, null, budgetDatum); // NEU
                         break;
 
                     case "Konto → Bank":
@@ -356,7 +370,7 @@ namespace MyCoinFlow.Views
                                 MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
-                        _db.SpeichereTransaktion(datum, vonKontoId, null, betrag, notiz, adresseId, bankId);
+                        _db.SpeichereTransaktion(datum, vonKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                         break;
 
                     case "Adresse → Bank":
@@ -377,7 +391,7 @@ namespace MyCoinFlow.Views
                             }
                             var not = string.IsNullOrWhiteSpace(notiz) ? "Budgetierte Einnahme" : notiz;
 
-                            _db.SpeichereTransaktion(datum, null, nachKontoId, betrag, not, adresseId, bankId);
+                            _db.SpeichereTransaktion(datum, null, nachKontoId, betrag, not, adresseId, bankId, budgetDatum); // NEU
                         }
                         else
                         {
@@ -387,7 +401,7 @@ namespace MyCoinFlow.Views
                                     MessageBoxButton.OK, MessageBoxImage.Information);
                                 return;
                             }
-                            _db.SpeichereTransaktion(datum, nachKontoId, null, betrag, notiz, adresseId, bankId);
+                            _db.SpeichereTransaktion(datum, nachKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                         }
                         break;
 
@@ -398,7 +412,7 @@ namespace MyCoinFlow.Views
                                 MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
-                        _db.SpeichereTransaktion(datum, null, nachKontoId, betrag, notiz, adresseId, bankId);
+                        _db.SpeichereTransaktion(datum, null, nachKontoId, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
                         break;
                 }
 
@@ -410,6 +424,14 @@ namespace MyCoinFlow.Views
                     "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void BudgetDatumClear_Click(object sender, RoutedEventArgs e)
+        {
+            // NEU: Budgetdatum (Override) entfernen
+            BudgetDatumBox.SelectedDate = null;
+        }
+
+
 
         private static int? GetSelectedIntOrNull(object? value)
         {

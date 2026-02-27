@@ -19,6 +19,8 @@ namespace MyCoinFlow.ViewModels
         public int Id { get; set; }
         public DateTime Datum { get; set; }
 
+        public DateTime? BudgetDatum { get; set; } // NEU
+
         public bool HasAttachments { get; set; }      // PDF/Bilder
         public string? AttachmentsTooltip { get; set; }
 
@@ -236,6 +238,9 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = AusgewaehlteTransaktion.Id,
                     Datum = AusgewaehlteTransaktion.Datum,
+
+                    BudgetDatum = AusgewaehlteTransaktion.BudgetDatum, // NEU: Budgetdatum übernehmen
+
                     VonKontoId = AusgewaehlteTransaktion.VonKontoId,
                     NachKontoId = AusgewaehlteTransaktion.NachKontoId,
                     Betrag = AusgewaehlteTransaktion.Betrag,
@@ -271,6 +276,8 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
+
+
         private void Loeschen()
         {
             if (AusgewaehlteTransaktion == null) return;
@@ -284,7 +291,6 @@ namespace MyCoinFlow.ViewModels
             _db.LoescheTransaktion(AusgewaehlteTransaktion.Id);
             LadeListe();
         }
-
         private void LadeListe()
         {
             Transaktionen.Clear();
@@ -344,6 +350,9 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = t.Id,
                     Datum = t.Datum,
+
+                    BudgetDatum = t.BudgetDatum, // NEU: Budgetdatum aus DB übernehmen
+
                     VonAnzeige = von,
                     NachAnzeige = nach,
                     Betrag = t.Betrag,
@@ -364,6 +373,7 @@ namespace MyCoinFlow.ViewModels
                 });
             }
         }
+
 
         private void OpenBankImport()
         {

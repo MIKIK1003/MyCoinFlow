@@ -1904,19 +1904,26 @@ ORDER BY Label";
         // ---------- TRANSAKTIONEN ----------
 
         public void SpeichereTransaktion(DateTime datum, int? vonKontoId, int? nachKontoId,
-                                 decimal betrag, string? notiz,
-                                 int? adresseId, int? geldinstitutId)
+                         decimal betrag, string? notiz,
+                         int? adresseId, int? geldinstitutId,
+                         DateTime? budgetDatum) // NEU: optionales BudgetDatum
         {
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"INSERT INTO Transaktion
-                         (Datum, VonKontoId, NachKontoId, Betrag, Notiz, AdresseId, GeldinstitutId)
-                         VALUES (@d, @v, @n, @b, @z, @a, @g)";
+                 (Datum, BudgetDatum, VonKontoId, NachKontoId, Betrag, Notiz, AdresseId, GeldinstitutId)  -- NEU: BudgetDatum
+                 VALUES (@d, @bd, @v, @n, @b, @z, @a, @g)";
 
             using var cmd = new SqlCommand(sql, c);
 
             cmd.Parameters.Add(new SqlParameter("@d", System.Data.SqlDbType.Date) { Value = datum.Date });
+
+            // NEU: BudgetDatum Parameter (nullable)
+            cmd.Parameters.Add(new SqlParameter("@bd", System.Data.SqlDbType.Date)
+            {
+                Value = (object?)budgetDatum?.Date ?? DBNull.Value
+            });
 
             var pVon = new SqlParameter("@v", System.Data.SqlDbType.Int);
             pVon.Value = (object?)vonKontoId ?? DBNull.Value;
@@ -1951,6 +1958,7 @@ ORDER BY Label";
             }
         }
 
+
         public List<Transaktion> LadeTransaktionen(DateTime? bisDatum = null)
         {
             var list = new List<Transaktion>();
@@ -1958,7 +1966,7 @@ ORDER BY Label";
             c.Open();
 
             const string sql = @"
-SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+SELECT t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
        t.Betrag, t.Notiz,
        t.AdresseId, a.Name as AdresseName,
        t.GeldinstitutId, g.Name as BankName,
@@ -1979,28 +1987,33 @@ ORDER BY t.Datum DESC";
                 {
                     Id = r.GetInt32(0),
                     Datum = r.GetDateTime(1),
-                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                    Betrag = r.GetDecimal(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
-                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
-                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
-                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+
+                    // NEU: BudgetDatum mitladen (optional)
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
+
+                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
                 });
             }
 
             return list;
         }
 
+        // Neu:Budgetdatum
         public MyCoinFlow.Models.Transaktion? HoleTransaktion(int id)
         {
             using var c = CreateConnection();
             c.Open();
 
             const string sql = @"
-SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+SELECT t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
        t.Betrag, t.Notiz,
        t.AdresseId, a.Name AS AdresseName,
        t.GeldinstitutId, g.Name AS BankName,
@@ -2020,17 +2033,22 @@ WHERE t.Id = @id;";
             {
                 Id = r.GetInt32(0),
                 Datum = r.GetDateTime(1),
-                VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                Betrag = r.GetDecimal(4),
-                Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
-                AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
-                GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                BankName = r.IsDBNull(9) ? null : r.GetString(9),
-                ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+
+                // NEU: BudgetDatum laden (optional)
+                BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
+
+                VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                Betrag = r.GetDecimal(5),
+                Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
             };
         }
+
 
         // NEU: Gefilterte Transaktionen für ein Geldinstitut
         public List<Transaktion> LadeTransaktionenByGeldinstitut(
@@ -2094,30 +2112,36 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             return list;
         }
 
-
-
         // ---------- TRANSAKTIONEN UPDATE/DELETE ----------
-
         public void AktualisiereTransaktion(int id, DateTime datum, int? vonKontoId, int? nachKontoId,
                                             decimal betrag, string? notiz,
-                                            int? adresseId, int? geldinstitutId)
+                                            int? adresseId, int? geldinstitutId,
+                                            DateTime? budgetDatum) // NEU: optionales BudgetDatum
         {
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"UPDATE Transaktion SET
-                           Datum=@d,
-                           VonKontoId=@v,
-                           NachKontoId=@n,
-                           Betrag=@b,
-                           Notiz=@z,
-                           AdresseId=@a,
-                           GeldinstitutId=@g
-                         WHERE Id=@id";
+                   Datum=@d,
+                   BudgetDatum=@bd,   -- NEU: BudgetDatum speichern
+                   VonKontoId=@v,
+                   NachKontoId=@n,
+                   Betrag=@b,
+                   Notiz=@z,
+                   AdresseId=@a,
+                   GeldinstitutId=@g
+                 WHERE Id=@id";
 
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
             cmd.Parameters.Add(new SqlParameter("@d", System.Data.SqlDbType.Date) { Value = datum.Date });
+
+            // NEU: BudgetDatum Parameter (nullable)
+            cmd.Parameters.Add(new SqlParameter("@bd", System.Data.SqlDbType.Date)
+            {
+                Value = (object?)budgetDatum?.Date ?? DBNull.Value
+            });
+
             cmd.Parameters.Add(new SqlParameter("@v", System.Data.SqlDbType.Int) { Value = (object?)vonKontoId ?? DBNull.Value });
             cmd.Parameters.Add(new SqlParameter("@n", System.Data.SqlDbType.Int) { Value = (object?)nachKontoId ?? DBNull.Value });
             cmd.Parameters.Add(new SqlParameter("@b", System.Data.SqlDbType.Decimal) { Precision = 18, Scale = 2, Value = betrag });
@@ -2127,6 +2151,7 @@ ORDER BY t.Datum DESC, t.Id DESC;";
 
             cmd.ExecuteNonQuery();
         }
+
 
         public void LoescheTransaktion(int id)
         {
@@ -3873,11 +3898,30 @@ ORDER BY t.Datum DESC, t.Id DESC;";
         /// <summary>
         /// Führt alle idempotenten Checks aus, um die für Anhänge/OCR benötigten DB-Objekte bereitzustellen.
         /// </summary>
+        /// 
+        // Neu:Budgetdatum
         public void EnsureAttachmentsSchema()
         {
             EnsureAppSettingsTable();
             EnsureAttachmentsTable();
             EnsureAttachmentTextTable(); // NEU: Textindex pro Attachment
+
+            // =========================================================
+            // NEU: BudgetDatum-Spalte in dbo.Transaktion sicherstellen
+            // =========================================================
+            using var conn = CreateConnection();
+            conn.Open();
+
+            var sql = @"
+IF COL_LENGTH('dbo.Transaktion', 'BudgetDatum') IS NULL
+BEGIN
+    ALTER TABLE dbo.Transaktion
+    ADD BudgetDatum DATE NULL;
+END;
+";
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
@@ -4416,7 +4460,7 @@ ORDER BY a.Id";
 
             var sb = new System.Text.StringBuilder(@"
 SELECT DISTINCT
-       t.Id, t.Datum, t.VonKontoId, t.NachKontoId,
+       t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
        t.Betrag, t.Notiz,
        t.AdresseId, a.Name AS AdresseName,
        t.GeldinstitutId, g.Name AS BankName,
@@ -4478,15 +4522,18 @@ WHERE 1=1
                 {
                     Id = r.GetInt32(0),
                     Datum = r.GetDateTime(1),
-                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                    Betrag = r.GetDecimal(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
-                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
-                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
-                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2), // NEU
+
+                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
                 });
             }
 
