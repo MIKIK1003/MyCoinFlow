@@ -1,4 +1,5 @@
-﻿using Microsoft.Win32; // für OpenFileDialog
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.Win32; // für OpenFileDialog
 using MyCoinFlow.Helpers;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
@@ -276,8 +277,6 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-
-
         private void Loeschen()
         {
             if (AusgewaehlteTransaktion == null) return;
@@ -288,9 +287,29 @@ namespace MyCoinFlow.ViewModels
                                       MessageBoxImage.Warning);
             if (ask != MessageBoxResult.Yes) return;
 
-            _db.LoescheTransaktion(AusgewaehlteTransaktion.Id);
-            LadeListe();
+            try
+            {
+                _db.LoescheTransaktion(AusgewaehlteTransaktion.Id);
+                LadeListe();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "Löschen nicht möglich",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Datenbankfehler beim Löschen: {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unerwarteter Fehler beim Löschen: {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
+
         private void LadeListe()
         {
             Transaktionen.Clear();

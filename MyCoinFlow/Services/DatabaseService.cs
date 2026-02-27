@@ -11,6 +11,7 @@ using System.Text;
 using System.Transactions;
 using System.Text.RegularExpressions;
 
+
 namespace MyCoinFlow.Services
 {
 
@@ -2157,9 +2158,55 @@ ORDER BY t.Datum DESC, t.Id DESC;";
         {
             using var c = new SqlConnection(_connectionString);
             c.Open();
+
+            // Guard: Transaktion darf nicht gelöscht werden, wenn sie in einem STWE-Set verwendet wird.
+            const string sqlCheck = "SELECT COUNT(1) FROM dbo.StweSet WHERE TransaktionId = @id;";
+            int usedCount;
+            using (var check = new SqlCommand(sqlCheck, c))
+            {
+                check.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
+                var usedCountObj = check.ExecuteScalar();
+                usedCount = usedCountObj == null || usedCountObj == DBNull.Value ? 0 : Convert.ToInt32(usedCountObj);
+            }
+
+            if (usedCount > 0)
+            {
+                // Optional: ein paar Set-Titel anzeigen (damit klar ist, wo es hängt).
+                const string sqlTitles = @"
+SELECT TOP (5) Id, Titel
+FROM dbo.StweSet
+WHERE TransaktionId = @id
+ORDER BY Id DESC;";
+
+                var lines = new List<string>
+        {
+            $"Diese Transaktion kann nicht gelöscht werden, weil sie in {usedCount} STWE-Set(s) verwendet wird."
+        };
+
+                using (var cmdTitles = new SqlCommand(sqlTitles, c))
+                {
+                    cmdTitles.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
+
+                    using var r = cmdTitles.ExecuteReader();
+                    while (r.Read())
+                    {
+                        var setId = r.GetInt32(0);
+                        var titel = r.IsDBNull(1) ? "" : r.GetString(1);
+                        titel = string.IsNullOrWhiteSpace(titel) ? "(ohne Titel)" : titel.Trim();
+
+                        lines.Add($"• Set #{setId}: {titel}");
+                    }
+                }
+
+                if (usedCount > 5)
+                    lines.Add("• …");
+
+                throw new InvalidOperationException(string.Join(Environment.NewLine, lines));
+            }
+
             const string sql = "DELETE FROM Transaktion WHERE Id=@id";
             using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
             cmd.ExecuteNonQuery();
         }
 
