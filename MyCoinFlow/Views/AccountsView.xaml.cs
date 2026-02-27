@@ -25,6 +25,28 @@ namespace MyCoinFlow.Views
 
         private void AccountsView_Loaded(object? sender, RoutedEventArgs e)
         {
+            // NEU: Default-Datum = aktiver Budgetzeitraum (wie TransactionsViewModel)
+            try
+            {
+                if (DateFromPicker?.SelectedDate == null && DateToPicker?.SelectedDate == null)
+                {
+                    var activeId = _db.HoleAktivenBudgetzeitraumId();
+                    if (activeId.HasValue)
+                    {
+                        var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                        if (bz != null)
+                        {
+                            DateFromPicker.SelectedDate = bz.Startdatum.Date; // NEU
+                            DateToPicker.SelectedDate = bz.Enddatum.Date;     // NEU
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // defensiv: keine Vorbelegung erzwingen
+            }
+
             AttachGridFilter();
             // Beim ersten Wechsel in die Tabellenansicht ggf. erste Zeile selektieren,
             // damit Bearbeiten/Löschen nicht deaktiviert bleiben.

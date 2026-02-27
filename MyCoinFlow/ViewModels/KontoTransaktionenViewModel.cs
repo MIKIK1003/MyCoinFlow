@@ -86,14 +86,52 @@ namespace MyCoinFlow.ViewModels
                 FilterVon = null; FilterBis = null;
                 FilterMinBetrag = null; FilterMaxBetrag = null;
                 FilterAdresseId = null; FilterGeldinstitutId = null;
+
+                // NEU: Reset auf aktiven Budgetzeitraum (wie Default)
+                PrefillDateRangeFromActiveBudget();
+
                 Load();
             });
 
             foreach (var a in _db.LadeAdressen().OrderBy(a => a.Name)) Adressen.Add(a);
             foreach (var gi in _db.LadeGeldinstitute().OrderBy(g => g.Name)) Geldinstitute.Add(gi);
 
+            // NEU: Default = aktiver Budgetzeitraum
+            PrefillDateRangeFromActiveBudget();
+
             Load();
         }
+
+        private void PrefillDateRangeFromActiveBudget()
+        {
+            try
+            {
+                var activeId = _db.HoleAktivenBudgetzeitraumId();
+                if (activeId.HasValue)
+                {
+                    var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                    if (bz != null)
+                    {
+                        // NEU: Default = aktiver Budgetzeitraum
+                        FilterVon = bz.Startdatum.Date;
+                        FilterBis = bz.Enddatum.Date;
+                        return;
+                    }
+                }
+
+                // Falls kein aktiver Zeitraum existiert:
+                // Filter bewusst leer lassen (zeigt alle Daten)
+                FilterVon = null;
+                FilterBis = null;
+            }
+            catch
+            {
+                // defensiv: Filter leer lassen
+                FilterVon = null;
+                FilterBis = null;
+            }
+        }
+
 
         private bool DetectIncomeAccount(int kontoId)
         {

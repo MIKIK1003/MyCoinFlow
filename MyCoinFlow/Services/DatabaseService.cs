@@ -91,7 +91,7 @@ OUTER APPLY (
         FROM Transaktion t
         WHERE bz.Id IS NOT NULL
           AND t.NachKontoId = k.Id
-          AND t.Datum >= bz.Startdatum AND t.Datum <= bz.Enddatum
+          AND ISNULL(t.BudgetDatum, t.Datum) >= bz.Startdatum AND ISNULL(t.BudgetDatum, t.Datum) <= bz.Enddatum  -- NEU: BudgetDatum falls gesetzt
         GROUP BY t.NachKontoId
         UNION ALL
         -- Abgänge (VonKontoId = dieses Konto) negativ
@@ -99,7 +99,7 @@ OUTER APPLY (
         FROM Transaktion t
         WHERE bz.Id IS NOT NULL
           AND t.VonKontoId = k.Id
-          AND t.Datum >= bz.Startdatum AND t.Datum <= bz.Enddatum
+          AND ISNULL(t.BudgetDatum, t.Datum) >= bz.Startdatum AND ISNULL(t.BudgetDatum, t.Datum) <= bz.Enddatum  -- NEU: BudgetDatum falls gesetzt
         GROUP BY t.VonKontoId
     ) x
 ) g
@@ -4610,8 +4610,8 @@ SELECT TOP(1) 1
 FROM dbo.Transaktion t
 LEFT JOIN dbo.Kontenplan kv ON kv.Id = t.VonKontoId
 LEFT JOIN dbo.Kontenplan kn ON kn.Id = t.NachKontoId
-WHERE (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
+WHERE (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU: BudgetDatum falls gesetzt
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)  -- NEU: BudgetDatum falls gesetzt
   AND (kv.Kontonummer = @knr OR kn.Kontonummer = @knr);";
 
             using var cmd = new SqlCommand(sql, c);
