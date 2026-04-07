@@ -2542,57 +2542,42 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
             DataTable t;
 
-            // === A) CSV (TOP-Card) ============================================
+            // Diese Header erwarten wir im Rohfile als mögliche Startsignale.
+            // Noch VOR dem Mapping suchen wir nach den Source-Headern.
+            var erwarteteRohHeader = new[]
+            {
+        "Datum",
+        "Buchungstext",
+        "Gegenpartei",
+        "Kategorie",
+        "Betrag",
+        "Konto",
+        "Debit/Kredit",
+        "Transaktionsdatum",
+        "Beschreibung",
+        "Händler",
+        "Händlerkategorie",
+        "Kartennummer"
+    };
+
+            // === A) CSV ========================================================
             if (ext == ".csv")
             {
-                // CSV einlesen: 1. Zeile = Header, Trennzeichen ';'
-                t = new DataTable();
-                // TOP-Card ist oft Latin1/Windows-1252; UTF8 klappt meist auch.
-                using (var sr = new StreamReader(filePath, Encoding.Latin1, detectEncodingFromByteOrderMarks: true))
-                {
-                    string? headerLine = sr.ReadLine();
-                    if (string.IsNullOrWhiteSpace(headerLine))
-                        return new();
+                t = LeseCsvMitAutomatischerHeaderZeile(filePath, erwarteteRohHeader);
 
-                    var headers = headerLine.Split(';');
-                    foreach (var h in headers)
-                        t.Columns.Add((h ?? string.Empty).Trim());
-
-                    string? line;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        var parts = line.Split(';');
-                        var row = t.NewRow();
-                        for (int i = 0; i < t.Columns.Count && i < parts.Length; i++)
-                            row[i] = parts[i];
-                        t.Rows.Add(row);
-                    }
-                }
-
-                // Mapping (inkl. Ableitung Debit/Kredit aus Belastung/Gutschrift)
+                // Mapping anwenden
                 t = new CreditCardImportMappingService(this).ApplyMappingIfNeeded(t);
             }
-            // === B) Excel (SwissCard Master) ==================================
+            // === B) Excel ======================================================
             else
             {
-                // Excel via ExcelDataReader
-                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                t = LeseExcelMitAutomatischerHeaderZeile(filePath, erwarteteRohHeader);
 
-                using var fs = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = ExcelDataReader.ExcelReaderFactory.CreateReader(fs);
-                var ds = reader.AsDataSet(new ExcelDataReader.ExcelDataSetConfiguration
-                {
-                    ConfigureDataTable = _ => new ExcelDataReader.ExcelDataTableConfiguration { UseHeaderRow = true }
-                });
-
-                if (ds.Tables.Count == 0) return new();
-                t = ds.Tables[0];
-
-                // Mapping (Top-Card-Sonderfälle sind hier egal; für xlsx bleibt praktisch alles Master)
+                // Mapping anwenden
                 t = new CreditCardImportMappingService(this).ApplyMappingIfNeeded(t);
             }
 
-            // === C) Deine bestehende Logik (unverändert) ======================
+            // === C) Master-Spalten prüfen =====================================
             const string COL_DATUM = "Transaktionsdatum";
             const string COL_BESCH = "Beschreibung";
             const string COL_HAEND = "Händler";
@@ -2602,16 +2587,22 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
             const string COL_CARD = "Kartennummer"; // optional
 
             foreach (var col in new[] { COL_DATUM, COL_BESCH, COL_HAEND, COL_KAT, COL_BETR, COL_DK })
+            {
                 if (!t.Columns.Contains(col))
                     throw new Exception($"Spalte „{col}“ fehlt in der Excel-Datei.");
+            }
 
+            // === D) Zeilen lesen ==============================================
             var list = new List<CreditCardImportRow>();
             var ciCH = new CultureInfo("de-CH");
 
             foreach (DataRow r in t.Rows)
             {
-                if (!TryGetDate(r[COL_DATUM], out var datum)) continue;
-                if (!TryGetDecimal(r[COL_BETR], ciCH, out var betrag)) continue;
+                if (!TryGetDate(r[COL_DATUM], out var datum))
+                    continue;
+
+                if (!TryGetDecimal(r[COL_BETR], ciCH, out var betragOriginal))
+                    continue;
 
                 var besch = r[COL_BESCH]?.ToString()?.Trim() ?? "";
                 var haend = r[COL_HAEND]?.ToString()?.Trim();
@@ -2619,7 +2610,17 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
                 var dk = r[COL_DK]?.ToString()?.Trim() ?? "";
                 var card = t.Columns.Contains(COL_CARD) ? r[COL_CARD]?.ToString()?.Trim() : null;
 
-                var betragPos = Math.Abs(betrag);
+                // Falls Debit/Kredit leer ist, Richtung aus Vorzeichen ableiten.
+                if (string.IsNullOrWhiteSpace(dk))
+                {
+                    if (betragOriginal < 0m)
+                        dk = "DEBIT";
+                    else if (betragOriginal > 0m)
+                        dk = "KREDIT";
+                }
+
+                // Betrag intern positiv speichern; Richtung separat über DebitKredit.
+                var betragPos = Math.Abs(betragOriginal);
 
                 list.Add(new CreditCardImportRow
                 {
@@ -2635,23 +2636,263 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
 
             return list;
 
+            // ================================================================
+            // Hilfsmethoden nur für diese Methode lokal gehalten
+            // ================================================================
+
+            DataTable LeseCsvMitAutomatischerHeaderZeile(string pfad, string[] erwarteteHeader)
+            {
+                var alleZeilen = new List<string[]>();
+
+                using (var sr = new StreamReader(pfad, Encoding.Latin1, detectEncodingFromByteOrderMarks: true))
+                {
+                    string? line;
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        alleZeilen.Add(line.Split(';'));
+                    }
+                }
+
+                if (alleZeilen.Count == 0)
+                    return new DataTable();
+
+                int headerIndex = FindeHeaderZeile(alleZeilen, erwarteteHeader);
+                if (headerIndex < 0)
+                    throw new Exception("Keine gültige Header-Zeile in der CSV-Datei gefunden.");
+
+                var table = new DataTable();
+
+                var headerCells = alleZeilen[headerIndex];
+                var verwendeteSpaltennamen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < headerCells.Length; i++)
+                {
+                    var colName = (headerCells[i] ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(colName))
+                        colName = $"Spalte{i + 1}";
+
+                    colName = MacheEindeutigenSpaltennamen(colName, verwendeteSpaltennamen);
+                    table.Columns.Add(colName);
+                }
+
+                for (int rowIndex = headerIndex + 1; rowIndex < alleZeilen.Count; rowIndex++)
+                {
+                    var raw = alleZeilen[rowIndex];
+
+                    if (IstLeerzeile(raw))
+                        continue;
+
+                    var row = table.NewRow();
+                    for (int col = 0; col < table.Columns.Count; col++)
+                    {
+                        row[col] = col < raw.Length ? (raw[col] ?? string.Empty).Trim() : string.Empty;
+                    }
+
+                    table.Rows.Add(row);
+                }
+
+                return table;
+            }
+
+            DataTable LeseExcelMitAutomatischerHeaderZeile(string pfad, string[] erwarteteHeader)
+            {
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+                using var fs = File.Open(pfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = ExcelDataReader.ExcelReaderFactory.CreateReader(fs);
+
+                var ds = reader.AsDataSet(new ExcelDataReader.ExcelDataSetConfiguration
+                {
+                    ConfigureDataTable = _ => new ExcelDataReader.ExcelDataTableConfiguration
+                    {
+                        UseHeaderRow = false
+                    }
+                });
+
+                if (ds.Tables.Count == 0)
+                    return new DataTable();
+
+                var roh = ds.Tables[0];
+                if (roh.Rows.Count == 0)
+                    return new DataTable();
+
+                var alleZeilen = new List<string[]>();
+
+                foreach (DataRow dr in roh.Rows)
+                {
+                    var cells = new string[roh.Columns.Count];
+                    for (int i = 0; i < roh.Columns.Count; i++)
+                    {
+                        cells[i] = dr[i]?.ToString()?.Trim() ?? string.Empty;
+                    }
+                    alleZeilen.Add(cells);
+                }
+
+                int headerIndex = FindeHeaderZeile(alleZeilen, erwarteteHeader);
+                if (headerIndex < 0)
+                    throw new Exception("Keine gültige Header-Zeile in der Excel-Datei gefunden.");
+
+                var table = new DataTable();
+                var verwendeteSpaltennamen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                var headerCells = alleZeilen[headerIndex];
+                for (int i = 0; i < headerCells.Length; i++)
+                {
+                    var colName = (headerCells[i] ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(colName))
+                        colName = $"Spalte{i + 1}";
+
+                    colName = MacheEindeutigenSpaltennamen(colName, verwendeteSpaltennamen);
+                    table.Columns.Add(colName);
+                }
+
+                for (int rowIndex = headerIndex + 1; rowIndex < alleZeilen.Count; rowIndex++)
+                {
+                    var raw = alleZeilen[rowIndex];
+
+                    if (IstLeerzeile(raw))
+                        continue;
+
+                    var row = table.NewRow();
+                    for (int col = 0; col < table.Columns.Count; col++)
+                    {
+                        row[col] = col < raw.Length ? raw[col] : string.Empty;
+                    }
+
+                    table.Rows.Add(row);
+                }
+
+                return table;
+            }
+
+            int FindeHeaderZeile(List<string[]> zeilen, string[] erwarteteHeader)
+            {
+                // Regel:
+                // Erste Zeile verwenden, die mindestens 2 erwartete Header enthält.
+                // Falls keine 2 gefunden werden, als Fallback eine Zeile mit mindestens 1 Treffer.
+                int fallbackIndex = -1;
+
+                for (int i = 0; i < zeilen.Count; i++)
+                {
+                    var row = zeilen[i];
+                    int treffer = ZaehleHeaderTreffer(row, erwarteteHeader);
+
+                    if (treffer >= 2)
+                        return i;
+
+                    if (treffer >= 1 && fallbackIndex < 0)
+                        fallbackIndex = i;
+                }
+
+                return fallbackIndex;
+            }
+
+            int ZaehleHeaderTreffer(string[] row, string[] erwarteteHeader)
+            {
+                int treffer = 0;
+
+                foreach (var cell in row)
+                {
+                    var wert = (cell ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(wert))
+                        continue;
+
+                    if (erwarteteHeader.Any(h => string.Equals(h, wert, StringComparison.OrdinalIgnoreCase)))
+                        treffer++;
+                }
+
+                return treffer;
+            }
+
+            bool IstLeerzeile(string[] row)
+            {
+                foreach (var cell in row)
+                {
+                    if (!string.IsNullOrWhiteSpace(cell))
+                        return false;
+                }
+
+                return true;
+            }
+
+            string MacheEindeutigenSpaltennamen(string name, HashSet<string> bestehend)
+            {
+                var basis = name;
+                var kandidat = basis;
+                int nr = 2;
+
+                while (!bestehend.Add(kandidat))
+                {
+                    kandidat = $"{basis}_{nr}";
+                    nr++;
+                }
+
+                return kandidat;
+            }
+
             static bool TryGetDate(object? v, out DateTime? d)
             {
                 d = null;
-                if (v == null) return false;
-                if (v is DateTime dt) { d = dt; return true; }
-                if (DateTime.TryParse(v.ToString(), out var dt2)) { d = dt2; return true; }
+
+                if (v == null)
+                    return false;
+
+                if (v is DateTime dt)
+                {
+                    d = dt;
+                    return true;
+                }
+
+                if (DateTime.TryParse(v.ToString(), out var dt2))
+                {
+                    d = dt2;
+                    return true;
+                }
+
                 return false;
             }
 
             static bool TryGetDecimal(object? v, CultureInfo ci, out decimal dec)
             {
                 dec = 0m;
-                if (v == null) return false;
-                if (v is double d) { dec = (decimal)d; return true; }
-                if (v is float f) { dec = (decimal)f; return true; }
-                if (decimal.TryParse(v.ToString(), NumberStyles.Any, ci, out var dd)) { dec = dd; return true; }
-                if (decimal.TryParse(v.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out dd)) { dec = dd; return true; }
+
+                if (v == null)
+                    return false;
+
+                if (v is double d)
+                {
+                    dec = (decimal)d;
+                    return true;
+                }
+
+                if (v is float f)
+                {
+                    dec = (decimal)f;
+                    return true;
+                }
+
+                if (v is decimal dd0)
+                {
+                    dec = dd0;
+                    return true;
+                }
+
+                var s = v.ToString()?.Trim();
+                if (string.IsNullOrWhiteSpace(s))
+                    return false;
+
+                if (decimal.TryParse(s, NumberStyles.Any, ci, out var dd))
+                {
+                    dec = dd;
+                    return true;
+                }
+
+                if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out dd))
+                {
+                    dec = dd;
+                    return true;
+                }
+
                 return false;
             }
         }

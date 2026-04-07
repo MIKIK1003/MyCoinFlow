@@ -20,6 +20,7 @@ namespace MyCoinFlow.Views
         {
             "Einnahmen (Budgetiert)",
             "Ausgaben (Budgetiert)",
+            "Anschaffungen (Budgetiert)",
             "Investitionen (Budgetiert)",
             "Amortisationen (Budgetiert)",
             "Durchlaufkonten (nicht budgetiert)"
