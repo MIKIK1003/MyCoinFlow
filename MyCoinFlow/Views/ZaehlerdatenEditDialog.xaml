@@ -13,6 +13,8 @@
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
@@ -23,11 +25,39 @@
                    FontWeight="SemiBold"
                    Text="{Binding HeaderText}"/>
 
+        <!-- Erfassungsart -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Vertical">
+
+            <TextBlock Text="Erfassungsart"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,4"/>
+
+            <ComboBox Width="220"
+                      SelectedValue="{Binding ErfassungsTypProxy, Mode=TwoWay}"
+                      SelectedValuePath="Tag">
+                <ComboBoxItem Content="Differenz (Zählerstand)"
+                              Tag="0"/>
+                <ComboBoxItem Content="Monatswerte (kWh)"
+                              Tag="1"/>
+            </ComboBox>
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,6,0,0"
+                        Visibility="{Binding MonatswerteVisibility}">
+                <TextBlock Text="Anzahl Monate:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBox Width="60"
+                         Text="{Binding MonatsAnzahlProxy, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+        </StackPanel>
+
         <!-- Header Felder -->
-        <Border Grid.Row="2"
-        Background="{DynamicResource MaterialDesignPaper}"
-        CornerRadius="10"
-        Padding="12">
+        <Border Grid.Row="4"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="10"
+                Padding="12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="170"/>
@@ -47,36 +77,53 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Row 0 -->
-                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Erfasst am"/>
-                <DatePicker Grid.Row="0" Grid.Column="2"
-                    SelectedDate="{Binding ModelErfasstAm, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           VerticalAlignment="Center"
+                           Text="Erfasst am"/>
+                <DatePicker Grid.Row="0"
+                            Grid.Column="2"
+                            SelectedDate="{Binding ModelErfasstAm, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="Rechnung kWh total"/>
-                <TextBox Grid.Row="0" Grid.Column="6"
-                 Text="{Binding RechnungKwhText, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Row="0"
+                           Grid.Column="4"
+                           VerticalAlignment="Center"
+                           Text="Rechnung kWh total"/>
+                <TextBox Grid.Row="0"
+                         Grid.Column="6"
+                         Text="{Binding RechnungKwhText, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <!-- Row 2 -->
-                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Gutschrift CHF (optional)"/>
-                <TextBox Grid.Row="2" Grid.Column="2"
-                 Text="{Binding GutschriftChfText, UpdateSourceTrigger=LostFocus}"/>
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           VerticalAlignment="Center"
+                           Text="Gutschrift CHF (optional)"/>
+                <TextBox Grid.Row="2"
+                         Grid.Column="2"
+                         Text="{Binding GutschriftChfText, UpdateSourceTrigger=LostFocus}"/>
 
-                <TextBlock Grid.Row="2" Grid.Column="4" VerticalAlignment="Center" Text="Rückspeisung kWh (optional)"/>
-                <TextBox Grid.Row="2" Grid.Column="6"
-                 Text="{Binding RueckgespeistKwhText, UpdateSourceTrigger=LostFocus}"/>
+                <TextBlock Grid.Row="2"
+                           Grid.Column="4"
+                           VerticalAlignment="Center"
+                           Text="Rückspeisung kWh (optional)"/>
+                <TextBox Grid.Row="2"
+                         Grid.Column="6"
+                         Text="{Binding RueckgespeistKwhText, UpdateSourceTrigger=LostFocus}"/>
 
-                <!-- Row 4 -->
-                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Top" Text="Notiz"/>
-                <TextBox Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="5"
-                 Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True"
-                 Height="60"/>
+                <TextBlock Grid.Row="4"
+                           Grid.Column="0"
+                           VerticalAlignment="Top"
+                           Text="Notiz"/>
+                <TextBox Grid.Row="4"
+                         Grid.Column="2"
+                         Grid.ColumnSpan="5"
+                         Text="{Binding Model.Notiz, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         Height="60"/>
             </Grid>
         </Border>
 
-
         <!-- Lines -->
-        <Border Grid.Row="4"
+        <Border Grid.Row="6"
                 Background="{DynamicResource MaterialDesignPaper}"
                 CornerRadius="10"
                 Padding="12">
@@ -85,19 +132,104 @@
                       CanUserAddRows="False"
                       IsReadOnly="False">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" IsReadOnly="True" Width="90"/>
-                    <DataGridTextColumn Header="Zähler" Binding="{Binding Name}" IsReadOnly="True" Width="2*"/>
-                    <DataGridTextColumn Header="EinheitId" Binding="{Binding EinheitId}" IsReadOnly="True" Width="100"/>
-                    <DataGridTextColumn Header="Neu-Wert (kWh)" Binding="{Binding NeuText, UpdateSourceTrigger=PropertyChanged}" Width="160"/>
+                    <DataGridTextColumn Header="Typ"
+                                        Binding="{Binding Typ}"
+                                        IsReadOnly="True"
+                                        Width="90"/>
+
+                    <DataGridTextColumn Header="Zähler"
+                                        Binding="{Binding Name}"
+                                        IsReadOnly="True"
+                                        Width="2*"/>
+
+                    <DataGridTextColumn Header="EinheitId"
+                                        Binding="{Binding EinheitId}"
+                                        IsReadOnly="True"
+                                        Width="100"/>
+
+                    <!-- Differenzmodus -->
+                    <DataGridTemplateColumn Header="Neu-Wert (kWh)"
+                                            Width="160">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding NeuText, UpdateSourceTrigger=PropertyChanged}">
+                                    <TextBox.Style>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsMonatswerte, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Monatswertmodus -->
+                    <DataGridTemplateColumn Header="Monatswerte"
+                                            Width="420">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Padding="4,2">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsMonatswerte, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+
+                                    <StackPanel>
+                                        <ItemsControl ItemsSource="{Binding Monatswerte}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding MonatIndex, StringFormat=Monat {0}}"
+                                                                   FontSize="11"
+                                                                   Margin="0,0,0,2"/>
+                                                        <TextBox Width="70"
+                                                                 Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Text="{Binding MonatswerteInfo}"
+                                                   Margin="0,6,0,0"
+                                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
 
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Click="Cancel_Click" Padding="14,8" Margin="0,0,10,0">
+        <StackPanel Grid.Row="8"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Click="Cancel_Click"
+                    Padding="14,8"
+                    Margin="0,0,10,0">
                 Abbrechen
             </Button>
-            <Button Style="{StaticResource MaterialDesignRaisedButton}" Click="Save_Click" Padding="16,8">
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    Click="Save_Click"
+                    Padding="16,8">
                 Speichern
             </Button>
         </StackPanel>

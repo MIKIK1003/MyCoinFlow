@@ -5181,7 +5181,7 @@ END;
 
 
 -- ------------------------------------------------------------
--- ENERGIE: Zählerstände je Set (Alt/Neu)
+-- : Zählerstände je Set (Alt/Neu)
 -- ------------------------------------------------------------
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweEnergieSetZaehler' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -5280,6 +5280,45 @@ BEGIN
     );
 
     CREATE INDEX IX_StweZaehlerdatenLine_SetId ON dbo.StweZaehlerdatenLine(SetId);
+END;
+
+-- ------------------------------------------------------------
+-- STWE: Monatswerte je Zähler (nur bei ErfassungsTyp = 1)
+-- ------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'StweZaehlerdatenMonat' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.StweZaehlerdatenMonat
+    (
+        Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StweZaehlerdatenMonat PRIMARY KEY,
+        SetId       INT NOT NULL,
+        ZaehlerId   INT NOT NULL,
+        MonatIndex  INT NOT NULL,              -- 1..n
+        Kwh         DECIMAL(18,3) NOT NULL,
+
+        CONSTRAINT FK_StweZaehlerdatenMonat_Set
+            FOREIGN KEY (SetId) REFERENCES dbo.StweZaehlerdatenSet(Id),
+
+        CONSTRAINT FK_StweZaehlerdatenMonat_Zaehler
+            FOREIGN KEY (ZaehlerId) REFERENCES dbo.StweZaehler(Id)
+    );
+
+    CREATE INDEX IX_StweZaehlerdatenMonat_SetId ON dbo.StweZaehlerdatenMonat(SetId);
+END;
+
+
+-- ------------------------------------------------------------
+-- STWE: Erfassungsart (Differenz / Monatswerte)
+-- ------------------------------------------------------------
+IF COL_LENGTH('dbo.StweZaehlerdatenSet', 'ErfassungsTyp') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweZaehlerdatenSet
+    ADD ErfassungsTyp INT NOT NULL CONSTRAINT DF_StweZaehlerdatenSet_ErfassungsTyp DEFAULT(0);
+END;
+
+IF COL_LENGTH('dbo.StweZaehlerdatenSet', 'MonatsAnzahl') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweZaehlerdatenSet
+    ADD MonatsAnzahl INT NULL;
 END;
 
 
@@ -7585,10 +7624,10 @@ ORDER BY t.Datum DESC, s.Id DESC;";
             c.Open();
 
             const string sql = @"
-                SELECT Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz
-                FROM dbo.StweZaehlerdatenSet
-                WHERE LiegenschaftId = @lid
-                ORDER BY ErfasstAm DESC, Id DESC;";
+        SELECT Id, LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz, ErfassungsTyp, MonatsAnzahl
+        FROM dbo.StweZaehlerdatenSet
+        WHERE LiegenschaftId = @lid
+        ORDER BY ErfasstAm DESC, Id DESC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -7605,7 +7644,9 @@ ORDER BY t.Datum DESC, s.Id DESC;";
                     RechnungKwhTotal = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3),
                     GutschriftChf = r.IsDBNull(4) ? (decimal?)null : r.GetDecimal(4),
                     RueckgespeistKwh = r.IsDBNull(5) ? (decimal?)null : r.GetDecimal(5),
-                    Notiz = r.IsDBNull(6) ? null : r.GetString(6)
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    ErfassungsTyp = r.IsDBNull(7) ? 0 : r.GetInt32(7),
+                    MonatsAnzahl = r.IsDBNull(8) ? (int?)null : r.GetInt32(8)
                 });
             }
 
@@ -7624,9 +7665,29 @@ ORDER BY t.Datum DESC, s.Id DESC;";
             c.Open();
 
             const string sql = @"
-INSERT INTO dbo.StweZaehlerdatenSet (LiegenschaftId, ErfasstAm, RechnungKwhTotal, GutschriftChf, RueckgespeistKwh, Notiz)
+INSERT INTO dbo.StweZaehlerdatenSet
+(
+    LiegenschaftId,
+    ErfasstAm,
+    RechnungKwhTotal,
+    GutschriftChf,
+    RueckgespeistKwh,
+    Notiz,
+    ErfassungsTyp,
+    MonatsAnzahl
+)
 OUTPUT INSERTED.Id
-VALUES (@lid, @am, @rk, @gc, @rkwh, @n);";
+VALUES
+(
+    @lid,
+    @am,
+    @rk,
+    @gc,
+    @rkwh,
+    @n,
+    @typ,
+    @ma
+);";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -7636,6 +7697,8 @@ VALUES (@lid, @am, @rk, @gc, @rkwh, @n);";
             cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@rkwh", (object?)m.RueckgespeistKwh ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@typ", m.ErfassungsTyp);
+            cmd.Parameters.AddWithValue("@ma", (object?)m.MonatsAnzahl ?? DBNull.Value);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
@@ -7657,6 +7720,8 @@ UPDATE dbo.StweZaehlerdatenSet SET
     GutschriftChf    = @gc,
     RueckgespeistKwh = @rkwh,
     Notiz            = @n,
+    ErfassungsTyp    = @typ,
+    MonatsAnzahl     = @ma,
     UpdatedAtUtc     = SYSUTCDATETIME()
 WHERE Id = @id;";
 
@@ -7668,6 +7733,8 @@ WHERE Id = @id;";
             cmd.Parameters.AddWithValue("@gc", (object?)m.GutschriftChf ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@rkwh", (object?)m.RueckgespeistKwh ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@n", (object?)m.Notiz ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@typ", m.ErfassungsTyp);
+            cmd.Parameters.AddWithValue("@ma", (object?)m.MonatsAnzahl ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
@@ -7784,6 +7851,83 @@ VALUES (@sid, @zid, @nw);";
                 throw;
             }
         }
+
+        public void StweZaehlerdatenMonateReplace(int setId, List<(int ZaehlerId, int MonatIndex, decimal Kwh)> monate)
+        {
+            EnsureStweSchema();
+
+            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
+            monate ??= new();
+
+            using var c = CreateConnection();
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var del = c.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM dbo.StweZaehlerdatenMonat WHERE SetId = @sid;";
+                    del.Parameters.AddWithValue("@sid", setId);
+                    del.ExecuteNonQuery();
+                }
+
+                foreach (var (zaehlerId, monatIndex, kwh) in monate)
+                {
+                    using var ins = c.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = @"
+INSERT INTO dbo.StweZaehlerdatenMonat (SetId, ZaehlerId, MonatIndex, Kwh)
+VALUES (@sid, @zid, @mid, @kwh);";
+                    ins.Parameters.AddWithValue("@sid", setId);
+                    ins.Parameters.AddWithValue("@zid", zaehlerId);
+                    ins.Parameters.AddWithValue("@mid", monatIndex);
+                    ins.Parameters.AddWithValue("@kwh", kwh);
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+        public List<(int ZaehlerId, int MonatIndex, decimal Kwh)> StweZaehlerdatenMonateGetBySet(int setId)
+        {
+            EnsureStweSchema();
+
+            var list = new List<(int ZaehlerId, int MonatIndex, decimal Kwh)>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT ZaehlerId, MonatIndex, Kwh
+FROM dbo.StweZaehlerdatenMonat
+WHERE SetId = @sid
+ORDER BY ZaehlerId, MonatIndex;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@sid", setId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((
+                    r.GetInt32(0),
+                    r.GetInt32(1),
+                    r.GetDecimal(2)
+                ));
+            }
+
+            return list;
+        }
+
 
         /// <summary>
         /// Liefert das direkt vorherige Zählerdaten-Set (nach ErfasstAm) innerhalb derselben Liegenschaft.

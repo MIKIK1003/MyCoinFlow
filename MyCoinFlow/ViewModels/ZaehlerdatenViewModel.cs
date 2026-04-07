@@ -37,7 +37,7 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand NeuesSetCommand { get; }
         public RelayCommand BearbeitenCommand { get; }
         public RelayCommand LoeschenCommand { get; }
-       
+
         public ZaehlerdatenViewModel(int liegenschaftId, string liegenschaftName)
         {
             _liegenschaftId = liegenschaftId;
@@ -68,8 +68,33 @@ namespace MyCoinFlow.ViewModels
             if (dlg.ShowDialog() == true)
             {
                 var id = _db.StweZaehlerdatenSetInsert(dlg.Model);
-                var lines = dlg.Rows.Select(r => (r.ZaehlerId, r.NeuWert)).ToList();
-                _db.StweZaehlerdatenLinesReplace(id, lines);
+
+                if (dlg.Model.ErfassungsTyp == 1)
+                {
+                    // Monatsmodus:
+                    // - Einzelmonate separat speichern
+                    // - Summen pro Zähler zusätzlich in StweZaehlerdatenLine ablegen,
+                    //   damit die bestehende Weiterverarbeitung mit Summen arbeiten kann.
+                    var monthLines = dlg.Rows
+                        .SelectMany(r => r.GetMonthValues().Select(m => (r.ZaehlerId, m.MonatIndex, m.Kwh)))
+                        .ToList();
+
+                    var sumLines = dlg.Rows
+                        .Select(r => (r.ZaehlerId, r.MonatswerteSumme))
+                        .ToList();
+
+                    _db.StweZaehlerdatenMonateReplace(id, monthLines);
+                    _db.StweZaehlerdatenLinesReplace(id, sumLines);
+                }
+                else
+                {
+                    // Differenzmodus wie bisher
+                    var lines = dlg.Rows.Select(r => (r.ZaehlerId, r.NeuWert)).ToList();
+                    _db.StweZaehlerdatenLinesReplace(id, lines);
+
+                    // Sicherheitsbereinigung: falls aus altem Bearbeiten Monatswerte vorhanden wären
+                    _db.StweZaehlerdatenMonateReplace(id, new());
+                }
 
                 Load();
                 StatusText = "Zählerdaten gespeichert.";
@@ -86,8 +111,33 @@ namespace MyCoinFlow.ViewModels
             if (dlg.ShowDialog() == true)
             {
                 _db.StweZaehlerdatenSetUpdate(dlg.Model);
-                var lines = dlg.Rows.Select(r => (r.ZaehlerId, r.NeuWert)).ToList();
-                _db.StweZaehlerdatenLinesReplace(SelectedSet.Id, lines);
+
+                if (dlg.Model.ErfassungsTyp == 1)
+                {
+                    // Monatsmodus:
+                    // - Einzelmonate separat speichern
+                    // - Summen pro Zähler zusätzlich in StweZaehlerdatenLine ablegen,
+                    //   damit die bestehende Weiterverarbeitung mit Summen arbeiten kann.
+                    var monthLines = dlg.Rows
+                        .SelectMany(r => r.GetMonthValues().Select(m => (r.ZaehlerId, m.MonatIndex, m.Kwh)))
+                        .ToList();
+
+                    var sumLines = dlg.Rows
+                        .Select(r => (r.ZaehlerId, r.MonatswerteSumme))
+                        .ToList();
+
+                    _db.StweZaehlerdatenMonateReplace(SelectedSet.Id, monthLines);
+                    _db.StweZaehlerdatenLinesReplace(SelectedSet.Id, sumLines);
+                }
+                else
+                {
+                    // Differenzmodus wie bisher
+                    var lines = dlg.Rows.Select(r => (r.ZaehlerId, r.NeuWert)).ToList();
+                    _db.StweZaehlerdatenLinesReplace(SelectedSet.Id, lines);
+
+                    // Sicherheitsbereinigung: bei Wechsel von Monatswerten zurück auf Differenz
+                    _db.StweZaehlerdatenMonateReplace(SelectedSet.Id, new());
+                }
 
                 Load();
                 StatusText = "Zählerdaten aktualisiert.";

@@ -3,6 +3,7 @@ using MyCoinFlow.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
@@ -55,7 +56,79 @@ namespace MyCoinFlow.Views
             }
         }
 
+        public int ErfassungsTypProxy
+        {
+            get => Model.ErfassungsTyp;
+            set
+            {
+                if (Model.ErfassungsTyp == value)
+                    return;
 
+                Model.ErfassungsTyp = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsMonatswerte));
+                OnPropertyChanged(nameof(MonatswerteVisibility));
+            }
+        }
+
+        public int? MonatsAnzahlProxy
+        {
+            get => Model.MonatsAnzahl;
+            set
+            {
+                if (Model.MonatsAnzahl == value)
+                    return;
+
+                Model.MonatsAnzahl = value;
+                EnsureRowMonthSlots();
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsMonatswerte
+        {
+            get => Model.ErfassungsTyp == 1;
+        }
+
+        public Visibility MonatswerteVisibility
+        {
+            get => IsMonatswerte ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public sealed class MonatVm : INotifyPropertyChanged
+        {
+            private string _text = "";
+
+            public int MonatIndex { get; init; }
+
+            public string Text
+            {
+                get => _text;
+                set
+                {
+                    if (_text == value)
+                        return;
+
+                    _text = value ?? "";
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(Kwh));
+                }
+            }
+
+            public decimal Kwh => ParseDecimal(Text);
+
+            private static decimal ParseDecimal(string? input)
+            {
+                var s = (input ?? "").Trim().Replace("’", "'").Replace(" ", "").Replace("'", "").Replace(",", ".");
+                if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
+                    return val;
+                return 0m;
+            }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void OnPropertyChanged([CallerMemberName] string? name = null)
+                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
 
         public sealed class RowVm : INotifyPropertyChanged
         {
@@ -66,13 +139,96 @@ namespace MyCoinFlow.Views
             public string Name { get; init; } = "";
             public int? EinheitId { get; init; }
 
+            // Bestehender Modus: absoluter Zählerstand
             public string NeuText
             {
                 get => _neuText;
-                set { _neuText = value ?? ""; OnPropertyChanged(); }
+                set
+                {
+                    _neuText = value ?? "";
+                    OnPropertyChanged();
+                }
             }
 
             public decimal NeuWert => ParseDecimal(NeuText);
+
+            // Neuer Modus: Monatswerte (kWh)
+            public ObservableCollection<MonatVm> Monatswerte { get; } = new();
+
+            public RowVm()
+            {
+                Monatswerte.CollectionChanged += Monatswerte_CollectionChanged;
+            }
+
+            public decimal MonatswerteSumme => Monatswerte.Sum(x => x.Kwh);
+
+            public string MonatswerteInfo
+            {
+                get
+                {
+                    if (Monatswerte.Count == 0)
+                        return "keine Monatswerte";
+
+                    return $"{Monatswerte.Count} Monat(e), Summe {MonatswerteSumme:0.###} kWh";
+                }
+            }
+
+            public void EnsureMonthSlots(int count)
+            {
+                if (count < 0) count = 0;
+
+                while (Monatswerte.Count < count)
+                {
+                    var item = new MonatVm { MonatIndex = Monatswerte.Count + 1, Text = "" };
+                    item.PropertyChanged += MonatItem_PropertyChanged;
+                    Monatswerte.Add(item);
+                }
+
+                while (Monatswerte.Count > count)
+                {
+                    var last = Monatswerte[Monatswerte.Count - 1];
+                    last.PropertyChanged -= MonatItem_PropertyChanged;
+                    Monatswerte.RemoveAt(Monatswerte.Count - 1);
+                }
+
+                RefreshMonatswerteDerivedProperties();
+            }
+
+            public bool AreAllMonthValuesFilled()
+            {
+                if (Monatswerte.Count == 0)
+                    return false;
+
+                return Monatswerte.All(x => !string.IsNullOrWhiteSpace(x.Text));
+            }
+
+            public List<(int MonatIndex, decimal Kwh)> GetMonthValues()
+            {
+                var list = new List<(int MonatIndex, decimal Kwh)>();
+
+                foreach (var item in Monatswerte.OrderBy(x => x.MonatIndex))
+                    list.Add((item.MonatIndex, item.Kwh));
+
+                return list;
+            }
+
+            private void Monatswerte_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+            {
+                RefreshMonatswerteDerivedProperties();
+            }
+
+            private void MonatItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+            {
+                if (e.PropertyName == nameof(MonatVm.Text) || e.PropertyName == nameof(MonatVm.Kwh))
+                    RefreshMonatswerteDerivedProperties();
+            }
+
+            private void RefreshMonatswerteDerivedProperties()
+            {
+                OnPropertyChanged(nameof(Monatswerte));
+                OnPropertyChanged(nameof(MonatswerteSumme));
+                OnPropertyChanged(nameof(MonatswerteInfo));
+            }
 
             private static decimal ParseDecimal(string? input)
             {
@@ -104,16 +260,26 @@ namespace MyCoinFlow.Views
                 Model.GutschriftChf = existing.GutschriftChf;
                 Model.RueckgespeistKwh = existing.RueckgespeistKwh;
                 Model.Notiz = existing.Notiz;
+                Model.ErfassungsTyp = existing.ErfassungsTyp;
+                Model.MonatsAnzahl = existing.MonatsAnzahl;
             }
             else
             {
                 Model.ErfasstAm = DateTime.Today;
+                Model.ErfassungsTyp = 0;
+                Model.MonatsAnzahl = null;
             }
 
             LoadRows();
+            EnsureRowMonthSlots();
+            LoadExistingMonthValues();
 
             DataContext = this;
             OnPropertyChanged(nameof(HeaderText));
+            OnPropertyChanged(nameof(ErfassungsTypProxy));
+            OnPropertyChanged(nameof(MonatsAnzahlProxy));
+            OnPropertyChanged(nameof(IsMonatswerte));
+            OnPropertyChanged(nameof(MonatswerteVisibility));
         }
 
         private void LoadRows()
@@ -155,6 +321,49 @@ namespace MyCoinFlow.Views
             }
         }
 
+        private void EnsureRowMonthSlots()
+        {
+            var count = Model.MonatsAnzahl ?? 0;
+            if (count < 0) count = 0;
+
+            foreach (var row in Rows)
+                row.EnsureMonthSlots(count);
+        }
+
+        private void LoadExistingMonthValues()
+        {
+            if (Model.Id <= 0)
+                return;
+
+            if (Model.ErfassungsTyp != 1)
+                return;
+
+            var monate = _db.StweZaehlerdatenMonateGetBySet(Model.Id);
+            if (monate == null || monate.Count == 0)
+                return;
+
+            foreach (var row in Rows)
+            {
+                var rowMonate = monate
+                    .Where(x => x.ZaehlerId == row.ZaehlerId)
+                    .OrderBy(x => x.MonatIndex)
+                    .ToList();
+
+                if (rowMonate.Count == 0)
+                    continue;
+
+                var maxIndex = rowMonate.Max(x => x.MonatIndex);
+                row.EnsureMonthSlots(maxIndex);
+
+                foreach (var m in rowMonate)
+                {
+                    var slot = row.Monatswerte.FirstOrDefault(x => x.MonatIndex == m.MonatIndex);
+                    if (slot != null)
+                        slot.Text = m.Kwh.ToString("0.###", CultureInfo.InvariantCulture);
+                }
+            }
+        }
+
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate())
@@ -186,12 +395,31 @@ namespace MyCoinFlow.Views
                 return false;
             }
 
-            // Alle Neuwerte müssen gesetzt sein (Praxistauglichkeit: immer kompletter Satz)
-            if (Rows.Any(r => string.IsNullOrWhiteSpace(r.NeuText)))
+            if (Model.ErfassungsTyp == 1)
             {
-                MessageBox.Show("Bitte bei allen Zählern einen Neu-Wert erfassen.",
-                    "Zählerdaten", MessageBoxButton.OK, MessageBoxImage.Information);
-                return false;
+                if (!Model.MonatsAnzahl.HasValue || Model.MonatsAnzahl.Value <= 0)
+                {
+                    MessageBox.Show("Bitte Anzahl Monate > 0 erfassen.",
+                        "Zählerdaten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+
+                if (Rows.Any(r => !r.AreAllMonthValuesFilled()))
+                {
+                    MessageBox.Show("Bitte bei allen Zählern alle Monatswerte erfassen.",
+                        "Zählerdaten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
+            }
+            else
+            {
+                // Bestehender Modus: absoluter Neu-Wert pro Zähler
+                if (Rows.Any(r => string.IsNullOrWhiteSpace(r.NeuText)))
+                {
+                    MessageBox.Show("Bitte bei allen Zählern einen Neu-Wert erfassen.",
+                        "Zählerdaten", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
             }
 
             return true;
@@ -225,7 +453,6 @@ namespace MyCoinFlow.Views
 
             return null;
         }
-
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
