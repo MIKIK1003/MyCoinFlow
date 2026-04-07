@@ -7751,6 +7751,14 @@ WHERE Id = @id;";
 
             try
             {
+                using (var delMonate = c.CreateCommand())
+                {
+                    delMonate.Transaction = tx;
+                    delMonate.CommandText = "DELETE FROM dbo.StweZaehlerdatenMonat WHERE SetId = @id;";
+                    delMonate.Parameters.AddWithValue("@id", id);
+                    delMonate.ExecuteNonQuery();
+                }
+
                 using (var delLines = c.CreateCommand())
                 {
                     delLines.Transaction = tx;

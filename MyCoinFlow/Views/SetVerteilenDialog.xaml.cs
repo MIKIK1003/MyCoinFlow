@@ -377,6 +377,19 @@ namespace MyCoinFlow.Views
 
                 var label = string.IsNullOrWhiteSpace(notiz) ? date : $"{date} – {notiz}";
 
+                // Erfassungsart sichtbar machen
+                if (s.ErfassungsTyp == 1)
+                {
+                    if (s.MonatsAnzahl.HasValue && s.MonatsAnzahl.Value > 0)
+                        label += $" [Monatswerte, {s.MonatsAnzahl.Value} Monate]";
+                    else
+                        label += " [Monatswerte]";
+                }
+                else
+                {
+                    label += " [Differenz]";
+                }
+
                 if (s.Id == oldest.Id)
                     label += " (erstes Set)";
 
@@ -450,15 +463,30 @@ namespace MyCoinFlow.Views
             }
 
             var current = SelectedZaehlerdatenSet.Model;
+            var isMonatswertSet = current.ErfassungsTyp == 1;
 
-            _prevZaehlerdatenSet = _db.StweZaehlerdatenGetPreviousSet(
-                _set.LiegenschaftId,
-                current.ErfasstAm,
-                current.Id);
+            if (!isMonatswertSet)
+            {
+                _prevZaehlerdatenSet = _db.StweZaehlerdatenGetPreviousSet(
+                    _set.LiegenschaftId,
+                    current.ErfasstAm,
+                    current.Id);
+            }
 
-            var prevText = _prevZaehlerdatenSet == null ? "—" : _prevZaehlerdatenSet.ErfasstAm.ToString("dd.MM.yyyy");
-            var curText = current.ErfasstAm.ToString("dd.MM.yyyy");
-            EnergieZeitraumText = $"Zeitraum: {prevText} – {curText}";
+            if (isMonatswertSet)
+            {
+                var monateText = current.MonatsAnzahl.HasValue && current.MonatsAnzahl.Value > 0
+                    ? $" ({current.MonatsAnzahl.Value} Monat(e))"
+                    : "";
+
+                EnergieZeitraumText = $"Zeitraum: Monatswerte bis {current.ErfasstAm:dd.MM.yyyy}{monateText}";
+            }
+            else
+            {
+                var prevText = _prevZaehlerdatenSet == null ? "—" : _prevZaehlerdatenSet.ErfasstAm.ToString("dd.MM.yyyy");
+                var curText = current.ErfasstAm.ToString("dd.MM.yyyy");
+                EnergieZeitraumText = $"Zeitraum: {prevText} – {curText}";
+            }
 
             var n = (current.Notiz ?? "").Trim();
             EnergieNotizText = string.IsNullOrWhiteSpace(n) ? "Notiz: —" : $"Notiz: {n}";
@@ -477,7 +505,7 @@ namespace MyCoinFlow.Views
                 .ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
 
             var prevLines = new Dictionary<int, decimal>();
-            if (_prevZaehlerdatenSet != null)
+            if (!isMonatswertSet && _prevZaehlerdatenSet != null)
             {
                 prevLines = _db.StweZaehlerdatenLinesGetBySet(_prevZaehlerdatenSet.Id)
                     .ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
@@ -486,7 +514,10 @@ namespace MyCoinFlow.Views
             foreach (var z in zaehler)
             {
                 curLines.TryGetValue(z.Id, out var neu);
-                prevLines.TryGetValue(z.Id, out var alt);
+
+                decimal alt = 0m;
+                if (!isMonatswertSet)
+                    prevLines.TryGetValue(z.Id, out alt);
 
                 EnergieDiffRows.Add(new EnergieDiffRowVm
                 {
@@ -497,7 +528,6 @@ namespace MyCoinFlow.Views
                     AltWert = alt,
                     NeuWert = neu,
                     SchluesselId = z.SchluesselId
-
                 });
             }
         }
