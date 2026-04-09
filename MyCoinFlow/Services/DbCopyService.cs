@@ -292,5 +292,6 @@ WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=@t AND COLUMN_NAME=@c";
             var id = await cmd.ExecuteScalarAsync();
             return id != null && id != DBNull.Value;
         }
+                
     }
 }

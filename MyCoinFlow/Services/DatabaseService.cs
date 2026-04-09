@@ -1558,29 +1558,7 @@ WHERE schP.name = @pSchema AND tP.name = @pTable AND cP.name = @pPk;";
             }
         }
 
-        // Liefert alle Aliase (Text -> Adresse)
-        public List<AdressAlias> LadeAdressAliase()
-        {
-            var list = new List<AdressAlias>();
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            // Beispiel-Tabelle/Spaltennamen: AdresseAlias (Id, AdresseId, Text, Modus)
-            const string sql = @"SELECT Id, AdresseId, Text, Modus FROM AdresseAlias;";
-            using var cmd = new SqlCommand(sql, c);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                list.Add(new AdressAlias(
-                    r.GetInt32(0),
-                    r.GetInt32(1),
-                    r.IsDBNull(2) ? "" : r.GetString(2),
-                    r.IsDBNull(3) ? "Exact" : r.GetString(3)
-                ));
-            }
-            return list;
-        }
-
+        
         // Speichert/überschreibt einen Alias (Unique-Constraint auf (AdresseId, Text) empfohlen)
         public void SpeichereAdressAlias(int adresseId, string text, string modus)
         {
@@ -1604,6 +1582,62 @@ WHEN NOT MATCHED THEN
         }
 
 
+        // ---------------------------------------------
+        // Schema für Adress-Buchungsregeln sicherstellen
+        // ---------------------------------------------
+        public void EnsureAdressBuchungsregelSchema()
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AdressBuchungsregel')
+BEGIN
+    CREATE TABLE dbo.AdressBuchungsregel
+    (
+        Id            INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        AdresseId     INT NOT NULL,
+        IstEinnahme   BIT NOT NULL,
+        TextPattern   NVARCHAR(200) NOT NULL,
+        PatternModus  NVARCHAR(20) NOT NULL DEFAULT('Contains'),
+        KontoId       INT NOT NULL,
+        Prioritaet    INT NOT NULL DEFAULT(100),
+        IstAktiv      BIT NOT NULL DEFAULT(1),
+
+        CONSTRAINT FK_ABR_Adresse FOREIGN KEY (AdresseId) REFERENCES dbo.Adresse(Id),
+        CONSTRAINT FK_ABR_Konto   FOREIGN KEY (KontoId)   REFERENCES dbo.Kontenplan(Id)
+    );
+
+    CREATE INDEX IX_ABR_AdresseId ON dbo.AdressBuchungsregel(AdresseId);
+END;
+";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.ExecuteNonQuery();
+        }
+
+        // Liefert alle Aliase (Text -> Adresse)
+        public List<AdressAlias> LadeAdressAliase()
+        {
+            var list = new List<AdressAlias>();
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            // Beispiel-Tabelle/Spaltennamen: AdresseAlias (Id, AdresseId, Text, Modus)
+            const string sql = @"SELECT Id, AdresseId, Text, Modus FROM AdresseAlias;";
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new AdressAlias(
+                    r.GetInt32(0),
+                    r.GetInt32(1),
+                    r.IsDBNull(2) ? "" : r.GetString(2),
+                    r.IsDBNull(3) ? "Exact" : r.GetString(3)
+                ));
+            }
+            return list;
+        }
 
 
 
@@ -5328,6 +5362,7 @@ END;
             cmd.ExecuteNonQuery();
         }
 
+ 
         /// <summary>
         /// Lädt alle Liegenschaften (STWE) für die Übersicht.
         /// </summary>
@@ -8166,6 +8201,130 @@ END
 
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, conn);
             cmd.CommandTimeout = 30;
+            cmd.ExecuteNonQuery();
+        }
+
+
+        // Buchnungsregeln beim Bankimport
+
+        public List<AdressBuchungsregel> LadeAdressBuchungsregeln(int adresseId, bool istEinnahme)
+        {
+            EnsureAdressBuchungsregelSchema();
+
+            var list = new List<AdressBuchungsregel>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+            SELECT
+            Id,
+            AdresseId,
+            IstEinnahme,
+            TextPattern,
+            PatternModus,
+            KontoId,
+            Prioritaet,
+            IstAktiv
+            FROM dbo.AdressBuchungsregel
+            WHERE AdresseId = @aid
+            AND IstEinnahme = @ein
+            AND IstAktiv = 1
+            ORDER BY Prioritaet ASC, Id ASC;";
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@aid", adresseId);
+            cmd.Parameters.AddWithValue("@ein", istEinnahme);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new AdressBuchungsregel
+                {
+                    Id = r.GetInt32(0),
+                    AdresseId = r.GetInt32(1),
+                    IstEinnahme = r.GetBoolean(2),
+                    TextPattern = r.IsDBNull(3) ? "" : r.GetString(3),
+                    PatternModus = r.IsDBNull(4) ? "Contains" : r.GetString(4),
+                    KontoId = r.GetInt32(5),
+                    Prioritaet = r.IsDBNull(6) ? 100 : r.GetInt32(6),
+                    IstAktiv = !r.IsDBNull(7) && r.GetBoolean(7)
+                });
+            }
+
+            return list;
+        }
+
+
+        // ---------------------------------------------
+        // Adress-Buchungsregel speichern/überschreiben
+        // Eine Adresse kann je Richtung mehrere Textregeln haben.
+        // Gleiche Regel = gleiche Adresse + Richtung + TextPattern + PatternModus.
+        // ---------------------------------------------
+        public void SpeichereAdressBuchungsregel(int adresseId, bool istEinnahme, string textPattern, string patternModus, int kontoId, int prioritaet = 100)
+        {
+            if (adresseId <= 0) throw new ArgumentOutOfRangeException(nameof(adresseId));
+            if (kontoId <= 0) throw new ArgumentOutOfRangeException(nameof(kontoId));
+
+            var pattern = (textPattern ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(pattern))
+                throw new ArgumentException("TextPattern fehlt.", nameof(textPattern));
+
+            var modus = string.IsNullOrWhiteSpace(patternModus) ? "Contains" : patternModus.Trim();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+MERGE dbo.AdressBuchungsregel AS tgt
+USING
+(
+    SELECT
+        @AdresseId    AS AdresseId,
+        @IstEinnahme  AS IstEinnahme,
+        @TextPattern  AS TextPattern,
+        @PatternModus AS PatternModus
+) AS src
+ON  tgt.AdresseId    = src.AdresseId
+AND tgt.IstEinnahme  = src.IstEinnahme
+AND tgt.TextPattern  = src.TextPattern
+AND tgt.PatternModus = src.PatternModus
+WHEN MATCHED THEN
+    UPDATE SET
+        KontoId    = @KontoId,
+        Prioritaet = @Prioritaet,
+        IstAktiv   = 1
+WHEN NOT MATCHED THEN
+    INSERT
+    (
+        AdresseId,
+        IstEinnahme,
+        TextPattern,
+        PatternModus,
+        KontoId,
+        Prioritaet,
+        IstAktiv
+    )
+    VALUES
+    (
+        @AdresseId,
+        @IstEinnahme,
+        @TextPattern,
+        @PatternModus,
+        @KontoId,
+        @Prioritaet,
+        1
+    );";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@AdresseId", adresseId);
+            cmd.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
+            cmd.Parameters.AddWithValue("@TextPattern", pattern);
+            cmd.Parameters.AddWithValue("@PatternModus", modus);
+            cmd.Parameters.AddWithValue("@KontoId", kontoId);
+            cmd.Parameters.AddWithValue("@Prioritaet", prioritaet);
+
             cmd.ExecuteNonQuery();
         }
 

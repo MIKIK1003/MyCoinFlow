@@ -164,6 +164,7 @@ namespace MyCoinFlow.Views
                         NeuNameBox.Focus();
                         return;
                     }
+
                     var ibanRaw = NeuIbanBox.Text != null ? NeuIbanBox.Text.Trim() : null;
                     string iban = string.IsNullOrWhiteSpace(ibanRaw) ? null : ibanRaw.Replace(" ", "").ToUpperInvariant();
 
@@ -215,7 +216,10 @@ namespace MyCoinFlow.Views
                 SelectedAdresseId = adrId;
                 SelectedKontoId = kontoId;
 
-                // Aliase automatisch anlegen
+                // ---------------------------------------------
+                // Bestehendes Verhalten:
+                // Alias für Adress-Erkennung anlegen
+                // ---------------------------------------------
                 if (SelectedAdresseId.HasValue && !string.IsNullOrWhiteSpace(_item.CounterpartyName))
                     _db.SpeichereAdressAlias(SelectedAdresseId.Value, _item.CounterpartyName.Trim(), "Exact");
 
@@ -224,6 +228,34 @@ namespace MyCoinFlow.Views
                     var cand = BuildAliasCandidate(_item.Text, _item.ServiceRef);
                     if (!string.IsNullOrWhiteSpace(cand))
                         _db.SpeichereAdressAlias(SelectedAdresseId.Value, cand, "Contains");
+                }
+
+                // ---------------------------------------------
+                // NEU:
+                // Buchungsregel für diese Adresse speichern
+                // Damit gleiche Adresse je nach Buchungstext
+                // auf unterschiedliche Konten gelernt werden kann.
+                // ---------------------------------------------
+                if (SelectedAdresseId.HasValue && SelectedKontoId.HasValue)
+                {
+                    var regelText = BuildAliasCandidate(_item.Text, _item.ServiceRef);
+
+                    // Fallback: wenn kein kompakter Kandidat gebildet werden kann,
+                    // nehmen wir den ganzen Buchungstext (getrimmt).
+                    if (string.IsNullOrWhiteSpace(regelText))
+                        regelText = string.IsNullOrWhiteSpace(_item.Text) ? null : _item.Text.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(regelText))
+                    {
+                        _db.SpeichereAdressBuchungsregel(
+                            adresseId: SelectedAdresseId.Value,
+                            istEinnahme: istEinnahme,
+                            textPattern: regelText,
+                            patternModus: "Contains",
+                            kontoId: SelectedKontoId.Value,
+                            prioritaet: 100
+                        );
+                    }
                 }
 
                 DialogResult = true;
