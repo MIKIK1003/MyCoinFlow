@@ -199,6 +199,9 @@ namespace MyCoinFlow.ViewModels
         // WICHTIG:
         // 1) Sonderregel hat immer Vorrang vor Standardkonto
         // 2) VorschlagNachKontoId wird immer aktiv neu gesetzt oder geleert
+        // 3) Bei budgetierten Einnahmen wird auch das Standard-Einnahmenkonto
+        //    direkt in VorschlagNachKontoId geschrieben, damit das Grid
+        //    "Konto (Nach)" sauber anzeigt.
         // ---------------------------------------------
         private void AutoMatchAdressen()
         {
@@ -219,6 +222,7 @@ namespace MyCoinFlow.ViewModels
             foreach (var it in Items)
             {
                 bool changed = false;
+                it.IstSonderregelTreffer = false;
 
                 // eigenes Geldinstitut aus Account-IBAN
                 if (!it.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(it.AccountIban))
@@ -273,6 +277,13 @@ namespace MyCoinFlow.ViewModels
                             }
                         }
                     }
+
+                    // Sicherheit: bei Auto-Match für Umbuchung kein Von-Konto stehen lassen
+                    if (it.VorschlagVonKontoId.HasValue)
+                    {
+                        it.VorschlagVonKontoId = null;
+                        changed = true;
+                    }
                 }
                 else
                 {
@@ -291,33 +302,58 @@ namespace MyCoinFlow.ViewModels
                     // 2) Konto immer neu bestimmen:
                     //    zuerst Sonderregel, dann Standard/Fallback
                     // ---------------------------------------------
-                    int? resolvedKontoId = null;
+                    int? resolvedNachKontoId = null;
+                    int? resolvedVonKontoId = null;
 
                     if (adrId.HasValue)
                     {
-                        // 2a) Sonderregel hat Vorrang
-                        resolvedKontoId = TryResolveKontoByAdressBuchungsregel(adrId.Value, it);
+                        var adr = _db.HoleAdresse(adrId.Value);
 
-                        // 2b) Fallback auf Standardkonto nur wenn keine Sonderregel passt
-                        if (!resolvedKontoId.HasValue)
+                        // 2a) Sonderregel hat Vorrang
+                        resolvedNachKontoId = TryResolveKontoByAdressBuchungsregel(adrId.Value, it);
+
+                        // 2b) Fallback je Richtung / Adress-Typ
+                        if (resolvedNachKontoId.HasValue)
+                            it.IstSonderregelTreffer = true;
                         {
-                            resolvedKontoId =
-                                _db.HoleDefaultKontoIdByAdresse(adrId.Value)
-                                ?? _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
+                            if (it.Direction == KreditDebit.Credit)
+                            {
+                                // Echte Einnahmen: StandardEinnahmenKonto direkt als NACH setzen
+                                if (adr?.IstBudgetiert == true && adr.StandardEinnahmenKontoId.HasValue)
+                                {
+                                    resolvedNachKontoId = adr.StandardEinnahmenKontoId.Value;
+                                }
+                                // Refund / Rückzahlung: DefaultKonto bleibt VON
+                                else if (adr?.DefaultKontoId.HasValue == true)
+                                {
+                                    resolvedVonKontoId = adr.DefaultKontoId.Value;
+                                }
+                                // letzter Fallback über IBAN
+                                else
+                                {
+                                    resolvedNachKontoId = _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
+                                }
+                            }
+                            else
+                            {
+                                // Ausgaben: wie bisher NACH-Konto
+                                resolvedNachKontoId =
+                                    (adr?.DefaultKontoId.HasValue == true ? adr.DefaultKontoId.Value : (int?)null)
+                                    ?? _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
+                            }
                         }
                     }
 
-                    // 2c) Vorschlag immer aktiv setzen oder leeren
-                    if (it.VorschlagNachKontoId != resolvedKontoId)
+                    // 2c) Vorschläge immer aktiv setzen oder leeren
+                    if (it.VorschlagNachKontoId != resolvedNachKontoId)
                     {
-                        it.VorschlagNachKontoId = resolvedKontoId;
+                        it.VorschlagNachKontoId = resolvedNachKontoId;
                         changed = true;
                     }
 
-                    // Sicherheit: bei dieser Auto-Match-Stufe nie Von-Konto stehen lassen
-                    if (it.VorschlagVonKontoId.HasValue)
+                    if (it.VorschlagVonKontoId != resolvedVonKontoId)
                     {
-                        it.VorschlagVonKontoId = null;
+                        it.VorschlagVonKontoId = resolvedVonKontoId;
                         changed = true;
                     }
                 }

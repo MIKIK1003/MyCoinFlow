@@ -39,8 +39,20 @@ namespace MyCoinFlow.Import
                 if (_istUmbuchung == value) return;
                 _istUmbuchung = value;
                 OnPropertyChanged();
-                // UI soll sofort auf Vollständigkeitssprung reagieren
                 OnPropertyChanged(nameof(IstVollstaendig));
+            }
+        }
+
+        // --- NEU: Markierung für Treffer über Sonderregel ---
+        private bool _istSonderregelTreffer;
+        public bool IstSonderregelTreffer
+        {
+            get => _istSonderregelTreffer;
+            set
+            {
+                if (_istSonderregelTreffer == value) return;
+                _istSonderregelTreffer = value;
+                OnPropertyChanged();
             }
         }
 
@@ -100,7 +112,6 @@ namespace MyCoinFlow.Import
             field = value;
             OnPropertyChanged(propertyName);
 
-            // Zugehörige Label-Spalte aktualisieren (ohne harte Abhängigkeit auf die Labels-Teildatei)
             if (propertyName == nameof(VorschlagNachKontoId))
                 OnPropertyChanged(nameof(NachKontoLabel));
             else if (propertyName == nameof(VorschlagVonKontoId))

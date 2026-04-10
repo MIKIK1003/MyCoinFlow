@@ -212,6 +212,34 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
+                    <DataGridTemplateColumn Header="" Width="44" MinWidth="44" MaxWidth="44" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <materialDesign:PackIcon Kind="StarFourPoints"
+                                         Width="18"
+                                         Height="18"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource PrimaryHueMidBrush}">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IstSonderregelTreffer}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+
+
                     <!-- vorhandene Daten-Spalten -->
                     <DataGridTextColumn Header="#" Binding="{Binding StagingId}" Width="60"/>
                     <DataGridTextColumn Header="Buchung" Binding="{Binding BookingDate, StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
