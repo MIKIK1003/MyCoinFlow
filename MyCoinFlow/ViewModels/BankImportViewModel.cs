@@ -196,10 +196,13 @@ namespace MyCoinFlow.ViewModels
 
         // ---------------------------------------------
         // Auto-Match: erkennt Adresse + optional spezifische Buchungsregel
+        // WICHTIG:
+        // 1) Sonderregel hat immer Vorrang vor Standardkonto
+        // 2) VorschlagNachKontoId wird immer aktiv neu gesetzt oder geleert
         // ---------------------------------------------
         private void AutoMatchAdressen()
         {
-            // NEU: stellt sicher, dass Tabelle für adressbezogene Buchungsregeln existiert
+            // Sicherstellen, dass Schema für adressbezogene Buchungsregeln existiert
             _db.EnsureAdressBuchungsregelSchema();
 
             // Geldinstitute für Gegen-IBAN-Abgleich (Bank↔Bank)
@@ -221,7 +224,11 @@ namespace MyCoinFlow.ViewModels
                 if (!it.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(it.AccountIban))
                 {
                     var gi = TryFindGeldinstitutId(it.AccountIban);
-                    if (gi.HasValue) { it.VorschlagGeldinstitutId = gi.Value; changed = true; }
+                    if (gi.HasValue)
+                    {
+                        it.VorschlagGeldinstitutId = gi.Value;
+                        changed = true;
+                    }
                 }
 
                 // Umbuchung? Gegen-IBAN ist unsere IBAN (DB) oder taucht als AccountIban im Batch auf
@@ -270,47 +277,48 @@ namespace MyCoinFlow.ViewModels
                 else
                 {
                     // ---------------------------------------------
-                    // 1) Adresse erkennen (bestehend)
+                    // 1) Adresse erkennen
                     // ---------------------------------------------
-                    var adrId = it.VorschlagAdresseId;
+                    var adrId = _matcher.TryMatch(it.CounterpartyIban, it.CounterpartyName, it.Text);
 
-                    if (!adrId.HasValue)
-                        adrId = _matcher.TryMatch(it.CounterpartyIban, it.CounterpartyName, it.Text);
-
-                    if (adrId.HasValue && it.VorschlagAdresseId != adrId.Value)
+                    if (it.VorschlagAdresseId != adrId)
                     {
-                        it.VorschlagAdresseId = adrId.Value;
+                        it.VorschlagAdresseId = adrId;
                         changed = true;
                     }
 
                     // ---------------------------------------------
-                    // 2) NEU: spezifische Buchungsregel prüfen
+                    // 2) Konto immer neu bestimmen:
+                    //    zuerst Sonderregel, dann Standard/Fallback
                     // ---------------------------------------------
-                    if (adrId.HasValue && !it.VorschlagNachKontoId.HasValue)
-                    {
-                        var regelKonto = TryResolveKontoByAdressBuchungsregel(adrId.Value, it);
+                    int? resolvedKontoId = null;
 
-                        // Nur wenn eindeutig → übernehmen
-                        if (regelKonto.HasValue)
+                    if (adrId.HasValue)
+                    {
+                        // 2a) Sonderregel hat Vorrang
+                        resolvedKontoId = TryResolveKontoByAdressBuchungsregel(adrId.Value, it);
+
+                        // 2b) Fallback auf Standardkonto nur wenn keine Sonderregel passt
+                        if (!resolvedKontoId.HasValue)
                         {
-                            it.VorschlagNachKontoId = regelKonto.Value;
-                            changed = true;
-                        }
-                        else
-                        {
-                            // ---------------------------------------------
-                            // 3) Fallback: bestehende Logik (unverändert!)
-                            // ---------------------------------------------
-                            int? kontoId =
+                            resolvedKontoId =
                                 _db.HoleDefaultKontoIdByAdresse(adrId.Value)
                                 ?? _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
-
-                            if (kontoId.HasValue)
-                            {
-                                it.VorschlagNachKontoId = kontoId.Value;
-                                changed = true;
-                            }
                         }
+                    }
+
+                    // 2c) Vorschlag immer aktiv setzen oder leeren
+                    if (it.VorschlagNachKontoId != resolvedKontoId)
+                    {
+                        it.VorschlagNachKontoId = resolvedKontoId;
+                        changed = true;
+                    }
+
+                    // Sicherheit: bei dieser Auto-Match-Stufe nie Von-Konto stehen lassen
+                    if (it.VorschlagVonKontoId.HasValue)
+                    {
+                        it.VorschlagVonKontoId = null;
+                        changed = true;
                     }
                 }
 
@@ -323,6 +331,10 @@ namespace MyCoinFlow.ViewModels
 
             RefreshItemsView();
         }
+
+        //____________________________________________
+        // Anlernen von importierten Banktransaktionen
+        // ___________________________________________
 
         private void Anlernen(BankImportItem item)
         {
@@ -415,7 +427,11 @@ namespace MyCoinFlow.ViewModels
                     if (!item.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(item.AccountIban))
                     {
                         var gi = TryFindGeldinstitutId(item.AccountIban);
-                        if (gi.HasValue) { item.VorschlagGeldinstitutId = gi.Value; changed = true; }
+                        if (gi.HasValue)
+                        {
+                            item.VorschlagGeldinstitutId = gi.Value;
+                            changed = true;
+                        }
                     }
 
                     if (item.VorschlagAdresseId.HasValue)
@@ -427,11 +443,38 @@ namespace MyCoinFlow.ViewModels
                         item.NotifyLabelPropertiesChanged();
                     }
 
+                    // -------------------------------------------------
+                    // NEU:
+                    // Nach dem Anlernen nicht mit altem In-Memory-Zustand
+                    // weiterarbeiten. Sonderregeln / Standardkonten / Aliase
+                    // sollen sofort aus der DB neu wirksam werden.
+                    // -------------------------------------------------
                     _matcher.Reload();
+
+                    // Wenn die Zeilen aus dem Staging stammen, laden wir den
+                    // ganzen Stapel hart neu aus der DB. Das ist die robusteste
+                    // Variante und verhindert "hängende" Vorschläge.
+                    if (Items.Any(x => x.StagingId.HasValue))
+                    {
+                        LoadPendingFromDb();
+                        return;
+                    }
+
+                    // Fallback für Datei-Import ohne vorheriges Staging:
+                    // Vorschläge aktiv zurücksetzen und komplett neu berechnen.
+                    foreach (var it2 in Items)
+                    {
+                        it2.VorschlagAdresseId = null;
+                        it2.VorschlagNachKontoId = null;
+                        it2.VorschlagVonKontoId = null;
+                        it2.VorschlagGeldinstitutId = null;
+                    }
+
                     AutoMatchAdressen();
 
                     BankImportLabelCache.Refresh();
-                    foreach (var it2 in Items) it2.NotifyLabelPropertiesChanged();
+                    foreach (var it2 in Items)
+                        it2.NotifyLabelPropertiesChanged();
 
                     RefreshItemsView();
                 }
@@ -442,6 +485,11 @@ namespace MyCoinFlow.ViewModels
                     "Anlernen", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+
+
+
+
 
         // ---------------------------------------------
         // Von/Nach ableiten – inkl. Durchlaufkonto-Logik für Umbuchungen
@@ -705,6 +753,82 @@ namespace MyCoinFlow.ViewModels
 
         // ---------------- Helpers ----------------
 
+        // ---------------------------------------------
+        // NEU: Baut für Buchungsregeln denselben Suchtext auf,
+        // der beim Anlernen als Regelbasis verwendet wird.
+        // ---------------------------------------------
+        private static string? BuildBookingRuleMatchText(BankImportItem item)
+        {
+            if (item == null)
+                return null;
+
+            // 1) voller Buchungstext bevorzugt
+            var text = (item.Text ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                return text;
+
+            // 2) sonst ServiceRef
+            var serviceRef = (item.ServiceRef ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(serviceRef))
+                return serviceRef;
+
+            // 3) sonst Gegenpartei
+            var cp = (item.CounterpartyName ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(cp))
+                return cp;
+
+            return null;
+        }
+
+        // ---------------------------------------------
+        // Baut denselben kompakten Regeltext wie BuildAliasCandidate
+        // im ZuordnungDialog.
+        // Dieser Text ist die Basis für AdressBuchungsregeln.
+        // ---------------------------------------------
+        private static string? BuildAdressBuchungsregelCandidate(string? text, string? serviceRef)
+        {
+            var src = !string.IsNullOrWhiteSpace(text) ? text : (serviceRef ?? "");
+            if (string.IsNullOrWhiteSpace(src)) return null;
+
+            // IBANs / lange Nummern entfernen
+            string t = Regex.Replace(src, @"[A-Z]{2}\d{2}[A-Z0-9]{4,}", " ", RegexOptions.IgnoreCase);
+            t = Regex.Replace(t, @"\b\d{5,}\b", " ");
+
+            // Wörter extrahieren (>=3 Zeichen), wie im Dialog
+            var stop = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "RECHNUNG","REFERENZ","ZAHLUNG","GEBUEHR","KARTENZAHLUNG","BELASTUNG",
+        "GUTSCHRIFT","MITTEILUNG","VALUTA","SEPA","SWIFT","UETR","CHF","EUR","USD",
+        "VISA","MASTERCARD","TWINT","POSTFINANCE","UBS","CS","BANK","KONTO","IBAN"
+    };
+
+            var words = Regex.Matches(t.ToUpperInvariant(), @"[A-ZÄÖÜ0-9]{3,}")
+                             .Cast<Match>()
+                             .Select(m => m.Value)
+                             .Where(w => !stop.Contains(w))
+                             .ToList();
+
+            if (words.Count == 0) return null;
+
+            var picks = words.Take(4)
+                             .Select(w => w.Length <= 5 ? w : w.Substring(0, 5))
+                             .ToList();
+
+            var code = string.Join("-", picks);
+
+            if (code.Replace("-", "").Length < 8)
+            {
+                var fallback = words.OrderByDescending(w => w.Length)
+                                    .Take(2)
+                                    .Select(w => w.Length <= 6 ? w : w.Substring(0, 6));
+
+                code = string.Join("-", fallback);
+            }
+
+            return code;
+        }
+
+
         private static string NormalizeIban(string? iban)
             => string.IsNullOrWhiteSpace(iban) ? "" : iban.Replace(" ", "").ToUpperInvariant();
 
@@ -839,8 +963,12 @@ namespace MyCoinFlow.ViewModels
             return sb.ToString();
         }
 
-        // zusätzliche Regeln für Bankimport
-
+        // ---------------------------------------------
+        // Konto über adressbezogene Buchungsregeln auflösen
+        // WICHTIG:
+        // Es wird exakt dieselbe Regeltext-Bildung verwendet
+        // wie beim Anlernen im ZuordnungDialog.
+        // ---------------------------------------------
         private int? TryResolveKontoByAdressBuchungsregel(int adresseId, BankImportItem item)
         {
             if (adresseId <= 0 || item == null)
@@ -852,23 +980,31 @@ namespace MyCoinFlow.ViewModels
             if (regeln == null || regeln.Count == 0)
                 return null;
 
-            var textNorm = NormalizeBookingRuleText(item.Text);
-            if (string.IsNullOrWhiteSpace(textNorm))
+            // Exakt dieselbe Verdichtung wie beim Anlernen:
+            // zuerst Alias-Kandidat, sonst voller Text/ServiceRef
+            var regelSuchtext = BuildAdressBuchungsregelCandidate(item.Text, item.ServiceRef);
+            if (string.IsNullOrWhiteSpace(regelSuchtext))
+                regelSuchtext = !string.IsNullOrWhiteSpace(item.Text)
+                    ? item.Text.Trim()
+                    : (string.IsNullOrWhiteSpace(item.ServiceRef) ? null : item.ServiceRef.Trim());
+
+            if (string.IsNullOrWhiteSpace(regelSuchtext))
                 return null;
+
+            var textNorm = NormalizeBookingRuleText(regelSuchtext);
+            var betragAbs = Math.Abs(item.Amount);
 
             var treffer = regeln
                 .Where(r => !string.IsNullOrWhiteSpace(r.TextPattern))
                 .Where(r => BuchungsregelTextPasst(r.TextPattern, r.PatternModus, textNorm))
+                .Where(r => BuchungsregelBetragPasst(r, betragAbs))
                 .OrderBy(r => r.Prioritaet)
                 .ThenBy(r => r.Id)
                 .ToList();
 
-            // Genau ein Treffer -> eindeutig
             if (treffer.Count == 1)
                 return treffer[0].KontoId;
 
-            // Mehrere Treffer:
-            // Nur dann eindeutig, wenn die erste Priorität genau einmal vorkommt.
             if (treffer.Count > 1)
             {
                 var bestePrioritaet = treffer[0].Prioritaet;
@@ -878,9 +1014,9 @@ namespace MyCoinFlow.ViewModels
                     return top[0].KontoId;
             }
 
-            // 0 Treffer oder mehrdeutig -> kein automatischer Kontoentscheid
             return null;
         }
+
 
         private static bool BuchungsregelTextPasst(string patternRaw, string? modusRaw, string textNorm)
         {
@@ -898,6 +1034,28 @@ namespace MyCoinFlow.ViewModels
                 "PrefixSeq" => PrefixSeqMatchForBookingRule(pattern, textNorm),
                 _ => textNorm.Contains(pattern, StringComparison.Ordinal)
             };
+        }
+
+        // ---------------------------------------------
+        // NEU: Prüft, ob der Betrag in den optionalen Bereich der Buchungsregel fällt.
+        // Wenn kein Bereich gesetzt ist, gilt die Regel für jeden Betrag.
+        // ---------------------------------------------
+        private static bool BuchungsregelBetragPasst(AdressBuchungsregel regel, decimal betragAbs)
+        {
+            if (regel == null)
+                return false;
+
+            // Kein Bereich gesetzt -> Betrag immer passend
+            if (!regel.BetragVon.HasValue && !regel.BetragBis.HasValue)
+                return true;
+
+            if (regel.BetragVon.HasValue && betragAbs < regel.BetragVon.Value)
+                return false;
+
+            if (regel.BetragBis.HasValue && betragAbs > regel.BetragBis.Value)
+                return false;
+
+            return true;
         }
 
         private static bool PrefixSeqMatchForBookingRule(string patternNorm, string textNorm)

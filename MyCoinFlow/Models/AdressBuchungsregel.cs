@@ -11,6 +11,10 @@
 
         public int KontoId { get; set; }
 
+        // NEU: Betrag zur Unterscheidung
+        public decimal? BetragVon { get; set; }
+        public decimal? BetragBis { get; set; }
+
         public int Prioritaet { get; set; } = 100;
         public bool IstAktiv { get; set; } = true;
     }

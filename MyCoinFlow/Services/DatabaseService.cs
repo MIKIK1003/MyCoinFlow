@@ -1581,9 +1581,9 @@ WHEN NOT MATCHED THEN
             cmd.ExecuteNonQuery();
         }
 
-
         // ---------------------------------------------
         // Schema für Adress-Buchungsregeln sicherstellen
+        // NEU: optionaler Betragsbereich für präzisere Unterscheidung
         // ---------------------------------------------
         public void EnsureAdressBuchungsregelSchema()
         {
@@ -1591,30 +1591,55 @@ WHEN NOT MATCHED THEN
             c.Open();
 
             const string sql = @"
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AdressBuchungsregel')
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AdressBuchungsregel' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
     CREATE TABLE dbo.AdressBuchungsregel
     (
-        Id            INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AdressBuchungsregel PRIMARY KEY,
         AdresseId     INT NOT NULL,
         IstEinnahme   BIT NOT NULL,
         TextPattern   NVARCHAR(200) NOT NULL,
-        PatternModus  NVARCHAR(20) NOT NULL DEFAULT('Contains'),
+        PatternModus  NVARCHAR(20) NOT NULL CONSTRAINT DF_AdressBuchungsregel_Modus DEFAULT('Contains'),
         KontoId       INT NOT NULL,
-        Prioritaet    INT NOT NULL DEFAULT(100),
-        IstAktiv      BIT NOT NULL DEFAULT(1),
 
-        CONSTRAINT FK_ABR_Adresse FOREIGN KEY (AdresseId) REFERENCES dbo.Adresse(Id),
-        CONSTRAINT FK_ABR_Konto   FOREIGN KEY (KontoId)   REFERENCES dbo.Kontenplan(Id)
+        -- NEU: optionaler Betragsbereich
+        BetragVon     DECIMAL(18,2) NULL,
+        BetragBis     DECIMAL(18,2) NULL,
+
+        Prioritaet    INT NOT NULL CONSTRAINT DF_AdressBuchungsregel_Prio DEFAULT(100),
+        IstAktiv      BIT NOT NULL CONSTRAINT DF_AdressBuchungsregel_Aktiv DEFAULT(1),
+        CreatedAtUtc  DATETIME2 NOT NULL CONSTRAINT DF_AdressBuchungsregel_Created DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_AdressBuchungsregel_Adresse
+            FOREIGN KEY (AdresseId) REFERENCES dbo.Adresse(Id),
+
+        CONSTRAINT FK_AdressBuchungsregel_Konto
+            FOREIGN KEY (KontoId) REFERENCES dbo.Kontenplan(Id)
     );
 
-    CREATE INDEX IX_ABR_AdresseId ON dbo.AdressBuchungsregel(AdresseId);
+    CREATE INDEX IX_AdressBuchungsregel_AdresseId ON dbo.AdressBuchungsregel(AdresseId);
+    CREATE INDEX IX_AdressBuchungsregel_KontoId   ON dbo.AdressBuchungsregel(KontoId);
+END;
+
+-- Nachrüstung bestehender DBs
+IF COL_LENGTH('dbo.AdressBuchungsregel', 'BetragVon') IS NULL
+BEGIN
+    ALTER TABLE dbo.AdressBuchungsregel
+    ADD BetragVon DECIMAL(18,2) NULL;
+END;
+
+IF COL_LENGTH('dbo.AdressBuchungsregel', 'BetragBis') IS NULL
+BEGIN
+    ALTER TABLE dbo.AdressBuchungsregel
+    ADD BetragBis DECIMAL(18,2) NULL;
 END;
 ";
 
             using var cmd = new SqlCommand(sql, c);
             cmd.ExecuteNonQuery();
         }
+
+
 
         // Liefert alle Aliase (Text -> Adresse)
         public List<AdressAlias> LadeAdressAliase()
@@ -8213,27 +8238,28 @@ END
 
             var list = new List<AdressBuchungsregel>();
 
-            using var c = CreateConnection();
+            using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"
-            SELECT
-            Id,
-            AdresseId,
-            IstEinnahme,
-            TextPattern,
-            PatternModus,
-            KontoId,
-            Prioritaet,
-            IstAktiv
-            FROM dbo.AdressBuchungsregel
-            WHERE AdresseId = @aid
-            AND IstEinnahme = @ein
-            AND IstAktiv = 1
-            ORDER BY Prioritaet ASC, Id ASC;";
+SELECT
+    Id,
+    AdresseId,
+    IstEinnahme,
+    TextPattern,
+    PatternModus,
+    KontoId,
+    BetragVon,
+    BetragBis,
+    Prioritaet,
+    IstAktiv
+FROM dbo.AdressBuchungsregel
+WHERE AdresseId = @aid
+  AND IstEinnahme = @ein
+  AND IstAktiv = 1
+ORDER BY Prioritaet ASC, Id ASC;";
 
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
+            using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@aid", adresseId);
             cmd.Parameters.AddWithValue("@ein", istEinnahme);
 
@@ -8248,21 +8274,25 @@ END
                     TextPattern = r.IsDBNull(3) ? "" : r.GetString(3),
                     PatternModus = r.IsDBNull(4) ? "Contains" : r.GetString(4),
                     KontoId = r.GetInt32(5),
-                    Prioritaet = r.IsDBNull(6) ? 100 : r.GetInt32(6),
-                    IstAktiv = !r.IsDBNull(7) && r.GetBoolean(7)
+
+                    BetragVon = r.IsDBNull(6) ? (decimal?)null : r.GetDecimal(6),
+                    BetragBis = r.IsDBNull(7) ? (decimal?)null : r.GetDecimal(7),
+
+                    Prioritaet = r.IsDBNull(8) ? 100 : r.GetInt32(8),
+                    IstAktiv = !r.IsDBNull(9) && r.GetBoolean(9)
                 });
             }
 
             return list;
         }
 
-
         // ---------------------------------------------
         // Adress-Buchungsregel speichern/überschreiben
-        // Eine Adresse kann je Richtung mehrere Textregeln haben.
-        // Gleiche Regel = gleiche Adresse + Richtung + TextPattern + PatternModus.
+        // NEU: BetragVon/BetragBis gehören zur Eindeutigkeit der Regel.
+        // So können gleiche Adresse + gleicher Text bei unterschiedlichem
+        // Betrag auf verschiedene Konten gelernt werden.
         // ---------------------------------------------
-        public void SpeichereAdressBuchungsregel(int adresseId, bool istEinnahme, string textPattern, string patternModus, int kontoId, int prioritaet = 100)
+        public void SpeichereAdressBuchungsregel(int adresseId, bool istEinnahme, string textPattern, string patternModus, int kontoId, decimal? betragVon, decimal? betragBis, int prioritaet = 100)
         {
             if (adresseId <= 0) throw new ArgumentOutOfRangeException(nameof(adresseId));
             if (kontoId <= 0) throw new ArgumentOutOfRangeException(nameof(kontoId));
@@ -8284,12 +8314,24 @@ USING
         @AdresseId    AS AdresseId,
         @IstEinnahme  AS IstEinnahme,
         @TextPattern  AS TextPattern,
-        @PatternModus AS PatternModus
+        @PatternModus AS PatternModus,
+        @BetragVon    AS BetragVon,
+        @BetragBis    AS BetragBis
 ) AS src
 ON  tgt.AdresseId    = src.AdresseId
 AND tgt.IstEinnahme  = src.IstEinnahme
 AND tgt.TextPattern  = src.TextPattern
 AND tgt.PatternModus = src.PatternModus
+AND
+(
+    (tgt.BetragVon = src.BetragVon)
+    OR (tgt.BetragVon IS NULL AND src.BetragVon IS NULL)
+)
+AND
+(
+    (tgt.BetragBis = src.BetragBis)
+    OR (tgt.BetragBis IS NULL AND src.BetragBis IS NULL)
+)
 WHEN MATCHED THEN
     UPDATE SET
         KontoId    = @KontoId,
@@ -8303,6 +8345,8 @@ WHEN NOT MATCHED THEN
         TextPattern,
         PatternModus,
         KontoId,
+        BetragVon,
+        BetragBis,
         Prioritaet,
         IstAktiv
     )
@@ -8313,6 +8357,8 @@ WHEN NOT MATCHED THEN
         @TextPattern,
         @PatternModus,
         @KontoId,
+        @BetragVon,
+        @BetragBis,
         @Prioritaet,
         1
     );";
@@ -8323,10 +8369,13 @@ WHEN NOT MATCHED THEN
             cmd.Parameters.AddWithValue("@TextPattern", pattern);
             cmd.Parameters.AddWithValue("@PatternModus", modus);
             cmd.Parameters.AddWithValue("@KontoId", kontoId);
+            cmd.Parameters.AddWithValue("@BetragVon", (object?)betragVon ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@BetragBis", (object?)betragBis ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Prioritaet", prioritaet);
 
             cmd.ExecuteNonQuery();
         }
+
 
 
     }

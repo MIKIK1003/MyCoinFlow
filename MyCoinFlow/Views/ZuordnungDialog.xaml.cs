@@ -154,6 +154,9 @@ namespace MyCoinFlow.Views
 
                 // Adresse bestimmen oder neu anlegen
                 int? adrId = null;
+                bool regelSpeichern = false;
+                int? regelKontoId = null;
+
                 if (NeueAdresseCheck != null && NeueAdresseCheck.IsChecked == true)
                 {
                     var name = (NeuNameBox.Text ?? "").Trim();
@@ -170,6 +173,8 @@ namespace MyCoinFlow.Views
 
                     var adrNeu = new Adresse { Name = name, IBAN = iban };
 
+                    // Neue Adresse:
+                    // Das gewählte Konto wird Standard der Adresse.
                     if (istEinnahme && budgetCheck != null && budgetCheck.IsChecked == true)
                     {
                         adrNeu.IstBudgetiert = true;
@@ -200,15 +205,35 @@ namespace MyCoinFlow.Views
                     if (istEinnahme && budgetCheck != null && budgetCheck.IsChecked == true)
                     {
                         adr.IstBudgetiert = true;
-                        adr.StandardEinnahmenKontoId = kontoId;
-                        _db.AktualisiereAdresse(adr);
+
+                        // WICHTIG:
+                        // Bestehendes Standardkonto bleibt Standard.
+                        // Abweichendes Konto wird als Sonderregel gelernt.
+                        if (!adr.StandardEinnahmenKontoId.HasValue || adr.StandardEinnahmenKontoId.Value <= 0)
+                        {
+                            adr.StandardEinnahmenKontoId = kontoId;
+                            _db.AktualisiereAdresse(adr);
+                        }
+                        else if (adr.StandardEinnahmenKontoId.Value != kontoId.Value)
+                        {
+                            regelSpeichern = true;
+                            regelKontoId = kontoId.Value;
+                        }
                     }
                     else
                     {
-                        if (adr.DefaultKontoId != kontoId)
+                        // Ausgabe / Refund:
+                        // Bestehendes DefaultKonto bleibt Standard.
+                        // Abweichendes Konto wird als Sonderregel gelernt.
+                        if (!adr.DefaultKontoId.HasValue || adr.DefaultKontoId.Value <= 0)
                         {
                             adr.DefaultKontoId = kontoId;
                             _db.AktualisiereAdresse(adr);
+                        }
+                        else if (adr.DefaultKontoId.Value != kontoId.Value)
+                        {
+                            regelSpeichern = true;
+                            regelKontoId = kontoId.Value;
                         }
                     }
                 }
@@ -232,27 +257,28 @@ namespace MyCoinFlow.Views
 
                 // ---------------------------------------------
                 // NEU:
-                // Buchungsregel für diese Adresse speichern
-                // Damit gleiche Adresse je nach Buchungstext
-                // auf unterschiedliche Konten gelernt werden kann.
+                // Sonderregel nur dann speichern, wenn bestehende
+                // Adresse bereits ein anderes Standardkonto hat.
                 // ---------------------------------------------
-                if (SelectedAdresseId.HasValue && SelectedKontoId.HasValue)
+                if (SelectedAdresseId.HasValue && regelSpeichern && regelKontoId.HasValue)
                 {
                     var regelText = BuildAliasCandidate(_item.Text, _item.ServiceRef);
 
-                    // Fallback: wenn kein kompakter Kandidat gebildet werden kann,
-                    // nehmen wir den ganzen Buchungstext (getrimmt).
                     if (string.IsNullOrWhiteSpace(regelText))
                         regelText = string.IsNullOrWhiteSpace(_item.Text) ? null : _item.Text.Trim();
 
                     if (!string.IsNullOrWhiteSpace(regelText))
                     {
+                        var betragAbs = Math.Abs(_item.Amount);
+
                         _db.SpeichereAdressBuchungsregel(
                             adresseId: SelectedAdresseId.Value,
                             istEinnahme: istEinnahme,
                             textPattern: regelText,
                             patternModus: "Contains",
-                            kontoId: SelectedKontoId.Value,
+                            kontoId: regelKontoId.Value,
+                            betragVon: betragAbs,
+                            betragBis: betragAbs,
                             prioritaet: 100
                         );
                     }
