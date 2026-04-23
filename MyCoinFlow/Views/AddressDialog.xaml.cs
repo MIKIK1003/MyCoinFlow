@@ -1,14 +1,17 @@
-﻿using System.Windows;
-using System.Windows.Controls;
-using MyCoinFlow.Models;
+﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base; // NEU: BaseWindow einbinden
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class AddressDialog : Window
+    public partial class AddressDialog : BaseWindow // NEU: BaseWindow statt Window
     {
         private readonly DatabaseService _db = new();
-        private readonly int? _adresseId;   // merken, welche Adresse wir bearbeiten
+        private readonly int? _adresseId;   // merkt, welche Adresse bearbeitet wird
 
         public Adresse? Ergebnis { get; private set; }
 
@@ -19,11 +22,11 @@ namespace MyCoinFlow.Views
             // Id merken (falls Bearbeitung)
             _adresseId = vorlage?.Id;
 
-            // UI-Events
+            // UI-Events für Budget-Checkbox
             IstBudgetiertCheck.Checked += (_, __) => RefreshBudgetUi();
             IstBudgetiertCheck.Unchecked += (_, __) => RefreshBudgetUi();
 
-            // Alles erst befüllen, wenn das Fenster geladen ist (dann existieren alle Controls)
+            // Initialisierung erst nach Laden des Fensters
             Loaded += AddressDialog_Loaded;
         }
 
@@ -31,15 +34,15 @@ namespace MyCoinFlow.Views
         {
             try
             {
-                // 1) Kontoliste laden (muss VOR dem Setzen von SelectedValue passieren)
+                // Kontoliste laden (muss vor SelectedValue erfolgen)
                 StandardEinnahmenKontoBox.ItemsSource = _db.LadeKontoLookup();
 
-                // 2) Falls Bearbeitung: frische Daten aus DB holen (nicht die alte Vorlage verwenden!)
+                // Falls Bearbeitung → aktuelle Daten aus DB holen
                 Adresse? src = null;
                 if (_adresseId.HasValue)
                     src = _db.HoleAdresse(_adresseId.Value);
 
-                // 3) UI-Felder befüllen
+                // UI befüllen
                 if (src != null)
                 {
                     NameBox.Text = src.Name;
@@ -56,7 +59,7 @@ namespace MyCoinFlow.Views
                     if (src.StandardEinnahmenKontoId.HasValue)
                         StandardEinnahmenKontoBox.SelectedValue = src.StandardEinnahmenKontoId.Value;
 
-                    // Ergebnis-Objekt mit Id anlegen (Rest wird bei OK neu gesetzt)
+                    // Ergebnisobjekt vorbereiten
                     Ergebnis = new Adresse { Id = src.Id };
                 }
 
@@ -70,7 +73,7 @@ namespace MyCoinFlow.Views
         }
 
         /// <summary>
-        /// Aktiviert/deaktiviert die Konto-Combo je nach Checkbox.
+        /// Aktiviert / deaktiviert Kontoauswahl je nach Budget-Checkbox
         /// </summary>
         private void RefreshBudgetUi()
         {
@@ -89,7 +92,8 @@ namespace MyCoinFlow.Views
             }
 
             Ergebnis ??= new Adresse();
-            if (_adresseId.HasValue) Ergebnis.Id = _adresseId.Value;
+            if (_adresseId.HasValue)
+                Ergebnis.Id = _adresseId.Value;
 
             Ergebnis.Name = NameBox.Text.Trim();
             Ergebnis.Strasse = TrimOrNull(StrasseBox.Text);
@@ -98,21 +102,23 @@ namespace MyCoinFlow.Views
             Ergebnis.Land = TrimOrNull(LandBox.Text);
             Ergebnis.Typ = TrimOrNull(TypBox.Text);
 
-            // IBAN: Leerzeichen entfernen + Uppercase, leer => null
+            // IBAN normalisieren
             var iban = TrimOrNull(IbanBox.Text);
-            Ergebnis.IBAN = string.IsNullOrEmpty(iban) ? null : iban.Replace(" ", "").ToUpperInvariant();
+            Ergebnis.IBAN = string.IsNullOrEmpty(iban)
+                ? null
+                : iban.Replace(" ", "").ToUpperInvariant();
 
             Ergebnis.Notiz = TrimOrNull(NotizBox.Text);
 
-            // NEU: Budget-Flag + optionales Standardkonto
+            // Budget-Logik
             Ergebnis.IstBudgetiert = IstBudgetiertCheck.IsChecked == true;
 
             int? stdKontoId = null;
             if (StandardEinnahmenKontoBox.SelectedValue is int id)
                 stdKontoId = id;
 
-            // Nur setzen, wenn budgetiert; sonst bewusst null (kein Budgetfluss)
-            Ergebnis.StandardEinnahmenKontoId = Ergebnis.IstBudgetiert ? stdKontoId : null;
+            Ergebnis.StandardEinnahmenKontoId =
+                Ergebnis.IstBudgetiert ? stdKontoId : null;
 
             DialogResult = true;
             Close();

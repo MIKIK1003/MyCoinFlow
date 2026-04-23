@@ -5,10 +5,11 @@ using System.Windows;
 using System.Windows.Controls;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
 
 namespace MyCoinFlow.Views
 {
-    public partial class TransactionsDialog : Window
+    public partial class TransactionsDialog : BaseWindow
     {
         private readonly DatabaseService _db = new();
 

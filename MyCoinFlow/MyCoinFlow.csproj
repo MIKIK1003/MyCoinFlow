@@ -16,6 +16,10 @@
   <ItemGroup>
     <None Remove="Assets\Icons\piggybank.ico" />
    </ItemGroup>
+	
+<ItemGroup>
+  <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+</ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />

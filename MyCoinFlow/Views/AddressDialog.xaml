@@ -1,7 +1,8 @@
-﻿<Window x:Class="MyCoinFlow.Views.AddressDialog"
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.AddressDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Adresse" Height="460" Width="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
@@ -63,13 +64,11 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Checkbox -->
             <CheckBox x:Name="IstBudgetiertCheck"
                       Grid.Row="0"
                       Content="Reine Standard-Einnahmen Adresse->Bank mit Standard-Einnahmenkonto"
                       Margin="0,0,0,8"/>
 
-            <!-- Label + ComboBox -->
             <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,0,0,12">
                 <TextBlock Text="Standard-Einnahmenkonto (optional)" Margin="0,0,0,4"/>
                 <ComboBox x:Name="StandardEinnahmenKontoBox"
@@ -79,8 +78,7 @@
                           MinWidth="280"/>
             </StackPanel>
 
-            <!-- Buttons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" >
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Style="{StaticResource IconTextButton}"
                         Tag="Close"
                         Content="Abbrechen"
@@ -94,4 +92,4 @@
             </StackPanel>
         </Grid>
     </Grid>
-</Window>
+</base:BaseWindow>
