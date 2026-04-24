@@ -2,15 +2,17 @@
 using System.Globalization;
 using System.Linq;
 using System.Printing;
+using MyCoinFlow.ViewModels;
+using MyCoinFlow.UI.Base; // NEU
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using MyCoinFlow.ViewModels;
+using MessageBox = System.Windows.MessageBox; // Fix Mehrdeutigkeit
 
 namespace MyCoinFlow.Views
 {
-    public partial class KontoTransaktionenWindow : Window
+    public partial class KontoTransaktionenWindow : BaseWindow // NEU
     {
         public KontoTransaktionenWindow(int kontoId, string kontoName)
         {
@@ -47,7 +49,6 @@ namespace MyCoinFlow.Views
         {
             try
             {
-                // 1) Selektion prüfen
                 if (TransGrid == null || TransGrid.SelectedItem is not KontoTransaktionenViewModel.Row row)
                 {
                     MessageBox.Show("Bitte zuerst eine Transaktion in der Liste auswählen.",
@@ -55,7 +56,6 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // 2) Vollständigen Transaktionssatz laden (für korrekte Vorbelegung im Dialog)
                 var db = new MyCoinFlow.Services.DatabaseService();
                 var t = db.HoleTransaktion(row.Id);
                 if (t == null)
@@ -65,7 +65,6 @@ namespace MyCoinFlow.Views
                     return;
                 }
 
-                // 3) Dialog wie im Transactions-Modul öffnen (Owner setzen, zentrieren)
                 var dlg = new TransactionsDialog(t);
 
                 Window? owner = null;
@@ -74,20 +73,17 @@ namespace MyCoinFlow.Views
                     owner = Application.Current?.Windows?.OfType<Window>()?.FirstOrDefault(w => w.IsActive)
                          ?? Application.Current?.MainWindow;
                 }
-                catch { /* still */ }
+                catch { }
 
                 if (owner != null && !ReferenceEquals(owner, dlg))
                     dlg.Owner = owner;
                 else
                     dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-                // 4) Bei Erfolg: Liste/Label neu aufbauen
                 if (dlg.ShowDialog() == true)
                 {
-                    // Deine VM hat Commands/PropertyChanged verkabelt; ApplyFilter lädt sicher erneut.
                     VM.ApplyFilterCommand?.Execute(null);
 
-                    // Bonus: Position / Auswahl beibehalten (best effort)
                     foreach (var it in TransGrid.Items)
                     {
                         if (it is KontoTransaktionenViewModel.Row r && r.Id == row.Id)
@@ -105,6 +101,7 @@ namespace MyCoinFlow.Views
                     "Bearbeiten", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private FlowDocument BuildFlowDocumentForPrint(double printableWidth, double printableHeight)
         {

@@ -1,9 +1,11 @@
-﻿using System.Windows;
-using MyCoinFlow.Models;
+﻿using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base; // NEU
+using System.Windows;
+using MessageBox = System.Windows.MessageBox; // Fix Mehrdeutigkeit
 
 namespace MyCoinFlow.Views
 {
-    public partial class LiegenschaftNeuDialog : Window
+    public partial class LiegenschaftNeuDialog : BaseWindow // NEU
     {
         public StweLiegenschaft Model { get; } = new();
 
@@ -14,7 +16,7 @@ namespace MyCoinFlow.Views
 
             Loaded += (_, __) =>
             {
-                try { NameBox?.Focus(); } catch { /* still */ }
+                try { NameBox?.Focus(); } catch { }
             };
         }
 
