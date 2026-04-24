@@ -1,14 +1,15 @@
-﻿<Window x:Class="MyCoinFlow.Views.AttachmentsDialog"
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.AttachmentsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Anhänge verwalten"
         Height="420" Width="640"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False">
+
     <Window.Resources>
-        <!-- Für Sichtbarkeit des Lösch-Buttons je nach AllowDelete -->
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
 
@@ -38,32 +39,29 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <!-- ÖFFNEN: nur sichtbar, wenn AllowDelete == false (also NICHT aus "Verwalten" geöffnet) -->
-                                <Button x:Name="OpenBtn"
-                    Style="{StaticResource IconTextButton}"
-                    Tag="FileEye"
-                    Content="Öffnen"
-                    Margin="0,0,8,0"
-                    Click="Open_Click"/>
 
-                                <!-- LÖSCHEN: bleibt wie bisher an AllowDelete gebunden -->
+                                <Button x:Name="OpenBtn"
+                                        Style="{StaticResource IconTextButton}"
+                                        Tag="FileEye"
+                                        Content="Öffnen"
+                                        Margin="0,0,8,0"
+                                        Click="Open_Click"/>
+
                                 <Button Style="{StaticResource IconTextButton.Danger}"
-                    Tag="Delete"
-                    Content="Löschen"
-                    Visibility="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete, Converter={StaticResource BoolToVis}}"
-                    Click="Delete_Click"/>
+                                        Tag="Delete"
+                                        Content="Löschen"
+                                        Visibility="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete, Converter={StaticResource BoolToVis}}"
+                                        Click="Delete_Click"/>
                             </StackPanel>
 
-                            <!-- NEU: OpenBtn ausblenden, wenn AllowDelete == true (drei Punkte / Verwalten) -->
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete}"
-                         Value="True">
+                                             Value="True">
                                     <Setter TargetName="OpenBtn" Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
-
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
@@ -72,4 +70,4 @@
             <Button Style="{StaticResource IconTextButton}" Tag="Close" Content="Schließen" IsDefault="True" Click="Close_Click"/>
         </StackPanel>
     </Grid>
-</Window>
+</base:BaseWindow>

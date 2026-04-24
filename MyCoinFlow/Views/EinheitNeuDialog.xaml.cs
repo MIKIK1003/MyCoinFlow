@@ -1,10 +1,12 @@
 ﻿using System.Globalization;
-using System.Windows;
 using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base; // NEU
+using System.Windows;
+using MessageBox = System.Windows.MessageBox; // Fix Mehrdeutigkeit
 
 namespace MyCoinFlow.Views
 {
-    public partial class EinheitNeuDialog : Window
+    public partial class EinheitNeuDialog : BaseWindow // NEU
     {
         public StweEinheit Model { get; } = new();
 
@@ -30,12 +32,12 @@ namespace MyCoinFlow.Views
             {
                 MessageBox.Show("Bitte eine Bezeichnung eingeben.", "Einheit",
                     MessageBoxButton.OK, MessageBoxImage.Information);
+
                 try { BezBox?.Focus(); } catch { }
                 return;
             }
 
-            // Zahlenfelder tolerant: Nutzer kann "12.5" oder "12,5" tippen
-            // (Optional: später schöner mit NumericUpDown, aber kein Gefrickel jetzt)
+            // Zahlenfelder bewusst tolerant (kein Parsing hier erzwungen)
             DialogResult = true;
         }
     }

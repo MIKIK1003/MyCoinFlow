@@ -1,9 +1,12 @@
-﻿using System.Windows;
-using MyCoinFlow.Models;
+﻿using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base; // NEU
+using System.Windows;
+using System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class EigentuemerNeuDialog : Window
+    public partial class EigentuemerNeuDialog : BaseWindow // NEU
     {
         public StweEigentuemer Model { get; } = new();
 

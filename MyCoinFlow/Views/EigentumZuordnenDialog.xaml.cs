@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using System.Windows;
 using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base; // NEU
+using System.Windows;
+using MessageBox = System.Windows.MessageBox; // Fix Mehrdeutigkeit
 
 namespace MyCoinFlow.Views
 {
-    public partial class EigentumZuordnenDialog : Window
+    public partial class EigentumZuordnenDialog : BaseWindow // NEU
     {
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
 
@@ -17,13 +19,20 @@ namespace MyCoinFlow.Views
         public EigentumZuordnenDialog(System.Collections.Generic.IEnumerable<StweEigentuemer> owners)
         {
             InitializeComponent();
-            foreach (var o in owners) Owners.Add(o);
+
+            foreach (var o in owners)
+                Owners.Add(o);
 
             DataContext = this;
-            Loaded += (_, __) => { try { OwnerBox?.Focus(); } catch { } };
+
+            Loaded += (_, __) =>
+            {
+                try { OwnerBox?.Focus(); } catch { }
+            };
         }
 
-        private void Abbrechen_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+        private void Abbrechen_Click(object sender, RoutedEventArgs e)
+            => DialogResult = false;
 
         private void Speichern_Click(object sender, RoutedEventArgs e)
         {

@@ -1,10 +1,10 @@
 ﻿using System.Windows;
 using MyCoinFlow.ViewModels;
-
+using MyCoinFlow.UI.Base; // NEU
 
 namespace MyCoinFlow.Views
 {
-    public partial class BudgetDetailWindow : Window
+    public partial class BudgetDetailWindow : BaseWindow // NEU
     {
         private readonly BudgetDetailViewModel _vm;
 
@@ -15,14 +15,13 @@ namespace MyCoinFlow.Views
             // EIN gemeinsames ViewModel für das ganze Fenster
             _vm = new BudgetDetailViewModel(zeitraumId);
 
-            // WICHTIG: Den DataContext direkt auf die View setzen,
-            // nicht (nur) aufs Window.
+            // DataContext direkt auf View setzen (gewollt)
             RootView.DataContext = _vm;
 
-            // Optionaler Fallback: Beim Schließen alles speichern
+            // Beim Schließen automatisch speichern
             this.Closing += (s, e) =>
             {
-                _vm.SaveAll(); // jetzt public, kein Reflection mehr nötig
+                _vm.SaveAll();
             };
         }
     }

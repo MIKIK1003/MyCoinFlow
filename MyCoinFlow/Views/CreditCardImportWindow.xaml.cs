@@ -1,14 +1,15 @@
 ﻿using System.Windows;
 using MyCoinFlow.ViewModels;
+using MyCoinFlow.UI.Base; // NEU
 
 namespace MyCoinFlow.Views
 {
-    public partial class CreditCardImportWindow : Window
+    public partial class CreditCardImportWindow : BaseWindow // NEU
     {
         public CreditCardImportWindow()
         {
             InitializeComponent();
-            DataContext = new CreditCardImportViewModel(); // reines Mock-VM (siehe unten)
+            DataContext = new CreditCardImportViewModel(); // unverändert
         }
     }
 }

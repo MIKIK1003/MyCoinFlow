@@ -4,24 +4,23 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base; // NEU
+using MessageBox = System.Windows.MessageBox; // NEU (Konflikt vermeiden)
 
 namespace MyCoinFlow.Views
 {
-    public partial class AttachmentsDialog : Window
+    public partial class AttachmentsDialog : BaseWindow // NEU
     {
         private readonly int _transaktionId;
         private readonly DatabaseService _db = new();
         private readonly AttachmentService _svc = new();
 
-        // Steuert, ob Löschen-Buttons sichtbar sind (Open-Only vs. Verwalten)
         public bool AllowDelete { get; }
 
         private bool _changed;
 
-        // Standard: Verwalten (mit Löschen)
         public AttachmentsDialog(int transaktionId) : this(transaktionId, true) { }
 
-        // Neu: frei wählbar, z. B. AllowDelete=false beim Öffnen aus der Liste
         public AttachmentsDialog(int transaktionId, bool allowDelete)
         {
             _transaktionId = transaktionId;
@@ -100,7 +99,7 @@ namespace MyCoinFlow.Views
 
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (!AllowDelete) return; // sicherheitshalber
+            if (!AllowDelete) return;
 
             if (GridFiles.SelectedItem is not Row row) return;
 
@@ -117,7 +116,6 @@ namespace MyCoinFlow.Views
                 _changed = true;
                 LoadList();
 
-                // wenn leer -> Dialog schließen (komfortabel)
                 if ((GridFiles.Items?.Count ?? 0) == 0)
                 {
                     this.DialogResult = true;

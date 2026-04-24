@@ -1,8 +1,9 @@
 ﻿using System.Windows;
+using MyCoinFlow.UI.Base; // NEU
 
 namespace MyCoinFlow.Views
 {
-    public partial class BudgetzeitraumDialog : Window
+    public partial class BudgetzeitraumDialog : BaseWindow // NEU
     {
         public BudgetzeitraumDialog()
         {

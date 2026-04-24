@@ -1,10 +1,12 @@
-﻿<Window x:Class="MyCoinFlow.Views.CreditCardImportWindow"
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.CreditCardImportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:MyCoinFlow.Views"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Kreditkarten-Import"
         Width="1100" Height="700"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterOwner">
+
     <local:CreditCardImportView/>
-</Window>
+</base:BaseWindow>

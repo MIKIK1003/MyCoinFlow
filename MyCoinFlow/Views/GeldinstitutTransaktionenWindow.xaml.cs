@@ -7,10 +7,12 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using MyCoinFlow.ViewModels;
+using MyCoinFlow.UI.Base; // NEU
+using MessageBox = System.Windows.MessageBox; // Fix Mehrdeutigkeit
 
 namespace MyCoinFlow.Views
 {
-    public partial class GeldinstitutTransaktionenWindow : Window
+    public partial class GeldinstitutTransaktionenWindow : BaseWindow // NEU
     {
         public GeldinstitutTransaktionenWindow(int geldinstitutId, string geldinstitutName)
         {
@@ -29,17 +31,14 @@ namespace MyCoinFlow.Views
                 var dlg = new PrintDialog();
                 if (dlg.ShowDialog() != true) return;
 
-                // Querformat A4
                 if (dlg.PrintTicket != null)
                     dlg.PrintTicket.PageOrientation = PageOrientation.Landscape;
 
-                // Dokument ERST nach Kenntnis der druckbaren Fläche bauen
                 var doc = BuildFlowDocumentForPrint(
                     dlg.PrintableAreaWidth,
                     dlg.PrintableAreaHeight
                 );
 
-                // Drucken
                 IDocumentPaginatorSource dps = doc;
                 dlg.PrintDocument(dps.DocumentPaginator, "Geldinstitut-Transaktionen");
             }
