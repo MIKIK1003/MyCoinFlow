@@ -14,7 +14,6 @@ namespace MyCoinFlow.Services
         private static readonly string _file =
             Path.Combine(_folder, "windowstate.json");
 
-        // Umbenannt → kein Konflikt mehr mit System.Windows.WindowState
         private class WindowPlacement
         {
             public double Top { get; set; }
@@ -57,7 +56,7 @@ namespace MyCoinFlow.Services
             }
             catch
             {
-                // bewusst leer – UI darf nie crashen wegen State
+                // UI darf nie crashen
             }
         }
 
@@ -68,7 +67,6 @@ namespace MyCoinFlow.Services
                 if (window == null)
                     return;
 
-                // Nur speichern wenn Fenster im normalen Zustand ist
                 if (window.WindowState != System.Windows.WindowState.Normal)
                     return;
 
@@ -87,7 +85,6 @@ namespace MyCoinFlow.Services
             }
             catch
             {
-                // kein Crash
             }
         }
 
@@ -106,7 +103,10 @@ namespace MyCoinFlow.Services
 
                 var state = all[key];
 
-                // Nur anwenden wenn noch sichtbar auf einem Screen
+                // 🔴 NEU: harte Plausibilitätsprüfung
+                if (!IsValidSize(state))
+                    return;
+
                 if (IsVisibleOnAnyScreen(state))
                 {
                     window.Top = state.Top;
@@ -117,8 +117,28 @@ namespace MyCoinFlow.Services
             }
             catch
             {
-                // kein Crash
             }
+        }
+
+        // 🔴 NEU
+        private static bool IsValidSize(WindowPlacement s)
+        {
+            // Minimum sinnvoll
+            if (s.Width < 300 || s.Height < 200)
+                return false;
+
+            // Maximum sinnvoll (Schutz vor „explodierten“ Werten)
+            if (s.Width > 2000 || s.Height > 1500)
+                return false;
+
+            // NaN / Infinity Schutz
+            if (double.IsNaN(s.Width) || double.IsNaN(s.Height))
+                return false;
+
+            if (double.IsInfinity(s.Width) || double.IsInfinity(s.Height))
+                return false;
+
+            return true;
         }
 
         private static bool IsVisibleOnAnyScreen(WindowPlacement state)

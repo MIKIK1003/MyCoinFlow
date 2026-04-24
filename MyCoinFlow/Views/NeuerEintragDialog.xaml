@@ -1,52 +1,40 @@
-﻿<Window x:Class="MyCoinFlow.Views.NeuerEintragDialog"
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.NeuerEintragDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Neuer Kontoplan-Eintrag"
         Height="460" Width="520"
-        WindowStartupLocation="CenterOwner"
+        WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         Background="{DynamicResource MaterialDesignPaper}">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <!-- Formular -->
             <RowDefinition Height="Auto"/>
-            <!-- Footer -->
         </Grid.RowDefinitions>
 
         <!-- Formular -->
         <Grid Grid.Row="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <!-- Kontonummer -->
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <!-- Art -->
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <!-- Gruppe -->
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <!-- Untergruppe -->
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <!-- Detail -->
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Kontonummer -->
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Kontonummer:" Margin="0,0,10,8" VerticalAlignment="Center"/>
             <TextBox x:Name="KontonummerBox"
                      Grid.Row="0" Grid.Column="1"
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
                      Margin="0,0,0,8"/>
 
-            <!-- Art -->
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Art:" Margin="0,0,10,8" VerticalAlignment="Center"/>
             <ComboBox x:Name="ArtComboBox"
                       Grid.Row="1" Grid.Column="1"
@@ -55,7 +43,6 @@
                       SelectedIndex="0"
                       Margin="0,0,0,8"/>
 
-            <!-- Gruppe -->
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Gruppe:" Margin="0,0,10,8" VerticalAlignment="Center"/>
             <ComboBox x:Name="GruppeComboBox"
                       Grid.Row="2" Grid.Column="1"
@@ -64,7 +51,6 @@
                       SelectedIndex="0"
                       Margin="0,0,0,8"/>
 
-            <!-- Untergruppe -->
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Untergruppe:" Margin="0,0,10,8" VerticalAlignment="Center"/>
             <ComboBox x:Name="UntergruppeComboBox"
                       Grid.Row="3" Grid.Column="1"
@@ -73,14 +59,13 @@
                       SelectedIndex="0"
                       Margin="0,0,0,8"/>
 
-            <!-- Detail -->
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Detail:" Margin="0,0,10,0" VerticalAlignment="Center"/>
             <TextBox x:Name="DetailBox"
                      Grid.Row="4" Grid.Column="1"
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
         </Grid>
 
-        <!-- Footer-Buttons -->
+        <!-- Footer -->
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
@@ -100,4 +85,4 @@
                     Click="Abbrechen_Click"/>
         </StackPanel>
     </Grid>
-</Window>
+</base:BaseWindow>

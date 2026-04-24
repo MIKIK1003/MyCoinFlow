@@ -1,14 +1,15 @@
 ﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base; // NEU
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class NeuerEintragDialog : Window
+    public partial class NeuerEintragDialog : BaseWindow // NEU
     {
-        // Damit klar ist, ob ein neuer oder ein bestehender Eintrag bearbeitet wird
         private readonly KontoplanEintrag? _bearbeiteEintrag;
 
         public NeuerEintragDialog(KontoplanEintrag? eintrag = null)
@@ -19,7 +20,6 @@ namespace MyCoinFlow.Views
 
             if (_bearbeiteEintrag != null)
             {
-                // Felder vorausfüllen bei Bearbeiten
                 KontonummerBox.Text = _bearbeiteEintrag.Kontonummer.ToString();
                 ArtComboBox.SelectedItem = ArtComboBox.Items.Cast<KontenArt>().FirstOrDefault(a => a.Bezeichnung == _bearbeiteEintrag.Art);
                 GruppeComboBox.SelectedItem = GruppeComboBox.Items.Cast<KontenGruppe>().FirstOrDefault(g => g.Bezeichnung == _bearbeiteEintrag.Gruppe);
@@ -59,21 +59,19 @@ namespace MyCoinFlow.Views
 
             if (_bearbeiteEintrag == null)
             {
-                // Neuer Eintrag
                 db.NeuenKontoplanEintragSpeichern(kontonummer, art, gruppe, untergruppe, detail);
             }
             else
             {
-                // Bestehenden Eintrag aktualisieren
                 db.KontenplanEintragAktualisieren(_bearbeiteEintrag.Id, kontonummer, art, gruppe, untergruppe, detail);
             }
 
-            this.DialogResult = true;
+            DialogResult = true;
         }
 
         private void Abbrechen_Click(object sender, RoutedEventArgs e)
         {
-            this.DialogResult = false;
+            DialogResult = false;
         }
     }
 }
