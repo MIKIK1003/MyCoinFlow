@@ -6,10 +6,12 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base;
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class SchluesselZeilenDialog : Window, INotifyPropertyChanged
+    public partial class SchluesselZeilenDialog : BaseWindow, INotifyPropertyChanged
     {
         public sealed class RowVm : INotifyPropertyChanged
         {
@@ -36,6 +38,7 @@ namespace MyCoinFlow.Views
             }
 
             public event PropertyChangedEventHandler? PropertyChanged;
+
             private void OnPropertyChanged([CallerMemberName] string? name = null)
                 => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
@@ -55,7 +58,9 @@ namespace MyCoinFlow.Views
             InitializeComponent();
 
             TitleText = $"Schlüssel: {schluesselName} (Fix %)";
-            foreach (var o in owners) Owners.Add(o);
+
+            foreach (var o in owners)
+                Owners.Add(o);
 
             foreach (var e in existing)
             {
@@ -72,10 +77,8 @@ namespace MyCoinFlow.Views
             DataContext = this;
         }
 
-        // Wird beim Editieren im Grid aufgerufen -> SumInfo aktualisieren
         private void Grid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
-            // best effort: nach Edit aktualisieren
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 SyncOwnerNames();
@@ -85,7 +88,6 @@ namespace MyCoinFlow.Views
 
         private void AddRow_Click(object sender, RoutedEventArgs e)
         {
-            // WICHTIG: keine Vorauswahl -> EigentuemerId = 0
             Rows.Add(new RowVm
             {
                 EigentuemerId = 0,
@@ -157,7 +159,6 @@ namespace MyCoinFlow.Views
                 return false;
             }
 
-            // optional: doppelte Eigentümer verhindern (sauberer Schlüssel)
             var dup = Rows.GroupBy(r => r.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
             if (dup != null)
             {
@@ -175,6 +176,7 @@ namespace MyCoinFlow.Views
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }

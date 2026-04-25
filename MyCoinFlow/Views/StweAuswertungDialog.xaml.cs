@@ -1,6 +1,7 @@
 ﻿using MaterialDesignThemes.Wpf;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
 using MyCoinFlow.ViewModels;
 using System;
 using System.Collections.ObjectModel;
@@ -17,7 +18,7 @@ using System.Windows.Media.Imaging;
 
 namespace MyCoinFlow.Views
 {
-    public partial class StweAuswertungDialog : Window, INotifyPropertyChanged
+    public partial class StweAuswertungDialog : BaseWindow, INotifyPropertyChanged
     {
         private readonly DatabaseService _db = new();
         private readonly StweLiegenschaft _liegenschaft;

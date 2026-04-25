@@ -1,8 +1,11 @@
-﻿using System.Windows;
+﻿using MyCoinFlow.UI.Base; // NEU
+using System.Windows;
+using System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class SchluesselUmbenennenDialog : Window
+    public partial class SchluesselUmbenennenDialog : BaseWindow // NEU
     {
         public string AlteBezeichnung { get; }
         public string NeueBezeichnung { get; set; }

@@ -1,5 +1,6 @@
 ﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,7 +13,7 @@ using System.Windows;
 
 namespace MyCoinFlow.Views
 {
-    public partial class SetVerteilenDialog : Window, INotifyPropertyChanged
+    public partial class SetVerteilenDialog : BaseWindow, INotifyPropertyChanged
     {
         // ===== Row VM (Verteilzeilen) =====
         public sealed class RowVm : INotifyPropertyChanged
@@ -23,6 +24,8 @@ namespace MyCoinFlow.Views
             private string? _notiz;
             private string _source = "MANUELL";
             
+
+
 
             public int? EigentuemerId
             {
@@ -218,6 +221,13 @@ namespace MyCoinFlow.Views
         public SetVerteilenDialog(StweSetRow setRow)
         {
             InitializeComponent();
+
+            PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == System.Windows.Input.Key.Enter)
+                    e.Handled = false;
+            };
+
             _set = setRow ?? throw new ArgumentNullException(nameof(setRow));
 
             HeaderText = $"{_set.Datum:yyyy-MM-dd}  |  {_set.Titel}";

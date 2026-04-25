@@ -1,11 +1,13 @@
-﻿<Window x:Class="MyCoinFlow.Views.SchluesselZeilenDialog"
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.SchluesselZeilenDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Schlüssel-Zeilen bearbeiten"
         Width="900"
         Height="650"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="Manual"
+        ResizeMode="CanResize">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -43,7 +45,6 @@
                   CellEditEnding="Grid_CellEditEnding">
             <DataGrid.Columns>
 
-                <!-- Eigentümer: TemplateColumn, ItemsSource sauber via Window.DataContext -->
                 <DataGridTemplateColumn Header="Eigentümer" Width="2*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -89,4 +90,4 @@
             </StackPanel>
         </DockPanel>
     </Grid>
-</Window>
+</base:BaseWindow>

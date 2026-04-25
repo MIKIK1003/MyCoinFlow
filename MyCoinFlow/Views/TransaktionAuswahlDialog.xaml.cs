@@ -1,12 +1,13 @@
-﻿using System.Collections.ObjectModel;
+﻿using MyCoinFlow.Models;
+using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
-using MyCoinFlow.Models;
-using MyCoinFlow.Services;
 
 namespace MyCoinFlow.Views
 {
-    public partial class TransaktionAuswahlDialog : Window
+    public partial class TransaktionAuswahlDialog : BaseWindow
     {
         public ObservableCollection<Transaktion> Rows { get; } = new();
         public Transaktion? SelectedRow { get; set; }
@@ -25,6 +26,12 @@ namespace MyCoinFlow.Views
 
         private void Abbrechen_Click(object sender, RoutedEventArgs e)
             => DialogResult = false;
+
+        private void Grid_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (SelectedRow != null)
+                DialogResult = true;
+        }
 
         private void Uebernehmen_Click(object sender, RoutedEventArgs e)
         {

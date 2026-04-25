@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Windows;
 using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base; // NEU
+using MessageBox = System.Windows.MessageBox;
 
 namespace MyCoinFlow.Views
 {
-    public partial class SchluesselNeuDialog : Window
+    public partial class SchluesselNeuDialog : BaseWindow // NEU
     {
         public StweSchluessel Model { get; } = new();
 
@@ -24,7 +26,6 @@ namespace MyCoinFlow.Views
 
         private void Speichern_Click(object sender, RoutedEventArgs e)
         {
-            // ✅ Robust: TextBox-Text immer in Model übernehmen (verhindert Binding/Focus-Effekte)
             Model.Name = (NameBox?.Text ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(Model.Name))

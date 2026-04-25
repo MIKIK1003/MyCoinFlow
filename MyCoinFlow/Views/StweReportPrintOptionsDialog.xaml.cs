@@ -1,9 +1,10 @@
-﻿using System.Windows;
-using MyCoinFlow.Models;
+﻿using MyCoinFlow.Models;
+using MyCoinFlow.UI.Base;
+using System.Windows;
 
 namespace MyCoinFlow.Views
 {
-    public partial class StweReportPrintOptionsDialog : Window
+    public partial class StweReportPrintOptionsDialog : BaseWindow
     {
         public StweReportPrintOptions Options { get; }
 
