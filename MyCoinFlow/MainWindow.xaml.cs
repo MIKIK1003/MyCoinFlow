@@ -1,5 +1,6 @@
 ﻿using MyCoinFlow.Services;
 using MyCoinFlow.Services.Update;
+using MyCoinFlow.UI.Base;
 using MyCoinFlow.ViewModels;
 using System;
 using System.Diagnostics;
@@ -10,8 +11,11 @@ using System.Windows;
 
 namespace MyCoinFlow
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : BaseWindow
     {
+
+        protected override bool AllowEscapeClose => false;
+
         public string VersionText { get; private set; } = "v0.0.0.0";
 
         public MainWindow()
@@ -31,6 +35,19 @@ namespace MyCoinFlow
                     ExitButton.Click += (_, __) => Application.Current?.Shutdown();
             }
             catch { }
+
+            // ✅ ESC im MainWindow hart unterdrücken (überschreibt BaseWindow!)
+            this.AddHandler(
+                System.Windows.UIElement.PreviewKeyDownEvent,
+                new System.Windows.Input.KeyEventHandler((s, e) =>
+                {
+                    if (e.Key == System.Windows.Input.Key.Escape)
+                    {
+                        e.Handled = true;
+                    }
+                }),
+                true // WICHTIG: handledEventsToo
+            );
 
             // ✅ PLUS/BASIC anwenden (2 Buttons links)
             ApplyEditionVisibility();

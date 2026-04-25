@@ -1,8 +1,9 @@
 ﻿using System.Windows;
+using MyCoinFlow.UI.Base;
 
 namespace MyCoinFlow.Views
 {
-    public partial class ZaehlerdatenWindow : Window
+    public partial class ZaehlerdatenWindow : BaseWindow
     {
         public ZaehlerdatenWindow()
         {

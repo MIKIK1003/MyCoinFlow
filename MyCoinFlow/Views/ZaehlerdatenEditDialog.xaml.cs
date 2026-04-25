@@ -1,5 +1,6 @@
 ﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,7 +13,7 @@ using System.Windows;
 
 namespace MyCoinFlow.Views
 {
-    public partial class ZaehlerdatenEditDialog : Window, INotifyPropertyChanged
+    public partial class ZaehlerdatenEditDialog : BaseWindow, INotifyPropertyChanged
     {
         private readonly DatabaseService _db = new();
 

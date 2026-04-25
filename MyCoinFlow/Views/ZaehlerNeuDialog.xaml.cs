@@ -1,5 +1,6 @@
 ﻿using MyCoinFlow.Models;
 using MyCoinFlow.Services;
+using MyCoinFlow.UI.Base;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,14 +11,13 @@ using System.Windows;
 
 namespace MyCoinFlow.Views
 {
-    public partial class ZaehlerNeuDialog : Window, INotifyPropertyChanged
+    public partial class ZaehlerNeuDialog : BaseWindow, INotifyPropertyChanged
     {
         private readonly DatabaseService _db = new();
         private readonly DateTime _stichtag;
 
         public StweZaehler Model { get; } = new();
 
-        // Wird vom Caller nach dem Dialog gespeichert (Replace)
         public List<(int EigentuemerId, decimal AnteilProzent)> ResultLines { get; private set; } = new();
 
         private readonly ObservableCollection<StweEigentuemer> _owners = new();
@@ -62,7 +62,6 @@ namespace MyCoinFlow.Views
                     Model.EinheitId = null;
                 }
 
-                // Best-Workflow: bei DIREKT ggf. 100%-Zeile automatisch setzen
                 EnsureDirectAutoLinesIfPossible();
             }
         }
@@ -77,7 +76,6 @@ namespace MyCoinFlow.Views
                 OnPropertyChanged();
                 Model.EinheitId = _selectedEinheit?.Id;
 
-                // Best-Workflow: bei DIREKT + Einheit ggf. 100%-Zeile automatisch setzen
                 EnsureDirectAutoLinesIfPossible();
             }
         }
@@ -85,10 +83,6 @@ namespace MyCoinFlow.Views
         public bool IsEinheitEnabled => string.Equals(SelectedTyp, "DIREKT", StringComparison.OrdinalIgnoreCase);
         public double EinheitOpacity => IsEinheitEnabled ? 1.0 : 0.5;
 
-        /// <summary>
-        /// Stichtag wird für die automatische Eigentümer-Ermittlung bei DIREKT-Zählern verwendet.
-        /// Best-Workflow: Heute.
-        /// </summary>
         public ZaehlerNeuDialog(int liegenschaftId,
                                 DateTime stichtag,
                                 ObservableCollection<StweEinheit> einheiten,
@@ -115,11 +109,9 @@ namespace MyCoinFlow.Views
             DataContext = this;
             OnPropertyChanged(nameof(LinesInfo));
 
-            // falls DIREKT+Einheit bereits vorbelegt wäre
             EnsureDirectAutoLinesIfPossible();
         }
 
-        // Für Bearbeiten: Model-Werte übernehmen
         public void SetModel(StweZaehler existing)
         {
             if (existing == null) return;
@@ -140,7 +132,6 @@ namespace MyCoinFlow.Views
 
             OnPropertyChanged(nameof(HeaderText));
 
-            // Bei Bearbeiten nie überschreiben, falls Zeilen existieren – Methode ist defensiv.
             EnsureDirectAutoLinesIfPossible();
         }
 
@@ -153,7 +144,6 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // SchluesselZeilenDialog erwartet StweSchluesselLine – wir mappen die Zählerzeilen darauf.
             var existing = ResultLines.Select(x => new StweSchluesselLine
             {
                 SchluesselId = 0,
@@ -218,12 +208,8 @@ namespace MyCoinFlow.Views
                 Model.EinheitId = null;
             }
 
-            // Best-Workflow: falls DIREKT + Einheit, aber User hat keine Zeilen erfasst -> automatisch setzen
             EnsureDirectAutoLinesIfPossible();
 
-            // Verteilzeilen:
-            // - EVU: keine Zeilen nötig (nur Statistik / Referenz)
-            // - alle anderen: Zeilen Pflicht (Summe 100%)
             if (!string.Equals(Model.Typ, "EVU", StringComparison.OrdinalIgnoreCase))
             {
                 if (ResultLines.Count == 0)
@@ -241,7 +227,6 @@ namespace MyCoinFlow.Views
                     return false;
                 }
 
-                // Doppelte Eigentümer verhindern
                 var dupOwner = ResultLines.GroupBy(x => x.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
                 if (dupOwner != null)
                 {
@@ -254,12 +239,6 @@ namespace MyCoinFlow.Views
             return true;
         }
 
-        /// <summary>
-        /// Best-Workflow:
-        /// Wenn Typ DIREKT und Einheit gewählt ist, und noch keine Zeilen vorhanden sind,
-        /// dann setzen wir automatisch 100% auf den Eigentümer dieser Einheit am Stichtag.
-        /// Überschreibt nie bestehende Zeilen.
-        /// </summary>
         private void EnsureDirectAutoLinesIfPossible()
         {
             if (!string.Equals(Model.Typ, "DIREKT", StringComparison.OrdinalIgnoreCase))
@@ -268,7 +247,6 @@ namespace MyCoinFlow.Views
             if (!Model.EinheitId.HasValue || Model.EinheitId.Value <= 0)
                 return;
 
-            // User hat schon Zeilen erfasst -> nichts anfassen
             if (ResultLines != null && ResultLines.Count > 0)
                 return;
 

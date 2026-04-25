@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using MyCoinFlow.UI.Base;
 using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Windows;
@@ -12,7 +13,7 @@ using MyCoinFlow.Services;
 
 namespace MyCoinFlow.Views
 {
-    public partial class ZuordnungDialog : Window
+    public partial class ZuordnungDialog : BaseWindow
     {
         private readonly DatabaseService _db = new();
         private readonly BankImportItem _item;

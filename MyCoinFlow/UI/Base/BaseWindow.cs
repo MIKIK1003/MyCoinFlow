@@ -7,6 +7,9 @@ namespace MyCoinFlow.UI.Base
     // Basisklasse für alle Fenster
     public class BaseWindow : Window
     {
+        // ✅ NEU: Steuerung, ob ESC das Fenster schliessen darf
+        protected virtual bool AllowEscapeClose => true;
+
         public BaseWindow()
         {
             // Lifecycle Events
@@ -47,10 +50,12 @@ namespace MyCoinFlow.UI.Base
         {
             try
             {
-                // ESC → Fenster schliessen
+                // ESC → Fenster schliessen (nur wenn erlaubt)
                 if (e.Key == Key.Escape)
                 {
-                    Close();
+                    if (AllowEscapeClose)
+                        Close();
+
                     e.Handled = true;
                     return;
                 }
