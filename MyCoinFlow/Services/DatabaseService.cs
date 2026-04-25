@@ -5788,56 +5788,59 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             return list;
         }
 
-        public bool StweAutoDetectIsCreditForTransaktion(int transaktionId)
-        {
-            using var c = CreateConnection();
-            c.Open();
-
-            // Regel (NEU, nur für STWE-Set-Initialtyp):
-            // 1) Bank -> Konto (Von NULL, Nach NOT NULL) => Belastung (0), unabhängig von Adresse
-            // 2) Notiz == "Budgetierte Einnahme" => Gutschrift (1)
-            // 3) Konto -> Bank (Von NOT NULL, Nach NULL) => Gutschrift (1)
-            // 4) sonst => Belastung (0)
-            const string sql = @"
-SELECT TOP(1)
-    CASE 
-        WHEN t.VonKontoId IS NULL AND t.NachKontoId IS NOT NULL THEN 0 -- NEU: Bank -> Konto immer Belastung
-        WHEN LTRIM(RTRIM(ISNULL(t.Notiz,''))) = N'Budgetierte Einnahme' THEN 1 -- NEU: budgetierte Einnahme
-        WHEN t.VonKontoId IS NOT NULL AND t.NachKontoId IS NULL THEN 1 -- unverändert Idee: Rückvergütung etc.
-        ELSE 0
-    END AS IsCredit
-FROM dbo.Transaktion t
-WHERE t.Id = @id;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@id", transaktionId);
-
-            var v = cmd.ExecuteScalar();
-            return v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
-        }
-
+        
         public int StweSetInsert(int liegenschaftId, int transaktionId, string? titel)
         {
             EnsureStweSchema();
 
-            bool isCredit = false;
-            try
-            {
-                isCredit = StweAutoDetectIsCreditForTransaktion(transaktionId);
-            }
-            catch
-            {
-                // defensiv: Default bleibt Belastung
-                isCredit = false;
-            }
-
             using var c = CreateConnection();
             c.Open();
 
-            // Defensiver Doppelverarbeitungs-Schutz:
-            // - innerhalb einer serialisierbaren Transaktion prüfen
-            // - wenn bereits vorhanden: harte Exception (UI fängt ab)
+            bool isCredit = false;
+
+            try
+            {
+                const string sql = @"
+        SELECT TOP(1)
+            CASE 
+                -- 1) Bankimport (höchste Priorität)
+                WHEN iba.Direction = 'CRDT' THEN 1
+                WHEN iba.Direction = 'DBIT' THEN 0
+
+                -- 2) Einnahme über Kontenregel
+                WHEN nrr.Richtung = 'Einnahme' AND nrr.IstBudgetkonto = 1 THEN 1
+
+                -- 3) Rückfluss Konto -> Bank
+                WHEN t.VonKontoId IS NOT NULL AND t.NachKontoId IS NULL THEN 1
+
+                ELSE 0
+            END
+
+        FROM dbo.Transaktion t
+
+        LEFT JOIN dbo.BankImportItemArchive iba 
+            ON iba.BookedTransaktionId = t.Id
+
+        LEFT JOIN dbo.Kontenplan kn 
+            ON kn.Id = t.NachKontoId
+
+        LEFT JOIN dbo.NumberRangeRules nrr
+            ON kn.Kontonummer BETWEEN nrr.RangeStart AND nrr.RangeEnd
+
+        WHERE t.Id = @id;";
+
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = sql;
+                cmd.Parameters.AddWithValue("@id", transaktionId);
+
+                var v = cmd.ExecuteScalar();
+                isCredit = v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+            }
+            catch
+            {
+                isCredit = false;
+            }
+
             using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
 
             try
@@ -5883,10 +5886,11 @@ VALUES (@lid, @tid, @t, @ic);";
             }
             catch
             {
-                try { tx.Rollback(); } catch { /* defensiv */ }
+                try { tx.Rollback(); } catch { }
                 throw;
             }
         }
+
 
 
 
@@ -6835,8 +6839,6 @@ ORDER BY GueltigVon DESC, Id DESC;";
         }
 
 
-
-
         public List<MyCoinFlow.Models.StweOwnerSummaryRow> StweReportOwnerSummary(
     int liegenschaftId, DateTime? von, DateTime? bis)
         {
@@ -6847,19 +6849,30 @@ ORDER BY GueltigVon DESC, Id DESC;";
             c.Open();
 
             const string sql = @"
-SELECT
-    o.Id AS EigentuemerId,
-    o.Name AS EigentuemerName,
-    SUM(l.Betrag) AS Summe
-FROM dbo.StweSetLine l
-JOIN dbo.StweSet s           ON s.Id = l.SetId
-JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
-JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
-WHERE s.LiegenschaftId = @lid
-  AND (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
-GROUP BY o.Id, o.Name
-ORDER BY o.Name;";
+    SELECT
+        o.Id AS EigentuemerId,
+        o.Name AS EigentuemerName,
+
+        -- WICHTIG: Vorzeichen-Normalisierung über IsCredit
+        SUM(
+            CASE 
+                WHEN ISNULL(s.IsCredit, 0) = 1 
+                    THEN -ABS(l.Betrag)   -- Gutschrift = negativ
+                ELSE ABS(l.Betrag)        -- Belastung = positiv
+            END
+        ) AS Summe
+
+    FROM dbo.StweSetLine l
+    JOIN dbo.StweSet s           ON s.Id = l.SetId
+    JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
+    JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
+
+    WHERE s.LiegenschaftId = @lid
+      AND (@von IS NULL OR t.Datum >= @von)
+      AND (@bis IS NULL OR t.Datum <= @bis)
+
+    GROUP BY o.Id, o.Name
+    ORDER BY o.Name;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6875,7 +6888,7 @@ ORDER BY o.Name;";
                 {
                     EigentuemerId = r.GetInt32(0),
                     EigentuemerName = r.GetString(1),
-                    Summe = r.GetDecimal(2)
+                    Summe = r.IsDBNull(2) ? 0m : r.GetDecimal(2) // defensiv
                 });
             }
 
@@ -6892,25 +6905,42 @@ ORDER BY o.Name;";
             c.Open();
 
             const string sql = @"
-SELECT
-    o.Id AS EigentuemerId,
-    o.Name AS EigentuemerName,
-    SUM(l.Betrag) AS Summe
-FROM dbo.StweSetLine l
-JOIN dbo.StweSet s           ON s.Id = l.SetId
-JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
-JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
-LEFT JOIN dbo.Kontenplan kv  ON kv.Id = t.VonKontoId
-LEFT JOIN dbo.Kontenplan kn  ON kn.Id = t.NachKontoId
-WHERE s.LiegenschaftId = @lid
-  AND (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
-  AND (
-        (kn.Kontonummer BETWEEN @kStart AND @kEnd)
-     OR (kv.Kontonummer BETWEEN @kStart AND @kEnd)
-  )
-GROUP BY o.Id, o.Name
-ORDER BY o.Name;";
+    SELECT
+        o.Id AS EigentuemerId,
+        o.Name AS EigentuemerName,
+
+        -- Vorzeichen-Korrektur (identisch zur anderen Methode)
+        SUM(
+            CASE 
+                WHEN ISNULL(s.IsCredit, 0) = 1 
+                    THEN CASE 
+                            WHEN l.Betrag < 0 THEN l.Betrag 
+                            ELSE -l.Betrag 
+                         END
+                ELSE CASE 
+                        WHEN l.Betrag < 0 THEN -l.Betrag 
+                        ELSE l.Betrag 
+                     END
+            END
+        ) AS Summe
+
+    FROM dbo.StweSetLine l
+    JOIN dbo.StweSet s           ON s.Id = l.SetId
+    JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
+    JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
+    LEFT JOIN dbo.Kontenplan kv  ON kv.Id = t.VonKontoId
+    LEFT JOIN dbo.Kontenplan kn  ON kn.Id = t.NachKontoId
+
+    WHERE s.LiegenschaftId = @lid
+      AND (@von IS NULL OR t.Datum >= @von)
+      AND (@bis IS NULL OR t.Datum <= @bis)
+      AND (
+            (kn.Kontonummer BETWEEN @kStart AND @kEnd)
+         OR (kv.Kontonummer BETWEEN @kStart AND @kEnd)
+      )
+
+    GROUP BY o.Id, o.Name
+    ORDER BY o.Name;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6929,13 +6959,12 @@ ORDER BY o.Name;";
                 {
                     EigentuemerId = r.GetInt32(0),
                     EigentuemerName = r.GetString(1),
-                    Summe = r.GetDecimal(2)
+                    Summe = r.IsDBNull(2) ? 0m : r.GetDecimal(2)
                 });
             }
 
             return list;
         }
-
 
 
         public List<MyCoinFlow.Models.StweOwnerDetailRow> StweReportOwnerDetails(
@@ -6948,22 +6977,36 @@ ORDER BY o.Name;";
             c.Open();
 
             const string sql = @"
-SELECT
-    t.Datum,
-    s.Id AS SetId,
-    s.TransaktionId,
-    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
-    l.Schluessel,
-    l.Notiz,
-    l.Betrag
-FROM dbo.StweSetLine l
-JOIN dbo.StweSet s      ON s.Id = l.SetId
-JOIN dbo.Transaktion t  ON t.Id = s.TransaktionId
-WHERE s.LiegenschaftId = @lid
-  AND l.EigentuemerId = @oid
-  AND (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
-ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
+    SELECT
+        t.Datum,
+        s.Id AS SetId,
+        COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
+        l.Schluessel,
+        l.Notiz,
+
+        -- Vorzeichen-Korrektur (ohne ABS, stabil)
+        CASE 
+            WHEN ISNULL(s.IsCredit, 0) = 1 
+                THEN CASE 
+                        WHEN l.Betrag < 0 THEN l.Betrag 
+                        ELSE -l.Betrag 
+                     END
+            ELSE CASE 
+                    WHEN l.Betrag < 0 THEN -l.Betrag 
+                    ELSE l.Betrag 
+                 END
+        END AS Betrag
+
+    FROM dbo.StweSetLine l
+    JOIN dbo.StweSet s      ON s.Id = l.SetId
+    JOIN dbo.Transaktion t  ON t.Id = s.TransaktionId
+
+    WHERE s.LiegenschaftId = @lid
+      AND l.EigentuemerId = @oid
+      AND (@von IS NULL OR t.Datum >= @von)
+      AND (@bis IS NULL OR t.Datum <= @bis)
+
+    ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6980,16 +7023,16 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
                 {
                     Datum = r.GetDateTime(0),
                     SetId = r.GetInt32(1),
-                    TransaktionId = r.GetInt32(2),
-                    Titel = r.GetString(3),
-                    Schluessel = r.IsDBNull(4) ? null : r.GetString(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    Betrag = r.GetDecimal(6)
+                    Titel = r.GetString(2),
+                    Schluessel = r.IsDBNull(3) ? null : r.GetString(3),
+                    Notiz = r.IsDBNull(4) ? null : r.GetString(4),
+                    Betrag = r.IsDBNull(5) ? 0m : r.GetDecimal(5)
                 });
             }
 
             return list;
         }
+
 
         public List<StweOriginalTransaktionRow> StweReportOriginalTransaktionen(int liegenschaftId, DateTime? von, DateTime? bis)
         {
@@ -6999,17 +7042,17 @@ ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
 
             // SIGNED: Wenn Set.IsCredit=1 => Betrag negativ
             const string sql = @"
-SELECT DISTINCT
-    t.Id            AS TransaktionsId,
-    t.Datum         AS Datum,
-    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
-    t.Notiz         AS Notiz
-FROM dbo.StweSet s
-INNER JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
-WHERE s.LiegenschaftId = @LiegenschaftId
-  AND (@Von IS NULL OR t.Datum >= @Von)
-  AND (@Bis IS NULL OR t.Datum <= @Bis)
-ORDER BY t.Datum DESC, t.Id DESC;";
+            SELECT DISTINCT
+            t.Id            AS TransaktionsId,
+            t.Datum         AS Datum,
+            CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
+            t.Notiz         AS Notiz
+            FROM dbo.StweSet s
+            INNER JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+            WHERE s.LiegenschaftId = @LiegenschaftId
+            AND (@Von IS NULL OR t.Datum >= @Von)
+            AND (@Bis IS NULL OR t.Datum <= @Bis)
+            ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var con = new SqlConnection(_connectionString);
             con.Open();

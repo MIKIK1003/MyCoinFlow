@@ -26,6 +26,24 @@ namespace MyCoinFlow.UI.Base
             {
                 // Fensterposition wiederherstellen
                 WindowStateService.Restore(this);
+
+                // 🔴 NEU: Fokus sauber setzen (nachdem Layout fertig ist)
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        // Falls bereits ein Fokus gesetzt ist → nichts tun
+                        var focused = FocusManager.GetFocusedElement(this);
+                        if (focused != null && focused is IInputElement)
+                            return;
+
+                        // Erstes fokussierbares Element finden
+                        MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+                    }
+                    catch
+                    {
+                    }
+                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
             catch
             {

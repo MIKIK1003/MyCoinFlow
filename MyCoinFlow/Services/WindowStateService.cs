@@ -103,21 +103,54 @@ namespace MyCoinFlow.Services
 
                 var state = all[key];
 
-                // 🔴 NEU: harte Plausibilitätsprüfung
+                // Plausibilitätsprüfung
                 if (!IsValidSize(state))
                     return;
 
-                if (IsVisibleOnAnyScreen(state))
-                {
-                    window.Top = state.Top;
-                    window.Left = state.Left;
-                    window.Width = state.Width;
-                    window.Height = state.Height;
-                }
+                var rect = new Rect(state.Left, state.Top, state.Width, state.Height);
+
+                // 🔴 NEU: immer auf gültige Screen-Position bringen
+                var safeRect = EnsureWindowVisible(rect);
+
+                window.Left = safeRect.Left;
+                window.Top = safeRect.Top;
+                window.Width = safeRect.Width;
+                window.Height = safeRect.Height;
             }
             catch
             {
             }
+        }
+
+        private static Rect EnsureWindowVisible(Rect rect)
+        {
+            foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+            {
+                var wa = screen.WorkingArea;
+
+                var screenRect = new Rect(
+                    wa.Left,
+                    wa.Top,
+                    wa.Width,
+                    wa.Height);
+
+                // Wenn Fenster irgendwo sichtbar ist → ok
+                if (screenRect.IntersectsWith(rect))
+                {
+                    return rect;
+                }
+            }
+
+            // 🔴 Fallback: Hauptmonitor zentriert
+            var primary = System.Windows.Forms.Screen.PrimaryScreen.WorkingArea;
+
+            double width = Math.Min(rect.Width, primary.Width);
+            double height = Math.Min(rect.Height, primary.Height);
+
+            double left = primary.Left + (primary.Width - width) / 2;
+            double top = primary.Top + (primary.Height - height) / 2;
+
+            return new Rect(left, top, width, height);
         }
 
         // 🔴 NEU
