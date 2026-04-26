@@ -36,31 +36,25 @@ namespace MyCoinFlow.Views.Admin
             ReleaseNotesText.Text = "Klicke auf „Nach Updates suchen“, um die neueste Version zu prüfen.";
         }
 
-        // =================== Kernlogik ===================
-
-        /// <summary>
-        /// Stellt sicher:
-        /// - AppSetting-Tabelle existiert
-        /// - InstalledVersion ist gesetzt (Seed)
-        /// - DEBUG: wenn JSON > DB, DB anheben (Entwicklerkomfort)
-        /// </summary>
-        // AdminUpdatesControl.xaml.cs  — Methode ersetzen
         private void EnsureInstalledVersionSeedAndDevSync()
         {
             var db = new DatabaseService();
 
             // Tabelle sicherstellen (idempotent)
-            try { db.SetAppSetting("___probe___", null); } catch { /* still */ }
+            try { db.SetAppSetting("___probe___", null); } catch { }
 
-            // Seed: wenn InstalledVersion fehlt -> auf Assembly-Version setzen
+            // Nur initial setzen, wenn leer
             var installed = db.GetAppSetting("InstalledVersion");
+
             if (string.IsNullOrWhiteSpace(installed))
             {
-                var seed = _update.GetCurrentVersion().ToString(); // Assembly/InformationalVersion
-                db.SetAppSetting("InstalledVersion", Normalize4(seed));
+                var current = _update.GetCurrentVersion().ToString();
+                db.SetAppSetting("InstalledVersion", Normalize4(current));
             }
 
-            // KEIN Debug-Autoupdate aus JSON mehr – DB wird nur noch durch laufende EXE (MainWindow) angehoben
+            // WICHTIG:
+            // KEIN Sync mehr mit JSON
+            // KEIN Überschreiben der DB-Version
         }
 
 

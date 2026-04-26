@@ -16,15 +16,34 @@ namespace MyCoinFlow
 
         protected override bool AllowEscapeClose => false;
 
-        public string VersionText { get; private set; } = "v0.0.0.0";
+        public string VersionText
+        {
+            get => (string)GetValue(VersionTextProperty);
+            set => SetValue(VersionTextProperty, value);
+        }
+
+        public static readonly DependencyProperty VersionTextProperty =
+            DependencyProperty.Register(
+                nameof(VersionText),
+                typeof(string),
+                typeof(MainWindow),
+                new PropertyMetadata("v0.0.0.0"));
 
         public MainWindow()
         {
-            try { PostInstallSyncFromJson(); } catch { }
-
-            VersionText = "v" + ReadInstalledVersionFromDbOrFallback();
-
+            
+            
             InitializeComponent();
+                        
+            Loaded += (s, e) =>
+            {
+                SyncInstalledVersionFromAssembly();
+
+                VersionText = "v" + ReadInstalledVersionFromDbOrFallback();
+            };
+
+            UpdateVersionInUi();
+
 
             if (DataContext is null) DataContext = new MyCoinFlow.ViewModels.MainViewModel();
             if (DataContext is null) DataContext = new MainViewModel();
@@ -73,22 +92,40 @@ namespace MyCoinFlow
 
         private static void PostInstallSyncFromJson()
         {
-            var db = new DatabaseService();
+            // DEAKTIVIERT
+            // JSON darf NICHT die InstalledVersion überschreiben
+        }
 
-            var dbRaw = db.GetAppSetting("InstalledVersion");
-            var dbVer = ParseVerOrZero(dbRaw);
-
-            var jsonVerRaw = TryReadLocalJsonVersion();
-            if (string.IsNullOrWhiteSpace(jsonVerRaw))
-                return;
-
-            var jsonVer = ParseVerOrZero(jsonVerRaw);
-
-            if (jsonVer > dbVer)
+        private void SyncInstalledVersionFromAssembly()
+        {
+            try
             {
-                db.SetAppSetting("InstalledVersion", Normalize4(jsonVerRaw));
+                var db = new DatabaseService();
+
+                var current = GetAssemblyVersion();
+                var dbValue = db.GetAppSetting("InstalledVersion");
+
+                var currentVer = ParseVerOrZero(current);
+                var dbVer = ParseVerOrZero(dbValue);
+
+                
+                if (currentVer > dbVer)
+                {
+                    db.SetAppSetting("InstalledVersion", Normalize4(current));
+
+                    MessageBox.Show(
+                        $"DB aktualisiert auf {current}",
+                        "DEBUG UPDATE");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "SYNC ERROR");
             }
         }
+
+
+
 
         private static string? TryReadLocalJsonVersion()
         {
@@ -159,6 +196,49 @@ namespace MyCoinFlow
             }
         }
 
+        private void UpdateVersionInUi()
+        {
+            try
+            {
+                var version = "v" + ReadInstalledVersionFromDbOrFallback();
+
+                // Suche das TextBlock im Visual Tree
+                var textBlocks = FindVisualChildren<System.Windows.Controls.TextBlock>(this);
+
+                foreach (var tb in textBlocks)
+                {
+                    // wir suchen den mit dem aktuellen Wert v0.0.0.0
+                    if (tb.Text != null && tb.Text.StartsWith("v0.0.0"))
+                    {
+                        tb.Text = version;
+                        break;
+                    }
+                }
+            }
+            catch
+            {
+                // still
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<T> FindVisualChildren<T>(System.Windows.DependencyObject depObj)
+    where T : System.Windows.DependencyObject
+        {
+            if (depObj != null)
+            {
+                for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(depObj); i++)
+                {
+                    var child = System.Windows.Media.VisualTreeHelper.GetChild(depObj, i);
+
+                    if (child is T t)
+                        yield return t;
+
+                    foreach (T childOfChild in FindVisualChildren<T>(child))
+                        yield return childOfChild;
+                }
+            }
+        }
+
         private static string ReadInstalledVersionFromDbOrFallback()
         {
             try
@@ -206,18 +286,10 @@ namespace MyCoinFlow
                 var asm = Assembly.GetEntryAssembly()
                           ?? Assembly.GetExecutingAssembly();
 
-                var fvi = FileVersionInfo.GetVersionInfo(asm.Location);
-                if (!string.IsNullOrWhiteSpace(fvi.FileVersion))
-                    return Normalize4(fvi.FileVersion);
+                var version = asm.GetName()?.Version;
 
-                var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                              ?.InformationalVersion;
-                if (!string.IsNullOrWhiteSpace(info))
-                    return Normalize4(info);
-
-                var asmVer = asm.GetName()?.Version?.ToString();
-                if (!string.IsNullOrWhiteSpace(asmVer))
-                    return Normalize4(asmVer);
+                if (version != null)
+                    return Normalize4(version.ToString());
             }
             catch { }
 
