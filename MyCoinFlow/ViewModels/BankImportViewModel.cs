@@ -312,23 +312,23 @@ namespace MyCoinFlow.ViewModels
                         // 2a) Sonderregel hat Vorrang
                         resolvedNachKontoId = TryResolveKontoByAdressBuchungsregel(adrId.Value, it);
 
-                        // 2b) Fallback je Richtung / Adress-Typ
+                        // Nur wenn KEINE Sonderregel greift → Fallback anwenden
                         if (resolvedNachKontoId.HasValue)
+                        {
                             it.IstSonderregelTreffer = true;
+                        }
+                        else
                         {
                             if (it.Direction == KreditDebit.Credit)
                             {
-                                // Echte Einnahmen: StandardEinnahmenKonto direkt als NACH setzen
                                 if (adr?.IstBudgetiert == true && adr.StandardEinnahmenKontoId.HasValue)
                                 {
                                     resolvedNachKontoId = adr.StandardEinnahmenKontoId.Value;
                                 }
-                                // Refund / Rückzahlung: DefaultKonto bleibt VON
                                 else if (adr?.DefaultKontoId.HasValue == true)
                                 {
                                     resolvedVonKontoId = adr.DefaultKontoId.Value;
                                 }
-                                // letzter Fallback über IBAN
                                 else
                                 {
                                     resolvedNachKontoId = _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
@@ -336,7 +336,6 @@ namespace MyCoinFlow.ViewModels
                             }
                             else
                             {
-                                // Ausgaben: wie bisher NACH-Konto
                                 resolvedNachKontoId =
                                     (adr?.DefaultKontoId.HasValue == true ? adr.DefaultKontoId.Value : (int?)null)
                                     ?? _db.HoleDefaultKontoIdByIban(it.CounterpartyIban);
