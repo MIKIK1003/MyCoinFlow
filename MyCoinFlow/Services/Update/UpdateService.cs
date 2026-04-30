@@ -55,13 +55,14 @@ namespace MyCoinFlow.Services.Update
 
         public async Task<AppVersionInfo?> TryFetchLatestAsync(CancellationToken ct = default)
         {
-            // TEMP: lokale Datei zum Testen
-            var path = @"D:\Michel\OneDrive\Dokumente\MyCoinFlowUpdate\version.json";
+            var url = "https://raw.githubusercontent.com/MIKIK1003/MyCoinFlow/master/MyCoinFlow/release/version.json";
 
-            if (!File.Exists(path))
-                throw new InvalidOperationException("Lokale version.json nicht gefunden.");
+            using var response = await _http.GetAsync(url, ct);
 
-            var json = await File.ReadAllTextAsync(path, ct);
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Fehler beim Laden der Version: {(int)response.StatusCode}");
+
+            var json = await response.Content.ReadAsStringAsync(ct);
 
             if (string.IsNullOrWhiteSpace(json) || json.TrimStart().StartsWith("<"))
                 throw new InvalidOperationException("Ungültige Antwort: kein JSON.");
