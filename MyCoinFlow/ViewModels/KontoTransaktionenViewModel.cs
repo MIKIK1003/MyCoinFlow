@@ -16,6 +16,8 @@ namespace MyCoinFlow.ViewModels
         private readonly DatabaseService _db = new();
         private readonly int _kontoId;
         private readonly bool _isIncomeAccount;  // ← Konto-Art: true = Einnahmenkonto
+        private DateTime? _activeStart;
+        private DateTime? _activeEnd;
         public string Titel { get; }
 
         // Filter
@@ -107,28 +109,39 @@ namespace MyCoinFlow.ViewModels
             try
             {
                 var activeId = _db.HoleAktivenBudgetzeitraumId();
+
                 if (activeId.HasValue)
                 {
                     var bz = _db.HoleBudgetzeitraum(activeId.Value);
+
                     if (bz != null)
                     {
-                        // NEU: Default = aktiver Budgetzeitraum
                         FilterVon = bz.Startdatum.Date;
                         FilterBis = bz.Enddatum.Date;
+
+                        // NEU
+                        _activeStart = bz.Startdatum.Date;
+                        _activeEnd = bz.Enddatum.Date;
+
                         return;
                     }
                 }
 
-                // Falls kein aktiver Zeitraum existiert:
-                // Filter bewusst leer lassen (zeigt alle Daten)
+                // Kein aktiver Zeitraum
                 FilterVon = null;
                 FilterBis = null;
+
+                _activeStart = null;
+                _activeEnd = null;
             }
             catch
             {
-                // defensiv: Filter leer lassen
+                // defensiv
                 FilterVon = null;
                 FilterBis = null;
+
+                _activeStart = null;
+                _activeEnd = null;
             }
         }
 
@@ -207,6 +220,20 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = t.Id,
                     Datum = t.Datum,
+
+                    BudgetDatum = t.BudgetDatum,
+
+                    HasBudgetDatumOverride =
+    t.BudgetDatum.HasValue
+    && _activeStart.HasValue
+    && _activeEnd.HasValue
+    && (t.Datum.Date < _activeStart.Value
+        || t.Datum.Date > _activeEnd.Value),
+
+                    BudgetDatumTooltip =
+    t.BudgetDatum.HasValue
+    ? $"Budgetdatum: {t.BudgetDatum:dd.MM.yyyy}\nBankdatum: {t.Datum:dd.MM.yyyy}"
+    : null,
                     GeldinstitutName = t.BankName,
                     Einnahmen = ein,
                     Ausgaben = aus,
@@ -241,12 +268,25 @@ namespace MyCoinFlow.ViewModels
         public sealed class Row
         {
             public int Id { get; set; }
+
             public DateTime Datum { get; set; }
+
+            public DateTime? BudgetDatum { get; set; }
+
+            public bool HasBudgetDatumOverride { get; set; }
+
+            public string? BudgetDatumTooltip { get; set; }
+
             public string? GeldinstitutName { get; set; }
+
             public decimal Einnahmen { get; set; }
+
             public decimal Ausgaben { get; set; }
+
             public string? AdresseName { get; set; }
+
             public string? Notiz { get; set; }
+
             public decimal BudgetDelta { get; set; }
         }
     }

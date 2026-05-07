@@ -3674,29 +3674,38 @@ VALUES (@sid, @master, @source, @def);", c, tx);
 
         // Transaktionen für ein bestimmtes Konto (sowohl als Von, als Nach)
         public List<Transaktion> LadeTransaktionenByKonto(
-    int kontoId,
-    DateTime? von = null,
-    DateTime? bis = null,
-    decimal? minBetrag = null,
-    decimal? maxBetrag = null,
-    int? adresseId = null,
-    int? geldinstitutId = null)
+            int kontoId,
+            DateTime? von = null,
+            DateTime? bis = null,
+            decimal? minBetrag = null,
+            decimal? maxBetrag = null,
+            int? adresseId = null,
+            int? geldinstitutId = null)
         {
             var list = new List<Transaktion>();
+
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"
-SELECT t.Id, t.Datum, t.VonKontoId, t.NachKontoId, t.Betrag, t.Notiz,
-       t.AdresseId, a.Name as AdresseName,
-       t.GeldinstitutId, g.Name as BankName,
+SELECT t.Id,
+       t.Datum,
+       t.BudgetDatum,
+       t.VonKontoId,
+       t.NachKontoId,
+       t.Betrag,
+       t.Notiz,
+       t.AdresseId,
+       a.Name as AdresseName,
+       t.GeldinstitutId,
+       g.Name as BankName,
        t.ImportQuelle
 FROM Transaktion t
 LEFT JOIN Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN Geldinstitut g ON g.Id = t.GeldinstitutId
 WHERE (t.VonKontoId = @kto OR t.NachKontoId = @kto)
-  AND (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)
   AND (@minB IS NULL OR t.Betrag >= @minB)
   AND (@maxB IS NULL OR t.Betrag <= @maxB)
   AND (@adr IS NULL OR t.AdresseId = @adr)
@@ -3704,6 +3713,7 @@ WHERE (t.VonKontoId = @kto OR t.NachKontoId = @kto)
 ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var cmd = new SqlCommand(sql, c);
+
             cmd.Parameters.AddWithValue("@kto", kontoId);
             cmd.Parameters.AddWithValue("@von", (object?)von?.Date ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@bis", (object?)bis?.Date ?? DBNull.Value);
@@ -3713,21 +3723,52 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             cmd.Parameters.AddWithValue("@gi", (object?)geldinstitutId ?? DBNull.Value);
 
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new Transaktion
                 {
                     Id = r.GetInt32(0),
+
                     Datum = r.GetDateTime(1),
-                    VonKontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                    NachKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                    Betrag = r.GetDecimal(4),
-                    Notiz = r.IsDBNull(5) ? null : r.GetString(5),
-                    AdresseId = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
-                    AdresseName = r.IsDBNull(7) ? null : r.GetString(7),
-                    GeldinstitutId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-                    BankName = r.IsDBNull(9) ? null : r.GetString(9),
-                    ImportQuelle = r.IsDBNull(10) ? null : r.GetString(10)
+
+                    BudgetDatum = r.IsDBNull(2)
+                        ? (DateTime?)null
+                        : r.GetDateTime(2),
+
+                    VonKontoId = r.IsDBNull(3)
+                        ? (int?)null
+                        : r.GetInt32(3),
+
+                    NachKontoId = r.IsDBNull(4)
+                        ? (int?)null
+                        : r.GetInt32(4),
+
+                    Betrag = r.GetDecimal(5),
+
+                    Notiz = r.IsDBNull(6)
+                        ? null
+                        : r.GetString(6),
+
+                    AdresseId = r.IsDBNull(7)
+                        ? (int?)null
+                        : r.GetInt32(7),
+
+                    AdresseName = r.IsDBNull(8)
+                        ? null
+                        : r.GetString(8),
+
+                    GeldinstitutId = r.IsDBNull(9)
+                        ? (int?)null
+                        : r.GetInt32(9),
+
+                    BankName = r.IsDBNull(10)
+                        ? null
+                        : r.GetString(10),
+
+                    ImportQuelle = r.IsDBNull(11)
+                        ? null
+                        : r.GetString(11)
                 });
             }
 
