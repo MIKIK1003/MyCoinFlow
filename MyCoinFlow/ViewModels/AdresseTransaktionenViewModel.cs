@@ -17,6 +17,9 @@ namespace MyCoinFlow.ViewModels
     {
         private readonly DatabaseService _db = new();
         private readonly int _adrId;
+        private DateTime? _activeStart;
+        private DateTime? _activeEnd;
+
         public string Titel { get; }
 
         // Filter
@@ -84,11 +87,21 @@ namespace MyCoinFlow.ViewModels
             Titel = $"Transaktionen – {adresseName} (Adresse)";
 
             ApplyFilterCommand = new RelayCommand(_ => Load(), _ => true);
+
             ResetFilterCommand = new RelayCommand(_ =>
             {
-                FilterVon = null; FilterBis = null;
-                FilterMinBetrag = null; FilterMaxBetrag = null;
-                FilterKontoId = null; FilterGeldinstitutId = null;
+                FilterVon = null;
+                FilterBis = null;
+
+                FilterMinBetrag = null;
+                FilterMaxBetrag = null;
+
+                FilterKontoId = null;
+                FilterGeldinstitutId = null;
+
+                // Reset auf aktiven Budgetzeitraum
+                PrefillDateRangeFromActiveBudget();
+
                 Load();
             });
 
@@ -104,7 +117,47 @@ namespace MyCoinFlow.ViewModels
 
             _incomeAccounts = BuildIncomeAccountSet();
 
+            PrefillDateRangeFromActiveBudget();
+
             Load();
+        }
+
+        private void PrefillDateRangeFromActiveBudget()
+        {
+            try
+            {
+                var activeId = _db.HoleAktivenBudgetzeitraumId();
+
+                if (activeId.HasValue)
+                {
+                    var bz = _db.HoleBudgetzeitraum(activeId.Value);
+
+                    if (bz != null)
+                    {
+                        FilterVon = bz.Startdatum.Date;
+                        FilterBis = bz.Enddatum.Date;
+
+                        _activeStart = bz.Startdatum.Date;
+                        _activeEnd = bz.Enddatum.Date;
+
+                        return;
+                    }
+                }
+
+                FilterVon = null;
+                FilterBis = null;
+
+                _activeStart = null;
+                _activeEnd = null;
+            }
+            catch
+            {
+                FilterVon = null;
+                FilterBis = null;
+
+                _activeStart = null;
+                _activeEnd = null;
+            }
         }
 
         private System.Collections.Generic.HashSet<int> BuildIncomeAccountSet()
@@ -129,6 +182,7 @@ namespace MyCoinFlow.ViewModels
                 return u.Contains("EINNAHM") || u.Contains("ERTR") || u.Contains("INCOME") || u.Contains("REVENUE");
             }
         }
+
 
         private void Load()
         {
@@ -163,6 +217,20 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = t.Id,
                     Datum = t.Datum,
+
+                    BudgetDatum = t.BudgetDatum,
+
+                    HasBudgetDatumOverride =
+    t.BudgetDatum.HasValue
+    && _activeStart.HasValue
+    && _activeEnd.HasValue
+    && (t.Datum.Date < _activeStart.Value
+        || t.Datum.Date > _activeEnd.Value),
+
+                    BudgetDatumTooltip =
+    t.BudgetDatum.HasValue
+    ? $"Budgetdatum: {t.BudgetDatum:dd.MM.yyyy}\nBankdatum: {t.Datum:dd.MM.yyyy}"
+    : null,
                     Konto = konto,
                     Einnahmen = einnahmen > 0 ? einnahmen : 0m,
                     Ausgaben = ausgaben > 0 ? ausgaben : 0m,
@@ -188,11 +256,23 @@ namespace MyCoinFlow.ViewModels
         public sealed class Row
         {
             public int Id { get; set; }
+
             public DateTime Datum { get; set; }
+
+            public DateTime? BudgetDatum { get; set; }
+
+            public bool HasBudgetDatumOverride { get; set; }
+
+            public string? BudgetDatumTooltip { get; set; }
+
             public string Konto { get; set; } = "";
+
             public decimal Einnahmen { get; set; }
+
             public decimal Ausgaben { get; set; }
+
             public string? GeldinstitutName { get; set; }
+
             public string? Notiz { get; set; }
         }
     }

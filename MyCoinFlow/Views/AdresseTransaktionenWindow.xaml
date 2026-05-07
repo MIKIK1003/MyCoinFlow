@@ -8,6 +8,10 @@
         ResizeMode="CanResize"
         Background="{DynamicResource MaterialDesignPaper}">
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
     <DockPanel>
 
         <!-- Linke Seitenleiste: Filter & Aktionen -->
@@ -176,6 +180,27 @@
                 </DataGrid.Resources>
 
                 <DataGrid.Columns>
+
+                    <DataGridTemplateColumn Header="" Width="44">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+
+                                <Button ToolTip="{Binding BudgetDatumTooltip}"
+                    Visibility="{Binding HasBudgetDatumOverride, Converter={StaticResource BoolToVis}}"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Padding="0"
+                    IsHitTestVisible="False">
+
+                                    <materialDesign:PackIcon
+                    Kind="CalendarAlert"
+                    Width="22"
+                    Height="22"/>
+                                </Button>
+
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
                     <DataGridTextColumn Header="Konto" Binding="{Binding Konto}" Width="240">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource TrimLeft}"/>
