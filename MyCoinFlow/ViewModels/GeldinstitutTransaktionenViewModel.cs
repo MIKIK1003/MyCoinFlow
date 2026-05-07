@@ -14,6 +14,9 @@ namespace MyCoinFlow.ViewModels
     {
         private readonly DatabaseService _db = new();
         private readonly int _giId;
+
+        private DateTime? _activeStart;
+        private DateTime? _activeEnd;
         public string Titel { get; }
 
         // Filter
@@ -92,6 +95,23 @@ namespace MyCoinFlow.ViewModels
 
             _incomeAccounts = BuildIncomeAccountSet();
 
+            var activeId = _db.HoleAktivenBudgetzeitraumId();
+            if (activeId.HasValue)
+            {
+                var bz = _db.HoleBudgetzeitraum(activeId.Value);
+                if (bz != null)
+                {
+                    _activeStart = bz.Startdatum.Date;
+                    _activeEnd = bz.Enddatum.Date;
+
+                    if (!FilterVon.HasValue)
+                        FilterVon = _activeStart;
+
+                    if (!FilterBis.HasValue)
+                        FilterBis = _activeEnd;
+                }
+            }
+
             Load();
         }
 
@@ -119,6 +139,8 @@ namespace MyCoinFlow.ViewModels
             }
             return set;
         }
+
+
 
         private void Load()
         {
@@ -183,6 +205,9 @@ namespace MyCoinFlow.ViewModels
         {
             public int Id { get; set; }
             public DateTime Datum { get; set; }
+            public DateTime? BudgetDatum { get; set; }
+            public bool HasBudgetDatumOverride { get; set; }
+            public string? BudgetDatumTooltip { get; set; }
             public string Konto { get; set; } = "";
             public decimal Einnahmen { get; set; }
             public decimal Ausgaben { get; set; }

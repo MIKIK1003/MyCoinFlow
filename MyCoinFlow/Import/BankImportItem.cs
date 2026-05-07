@@ -22,6 +22,18 @@ namespace MyCoinFlow.Import
         public DateTime? ValueDate { get; set; }
         public decimal Amount { get; set; }
         public KreditDebit Direction { get; set; }
+
+        public string RichtungText
+        {
+            get
+            {
+                return Direction == KreditDebit.Debit
+                    ? "Ausgang"
+                    : "Eingang";
+            }
+        }
+
+
         public string ServiceRef { get; set; } = "";
         public string Text { get; set; } = "";
         public string? CounterpartyName { get; set; }
@@ -67,6 +79,7 @@ namespace MyCoinFlow.Import
                     OnPropertyChanged(nameof(IstVollstaendig));
             }
         }
+
 
         private int? _vorschlagNachKontoId;
         public int? VorschlagNachKontoId

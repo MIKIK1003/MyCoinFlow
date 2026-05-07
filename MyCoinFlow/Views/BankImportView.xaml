@@ -241,42 +241,22 @@
 
 
                     <!-- vorhandene Daten-Spalten -->
-                    <DataGridTextColumn Header="#" Binding="{Binding StagingId}" Width="60"/>
-                    <DataGridTextColumn Header="Buchung" Binding="{Binding BookingDate, StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
-                    <DataGridTextColumn Header="Valuta"   Binding="{Binding ValueDate,   StringFormat={}{0:yyyy-MM-dd}}" Width="110"/>
-                    <DataGridTextColumn Header="Betrag"   Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="110"/>
-                    <DataGridTextColumn Header="Währung"  Binding="{Binding Currency}" Width="80"/>
-                    <DataGridTextColumn Header="Richtung" Binding="{Binding Direction}" Width="90"/>
-                    <DataGridTextColumn Header="Konto-IBAN" Binding="{Binding AccountIban}" Width="200"/>
-                    <DataGridTextColumn Header="Gegenpartei" Binding="{Binding CounterpartyName}" Width="200"/>
-                    <DataGridTextColumn Header="Gegen-IBAN"  Binding="{Binding CounterpartyIban}" Width="200"/>
-                    <DataGridTextColumn Header="Text"     Binding="{Binding Text}" Width="*"/>
-                    <DataGridTextColumn Header="ServiceRef" Binding="{Binding ServiceRef}" Width="160"/>
+                    <!-- kompakte Daten-Spalten -->
+                    <DataGridTextColumn Header="Valuta"
+                    Binding="{Binding ValueDate, StringFormat={}{0:yyyy-MM-dd}}"
+                    Width="110"/>
 
-                    <!-- Label-Spalten -->
-                    <DataGridTemplateColumn Header="Adresse" Width="220">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding AdresseLabel}"/>
-                                    <TextBlock Style="{StaticResource IdHintText}"
-                                               Text="{Binding VorschlagAdresseId, StringFormat=Id: {0}}"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Betrag"
+                    Binding="{Binding Amount, StringFormat={}{0:N2}}"
+                    Width="110"/>
 
-                    <DataGridTemplateColumn Header="Geldinstitut" Width="220">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding GeldinstitutLabel}"/>
-                                    <TextBlock Style="{StaticResource IdHintText}"
-                                               Text="{Binding VorschlagGeldinstitutId, StringFormat=Id: {0}}"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Richtung"
+                    Binding="{Binding RichtungText}"
+                    Width="100"/>
+
+                    <DataGridTextColumn Header="Gegenpartei"
+                    Binding="{Binding CounterpartyName}"
+                    Width="220"/>
 
                     <DataGridTemplateColumn Header="Konto (Nach)" Width="260">
                         <DataGridTemplateColumn.CellTemplate>
