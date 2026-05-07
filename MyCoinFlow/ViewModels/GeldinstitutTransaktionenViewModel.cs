@@ -184,6 +184,19 @@ namespace MyCoinFlow.ViewModels
                 {
                     Id = t.Id,
                     Datum = t.Datum,
+                    BudgetDatum = t.BudgetDatum,
+
+                    HasBudgetDatumOverride =
+    t.BudgetDatum.HasValue
+    && _activeStart.HasValue
+    && _activeEnd.HasValue
+    && (t.Datum.Date < _activeStart.Value
+        || t.Datum.Date > _activeEnd.Value),
+
+                    BudgetDatumTooltip =
+    t.BudgetDatum.HasValue
+    ? $"Budgetdatum: {t.BudgetDatum:dd.MM.yyyy}\nBankdatum: {t.Datum:dd.MM.yyyy}"
+    : null,
                     Konto = konto,
                     Einnahmen = einnahmen,
                     Ausgaben = ausgaben,
