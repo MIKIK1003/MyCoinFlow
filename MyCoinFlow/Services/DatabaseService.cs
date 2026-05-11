@@ -6919,7 +6919,7 @@ ORDER BY GueltigVon DESC, Id DESC;";
 
 
         public List<MyCoinFlow.Models.StweOwnerSummaryRow> StweReportOwnerSummary(
-    int liegenschaftId, DateTime? von, DateTime? bis)
+int liegenschaftId, DateTime? von, DateTime? bis)
         {
             EnsureStweSchema();
 
@@ -6928,30 +6928,30 @@ ORDER BY GueltigVon DESC, Id DESC;";
             c.Open();
 
             const string sql = @"
-    SELECT
-        o.Id AS EigentuemerId,
-        o.Name AS EigentuemerName,
+SELECT
+    o.Id AS EigentuemerId,
+    o.Name AS EigentuemerName,
 
-        -- WICHTIG: Vorzeichen-Normalisierung über IsCredit
-        SUM(
-            CASE 
-                WHEN ISNULL(s.IsCredit, 0) = 1 
-                    THEN -ABS(l.Betrag)   -- Gutschrift = negativ
-                ELSE ABS(l.Betrag)        -- Belastung = positiv
-            END
-        ) AS Summe
+    -- WICHTIG: Vorzeichen-Normalisierung über IsCredit
+    SUM(
+        CASE 
+            WHEN ISNULL(s.IsCredit, 0) = 1 
+                THEN -ABS(l.Betrag)
+            ELSE ABS(l.Betrag)
+        END
+    ) AS Summe
 
-    FROM dbo.StweSetLine l
-    JOIN dbo.StweSet s           ON s.Id = l.SetId
-    JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
-    JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s           ON s.Id = l.SetId
+JOIN dbo.Transaktion t       ON t.Id = s.TransaktionId
+JOIN dbo.StweEigentuemer o   ON o.Id = l.EigentuemerId
 
-    WHERE s.LiegenschaftId = @lid
-      AND (@von IS NULL OR t.Datum >= @von)
-      AND (@bis IS NULL OR t.Datum <= @bis)
+WHERE s.LiegenschaftId = @lid
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)
 
-    GROUP BY o.Id, o.Name
-    ORDER BY o.Name;";
+GROUP BY o.Id, o.Name
+ORDER BY o.Name;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -6967,7 +6967,7 @@ ORDER BY GueltigVon DESC, Id DESC;";
                 {
                     EigentuemerId = r.GetInt32(0),
                     EigentuemerName = r.GetString(1),
-                    Summe = r.IsDBNull(2) ? 0m : r.GetDecimal(2) // defensiv
+                    Summe = r.IsDBNull(2) ? 0m : r.GetDecimal(2)
                 });
             }
 
@@ -7047,7 +7047,7 @@ ORDER BY GueltigVon DESC, Id DESC;";
 
 
         public List<MyCoinFlow.Models.StweOwnerDetailRow> StweReportOwnerDetails(
-    int liegenschaftId, int eigentuemerId, DateTime? von, DateTime? bis)
+int liegenschaftId, int eigentuemerId, DateTime? von, DateTime? bis)
         {
             EnsureStweSchema();
 
@@ -7056,36 +7056,35 @@ ORDER BY GueltigVon DESC, Id DESC;";
             c.Open();
 
             const string sql = @"
-    SELECT
-        t.Datum,
-        s.Id AS SetId,
-        COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
-        l.Schluessel,
-        l.Notiz,
+SELECT
+    t.Datum,
+    s.Id AS SetId,
+    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
+    l.Schluessel,
+    l.Notiz,
 
-        -- Vorzeichen-Korrektur (ohne ABS, stabil)
-        CASE 
-            WHEN ISNULL(s.IsCredit, 0) = 1 
-                THEN CASE 
-                        WHEN l.Betrag < 0 THEN l.Betrag 
-                        ELSE -l.Betrag 
-                     END
-            ELSE CASE 
-                    WHEN l.Betrag < 0 THEN -l.Betrag 
-                    ELSE l.Betrag 
+    CASE 
+        WHEN ISNULL(s.IsCredit, 0) = 1 
+            THEN CASE 
+                    WHEN l.Betrag < 0 THEN l.Betrag 
+                    ELSE -l.Betrag 
                  END
-        END AS Betrag
+        ELSE CASE 
+                WHEN l.Betrag < 0 THEN -l.Betrag 
+                ELSE l.Betrag 
+             END
+    END AS Betrag
 
-    FROM dbo.StweSetLine l
-    JOIN dbo.StweSet s      ON s.Id = l.SetId
-    JOIN dbo.Transaktion t  ON t.Id = s.TransaktionId
+FROM dbo.StweSetLine l
+JOIN dbo.StweSet s      ON s.Id = l.SetId
+JOIN dbo.Transaktion t  ON t.Id = s.TransaktionId
 
-    WHERE s.LiegenschaftId = @lid
-      AND l.EigentuemerId = @oid
-      AND (@von IS NULL OR t.Datum >= @von)
-      AND (@bis IS NULL OR t.Datum <= @bis)
+WHERE s.LiegenschaftId = @lid
+  AND l.EigentuemerId = @oid
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)
 
-    ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
+ORDER BY t.Datum DESC, s.Id DESC, l.Id ASC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -7119,27 +7118,26 @@ ORDER BY GueltigVon DESC, Id DESC;";
 
             var list = new List<StweOriginalTransaktionRow>();
 
-            // SIGNED: Wenn Set.IsCredit=1 => Betrag negativ
             const string sql = @"
-            SELECT DISTINCT
-            t.Id            AS TransaktionsId,
-            t.Datum         AS Datum,
-            CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
-            t.Notiz         AS Notiz
-            FROM dbo.StweSet s
-            INNER JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
-            WHERE s.LiegenschaftId = @LiegenschaftId
-            AND (@Von IS NULL OR t.Datum >= @Von)
-            AND (@Bis IS NULL OR t.Datum <= @Bis)
-            ORDER BY t.Datum DESC, t.Id DESC;";
+SELECT DISTINCT
+    t.Id            AS TransaktionsId,
+    t.Datum         AS Datum,
+    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
+    t.Notiz         AS Notiz
+FROM dbo.StweSet s
+INNER JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
+WHERE s.LiegenschaftId = @LiegenschaftId
+  AND (@Von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @Von)
+  AND (@Bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @Bis)
+ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var con = new SqlConnection(_connectionString);
             con.Open();
 
             using var cmd = new SqlCommand(sql, con);
             cmd.Parameters.AddWithValue("@LiegenschaftId", liegenschaftId);
-            cmd.Parameters.AddWithValue("@Von", (object?)von ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Bis", (object?)bis ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Von", (object?)von?.Date ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Bis", (object?)bis?.Date ?? DBNull.Value);
 
             using var r = cmd.ExecuteReader();
             while (r.Read())
@@ -7148,7 +7146,7 @@ ORDER BY GueltigVon DESC, Id DESC;";
                 {
                     TransaktionsId = r.GetInt32(0),
                     Datum = r.GetDateTime(1),
-                    Betrag = r.GetDecimal(2),          // jetzt SIGNED
+                    Betrag = r.GetDecimal(2),
                     Notiz = r.IsDBNull(3) ? null : r.GetString(3)
                 });
             }
