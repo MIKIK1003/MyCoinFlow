@@ -515,17 +515,95 @@ ORDER BY name;";
             catch { }
         }
 
+        private string GetBackupFileNameOrDefault(string currentPath)
+        {
+            var fileName = "";
+
+            if (!string.IsNullOrWhiteSpace(currentPath))
+                fileName = Path.GetFileName(currentPath);
+
+            if (!string.IsNullOrWhiteSpace(fileName) &&
+                fileName.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
+            {
+                return fileName;
+            }
+
+            var dbName = ConnectionStrings.ActiveDatabaseName;
+            return $"{dbName}_{DateTime.Now:yyyyMMdd_HHmm}.bak";
+        }
+
+        private static bool IsOneDrivePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            var fullPath = Path.GetFullPath(path);
+
+            if (fullPath.Contains("\\OneDrive\\", StringComparison.OrdinalIgnoreCase) ||
+                fullPath.Contains("\\OneDrive - ", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var oneDriveVars = new[]
+            {
+        Environment.GetEnvironmentVariable("OneDrive"),
+        Environment.GetEnvironmentVariable("OneDriveConsumer"),
+        Environment.GetEnvironmentVariable("OneDriveCommercial")
+    };
+
+            foreach (var root in oneDriveVars)
+            {
+                if (string.IsNullOrWhiteSpace(root))
+                    continue;
+
+                var rootFull = Path.GetFullPath(root);
+
+                if (fullPath.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+
         private void Backup_Browse_Click(object sender, RoutedEventArgs e)
         {
-            var sfd = new SaveFileDialog
+            try
             {
-                Title = "Ziel-Datei (*.bak)",
-                Filter = "SQL Server Backup (*.bak)|*.bak",
-                AddExtension = true,
-                OverwritePrompt = true
-            };
-            if (sfd.ShowDialog() == true)
-                El<TextBox>("BackupFileBox")!.Text = sfd.FileName;
+                var currentPath = El<TextBox>("BackupFileBox")?.Text?.Trim() ?? "";
+                var currentFileName = GetBackupFileNameOrDefault(currentPath);
+
+                var initialDir = "";
+                if (!string.IsNullOrWhiteSpace(currentPath))
+                {
+                    var dir = Path.GetDirectoryName(currentPath);
+                    if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                        initialDir = dir;
+                }
+
+                using var dlg = new System.Windows.Forms.FolderBrowserDialog
+                {
+                    Description = "Backup-Zielordner wählen",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = true,
+                    SelectedPath = initialDir
+                };
+
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                    return;
+
+                var selectedDir = dlg.SelectedPath?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(selectedDir))
+                    return;
+
+                El<TextBox>("BackupFileBox")!.Text = Path.Combine(selectedDir, currentFileName);
+                SetText("Backup_StatusText", "");
+            }
+            catch (Exception ex)
+            {
+                SetText("Backup_StatusText", "Zielordner konnte nicht gewählt werden: " + ex.Message);
+            }
         }
 
         private async void Backup_Run_Click(object sender, RoutedEventArgs e)
@@ -533,24 +611,59 @@ ORDER BY name;";
             try
             {
                 SetText("Backup_StatusText", "");
+
                 var db = ConnectionStrings.ActiveDatabaseName;
                 var path = El<TextBox>("BackupFileBox")?.Text?.Trim() ?? "";
+
                 if (string.IsNullOrWhiteSpace(path))
                 {
                     SetText("Backup_StatusText", "Bitte eine Zieldatei auswählen.");
                     return;
                 }
 
+                if (IsOneDrivePath(path))
+                {
+                    var msg =
+                        "Backups in synchronisierte OneDrive-Ordner sind nicht erlaubt.\n\n" +
+                        "Bitte wählen Sie einen lokalen Ordner, z. B. C:\\Backup oder D:\\MyCoinFlowBackup.";
+
+                    SetText("Backup_StatusText", msg);
+
+                    MessageBox.Show(
+                        Window.GetWindow(this) ?? Application.Current.MainWindow,
+                        msg,
+                        "Backup-Ziel nicht erlaubt",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                var dir = Path.GetDirectoryName(path);
+                if (string.IsNullOrWhiteSpace(dir))
+                {
+                    SetText("Backup_StatusText", "Der Zielordner ist ungültig.");
+                    return;
+                }
+
+                Directory.CreateDirectory(dir);
+
                 var btn = sender as Button;
                 if (btn != null) btn.IsEnabled = false;
+
                 Mouse.OverrideCursor = Cursors.Wait;
                 SetText("Backup_StatusText", $"Backup läuft… DB '{db}'. Bitte warten.");
 
                 await _backup.BackupAsync(db, path, useCompression: true);
 
                 SetText("Backup_StatusText", $"Backup erstellt: {path}");
-                MessageBox.Show(Window.GetWindow(this) ?? Application.Current.MainWindow,
-                    $"Backup erstellt:\n{path}", "Backup", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                MessageBox.Show(
+                    Window.GetWindow(this) ?? Application.Current.MainWindow,
+                    $"Backup erstellt:\n{path}",
+                    "Backup",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
