@@ -2,9 +2,10 @@
 {
     /// <summary>
     /// Benutzerdefinierte Regel für Kontonummern-Bereiche.
-    /// Richtung: "Ausgabe" oder "Einnahme"
+    /// Richtung: "Ausgabe", "Einnahme" oder "Neutral"
     /// Bezeichnung: rein informativ (z. B. "Investitionen (Budgetiert)")
-    /// IstBudgetkonto: optionales Flag (derzeit ohne Logikverwendung)
+    /// IstBudgetkonto: optionales Flag
+    /// ExcludeFromStweSets: Konten dieses Nummernkreises sollen in STWE-Set-Auswahlen nicht erscheinen.
     /// </summary>
     public class NumberRangeRule
     {
@@ -14,5 +15,6 @@
         public string Richtung { get; set; } = "Ausgabe";
         public string? Bezeichnung { get; set; } = "Ausgaben (Budgetiert)";
         public bool IstBudgetkonto { get; set; }
+        public bool ExcludeFromStweSets { get; set; }
     }
 }

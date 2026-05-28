@@ -9,16 +9,16 @@ namespace MyCoinFlow.Models
         public int TransaktionId { get; set; }
 
         public DateTime Datum { get; set; }
+        public DateTime? BudgetDatum { get; set; }
 
-        // Wichtig: Dieses Feld wird ab jetzt im DB-Select als SIGNED geladen:
-        // Belastung = +Betrag, Gutschrift = -Betrag
+        public DateTime VerteilDatum => BudgetDatum?.Date ?? Datum.Date;
+
         public decimal Betrag { get; set; }
 
         public string Titel { get; set; } = "";
 
         public bool IsClosed { get; set; }
 
-        // NEU: True = Gutschrift/Einzahlung/Rückvergütung -> Verteilzeilen NEGATIV
         public bool IsCredit { get; set; }
 
         public decimal Verteilt { get; set; }

@@ -23,9 +23,6 @@ namespace MyCoinFlow.Views
             private decimal _betrag;
             private string? _notiz;
             private string _source = "MANUELL";
-            
-
-
 
             public int? EigentuemerId
             {
@@ -64,11 +61,10 @@ namespace MyCoinFlow.Views
 
             private void ParseBetrag()
             {
-                // CH-tolerant: "1'234.50" / "1234,50" / "1234.50"
                 var s = (_betragText ?? "").Trim();
                 s = s.Replace("’", "'").Replace(" ", "");
-                s = s.Replace("'", "");      // Tausender
-                s = s.Replace(",", ".");     // Dezimal
+                s = s.Replace("'", "");
+                s = s.Replace(",", ".");
 
                 if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
                     Betrag = val;
@@ -81,14 +77,12 @@ namespace MyCoinFlow.Views
                 => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        // ===== Helper for rounded allocation =====
         private sealed class RawShare
         {
             public int EigentuemerId { get; set; }
             public decimal BetragRaw { get; set; }
         }
 
-        // ===== Energie: Diff Anzeige je Zähler =====
         public sealed class EnergieDiffRowVm : INotifyPropertyChanged
         {
             public int ZaehlerId { get; init; }
@@ -96,7 +90,6 @@ namespace MyCoinFlow.Views
             public string Name { get; init; } = "";
             public int? EinheitId { get; init; }
             public int? SchluesselId { get; init; }
-
 
             public decimal AltWert { get; init; }
             public decimal NeuWert { get; init; }
@@ -113,23 +106,17 @@ namespace MyCoinFlow.Views
             public string DisplayText { get; init; } = "";
         }
 
-
         private readonly DatabaseService _db = new();
         private readonly StweSetRow _set;
 
         private string? _lastUsedSourceFromRows;
 
-        // ===== Collections =====
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
         public ObservableCollection<RowVm> Rows { get; } = new();
         public ObservableCollection<StweSchluessel> Schluessel { get; } = new();
-
-        // NEU: Zählerdaten-Sets (Dropdown) + Diff-Grid
         public ObservableCollection<ZaehlerdatenSetVm> ZaehlerdatenSets { get; } = new();
-
         public ObservableCollection<EnergieDiffRowVm> EnergieDiffRows { get; } = new();
 
-        // ===== Selection =====
         private StweSchluessel? _selectedSchluessel;
         public StweSchluessel? SelectedSchluessel
         {
@@ -149,15 +136,10 @@ namespace MyCoinFlow.Views
             set { _selectedZaehlerdatenSet = value; OnPropertyChanged(); RefreshEnergieInfo(); }
         }
 
-
-        // ===== Status / Flags =====
         public bool IsEditable => !_set.IsClosed;
         public bool IsReadOnlyGrid => _set.IsClosed;
 
-        // Set-Typ aus DB: IsCredit (Single Source of Truth)
         private bool IsCreditSet => _set.IsCredit;
-
-        // Signed Total (Belastung = +, Gutschrift = -)
         private decimal SetTotalSigned => IsCreditSet ? -Math.Abs(_set.Betrag) : Math.Abs(_set.Betrag);
 
         private bool _isEnergyVisible;
@@ -167,7 +149,6 @@ namespace MyCoinFlow.Views
             private set { _isEnergyVisible = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanUseStandardAuto)); }
         }
 
-        // FIX/MEA Buttons deaktivieren, wenn ENERGIE aktiv
         public bool CanUseStandardAuto => IsEditable && !IsEnergyVisible;
 
         public string HeaderText { get; private set; } = "";
@@ -178,7 +159,8 @@ namespace MyCoinFlow.Views
             {
                 var status = _set.IsClosed ? "Status: GESCHLOSSEN" : "Status: OFFEN";
                 var typ = IsCreditSet ? "Typ: GUTSCHRIFT" : "Typ: BELASTUNG";
-                return $"{status}  |  {typ}";
+                var verteilDatum = $"Verteil-Stichtag: {_set.VerteilDatum:yyyy-MM-dd}";
+                return $"{status}  |  {typ}  |  {verteilDatum}";
             }
         }
 
@@ -186,7 +168,6 @@ namespace MyCoinFlow.Views
         public string DistributedText => $"Verteilt: {FormatChf(Rows.Sum(r => r.Betrag))}";
         public string RestText => $"Rest: {FormatChf(SetTotalSigned - Rows.Sum(r => r.Betrag))}";
 
-        // ===== Energie Info-Texts für XAML =====
         private string _energieZeitraumText = "Zeitraum: —";
         public string EnergieZeitraumText
         {
@@ -215,7 +196,6 @@ namespace MyCoinFlow.Views
             private set { _energieGutschriftChfText = value; OnPropertyChanged(); }
         }
 
-        // Cache: vorheriges Zählerdaten-Set (für Berechnung)
         private StweZaehlerdatenSet? _prevZaehlerdatenSet;
 
         public SetVerteilenDialog(StweSetRow setRow)
@@ -230,13 +210,13 @@ namespace MyCoinFlow.Views
 
             _set = setRow ?? throw new ArgumentNullException(nameof(setRow));
 
-            HeaderText = $"{_set.Datum:yyyy-MM-dd}  |  {_set.Titel}";
+            HeaderText = $"{_set.Datum:yyyy-MM-dd}  |  Verteil-Stichtag: {_set.VerteilDatum:yyyy-MM-dd}  |  {_set.Titel}";
 
             LoadOwners();
             LoadExistingLines();
             LoadSchluessel();
             LoadZaehlerdatenSets();
-                        
+
             Rows.CollectionChanged += Rows_CollectionChanged;
             Closing += SetVerteilenDialog_Closing;
 
@@ -247,8 +227,6 @@ namespace MyCoinFlow.Views
             OnPropertyChanged(nameof(IsReadOnlyGrid));
             OnPropertyChanged(nameof(StatusLine));
         }
-
-        // ===== Load =====
 
         private void LoadOwners()
         {
@@ -261,8 +239,6 @@ namespace MyCoinFlow.Views
         {
             Rows.Clear();
 
-            // Merkt sich den "dominanten" Source, damit wir den Schlüssel vorauswählen können.
-            // Wir ignorieren MANUELL, wenn es auch echte Schlüssel gibt.
             var sourceCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var l in _db.StweSetLinesGet(_set.Id))
@@ -271,6 +247,7 @@ namespace MyCoinFlow.Views
 
                 if (!sourceCount.ContainsKey(src))
                     sourceCount[src] = 0;
+
                 sourceCount[src]++;
 
                 var row = new RowVm
@@ -280,21 +257,18 @@ namespace MyCoinFlow.Views
                     Notiz = l.Notiz,
                     Source = src
                 };
+
                 AttachRow(row);
                 Rows.Add(row);
             }
 
-            // Wenn bereits verteilt: bevorzugt echten Schlüssel (z.B. ENERGIE, MEA:..., FIX:...)
             if (Rows.Count > 0)
             {
-                var best = sourceCount
+                _lastUsedSourceFromRows = sourceCount
                     .Where(kv => !string.Equals(kv.Key, "MANUELL", StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(kv => kv.Value)
                     .Select(kv => kv.Key)
                     .FirstOrDefault();
-
-                // Fallback: wenn alles MANUELL ist, bleibt best null
-                _lastUsedSourceFromRows = best;
             }
             else
             {
@@ -306,7 +280,6 @@ namespace MyCoinFlow.Views
         {
             Schluessel.Clear();
 
-            // 0) Pseudo-Schlüssel für Energie (Zähler) – nur UI, nie DB
             var energieUi = new StweSchluessel
             {
                 Id = -1,
@@ -314,14 +287,12 @@ namespace MyCoinFlow.Views
                 Name = "Energie (Zähler)",
                 Modus = "ENERGIE"
             };
+
             Schluessel.Add(energieUi);
 
-            // 1) echte Schlüssel aus DB
             foreach (var s in _db.StweSchluesselGetByLiegenschaft(_set.LiegenschaftId))
                 Schluessel.Add(s);
 
-            // 2) Wenn schon verteilt wurde: verwendeten Schlüssel anzeigen (z.B. ENERGIE)
-            // sonst Standard: MEA → FIX → erster echter → Energie
             if (!string.IsNullOrWhiteSpace(_lastUsedSourceFromRows))
             {
                 if (string.Equals(_lastUsedSourceFromRows, "ENERGIE", StringComparison.OrdinalIgnoreCase))
@@ -363,8 +334,6 @@ namespace MyCoinFlow.Views
             UpdateEnergyVisibility();
         }
 
-
-
         private void LoadZaehlerdatenSets()
         {
             ZaehlerdatenSets.Clear();
@@ -387,7 +356,6 @@ namespace MyCoinFlow.Views
 
                 var label = string.IsNullOrWhiteSpace(notiz) ? date : $"{date} – {notiz}";
 
-                // Erfassungsart sichtbar machen
                 if (s.ErfassungsTyp == 1)
                 {
                     if (s.MonatsAnzahl.HasValue && s.MonatsAnzahl.Value > 0)
@@ -413,15 +381,14 @@ namespace MyCoinFlow.Views
                 });
             }
 
-            // 1) Wenn Set bereits gespeichert hat, welches Zählerdaten-Set verwendet wurde -> das wählen
             int? savedId = null;
+
             try
             {
                 savedId = _db.StweSetGetEnergieZaehlerdatenSetId(_set.Id);
             }
             catch
             {
-                // bewusst still: Dialog soll trotzdem funktionieren
             }
 
             if (savedId.HasValue)
@@ -431,9 +398,8 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // 2) sonst Default-Auswahl: neustes Set, das <= Set-Datum ist (sonst neustes insgesamt)
             var best = ZaehlerdatenSets
-                .Where(x => x.Model.ErfasstAm.Date <= _set.Datum.Date)
+                .Where(x => x.Model.ErfasstAm.Date <= _set.VerteilDatum.Date)
                 .OrderByDescending(x => x.Model.ErfasstAm)
                 .ThenByDescending(x => x.Model.Id)
                 .FirstOrDefault();
@@ -441,12 +407,9 @@ namespace MyCoinFlow.Views
             SelectedZaehlerdatenSet = best ?? ZaehlerdatenSets.FirstOrDefault();
         }
 
-
-
         private void UpdateEnergyVisibility()
         {
             IsEnergyVisible = string.Equals(SelectedSchluessel?.Modus?.Trim(), "ENERGIE", StringComparison.OrdinalIgnoreCase);
-
         }
 
         private void RefreshEnergieInfo()
@@ -454,16 +417,7 @@ namespace MyCoinFlow.Views
             EnergieDiffRows.Clear();
             _prevZaehlerdatenSet = null;
 
-            if (!IsEnergyVisible)
-            {
-                EnergieZeitraumText = "Zeitraum: —";
-                EnergieNotizText = "Notiz: —";
-                EnergieRechnungKwhText = "—";
-                EnergieGutschriftChfText = "—";
-                return;
-            }
-
-            if (SelectedZaehlerdatenSet == null)
+            if (!IsEnergyVisible || SelectedZaehlerdatenSet == null)
             {
                 EnergieZeitraumText = "Zeitraum: —";
                 EnergieNotizText = "Notiz: —";
@@ -515,6 +469,7 @@ namespace MyCoinFlow.Views
                 .ToDictionary(x => x.ZaehlerId, x => x.NeuWert);
 
             var prevLines = new Dictionary<int, decimal>();
+
             if (!isMonatswertSet && _prevZaehlerdatenSet != null)
             {
                 prevLines = _db.StweZaehlerdatenLinesGetBySet(_prevZaehlerdatenSet.Id)
@@ -542,9 +497,6 @@ namespace MyCoinFlow.Views
             }
         }
 
-
-        // ===== Row events =====
-
         private void Rows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.NewItems != null)
@@ -566,8 +518,6 @@ namespace MyCoinFlow.Views
             if (e.PropertyName == nameof(RowVm.BetragText) || e.PropertyName == nameof(RowVm.Betrag))
                 RaiseTotals();
         }
-
-        // ===== Buttons =====
 
         private void AddRow_Click(object sender, RoutedEventArgs e)
         {
@@ -616,6 +566,7 @@ namespace MyCoinFlow.Views
             }
 
             var lines = _db.StweSchluesselLinesGet(SelectedSchluessel.Id);
+
             if (lines.Count == 0)
             {
                 MessageBox.Show("Dieser FIX-Schlüssel hat noch keine Zeilen.\n\nBitte unter „Liegenschaften → Schlüssel“ erfassen.",
@@ -624,6 +575,7 @@ namespace MyCoinFlow.Views
             }
 
             var sumPct = lines.Sum(x => x.AnteilProzent);
+
             if (Math.Abs((double)(sumPct - 100m)) > 0.0001)
             {
                 MessageBox.Show($"Schlüssel ist ungültig: Summe ist {sumPct:N4}% (muss 100.0000% sein).",
@@ -632,6 +584,7 @@ namespace MyCoinFlow.Views
             }
 
             var total = SetTotalSigned;
+
             var raw = lines.Select(l =>
             {
                 var amount = total * (l.AnteilProzent / 100m);
@@ -675,7 +628,8 @@ namespace MyCoinFlow.Views
 
             foreach (var u in units)
             {
-                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.VerteilDatum);
+
                 if (!oid.HasValue)
                 {
                     missing.Add(u.Bezeichnung);
@@ -691,16 +645,18 @@ namespace MyCoinFlow.Views
             if (missing.Count > 0)
             {
                 MessageBox.Show(
-                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    $"Für folgende Einheiten ist am Verteil-Stichtag ({_set.VerteilDatum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
                     string.Join("\n• ", missing.Take(10)) +
                     (missing.Count > 10 ? "\n…" : "") +
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
                     "Auto verteilen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
             var sumMea = ownerMea.Values.Sum();
+
             if (sumMea <= 0m)
             {
                 MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
@@ -709,6 +665,7 @@ namespace MyCoinFlow.Views
             }
 
             var total = SetTotalSigned;
+
             var raw = ownerMea.Select(kv =>
             {
                 var amount = total * (kv.Value / sumMea);
@@ -718,7 +675,6 @@ namespace MyCoinFlow.Views
             ApplyRoundedRows(raw, $"Auto (MEA): {SelectedSchluessel.Name}", $"MEA:{SelectedSchluessel.Id}");
         }
 
-        // ===== ENERGIE: Rechnen aus Zählerdaten-Set =====
         void EnergieBerechnen_Click(object sender, RoutedEventArgs e)
         {
             if (!IsEditable) return;
@@ -744,14 +700,12 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // Merken, welches Zählerdaten-Set für dieses STWE-Set verwendet wurde
             try
             {
                 _db.StweSetUpdateEnergieZaehlerdatenSetId(_set.Id, SelectedZaehlerdatenSet.Model.Id);
             }
             catch
             {
-                // bewusst still: Berechnung soll trotzdem laufen
             }
 
             if (Rows.Count > 0)
@@ -772,14 +726,12 @@ namespace MyCoinFlow.Views
             if (EnergieDiffRows.Count == 0)
                 RefreshEnergieInfo();
 
-            // Gutschrift-Sonderfall: weiterhin vollständig nach MEA
             if (IsCreditSet)
             {
                 ApplyEnergyAsMeaOnly();
                 return;
             }
 
-            // ===== MEA-Basis vorbereiten (wie bisher), wird für Plausibilitäten/Notizen weiter genutzt =====
             var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
                            .Where(u => u.MeaPromille.HasValue && u.MeaPromille.Value > 0m)
                            .ToList();
@@ -796,7 +748,8 @@ namespace MyCoinFlow.Views
 
             foreach (var u in units)
             {
-                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.VerteilDatum);
+
                 if (!oid.HasValue)
                 {
                     missing.Add(u.Bezeichnung);
@@ -812,16 +765,18 @@ namespace MyCoinFlow.Views
             if (missing.Count > 0)
             {
                 MessageBox.Show(
-                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    $"Für folgende Einheiten ist am Verteil-Stichtag ({_set.VerteilDatum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
                     string.Join("\n• ", missing.Take(10)) +
                     (missing.Count > 10 ? "\n…" : "") +
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
                     "Energie berechnen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
             var sumMea = ownerMea.Values.Sum();
+
             if (sumMea <= 0m)
             {
                 MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
@@ -829,16 +784,19 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // ===== Neu: Verteilung pro Zähler über ZÄHLER-ZEILEN (StweZaehlerLine) =====
             var ownerAmountRaw = new Dictionary<int, decimal>();
             var ownerNotizParts = new Dictionary<int, List<string>>();
 
             void AddAmount(int ownerId, decimal value, string notizPart)
             {
-                if (!ownerAmountRaw.ContainsKey(ownerId)) ownerAmountRaw[ownerId] = 0m;
+                if (!ownerAmountRaw.ContainsKey(ownerId))
+                    ownerAmountRaw[ownerId] = 0m;
+
                 ownerAmountRaw[ownerId] += value;
 
-                if (!ownerNotizParts.ContainsKey(ownerId)) ownerNotizParts[ownerId] = new List<string>();
+                if (!ownerNotizParts.ContainsKey(ownerId))
+                    ownerNotizParts[ownerId] = new List<string>();
+
                 ownerNotizParts[ownerId].Add(notizPart);
             }
 
@@ -851,7 +809,6 @@ namespace MyCoinFlow.Views
 
                 var chfTotalForZaehler = diff * preis;
 
-                // Zähler-Quoten holen
                 var zLines = _db.StweZaehlerLinesGet(d.ZaehlerId);
                 var zSumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
 
@@ -883,6 +840,7 @@ namespace MyCoinFlow.Views
             }
 
             var sumOwner = ownerAmountRaw.Values.Sum();
+
             if (sumOwner == 0m)
             {
                 MessageBox.Show("Es konnte kein Betrag berechnet werden (Summe = 0).",
@@ -890,7 +848,6 @@ namespace MyCoinFlow.Views
                 return;
             }
 
-            // Skala auf exaktes SetTotalSigned
             var scale = SetTotalSigned / sumOwner;
 
             var raw = ownerAmountRaw.Select(kv => new RawShare
@@ -899,8 +856,8 @@ namespace MyCoinFlow.Views
                 BetragRaw = kv.Value * scale
             }).ToList();
 
-            // Notizen
             var ownerNotiz = new Dictionary<int, string>();
+
             foreach (var kv in ownerNotizParts)
             {
                 var oid = kv.Key;
@@ -920,8 +877,6 @@ namespace MyCoinFlow.Views
             ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
         }
 
-
-
         private void ApplyEnergyAsMeaOnly()
         {
             var units = _db.StweEinheitenGetByLiegenschaft(_set.LiegenschaftId)
@@ -940,7 +895,8 @@ namespace MyCoinFlow.Views
 
             foreach (var u in units)
             {
-                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.Datum);
+                var oid = _db.StweEigentuemerGetByEinheitAtDate(u.Id, _set.VerteilDatum);
+
                 if (!oid.HasValue)
                 {
                     missing.Add(u.Bezeichnung);
@@ -956,16 +912,18 @@ namespace MyCoinFlow.Views
             if (missing.Count > 0)
             {
                 MessageBox.Show(
-                    $"Für folgende Einheiten ist am Transaktionsdatum ({_set.Datum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    $"Für folgende Einheiten ist am Verteil-Stichtag ({_set.VerteilDatum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
                     string.Join("\n• ", missing.Take(10)) +
                     (missing.Count > 10 ? "\n…" : "") +
                     "\n\nBitte unter „Liegenschaften → Eigentümer & Zuordnung“ nachpflegen.",
                     "Energie berechnen",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
             var sumMea = ownerMea.Values.Sum();
+
             if (sumMea <= 0m)
             {
                 MessageBox.Show("Summe MEA ist 0 – keine Verteilung möglich.",
@@ -974,6 +932,7 @@ namespace MyCoinFlow.Views
             }
 
             var total = SetTotalSigned;
+
             var raw = ownerMea.Select(kv =>
             {
                 var amount = total * (kv.Value / sumMea);
@@ -986,8 +945,6 @@ namespace MyCoinFlow.Views
 
             ApplyRoundedRows(raw, ownerNotiz, "ENERGIE");
         }
-
-        // ===== Rounded Rows =====
 
         private void ApplyRoundedRows(List<RawShare> raw, string notiz, string source)
         {
@@ -1014,6 +971,7 @@ namespace MyCoinFlow.Views
             }
 
             Rows.Clear();
+
             foreach (var r in rounded)
             {
                 Rows.Add(new RowVm
@@ -1056,6 +1014,7 @@ namespace MyCoinFlow.Views
             }
 
             Rows.Clear();
+
             foreach (var r in rounded)
             {
                 ownerNotiz ??= new();
@@ -1073,8 +1032,6 @@ namespace MyCoinFlow.Views
             RaiseTotals();
         }
 
-        // ===== Save =====
-
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             if (!IsEditable) return;
@@ -1085,7 +1042,6 @@ namespace MyCoinFlow.Views
         {
             if (!IsEditable) return;
 
-            // Auto-Save beim X
             if (!TrySave())
                 e.Cancel = true;
         }
@@ -1129,7 +1085,6 @@ namespace MyCoinFlow.Views
 
         private bool ValidateBeforeSave()
         {
-            // leeres Set ist ok
             if (Rows.Count == 0) return true;
 
             if (Rows.Any(r => !r.EigentuemerId.HasValue || r.EigentuemerId.Value <= 0))
@@ -1146,7 +1101,6 @@ namespace MyCoinFlow.Views
                 return false;
             }
 
-            // Vorzeichen-Regeln
             if (IsCreditSet)
             {
                 if (Rows.Any(r => r.Betrag > 0m))
@@ -1166,7 +1120,6 @@ namespace MyCoinFlow.Views
                 }
             }
 
-            // Summen-Regel (Überverteilung verhindern) – für beide Vorzeichen korrekt
             var sum = Rows.Sum(r => r.Betrag);
             var total = SetTotalSigned;
             const decimal eps = 0.0001m;
@@ -1193,8 +1146,6 @@ namespace MyCoinFlow.Views
             return true;
         }
 
-        // ===== Helpers =====
-
         private static string FormatChf(decimal v)
         {
             var ch = CultureInfo.GetCultureInfo("de-CH");
@@ -1210,10 +1161,8 @@ namespace MyCoinFlow.Views
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
-
-
-
 }

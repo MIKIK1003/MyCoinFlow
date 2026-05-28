@@ -124,6 +124,9 @@
                     <DataGridCheckBoxColumn Header="Ist Budgetkonto"
                                             Binding="{Binding IstBudgetkonto, UpdateSourceTrigger=PropertyChanged}"
                                             Width="160"/>
+                    <DataGridCheckBoxColumn Header="Nicht in STWE-Sets"
+                        Binding="{Binding ExcludeFromStweSets, UpdateSourceTrigger=PropertyChanged}"
+                        Width="170"/>
                 </DataGrid.Columns>
             </DataGrid>
 

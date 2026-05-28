@@ -3918,7 +3918,6 @@ WHERE Id = @Id";
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
 
-            // 1) Tabelle anlegen (falls nicht vorhanden) – unverändert bis auf expliziten Constraint-Namen
             const string createSql = @"
 IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[NumberRangeRules]') AND type = N'U')
 BEGIN
@@ -3929,13 +3928,13 @@ BEGIN
         [Richtung]       NVARCHAR(12) NOT NULL,
         [Bezeichnung]    NVARCHAR(64) NULL,
         [IstBudgetkonto] BIT NOT NULL CONSTRAINT DF_NumberRangeRules_IstBudgetkonto DEFAULT(0),
+        [ExcludeFromStweSets] BIT NOT NULL CONSTRAINT DF_NumberRangeRules_ExcludeFromStweSets DEFAULT(0),
         CONSTRAINT CK_NumberRangeRules_Range CHECK ([RangeStart] <= [RangeEnd])
     );
 END";
             using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(createSql, c))
                 cmd.ExecuteNonQuery();
 
-            // 2) Sicherstellen: Spalte Bezeichnung existiert
             bool hasBezeichnung;
             using (var chk = new Microsoft.Data.SqlClient.SqlCommand(
                 "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','Bezeichnung') IS NULL THEN 0 ELSE 1 END", c))
@@ -3943,6 +3942,7 @@ END";
                 var v = chk.ExecuteScalar();
                 hasBezeichnung = v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
             }
+
             if (!hasBezeichnung)
             {
                 using (var alter = new Microsoft.Data.SqlClient.SqlCommand(
@@ -3950,6 +3950,7 @@ END";
                 {
                     alter.ExecuteNonQuery();
                 }
+
                 using (var fill = new Microsoft.Data.SqlClient.SqlCommand(@"
 UPDATE dbo.NumberRangeRules
 SET Bezeichnung = CASE WHEN Richtung = N'Einnahme' 
@@ -3961,7 +3962,24 @@ WHERE Bezeichnung IS NULL;", c))
                 }
             }
 
-            // 3) **WICHTIG**: CHECK-Constraint für Richtung auf (Ausgabe, Einnahme, Neutral) bringen
+            bool hasExcludeFromStweSets;
+            using (var chk = new Microsoft.Data.SqlClient.SqlCommand(
+                "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','ExcludeFromStweSets') IS NULL THEN 0 ELSE 1 END", c))
+            {
+                var v = chk.ExecuteScalar();
+                hasExcludeFromStweSets = v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+            }
+
+            if (!hasExcludeFromStweSets)
+            {
+                using var alter = new Microsoft.Data.SqlClient.SqlCommand(@"
+ALTER TABLE dbo.NumberRangeRules
+ADD [ExcludeFromStweSets] BIT NOT NULL 
+    CONSTRAINT DF_NumberRangeRules_ExcludeFromStweSets DEFAULT(0);", c);
+
+                alter.ExecuteNonQuery();
+            }
+
             EnsureNumberRangeRulesAllowNeutral(c);
         }
 
@@ -4002,20 +4020,30 @@ ALTER TABLE dbo.NumberRangeRules CHECK CONSTRAINT CK_NumberRangeRules_Richtung_A
             }
         }
 
-
-
-
         public System.Collections.Generic.List<NumberRangeRule> LadeNummernRegeln()
         {
             EnsureNumberRangeRulesTable();
+
             var list = new System.Collections.Generic.List<NumberRangeRule>();
+
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
-            const string sql = @"SELECT Id, RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto
-                         FROM dbo.NumberRangeRules
-                         ORDER BY RangeStart, RangeEnd";
+
+            const string sql = @"
+SELECT 
+    Id, 
+    RangeStart, 
+    RangeEnd, 
+    Richtung, 
+    Bezeichnung, 
+    IstBudgetkonto,
+    ExcludeFromStweSets
+FROM dbo.NumberRangeRules
+ORDER BY RangeStart, RangeEnd;";
+
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new NumberRangeRule
@@ -4025,44 +4053,80 @@ ALTER TABLE dbo.NumberRangeRules CHECK CONSTRAINT CK_NumberRangeRules_Richtung_A
                     RangeEnd = r.GetInt32(2),
                     Richtung = r.GetString(3),
                     Bezeichnung = r.IsDBNull(4) ? null : r.GetString(4),
-                    IstBudgetkonto = r.GetBoolean(5)
+                    IstBudgetkonto = r.GetBoolean(5),
+                    ExcludeFromStweSets = r.GetBoolean(6)
                 });
             }
+
             return list;
         }
 
         public int SpeichereNummernRegel(NumberRangeRule rule)
         {
             EnsureNumberRangeRulesTable();
+
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
-            const string sql = @"INSERT INTO dbo.NumberRangeRules (RangeStart, RangeEnd, Richtung, Bezeichnung, IstBudgetkonto)
-                         OUTPUT INSERTED.Id
-                         VALUES (@s, @e, @r, @b, @flag)";
+
+            const string sql = @"
+INSERT INTO dbo.NumberRangeRules 
+(
+    RangeStart, 
+    RangeEnd, 
+    Richtung, 
+    Bezeichnung, 
+    IstBudgetkonto,
+    ExcludeFromStweSets
+)
+OUTPUT INSERTED.Id
+VALUES 
+(
+    @s, 
+    @e, 
+    @r, 
+    @b, 
+    @flag,
+    @excludeFromStweSets
+);";
+
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@s", rule.RangeStart);
             cmd.Parameters.AddWithValue("@e", rule.RangeEnd);
             cmd.Parameters.AddWithValue("@r", rule.Richtung);
             cmd.Parameters.AddWithValue("@b", (object?)rule.Bezeichnung ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@flag", rule.IstBudgetkonto);
+            cmd.Parameters.AddWithValue("@excludeFromStweSets", rule.ExcludeFromStweSets);
+
             return (int)cmd.ExecuteScalar();
         }
 
         public void AktualisiereNummernRegel(NumberRangeRule rule)
         {
             EnsureNumberRangeRulesTable();
+
             using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
             c.Open();
-            const string sql = @"UPDATE dbo.NumberRangeRules
-                         SET RangeStart=@s, RangeEnd=@e, Richtung=@r, Bezeichnung=@b, IstBudgetkonto=@flag
-                         WHERE Id=@id";
+
+            const string sql = @"
+UPDATE dbo.NumberRangeRules
+SET 
+    RangeStart = @s, 
+    RangeEnd = @e, 
+    Richtung = @r, 
+    Bezeichnung = @b, 
+    IstBudgetkonto = @flag,
+    ExcludeFromStweSets = @excludeFromStweSets
+WHERE Id = @id;";
+
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@s", rule.RangeStart);
             cmd.Parameters.AddWithValue("@e", rule.RangeEnd);
             cmd.Parameters.AddWithValue("@r", rule.Richtung);
             cmd.Parameters.AddWithValue("@b", (object?)rule.Bezeichnung ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@flag", rule.IstBudgetkonto);
+            cmd.Parameters.AddWithValue("@excludeFromStweSets", rule.ExcludeFromStweSets);
             cmd.Parameters.AddWithValue("@id", rule.Id);
+
             cmd.ExecuteNonQuery();
         }
 
@@ -4126,14 +4190,28 @@ ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC";
             return v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
         }
 
+        private bool NumberRangeRulesHasExcludeFromStweSets()
+        {
+            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+            c.Open();
+
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
+                "SELECT CASE WHEN COL_LENGTH('dbo.NumberRangeRules','ExcludeFromStweSets') IS NULL THEN 0 ELSE 1 END", c);
+
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value && Convert.ToInt32(v) == 1;
+        }
+
+
         public void AssertNumberRangeRulesSchema()
         {
-            // 1) Erstellen/Erweitern versuchen
             EnsureNumberRangeRulesTable();
-            // 2) Hart prüfen
+
             if (!NumberRangeRulesHasBezeichnung())
-                throw new Exception("Spalte 'Bezeichnung' fehlt weiterhin in dbo.NumberRangeRules. " +
-                                    "Prüfe Datenbank/Connection und Rechte.");
+                throw new Exception("Spalte 'Bezeichnung' fehlt weiterhin in dbo.NumberRangeRules. Prüfe Datenbank/Connection und Rechte.");
+
+            if (!NumberRangeRulesHasExcludeFromStweSets())
+                throw new Exception("Spalte 'ExcludeFromStweSets' fehlt weiterhin in dbo.NumberRangeRules. Prüfe Datenbank/Connection und Rechte.");
         }
 
         // Löscht alle Aliase, die auf eine Adresse zeigen.
@@ -5786,19 +5864,18 @@ WHERE Id = @id;";
 
         public List<MyCoinFlow.Models.Transaktion> StweTransaktionenGetRecent(int top = 500)
         {
-            // Wir nutzen die bestehende Tabelle Transaktion.
-            // Minimal: letzte N Transaktionen für Auswahl im Dialog.
-            // Erweiterung: Blende Transaktionen aus, die bereits in dbo.StweSet verarbeitet wurden (TransaktionId vorhanden).
-            // NEU: Zeige nur Transaktionen im aktiven Budgetzeitraum anhand ISNULL(BudgetDatum, Datum).
             var list = new List<MyCoinFlow.Models.Transaktion>();
+
+            EnsureNumberRangeRulesTable();
 
             using var c = CreateConnection();
             c.Open();
 
-            // NEU: aktiven Zeitraum laden (wie in anderen Bereichen)
             var activeId = HoleAktivenBudgetzeitraumId();
+
             DateTime? start = null;
             DateTime? end = null;
+
             if (activeId.HasValue)
             {
                 var bz = HoleBudgetzeitraum(activeId.Value);
@@ -5809,29 +5886,48 @@ WHERE Id = @id;";
                 }
             }
 
+            var safeTop = top <= 0 ? 500 : top;
+
             var sql = $@"
-SELECT TOP ({top})
-    t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
-    t.Betrag, t.Notiz,
-    t.AdresseId, a.Name as AdresseName,
-    t.GeldinstitutId, g.Name as BankName,
+SELECT TOP ({safeTop})
+    t.Id,
+    t.Datum,
+    t.BudgetDatum,
+    t.VonKontoId,
+    t.NachKontoId,
+    t.Betrag,
+    t.Notiz,
+    t.AdresseId,
+    a.Name AS AdresseName,
+    t.GeldinstitutId,
+    g.Name AS BankName,
     t.ImportQuelle
 FROM dbo.Transaktion t
 LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+LEFT JOIN dbo.Kontenplan vk  ON vk.Id = t.VonKontoId
+LEFT JOIN dbo.Kontenplan nk  ON nk.Id = t.NachKontoId
 WHERE NOT EXISTS (
     SELECT 1
     FROM dbo.StweSet s
     WHERE s.TransaktionId = t.Id
 )
-  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU
-  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)  -- NEU
+AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)
+AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)
+AND NOT EXISTS (
+    SELECT 1
+    FROM dbo.NumberRangeRules nr
+    WHERE nr.ExcludeFromStweSets = 1
+      AND (
+            TRY_CONVERT(INT, vk.Kontonummer) BETWEEN nr.RangeStart AND nr.RangeEnd
+         OR TRY_CONVERT(INT, nk.Kontonummer) BETWEEN nr.RangeStart AND nr.RangeEnd
+      )
+)
 ORDER BY t.Datum DESC, t.Id DESC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
 
-            // NEU: Zeitraumparameter (wenn kein aktiver Zeitraum: null => keine Einschränkung)
             var pVon = cmd.CreateParameter();
             pVon.ParameterName = "@von";
             pVon.Value = (object?)start ?? DBNull.Value;
@@ -5843,15 +5939,14 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             cmd.Parameters.Add(pBis);
 
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new MyCoinFlow.Models.Transaktion
                 {
                     Id = r.GetInt32(0),
                     Datum = r.GetDateTime(1),
-
-                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2), // NEU
-
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
                     VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
                     NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
                     Betrag = r.GetDecimal(5),
@@ -5867,7 +5962,7 @@ ORDER BY t.Datum DESC, t.Id DESC;";
             return list;
         }
 
-        
+
         public int StweSetInsert(int liegenschaftId, int transaktionId, string? titel)
         {
             EnsureStweSchema();
@@ -5988,6 +6083,7 @@ SELECT
     s.LiegenschaftId,
     s.TransaktionId,
     t.Datum,
+    t.BudgetDatum
 
     -- SIGNED Total (Belastung = +, Gutschrift = -)
     CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
@@ -7740,6 +7836,7 @@ SELECT
     s.LiegenschaftId,
     s.TransaktionId,
     t.Datum,
+    t.BudgetDatum,
 
     -- SIGNED Total (Belastung = +, Gutschrift = -)
     CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
@@ -7759,9 +7856,9 @@ OUTER APPLY (
     WHERE l.SetId = s.Id
 ) x
 WHERE s.LiegenschaftId = @lid
-  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU
-  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)  -- NEU
-ORDER BY t.Datum DESC, s.Id DESC;";
+  AND (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)
+  AND (@bis IS NULL OR ISNULL(t.BudgetDatum, t.Datum) <= @bis)
+ORDER BY ISNULL(t.BudgetDatum, t.Datum) DESC, s.Id DESC;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
@@ -7771,6 +7868,7 @@ ORDER BY t.Datum DESC, s.Id DESC;";
             cmd.Parameters.AddWithValue("@bis", (object?)bis?.Date ?? DBNull.Value);
 
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new MyCoinFlow.Models.StweSetRow
@@ -7779,17 +7877,21 @@ ORDER BY t.Datum DESC, s.Id DESC;";
                     LiegenschaftId = r.GetInt32(1),
                     TransaktionId = r.GetInt32(2),
                     Datum = r.GetDateTime(3),
-                    Betrag = r.GetDecimal(4),
-                    Titel = r.GetString(5),
-                    IsClosed = r.GetBoolean(6),
-                    IsCredit = r.GetBoolean(7),
-                    Verteilt = r.GetDecimal(8),
-                    Rest = r.GetDecimal(9)
+                    BudgetDatum = r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
+                    Betrag = r.GetDecimal(5),
+                    Titel = r.GetString(6),
+                    IsClosed = r.GetBoolean(7),
+                    IsCredit = r.GetBoolean(8),
+                    Verteilt = r.GetDecimal(9),
+                    Rest = r.GetDecimal(10)
                 });
             }
 
             return list;
         }
+
+
+
 
         // ------------------------------------------------------------
         // STWE: Zählerdaten-Sets (Ablesungen)
