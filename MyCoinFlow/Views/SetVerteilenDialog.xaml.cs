@@ -861,34 +861,63 @@ namespace MyCoinFlow.Views
 
                 var chfTotalForZaehler = diff * preis;
 
-                var zLines = _db.StweZaehlerLinesGet(d.ZaehlerId);
-                var zSumPct = zLines.Sum(x => Math.Max(0m, x.AnteilProzent));
+                var typ = (d.Typ ?? "").Trim().ToUpperInvariant();
 
-                if (zSumPct <= 0m)
+                if (typ == "DIREKT")
                 {
-                    MessageBox.Show(
-                        $"Zähler „{d.Name}“ hat keine gültigen Verteilzeilen.\n\n" +
-                        "Bitte beim Zähler unter „Zeilen bearbeiten“ die Eigentümer-Quoten erfassen (Summe > 0, ideal 100%).",
-                        "Energie berechnen",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
+                    if (!d.EinheitId.HasValue || d.EinheitId.Value <= 0)
+                    {
+                        MessageBox.Show(
+                            $"DIREKT-Zähler „{d.Name}“ hat keine Einheit.",
+                            "Energie berechnen",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                        return;
+                    }
 
-                foreach (var ln in zLines)
-                {
-                    var pct = Math.Max(0m, ln.AnteilProzent);
-                    if (pct <= 0m) continue;
+                    var ownerId = _db.StweEigentuemerGetByEinheitAtDate(d.EinheitId.Value, _set.VerteilDatum);
 
-                    var part = chfTotalForZaehler * (pct / zSumPct);
-                    if (part == 0m) continue;
+                    if (!ownerId.HasValue)
+                    {
+                        MessageBox.Show(
+                            $"Für DIREKT-Zähler „{d.Name}“ ist am Verteil-Stichtag ({_set.VerteilDatum:yyyy-MM-dd}) kein Eigentümer zugeordnet.",
+                            "Energie berechnen",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                        return;
+                    }
 
                     AddAmount(
-                        ln.EigentuemerId,
-                        part,
-                        $"{d.Name}: {diff:0.###}kWh×{preis:0.####} × ({pct:0.###}/{zSumPct:0.###}) = {part:0.00}"
+                        ownerId.Value,
+                        chfTotalForZaehler,
+                        $"{d.Name}: DIREKT {diff:0.###}kWh × {preis:0.####} = {chfTotalForZaehler:0.00}"
                     );
+
+                    continue;
                 }
+
+                if (typ == "ALLG" || typ == "HEIZ")
+                {
+                    foreach (var kv in ownerMea)
+                    {
+                        var part = chfTotalForZaehler * (kv.Value / sumMea);
+
+                        AddAmount(
+                            kv.Key,
+                            part,
+                            $"{d.Name}: {typ} {diff:0.###}kWh × {preis:0.####} × MEA {kv.Value:0.###}/{sumMea:0.###} = {part:0.00}"
+                        );
+                    }
+
+                    continue;
+                }
+
+                MessageBox.Show(
+                    $"Unbekannter Zählertyp „{d.Typ}“ bei Zähler „{d.Name}“.",
+                    "Energie berechnen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
             }
 
             var sumOwner = ownerAmountRaw.Values.Sum();

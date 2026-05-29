@@ -255,10 +255,8 @@ namespace MyCoinFlow.Views
             if (!Model.EinheitId.HasValue || Model.EinheitId.Value <= 0)
                 return;
 
-            if (ResultLines != null && ResultLines.Count > 0)
-                return;
-
             int? ownerId = null;
+
             try
             {
                 ownerId = _db.StweEigentuemerGetByEinheitAtDate(Model.EinheitId.Value, _stichtag);
@@ -271,10 +269,13 @@ namespace MyCoinFlow.Views
             if (!ownerId.HasValue)
                 return;
 
+            // DIREKT ist fachlich immer 100 % auf die gewählte Einheit.
+            // Bestehende alte Eigentümer-Zeilen werden bewusst ersetzt,
+            // damit EinheitId gespeichert wird und spätere Eigentümerwechsel funktionieren.
             ResultLines = new List<(int? EinheitId, int EigentuemerId, decimal AnteilProzent)>
-{
-    (Model.EinheitId, ownerId.Value, 100m)
-};
+    {
+        (Model.EinheitId, ownerId.Value, 100m)
+    };
 
             OnPropertyChanged(nameof(LinesInfo));
         }
