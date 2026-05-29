@@ -15,9 +15,23 @@ namespace MyCoinFlow.Views
     {
         public sealed class RowVm : INotifyPropertyChanged
         {
+            private int? _einheitId;
+            private string _einheitBezeichnung = "";
             private int _eigentuemerId;
             private string _eigentuemerName = "";
             private decimal _anteilProzent;
+
+            public int? EinheitId
+            {
+                get => _einheitId;
+                set { _einheitId = value; OnPropertyChanged(); }
+            }
+
+            public string EinheitBezeichnung
+            {
+                get => _einheitBezeichnung;
+                set { _einheitBezeichnung = value; OnPropertyChanged(); }
+            }
 
             public int EigentuemerId
             {
@@ -44,6 +58,7 @@ namespace MyCoinFlow.Views
         }
 
         public ObservableCollection<StweEigentuemer> Owners { get; } = new();
+        public ObservableCollection<StweEinheit> Einheiten { get; } = new();
         public ObservableCollection<RowVm> Rows { get; } = new();
 
         public string TitleText { get; private set; } = "Schlüssel-Zeilen";
@@ -51,21 +66,28 @@ namespace MyCoinFlow.Views
         public string SumInfo
             => $"Summe: {Rows.Sum(r => r.AnteilProzent):N4}%  (muss 100.0000% ergeben)";
 
-        public SchluesselZeilenDialog(string schluesselName,
-                                      System.Collections.Generic.IEnumerable<StweEigentuemer> owners,
-                                      System.Collections.Generic.IEnumerable<StweSchluesselLine> existing)
+        public SchluesselZeilenDialog(
+            string schluesselName,
+            System.Collections.Generic.IEnumerable<StweEigentuemer> owners,
+            System.Collections.Generic.IEnumerable<StweEinheit> einheiten,
+            System.Collections.Generic.IEnumerable<StweSchluesselLine> existing)
         {
             InitializeComponent();
 
             TitleText = $"Schlüssel: {schluesselName} (Fix %)";
 
-            foreach (var o in owners)
+            foreach (var e in einheiten.OrderBy(x => x.Bezeichnung))
+                Einheiten.Add(e);
+
+            foreach (var o in owners.OrderBy(x => x.Name))
                 Owners.Add(o);
 
             foreach (var e in existing)
             {
                 Rows.Add(new RowVm
                 {
+                    EinheitId = e.EinheitId,
+                    EinheitBezeichnung = e.EinheitBezeichnung,
                     EigentuemerId = e.EigentuemerId,
                     EigentuemerName = e.EigentuemerName,
                     AnteilProzent = e.AnteilProzent
@@ -81,7 +103,7 @@ namespace MyCoinFlow.Views
         {
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                SyncOwnerNames();
+                SyncDisplayNames();
                 RaiseSumInfo();
             }));
         }
@@ -90,6 +112,8 @@ namespace MyCoinFlow.Views
         {
             Rows.Add(new RowVm
             {
+                EinheitId = null,
+                EinheitBezeichnung = "",
                 EigentuemerId = 0,
                 EigentuemerName = "",
                 AnteilProzent = 0m
@@ -111,7 +135,7 @@ namespace MyCoinFlow.Views
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            SyncOwnerNames();
+            SyncDisplayNames();
 
             if (!Validate())
                 return;
@@ -119,12 +143,18 @@ namespace MyCoinFlow.Views
             DialogResult = true;
         }
 
-        private void SyncOwnerNames()
+        private void SyncDisplayNames()
         {
             foreach (var r in Rows)
             {
-                var o = Owners.FirstOrDefault(x => x.Id == r.EigentuemerId);
-                r.EigentuemerName = o?.Name ?? "";
+                var einheit = r.EinheitId.HasValue
+                    ? Einheiten.FirstOrDefault(x => x.Id == r.EinheitId.Value)
+                    : null;
+
+                r.EinheitBezeichnung = einheit?.Bezeichnung ?? "";
+
+                var owner = Owners.FirstOrDefault(x => x.Id == r.EigentuemerId);
+                r.EigentuemerName = owner?.Name ?? "";
             }
         }
 
@@ -139,7 +169,7 @@ namespace MyCoinFlow.Views
 
             if (Rows.Any(r => r.EigentuemerId <= 0))
             {
-                MessageBox.Show("Bitte in allen Zeilen einen Eigentümer wählen.", "Schlüssel",
+                MessageBox.Show("Bitte in allen Zeilen einen Eigentümer/Fallback wählen.", "Schlüssel",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
@@ -159,10 +189,26 @@ namespace MyCoinFlow.Views
                 return false;
             }
 
-            var dup = Rows.GroupBy(r => r.EigentuemerId).FirstOrDefault(g => g.Count() > 1);
-            if (dup != null)
+            var dupEinheit = Rows
+                .Where(r => r.EinheitId.HasValue)
+                .GroupBy(r => r.EinheitId!.Value)
+                .FirstOrDefault(g => g.Count() > 1);
+
+            if (dupEinheit != null)
             {
-                MessageBox.Show("Ein Eigentümer darf im Schlüssel nur einmal vorkommen.", "Schlüssel",
+                MessageBox.Show("Eine Einheit darf im Schlüssel nur einmal vorkommen.", "Schlüssel",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+
+            var dupOwnerWithoutUnit = Rows
+                .Where(r => !r.EinheitId.HasValue)
+                .GroupBy(r => r.EigentuemerId)
+                .FirstOrDefault(g => g.Count() > 1);
+
+            if (dupOwnerWithoutUnit != null)
+            {
+                MessageBox.Show("Ein Eigentümer ohne Einheit darf im Schlüssel nur einmal vorkommen.", "Schlüssel",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }

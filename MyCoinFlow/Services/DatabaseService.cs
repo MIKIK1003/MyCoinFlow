@@ -5537,6 +5537,46 @@ BEGIN
     ADD MonatsAnzahl INT NULL;
 END;
 
+-- ------------------------------------------------------------
+-- STWE: FIX-/ENERGIE-Zeilen optional auf Einheit beziehen
+-- ------------------------------------------------------------
+IF COL_LENGTH('dbo.StweSchluesselLine', 'EinheitId') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweSchluesselLine
+    ADD EinheitId INT NULL;
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_StweSchluesselLine_Einheit')
+BEGIN
+    ALTER TABLE dbo.StweSchluesselLine WITH CHECK
+    ADD CONSTRAINT FK_StweSchluesselLine_Einheit
+    FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StweSchluesselLine_EinheitId' AND object_id = OBJECT_ID('dbo.StweSchluesselLine'))
+BEGIN
+    CREATE INDEX IX_StweSchluesselLine_EinheitId ON dbo.StweSchluesselLine(EinheitId);
+END;
+
+IF COL_LENGTH('dbo.StweZaehlerLine', 'EinheitId') IS NULL
+BEGIN
+    ALTER TABLE dbo.StweZaehlerLine
+    ADD EinheitId INT NULL;
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_StweZaehlerLine_Einheit')
+BEGIN
+    ALTER TABLE dbo.StweZaehlerLine WITH CHECK
+    ADD CONSTRAINT FK_StweZaehlerLine_Einheit
+    FOREIGN KEY (EinheitId) REFERENCES dbo.StweEinheit(Id);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StweZaehlerLine_EinheitId' AND object_id = OBJECT_ID('dbo.StweZaehlerLine'))
+BEGIN
+    CREATE INDEX IX_StweZaehlerLine_EinheitId ON dbo.StweZaehlerLine(EinheitId);
+END;
+
+
 
 ";
             using var cmd = c.CreateCommand();
@@ -6198,36 +6238,67 @@ VALUES (@lid, @n, @m);";
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
-
         public List<MyCoinFlow.Models.StweSchluesselLine> StweSchluesselLinesGet(int schluesselId)
         {
             EnsureStweSchema();
 
             var list = new List<MyCoinFlow.Models.StweSchluesselLine>();
+
             using var c = CreateConnection();
             c.Open();
 
             const string sql = @"
-SELECT l.Id, l.SchluesselId, l.EigentuemerId, e.Name, l.AnteilProzent
+SELECT
+    l.Id,
+    l.SchluesselId,
+
+    l.EinheitId,
+    ISNULL(u.Bezeichnung, '') AS EinheitBezeichnung,
+
+    l.EigentuemerId,
+    e.Name,
+
+    l.AnteilProzent
+
 FROM dbo.StweSchluesselLine l
-JOIN dbo.StweEigentuemer e ON e.Id = l.EigentuemerId
+
+LEFT JOIN dbo.StweEinheit u
+    ON u.Id = l.EinheitId
+
+JOIN dbo.StweEigentuemer e
+    ON e.Id = l.EigentuemerId
+
 WHERE l.SchluesselId = @sid
-ORDER BY e.Name;";
+
+ORDER BY
+    CASE WHEN l.EinheitId IS NULL THEN 1 ELSE 0 END,
+    u.Bezeichnung,
+    e.Name;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
-            var p = cmd.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; cmd.Parameters.Add(p);
+
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@sid";
+            p.Value = schluesselId;
+            cmd.Parameters.Add(p);
 
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new MyCoinFlow.Models.StweSchluesselLine
                 {
                     Id = r.GetInt32(0),
                     SchluesselId = r.GetInt32(1),
-                    EigentuemerId = r.GetInt32(2),
-                    EigentuemerName = r.GetString(3),
-                    AnteilProzent = r.GetDecimal(4)
+
+                    EinheitId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    EinheitBezeichnung = r.IsDBNull(3) ? "" : r.GetString(3),
+
+                    EigentuemerId = r.GetInt32(4),
+                    EigentuemerName = r.GetString(5),
+
+                    AnteilProzent = r.GetDecimal(6)
                 });
             }
 
@@ -6239,50 +6310,83 @@ ORDER BY e.Name;";
             EnsureStweSchema();
 
             var list = new List<StweZaehlerLine>();
+
             using var c = CreateConnection();
             c.Open();
 
             const string sql = @"
-SELECT l.Id, l.ZaehlerId, l.EigentuemerId, o.Name, l.AnteilProzent
+SELECT
+    l.Id,
+    l.ZaehlerId,
+
+    l.EinheitId,
+    ISNULL(u.Bezeichnung, '') AS EinheitBezeichnung,
+
+    l.EigentuemerId,
+    o.Name,
+
+    l.AnteilProzent
+
 FROM dbo.StweZaehlerLine l
-JOIN dbo.StweEigentuemer o ON o.Id = l.EigentuemerId
+
+LEFT JOIN dbo.StweEinheit u
+    ON u.Id = l.EinheitId
+
+JOIN dbo.StweEigentuemer o
+    ON o.Id = l.EigentuemerId
+
 WHERE l.ZaehlerId = @zid
-ORDER BY o.Name;";
+
+ORDER BY
+    CASE WHEN l.EinheitId IS NULL THEN 1 ELSE 0 END,
+    u.Bezeichnung,
+    o.Name;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sql;
             cmd.Parameters.AddWithValue("@zid", zaehlerId);
 
             using var r = cmd.ExecuteReader();
+
             while (r.Read())
             {
                 list.Add(new StweZaehlerLine
                 {
                     Id = r.GetInt32(0),
                     ZaehlerId = r.GetInt32(1),
-                    EigentuemerId = r.GetInt32(2),
-                    EigentuemerName = r.IsDBNull(3) ? "" : r.GetString(3),
-                    AnteilProzent = r.GetDecimal(4)
+
+                    EinheitId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    EinheitBezeichnung = r.IsDBNull(3) ? "" : r.GetString(3),
+
+                    EigentuemerId = r.GetInt32(4),
+                    EigentuemerName = r.IsDBNull(5) ? "" : r.GetString(5),
+
+                    AnteilProzent = r.GetDecimal(6)
                 });
             }
 
             return list;
         }
 
-        public void StweZaehlerLinesReplace(int zaehlerId, List<(int EigentuemerId, decimal AnteilProzent)> lines)
+
+
+        public void StweZaehlerLinesReplace(int zaehlerId, List<(int? EinheitId, int EigentuemerId, decimal AnteilProzent)> lines)
         {
             EnsureStweSchema();
 
-            if (zaehlerId <= 0) throw new ArgumentException("zaehlerId muss > 0 sein.", nameof(zaehlerId));
-            if (lines == null) throw new ArgumentNullException(nameof(lines));
+            if (zaehlerId <= 0)
+                throw new ArgumentException("zaehlerId muss > 0 sein.", nameof(zaehlerId));
+
+            if (lines == null)
+                throw new ArgumentNullException(nameof(lines));
 
             using var c = CreateConnection();
             c.Open();
 
             using var tx = c.BeginTransaction();
+
             try
             {
-                // delete old
                 using (var cmd = c.CreateCommand())
                 {
                     cmd.Transaction = tx;
@@ -6291,17 +6395,32 @@ ORDER BY o.Name;";
                     cmd.ExecuteNonQuery();
                 }
 
-                // insert new
-                foreach (var (oid, pct) in lines)
+                foreach (var (einheitId, eigentuemerId, anteilProzent) in lines)
                 {
                     using var cmd = c.CreateCommand();
                     cmd.Transaction = tx;
+
                     cmd.CommandText = @"
-INSERT INTO dbo.StweZaehlerLine (ZaehlerId, EigentuemerId, AnteilProzent)
-VALUES (@zid, @oid, @pct);";
+INSERT INTO dbo.StweZaehlerLine
+(
+    ZaehlerId,
+    EinheitId,
+    EigentuemerId,
+    AnteilProzent
+)
+VALUES
+(
+    @zid,
+    @einheitId,
+    @eigentuemerId,
+    @anteilProzent
+);";
+
                     cmd.Parameters.AddWithValue("@zid", zaehlerId);
-                    cmd.Parameters.AddWithValue("@oid", oid);
-                    cmd.Parameters.AddWithValue("@pct", pct);
+                    cmd.Parameters.AddWithValue("@einheitId", (object?)einheitId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@eigentuemerId", eigentuemerId);
+                    cmd.Parameters.AddWithValue("@anteilProzent", anteilProzent);
+
                     cmd.ExecuteNonQuery();
                 }
 
@@ -6316,42 +6435,54 @@ VALUES (@zid, @oid, @pct);";
 
 
 
-
-
-        public void StweSchluesselLinesReplace(int schluesselId, List<(int EigentuemerId, decimal AnteilProzent)> lines)
+        public void StweSchluesselLinesReplace(int schluesselId, List<(int? EinheitId, int EigentuemerId, decimal AnteilProzent)> lines)
         {
             EnsureStweSchema();
 
-            if (schluesselId <= 0) throw new ArgumentOutOfRangeException(nameof(schluesselId));
+            if (schluesselId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(schluesselId));
+
             lines ??= new();
 
             using var c = CreateConnection();
             c.Open();
+
             using var tx = c.BeginTransaction();
 
             try
             {
-                // delete old
                 using (var del = c.CreateCommand())
                 {
                     del.Transaction = tx;
                     del.CommandText = "DELETE FROM dbo.StweSchluesselLine WHERE SchluesselId = @sid;";
-                    var p = del.CreateParameter(); p.ParameterName = "@sid"; p.Value = schluesselId; del.Parameters.Add(p);
+                    del.Parameters.AddWithValue("@sid", schluesselId);
                     del.ExecuteNonQuery();
                 }
 
-                // insert new
-                foreach (var (oid, pct) in lines)
+                foreach (var (einheitId, eigentuemerId, anteilProzent) in lines)
                 {
                     using var ins = c.CreateCommand();
                     ins.Transaction = tx;
                     ins.CommandText = @"
-INSERT INTO dbo.StweSchluesselLine (SchluesselId, EigentuemerId, AnteilProzent)
-VALUES (@sid, @oid, @pct);";
+INSERT INTO dbo.StweSchluesselLine
+(
+    SchluesselId,
+    EinheitId,
+    EigentuemerId,
+    AnteilProzent
+)
+VALUES
+(
+    @sid,
+    @einheitId,
+    @eigentuemerId,
+    @anteilProzent
+);";
 
-                    var p1 = ins.CreateParameter(); p1.ParameterName = "@sid"; p1.Value = schluesselId; ins.Parameters.Add(p1);
-                    var p2 = ins.CreateParameter(); p2.ParameterName = "@oid"; p2.Value = oid; ins.Parameters.Add(p2);
-                    var p3 = ins.CreateParameter(); p3.ParameterName = "@pct"; p3.Value = pct; ins.Parameters.Add(p3);
+                    ins.Parameters.AddWithValue("@sid", schluesselId);
+                    ins.Parameters.AddWithValue("@einheitId", (object?)einheitId ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@eigentuemerId", eigentuemerId);
+                    ins.Parameters.AddWithValue("@anteilProzent", anteilProzent);
 
                     ins.ExecuteNonQuery();
                 }

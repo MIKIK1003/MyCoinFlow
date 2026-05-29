@@ -585,14 +585,66 @@ namespace MyCoinFlow.Views
 
             var total = SetTotalSigned;
 
-            var raw = lines.Select(l =>
+            var rawByOwner = new Dictionary<int, decimal>();
+            var missing = new List<string>();
+
+            foreach (var l in lines)
             {
+                var ownerId = ResolveOwnerFromEinheitOrFallback(l.EinheitId, l.EigentuemerId);
+
+                if (!ownerId.HasValue)
+                {
+                    missing.Add(!string.IsNullOrWhiteSpace(l.EinheitBezeichnung)
+                        ? l.EinheitBezeichnung
+                        : l.EigentuemerName);
+                    continue;
+                }
+
                 var amount = total * (l.AnteilProzent / 100m);
-                return new RawShare { EigentuemerId = l.EigentuemerId, BetragRaw = amount };
-            }).ToList();
+
+                if (!rawByOwner.ContainsKey(ownerId.Value))
+                    rawByOwner[ownerId.Value] = 0m;
+
+                rawByOwner[ownerId.Value] += amount;
+            }
+
+            if (missing.Count > 0)
+            {
+                MessageBox.Show(
+                    $"Für folgende Einheiten ist am Verteil-Stichtag ({_set.VerteilDatum:yyyy-MM-dd}) kein Eigentümer zugeordnet:\n\n• " +
+                    string.Join("\n• ", missing.Take(10)) +
+                    (missing.Count > 10 ? "\n…" : ""),
+                    "Auto verteilen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var raw = rawByOwner
+                .Select(kv => new RawShare { EigentuemerId = kv.Key, BetragRaw = kv.Value })
+                .ToList();
 
             ApplyRoundedRows(raw, $"Auto (FIX): {SelectedSchluessel.Name}", $"FIX:{SelectedSchluessel.Id}");
         }
+
+
+        private int? ResolveOwnerFromEinheitOrFallback(int? einheitId, int fallbackEigentuemerId)
+        {
+            if (einheitId.HasValue && einheitId.Value > 0)
+            {
+                var ownerAtDate = _db.StweEigentuemerGetByEinheitAtDate(einheitId.Value, _set.VerteilDatum);
+                if (ownerAtDate.HasValue)
+                    return ownerAtDate.Value;
+
+                return null;
+            }
+
+            return fallbackEigentuemerId > 0 ? fallbackEigentuemerId : null;
+        }
+
+
+
+
 
         private void AutoMea_Click(object sender, RoutedEventArgs e)
         {

@@ -18,7 +18,7 @@ namespace MyCoinFlow.Views
 
         public StweZaehler Model { get; } = new();
 
-        public List<(int EigentuemerId, decimal AnteilProzent)> ResultLines { get; private set; } = new();
+        public List<(int? EinheitId, int EigentuemerId, decimal AnteilProzent)> ResultLines { get; private set; } = new();
 
         private readonly ObservableCollection<StweEigentuemer> _owners = new();
 
@@ -104,7 +104,9 @@ namespace MyCoinFlow.Views
             _selectedTyp = "DIREKT";
 
             if (existingLines != null)
-                ResultLines = existingLines.Select(x => (x.EigentuemerId, x.AnteilProzent)).ToList();
+                ResultLines = existingLines
+                    .Select(x => (x.EinheitId, x.EigentuemerId, x.AnteilProzent))
+                    .ToList();
 
             DataContext = this;
             OnPropertyChanged(nameof(LinesInfo));
@@ -152,12 +154,18 @@ namespace MyCoinFlow.Views
                 AnteilProzent = x.AnteilProzent
             }).ToList();
 
-            var dlg = new SchluesselZeilenDialog($"Zähler: {Model.Name}", _owners, existing);
-            TrySetOwner(dlg);
+            var dlg = new SchluesselZeilenDialog(
+    $"Zähler: {Model.Name}",
+    _owners,
+    new List<StweEinheit>(),
+    existing);
 
             if (dlg.ShowDialog() == true)
             {
-                ResultLines = dlg.Rows.Select(r => (r.EigentuemerId, r.AnteilProzent)).ToList();
+                ResultLines = dlg.Rows
+                    .Select(r => (r.EinheitId, r.EigentuemerId, r.AnteilProzent))
+                    .ToList();
+
                 OnPropertyChanged(nameof(LinesInfo));
             }
         }
@@ -263,10 +271,10 @@ namespace MyCoinFlow.Views
             if (!ownerId.HasValue)
                 return;
 
-            ResultLines = new List<(int EigentuemerId, decimal AnteilProzent)>
-            {
-                (ownerId.Value, 100m)
-            };
+            ResultLines = new List<(int? EinheitId, int EigentuemerId, decimal AnteilProzent)>
+{
+    (Model.EinheitId, ownerId.Value, 100m)
+};
 
             OnPropertyChanged(nameof(LinesInfo));
         }

@@ -536,8 +536,6 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
-
-
         private void SchluesselZeilenBearbeiten()
         {
             if (SelectedSchluessel == null)
@@ -548,16 +546,25 @@ namespace MyCoinFlow.ViewModels
                 !string.Equals(modus, "ENERGIE", StringComparison.OrdinalIgnoreCase))
                 return;
 
-
             LoadEigentuemer();
 
+            var einheiten = _db.StweEinheitenGetByLiegenschaft(SelectedSchluessel.LiegenschaftId);
             var existing = _db.StweSchluesselLinesGet(SelectedSchluessel.Id);
-            var dlg = new SchluesselZeilenDialog(SelectedSchluessel.Name, Eigentuemer, existing);
+
+            var dlg = new SchluesselZeilenDialog(
+                SelectedSchluessel.Name,
+                Eigentuemer,
+                einheiten,
+                existing);
+
             TrySetOwner(dlg);
 
             if (dlg.ShowDialog() == true)
             {
-                var lines = dlg.Rows.Select(r => (r.EigentuemerId, r.AnteilProzent)).ToList();
+                var lines = dlg.Rows
+                    .Select(r => (r.EinheitId, r.EigentuemerId, r.AnteilProzent))
+                    .ToList();
+
                 _db.StweSchluesselLinesReplace(SelectedSchluessel.Id, lines);
             }
         }

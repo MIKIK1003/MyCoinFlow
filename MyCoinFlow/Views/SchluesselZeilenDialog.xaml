@@ -45,7 +45,25 @@
                   CellEditEnding="Grid_CellEditEnding">
             <DataGrid.Columns>
 
-                <DataGridTemplateColumn Header="Eigentümer" Width="2*">
+                <DataGridTemplateColumn Header="Einheit (optional)" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding EinheitBezeichnung}" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox ItemsSource="{Binding DataContext.Einheiten, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      SelectedValuePath="Id"
+                                      DisplayMemberPath="Bezeichnung"
+                                      SelectedValue="{Binding EinheitId, UpdateSourceTrigger=PropertyChanged}"
+                                      MinWidth="220"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Eigentümer / Fallback" Width="2*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding EigentuemerName}" />
