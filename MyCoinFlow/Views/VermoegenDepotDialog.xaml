@@ -1,0 +1,78 @@
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.VermoegenDepotDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Depot"
+                 Width="520"
+                 Height="450"
+                 SizeToContent="Manual"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Depot erfassen / bearbeiten"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
+
+        <StackPanel Grid.Row="2">
+
+            <TextBox x:Name="NameBox"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Depotname"
+                     Text="{Binding Model.Name, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,12"/>
+
+            <ComboBox MinHeight="40"
+          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+          materialDesign:HintAssist.Hint="Verknüpftes Geldinstitut"
+          ItemsSource="{Binding Geldinstitute}"
+          SelectedItem="{Binding SelectedGeldinstitut, Mode=TwoWay}"
+          DisplayMemberPath="AnzeigeText"
+          Margin="0,0,0,12"/>
+
+            <TextBox MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Institut"
+                     Text="{Binding Model.Institut, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,12"/>
+
+            <ComboBox MinHeight="40"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Währung"
+                      ItemsSource="{Binding Waehrungen}"
+                      SelectedItem="{Binding Model.Waehrung, Mode=TwoWay}"
+                      Margin="0,0,0,12"/>
+
+            <CheckBox Content="Aktiv"
+                      IsChecked="{Binding Model.IstAktiv, Mode=TwoWay}"/>
+
+        </StackPanel>
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="ContentSave"
+                    Content="Speichern"
+                    Width="130"
+                    IsDefault="True"
+                    Click="Speichern_Click"
+                    Margin="0,0,10,0"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    Width="130"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

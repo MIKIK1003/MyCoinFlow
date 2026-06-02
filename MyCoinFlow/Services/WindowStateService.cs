@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using System.Collections.Generic;
 using System.Windows;
 
 namespace MyCoinFlow.Services
@@ -20,6 +20,7 @@ namespace MyCoinFlow.Services
             public double Left { get; set; }
             public double Width { get; set; }
             public double Height { get; set; }
+            public WindowState WindowState { get; set; } = WindowState.Normal;
         }
 
         private static Dictionary<string, WindowPlacement> LoadAll()
@@ -67,24 +68,32 @@ namespace MyCoinFlow.Services
                 if (window == null)
                     return;
 
-                if (window.WindowState != System.Windows.WindowState.Normal)
-                    return;
-
                 var all = LoadAll();
                 var key = window.GetType().Name;
 
+                var bounds = window.WindowState == WindowState.Normal
+                    ? new Rect(window.Left, window.Top, window.Width, window.Height)
+                    : window.RestoreBounds;
+
+                if (!IsValidSize(bounds))
+                    return;
+
                 all[key] = new WindowPlacement
                 {
-                    Top = window.Top,
-                    Left = window.Left,
-                    Width = window.Width,
-                    Height = window.Height
+                    Left = bounds.Left,
+                    Top = bounds.Top,
+                    Width = bounds.Width,
+                    Height = bounds.Height,
+                    WindowState = window.WindowState == WindowState.Maximized
+                        ? WindowState.Maximized
+                        : WindowState.Normal
                 };
 
                 SaveAll(all);
             }
             catch
             {
+                // UI darf nie crashen
             }
         }
 
@@ -98,27 +107,28 @@ namespace MyCoinFlow.Services
                 var all = LoadAll();
                 var key = window.GetType().Name;
 
-                if (!all.ContainsKey(key))
+                if (!all.TryGetValue(key, out var state))
                     return;
 
-                var state = all[key];
-
-                // Plausibilitätsprüfung
                 if (!IsValidSize(state))
                     return;
 
                 var rect = new Rect(state.Left, state.Top, state.Width, state.Height);
-
-                // 🔴 NEU: immer auf gültige Screen-Position bringen
                 var safeRect = EnsureWindowVisible(rect);
+
+                window.WindowState = WindowState.Normal;
 
                 window.Left = safeRect.Left;
                 window.Top = safeRect.Top;
                 window.Width = safeRect.Width;
                 window.Height = safeRect.Height;
+
+                if (state.WindowState == WindowState.Maximized)
+                    window.WindowState = WindowState.Maximized;
             }
             catch
             {
+                // UI darf nie crashen
             }
         }
 
@@ -134,14 +144,10 @@ namespace MyCoinFlow.Services
                     wa.Width,
                     wa.Height);
 
-                // Wenn Fenster irgendwo sichtbar ist → ok
                 if (screenRect.IntersectsWith(rect))
-                {
                     return rect;
-                }
             }
 
-            // 🔴 Fallback: Hauptmonitor zentriert
             var primary = System.Windows.Forms.Screen.PrimaryScreen.WorkingArea;
 
             double width = Math.Min(rect.Width, primary.Width);
@@ -153,43 +159,26 @@ namespace MyCoinFlow.Services
             return new Rect(left, top, width, height);
         }
 
-        // 🔴 NEU
         private static bool IsValidSize(WindowPlacement s)
         {
-            // Minimum sinnvoll
-            if (s.Width < 300 || s.Height < 200)
+            return IsValidSize(new Rect(s.Left, s.Top, s.Width, s.Height));
+        }
+
+        private static bool IsValidSize(Rect rect)
+        {
+            if (rect.Width < 300 || rect.Height < 200)
                 return false;
 
-            // Maximum sinnvoll (Schutz vor „explodierten“ Werten)
-            if (s.Width > 2000 || s.Height > 1500)
+            if (rect.Width > 4000 || rect.Height > 3000)
                 return false;
 
-            // NaN / Infinity Schutz
-            if (double.IsNaN(s.Width) || double.IsNaN(s.Height))
+            if (double.IsNaN(rect.Width) || double.IsNaN(rect.Height))
                 return false;
 
-            if (double.IsInfinity(s.Width) || double.IsInfinity(s.Height))
+            if (double.IsInfinity(rect.Width) || double.IsInfinity(rect.Height))
                 return false;
 
             return true;
-        }
-
-        private static bool IsVisibleOnAnyScreen(WindowPlacement state)
-        {
-            foreach (var screen in System.Windows.Forms.Screen.AllScreens)
-            {
-                var bounds = screen.WorkingArea;
-
-                if (state.Left < bounds.Right &&
-                    state.Left + state.Width > bounds.Left &&
-                    state.Top < bounds.Bottom &&
-                    state.Top + state.Height > bounds.Top)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

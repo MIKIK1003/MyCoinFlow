@@ -176,6 +176,16 @@
                         </Button>
 
                         <Button Style="{StaticResource NavTileButton}"
+        Command="{Binding ShowVermoegenCommand}"
+        Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="ChartLine"
+                                 Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Vermögen" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowAdminCommand}"
                                 Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">

@@ -41,6 +41,13 @@
             <DataTemplate DataType="{x:Type vm:LiegenschaftenViewModel}">
                 <views:LiegenschaftenView />
             </DataTemplate>
+
+            <DataTemplate DataType="{x:Type vm:VermoegenViewModel}">
+                <views:VermoegenView />
+            </DataTemplate>
+
+
+
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
             </DataTemplate>

@@ -28,8 +28,8 @@ namespace MyCoinFlow.ViewModels
         public ICommand ShowAddressesCommand { get; }
         public ICommand ShowBudgetsCommand { get; }
         public ICommand ShowAdminCommand { get; }
-
         public ICommand ShowLiegenschaftenCommand { get; }
+        public ICommand ShowVermoegenCommand { get; }
 
         // NEU: Tages-Workflow für Sets
         public ICommand ShowTransaktionSetsCommand { get; }
@@ -45,8 +45,8 @@ namespace MyCoinFlow.ViewModels
             ShowAddressesCommand = new RelayCommand(_ => CurrentViewModel = new AddressesViewModel());
             ShowBudgetsCommand = new RelayCommand(_ => CurrentViewModel = new BudgetsViewModel());
             ShowAdminCommand = new RelayCommand(_ => CurrentViewModel = new AdminViewModel());
-
             ShowLiegenschaftenCommand = new RelayCommand(_ => CurrentViewModel = new LiegenschaftenViewModel());
+            ShowVermoegenCommand = new RelayCommand(_ => CurrentViewModel = new VermoegenViewModel());
 
             // NEU
             ShowTransaktionSetsCommand = new RelayCommand(_ => CurrentViewModel = new TransaktionSetsViewModel());

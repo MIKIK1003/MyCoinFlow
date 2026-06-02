@@ -1,0 +1,224 @@
+﻿<UserControl x:Class="MyCoinFlow.Views.VermoegenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LINKS: SIDEBAR -->
+        <Border Grid.Column="0"
+                Style="{StaticResource SidebarCard}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <TextBlock Text="Filter und Aktionen"
+                               Style="{StaticResource SidebarSectionHeader}"/>
+
+                    <TextBlock Text="Suche"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,6"/>
+
+                    <TextBox MinHeight="40"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Titel, ISIN, Depot…"/>
+
+                    <TextBlock Text="Depot"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,14,0,6"/>
+
+                    <ComboBox MinHeight="36"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              materialDesign:HintAssist.Hint="Depot wählen…"/>
+
+                    <TextBlock Text="Anlageklasse"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,14,0,6"/>
+
+                    <ComboBox MinHeight="36"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              materialDesign:HintAssist.Hint="Anlageklasse wählen…"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,6">
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="Magnify"
+                                Content="Suchen"
+                                MinHeight="40"
+                                Margin="0,0,10,0"
+                                Width="118"
+                                IsDefault="True"/>
+
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="CloseCircle"
+                                Content="Leeren"
+                                MinHeight="40"
+                                Width="118"/>
+                    </StackPanel>
+
+                    <Separator Margin="0,10,0,12"/>
+
+                    <TextBlock Text="Depots"
+           Style="{StaticResource SidebarGroupHeader}"
+           Margin="0,0,0,8"/>
+
+                    <ComboBox MinHeight="36"
+          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+          ItemsSource="{Binding Depots}"
+          SelectedItem="{Binding SelectedDepot, Mode=TwoWay}"
+          DisplayMemberPath="Name"
+          materialDesign:HintAssist.Hint="Depot wählen…"
+          Margin="0,0,0,10"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+        Tag="PlusCircleOutline"
+        Content="Depot neu"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding NeuesDepotCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+        Tag="PencilOutline"
+        Content="Depot bearbeiten"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding DepotBearbeitenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton.Danger}"
+        Tag="DeleteOutline"
+        Content="Depot ausblenden"
+        MinHeight="40"
+        Margin="0,0,0,12"
+        Command="{Binding DepotLoeschenCommand}"/>
+
+                    <Separator Margin="0,10,0,12"/>
+
+
+
+                    <TextBlock Text="Positionen"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="PlusCircleOutline"
+                            Content="Neu"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            MinHeight="40"
+                            Margin="0,0,0,10"/>
+
+                    <Button Style="{StaticResource IconTextButton.Danger}"
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            MinHeight="40"/>
+
+                    <Separator Margin="0,12,0,12"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="ChartLine"
+                            Content="Kurse aktualisieren"
+                            MinHeight="40"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- RECHTS: INHALT -->
+        <Border Grid.Column="2"
+                CornerRadius="{StaticResource AppCornerRadius.Card}"
+                Background="{DynamicResource MaterialDesignPaper}"
+                Padding="12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="16"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="Vermögen"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,12"/>
+
+                    <UniformGrid Columns="3">
+                        <Border Padding="12" Margin="0,0,10,0"
+                                Background="{DynamicResource MaterialDesignCardBackground}"
+                                CornerRadius="{StaticResource AppCornerRadius.Card}">
+                            <StackPanel>
+                                <TextBlock Text="Depotwert"
+                                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <TextBlock Text="{Binding DepotwertText}"
+                                            FontSize="22"
+                                            FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="12" Margin="0,0,10,0"
+                                Background="{DynamicResource MaterialDesignCardBackground}"
+                                CornerRadius="{StaticResource AppCornerRadius.Card}">
+                            <StackPanel>
+                                <TextBlock Text="Einstand"
+                                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <TextBlock Text="{Binding EinstandText}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="12"
+                                Background="{DynamicResource MaterialDesignCardBackground}"
+                                CornerRadius="{StaticResource AppCornerRadius.Card}">
+                            <StackPanel>
+                                <TextBlock Text="Gewinn / Verlust"
+                                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                <TextBlock Text="{Binding GewinnVerlustText}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+
+                <DataGrid Grid.Row="2"
+                          ItemsSource="{Binding Positionen}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          RowHeaderWidth="0"
+                          SelectionUnit="FullRow"
+                          Background="White"
+                          RowBackground="White"
+                          AlternatingRowBackground="{x:Null}"
+                          materialDesign:DataGridAssist.CellPadding="8"
+                          materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                          RowHeight="40">
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Depot" Binding="{Binding Depot}" Width="160"/>
+                        <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="*"/>
+                        <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="140"/>
+                        <DataGridTextColumn Header="Stück" Binding="{Binding Anzahl}" Width="90"/>
+                        <DataGridTextColumn Header="Einstand" Binding="{Binding EinstandText}" Width="120"/>
+                        <DataGridTextColumn Header="Aktuell" Binding="{Binding AktuellText}" Width="120"/>
+                        <DataGridTextColumn Header="Gewinn" Binding="{Binding GewinnText}" Width="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

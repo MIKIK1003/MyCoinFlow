@@ -19,7 +19,7 @@ namespace MyCoinFlow.Services
     /// Repräsentiert einen Eintrag aus der Kontenplan-Tabelle.
     /// Diese Klasse steht im Models-Ordner, wird hier verwendet.
     /// </summary>
-    public class DatabaseService : ICreditCardImportRepository
+    public partial class DatabaseService : ICreditCardImportRepository
     {
         // Verbindung zur Datenbank
         private string _connectionString => MyCoinFlow.Services.ConnectionStrings.Current;
