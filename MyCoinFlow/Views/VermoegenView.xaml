@@ -103,21 +103,24 @@
                                Margin="0,0,0,8"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-                            Tag="PlusCircleOutline"
-                            Content="Neu"
-                            MinHeight="40"
-                            Margin="0,0,0,10"/>
+        Tag="PlusCircleOutline"
+        Content="Neu"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding NeuePositionCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-                            Tag="PencilOutline"
-                            Content="Bearbeiten"
-                            MinHeight="40"
-                            Margin="0,0,0,10"/>
+        Tag="PencilOutline"
+        Content="Bearbeiten"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding PositionBearbeitenCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton.Danger}"
-                            Tag="DeleteOutline"
-                            Content="Löschen"
-                            MinHeight="40"/>
+        Tag="DeleteOutline"
+        Content="Löschen"
+        MinHeight="40"
+        Command="{Binding PositionLoeschenCommand}"/>
 
                     <Separator Margin="0,12,0,12"/>
 
@@ -194,6 +197,7 @@
 
                 <DataGrid Grid.Row="2"
                           ItemsSource="{Binding Positionen}"
+                          SelectedItem="{Binding SelectedPosition, Mode=TwoWay}"
                           AutoGenerateColumns="False"
                           CanUserAddRows="False"
                           IsReadOnly="True"
@@ -212,7 +216,7 @@
                         <DataGridTextColumn Header="Depot" Binding="{Binding Depot}" Width="160"/>
                         <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="*"/>
                         <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="140"/>
-                        <DataGridTextColumn Header="Stück" Binding="{Binding Anzahl}" Width="90"/>
+                        <DataGridTextColumn Header="Stück" Binding="{Binding AnzahlText}" Width="90"/>
                         <DataGridTextColumn Header="Einstand" Binding="{Binding EinstandText}" Width="120"/>
                         <DataGridTextColumn Header="Aktuell" Binding="{Binding AktuellText}" Width="120"/>
                         <DataGridTextColumn Header="Gewinn" Binding="{Binding GewinnText}" Width="120"/>

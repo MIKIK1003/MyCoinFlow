@@ -281,7 +281,120 @@ ORDER BY Name;";
             return list;
         }
 
+        public int VermoegenPositionInsert(VermoegenPosition model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureVermoegenSchema();
 
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.VermoegenPosition
+(
+    DepotId,
+    Titel,
+    ISIN,
+    Anlageklasse,
+    Anzahl,
+    Einstandspreis,
+    EinstandDatum,
+    AktuellerKurs,
+    KursDatum,
+    Notiz,
+    IstAktiv
+)
+OUTPUT INSERTED.Id
+VALUES
+(
+    @DepotId,
+    @Titel,
+    @ISIN,
+    @Anlageklasse,
+    @Anzahl,
+    @Einstandspreis,
+    @EinstandDatum,
+    @AktuellerKurs,
+    @KursDatum,
+    @Notiz,
+    @IstAktiv
+);";
+
+            using var cmd = new SqlCommand(sql, c);
+
+            cmd.Parameters.AddWithValue("@DepotId", model.DepotId);
+            cmd.Parameters.AddWithValue("@Titel", model.Titel.Trim());
+            cmd.Parameters.AddWithValue("@ISIN", string.IsNullOrWhiteSpace(model.ISIN) ? DBNull.Value : model.ISIN.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
+            cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
+            cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
+            cmd.Parameters.AddWithValue("@EinstandDatum", model.EinstandDatum.HasValue ? model.EinstandDatum.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@AktuellerKurs", model.AktuellerKurs.HasValue ? model.AktuellerKurs.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@KursDatum", model.KursDatum.HasValue ? model.KursDatum.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@Notiz", string.IsNullOrWhiteSpace(model.Notiz) ? DBNull.Value : model.Notiz.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void VermoegenPositionUpdate(VermoegenPosition model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.VermoegenPosition
+SET
+    DepotId = @DepotId,
+    Titel = @Titel,
+    ISIN = @ISIN,
+    Anlageklasse = @Anlageklasse,
+    Anzahl = @Anzahl,
+    Einstandspreis = @Einstandspreis,
+    EinstandDatum = @EinstandDatum,
+    AktuellerKurs = @AktuellerKurs,
+    KursDatum = @KursDatum,
+    Notiz = @Notiz,
+    IstAktiv = @IstAktiv
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+
+            cmd.Parameters.AddWithValue("@Id", model.Id);
+            cmd.Parameters.AddWithValue("@DepotId", model.DepotId);
+            cmd.Parameters.AddWithValue("@Titel", model.Titel.Trim());
+            cmd.Parameters.AddWithValue("@ISIN", string.IsNullOrWhiteSpace(model.ISIN) ? DBNull.Value : model.ISIN.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
+            cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
+            cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
+            cmd.Parameters.AddWithValue("@EinstandDatum", model.EinstandDatum.HasValue ? model.EinstandDatum.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@AktuellerKurs", model.AktuellerKurs.HasValue ? model.AktuellerKurs.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@KursDatum", model.KursDatum.HasValue ? model.KursDatum.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@Notiz", string.IsNullOrWhiteSpace(model.Notiz) ? DBNull.Value : model.Notiz.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void VermoegenPositionDelete(int id)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.VermoegenPosition
+SET IstAktiv = 0
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.ExecuteNonQuery();
+        }
 
 
     }
