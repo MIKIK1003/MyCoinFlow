@@ -40,6 +40,14 @@ namespace MyCoinFlow.Views
             "Sonstiges"
         };
 
+        public ObservableCollection<string> Waehrungen { get; } = new()
+        {
+            "CHF",
+            "EUR",
+            "USD",
+            "GBP"
+        };
+
         private VermoegenDepot? _selectedDepot;
         public VermoegenDepot? SelectedDepot
         {
@@ -69,13 +77,14 @@ namespace MyCoinFlow.Views
                 Depots.Add(d);
 
             Model = model == null
-                ? new VermoegenPosition
-                {
-                    Anlageklasse = "Aktie",
-                    Boerse = "SIX",
-                    IstAktiv = true,
-                    KursDatum = DateTime.Today
-                }
+    ? new VermoegenPosition
+    {
+        Anlageklasse = "Aktie",
+        Boerse = "SIX",
+        Waehrung = "CHF",
+        IstAktiv = true,
+        KursDatum = DateTime.Today
+    }
                 : new VermoegenPosition
                 {
                     Id = model.Id,
@@ -86,6 +95,7 @@ namespace MyCoinFlow.Views
                     Valor = model.Valor,
                     Symbol = model.Symbol,
                     Boerse = string.IsNullOrWhiteSpace(model.Boerse) ? "SIX" : model.Boerse,
+                    Waehrung = string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung,
                     Anlageklasse = string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse,
                     Anzahl = model.Anzahl,
                     Einstandspreis = model.Einstandspreis,
@@ -181,6 +191,10 @@ namespace MyCoinFlow.Views
                 ? ""
                 : Model.Boerse.Trim().ToUpperInvariant();
 
+            Model.Waehrung = string.IsNullOrWhiteSpace(Model.Waehrung)
+                ? "CHF"
+                : Model.Waehrung.Trim().ToUpperInvariant();
+
             Model.Anlageklasse = string.IsNullOrWhiteSpace(Model.Anlageklasse)
                 ? "Aktie"
                 : Model.Anlageklasse.Trim();
@@ -210,6 +224,7 @@ namespace MyCoinFlow.Views
                 ChCulture,
                 out value);
         }
+
 
         private void SymbolSuchen_Click(object sender, RoutedEventArgs e)
         {

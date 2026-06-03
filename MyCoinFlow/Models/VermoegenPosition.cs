@@ -14,6 +14,7 @@ namespace MyCoinFlow.Models
 
         public string Symbol { get; set; } = "";
         public string Boerse { get; set; } = "";
+        public string Waehrung { get; set; } = "CHF";
 
         public string Anlageklasse { get; set; } = "Aktie";
 

@@ -381,12 +381,23 @@ namespace MyCoinFlow.ViewModels
                 Titel = p.Titel,
                 ISIN = p.ISIN,
                 Anlageklasse = p.Anlageklasse,
+
+                Waehrung = p.Waehrung,
+
                 Anzahl = p.Anzahl,
                 AnzahlText = FormatNumber(p.Anzahl),
-                EinstandText = FormatCurrency(p.EinstandWert),
-                AktuellText = p.Marktwert.HasValue ? FormatCurrency(p.Marktwert.Value) : "-",
+
+                EinstandText = FormatCurrency(p.EinstandWert, p.Waehrung),
+
+                AktuellText = p.Marktwert.HasValue
+                    ? FormatCurrency(p.Marktwert.Value, p.Waehrung)
+                    : "-",
+
                 GewinnText = BuildGewinnText(p),
-                KursdatumText = p.KursDatum.HasValue ? p.KursDatum.Value.ToString("dd.MM.yyyy") : "-"
+
+                KursdatumText = p.KursDatum.HasValue
+                    ? p.KursDatum.Value.ToString("dd.MM.yyyy")
+                    : "-"
             };
         }
 
@@ -591,9 +602,13 @@ namespace MyCoinFlow.ViewModels
             return source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static string FormatCurrency(decimal value)
+        private static string FormatCurrency(decimal value, string waehrung = "CHF")
         {
-            return string.Format(CultureInfo.GetCultureInfo("de-CH"), "CHF {0:N2}", value);
+            var w = string.IsNullOrWhiteSpace(waehrung)
+                ? "CHF"
+                : waehrung.Trim().ToUpperInvariant();
+
+            return string.Format(CultureInfo.GetCultureInfo("de-CH"), "{0} {1:N2}", w, value);
         }
 
         private static string FormatPercent(decimal value)
@@ -616,7 +631,7 @@ namespace MyCoinFlow.ViewModels
         public string Titel { get; set; } = "";
         public string ISIN { get; set; } = "";
         public string Anlageklasse { get; set; } = "";
-
+        public string Waehrung { get; set; } = "CHF";
         public decimal Anzahl { get; set; }
         public string AnzahlText { get; set; } = "";
 

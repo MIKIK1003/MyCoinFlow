@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Vermögensposition"
                  Width="620"
-                 Height="1000"
+                 Height="1200"
                  SizeToContent="Manual"
                  WindowStartupLocation="CenterOwner">
 
@@ -72,6 +72,14 @@
                           ItemsSource="{Binding Boersen}"
                           SelectedItem="{Binding Model.Boerse, Mode=TwoWay}"
                           Margin="0,0,0,12"/>
+
+                <ComboBox MinHeight="40"
+          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+          materialDesign:HintAssist.Hint="Währung"
+          ItemsSource="{Binding Waehrungen}"
+          SelectedItem="{Binding Model.Waehrung, Mode=TwoWay}"
+          Margin="0,0,0,12"/>
+
 
                 <ComboBox MinHeight="40"
                           Style="{StaticResource MaterialDesignOutlinedComboBox}"

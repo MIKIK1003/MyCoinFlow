@@ -44,6 +44,7 @@ BEGIN
         Valor NVARCHAR(50) NULL,
         Symbol NVARCHAR(50) NULL,
         Boerse NVARCHAR(50) NULL,
+        Waehrung NVARCHAR(10) NOT NULL CONSTRAINT DF_VermoegenPosition_Waehrung DEFAULT ('CHF'),
         Anlageklasse NVARCHAR(50) NOT NULL CONSTRAINT DF_VermoegenPosition_Anlageklasse DEFAULT ('Aktie'),
 
         Anzahl DECIMAL(28,8) NOT NULL,
@@ -78,6 +79,13 @@ IF COL_LENGTH('dbo.VermoegenPosition', 'Boerse') IS NULL
 BEGIN
     ALTER TABLE dbo.VermoegenPosition
     ADD Boerse NVARCHAR(50) NULL;
+END;
+
+IF COL_LENGTH('dbo.VermoegenPosition', 'Waehrung') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenPosition
+    ADD Waehrung NVARCHAR(10) NOT NULL
+        CONSTRAINT DF_VermoegenPosition_Waehrung DEFAULT ('CHF');
 END;
 
 IF OBJECT_ID('dbo.VermoegenEinstellung', 'U') IS NULL
@@ -235,6 +243,7 @@ SELECT
     ISNULL(p.Valor, '') AS Valor,
     ISNULL(p.Symbol, '') AS Symbol,
     ISNULL(p.Boerse, '') AS Boerse,
+    ISNULL(p.Waehrung, 'CHF') AS Waehrung,
     p.Anlageklasse,
     p.Anzahl,
     p.Einstandspreis,
@@ -262,14 +271,15 @@ ORDER BY d.Name, p.Titel;";
                     Valor = r.GetString(5),
                     Symbol = r.GetString(6),
                     Boerse = r.GetString(7),
-                    Anlageklasse = r.GetString(8),
-                    Anzahl = r.GetDecimal(9),
-                    Einstandspreis = r.GetDecimal(10),
-                    EinstandDatum = r.IsDBNull(11) ? null : r.GetDateTime(11),
-                    AktuellerKurs = r.IsDBNull(12) ? null : r.GetDecimal(12),
-                    KursDatum = r.IsDBNull(13) ? null : r.GetDateTime(13),
-                    Notiz = r.IsDBNull(14) ? "" : r.GetString(14),
-                    IstAktiv = r.GetBoolean(15)
+                    Waehrung = r.GetString(8),
+                    Anlageklasse = r.GetString(9),
+                    Anzahl = r.GetDecimal(10),
+                    Einstandspreis = r.GetDecimal(11),
+                    EinstandDatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
+                    AktuellerKurs = r.IsDBNull(13) ? null : r.GetDecimal(13),
+                    KursDatum = r.IsDBNull(14) ? null : r.GetDateTime(14),
+                    Notiz = r.IsDBNull(15) ? "" : r.GetString(15),
+                    IstAktiv = r.GetBoolean(16)
                 });
             }
 
@@ -367,6 +377,7 @@ INSERT INTO dbo.VermoegenPosition
     Valor,
     Symbol,
     Boerse,
+    Waehrung,
     Anlageklasse,
     Anzahl,
     Einstandspreis,
@@ -385,6 +396,7 @@ VALUES
     @Valor,
     @Symbol,
     @Boerse,
+    @Waehrung,
     @Anlageklasse,
     @Anzahl,
     @Einstandspreis,
@@ -403,6 +415,7 @@ VALUES
             cmd.Parameters.AddWithValue("@Valor", string.IsNullOrWhiteSpace(model.Valor) ? DBNull.Value : model.Valor.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
@@ -432,6 +445,7 @@ SET
     Valor = @Valor,
     Symbol = @Symbol,
     Boerse = @Boerse,
+    Waehrung = @Waehrung,
     Anlageklasse = @Anlageklasse,
     Anzahl = @Anzahl,
     Einstandspreis = @Einstandspreis,
@@ -451,6 +465,7 @@ WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Valor", string.IsNullOrWhiteSpace(model.Valor) ? DBNull.Value : model.Valor.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);

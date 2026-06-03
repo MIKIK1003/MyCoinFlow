@@ -254,6 +254,7 @@
                         <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="*"/>
                         <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="125"/>
                         <DataGridTextColumn Header="Anlageklasse" Binding="{Binding Anlageklasse}" Width="120"/>
+                        <DataGridTextColumn Header="Währung" Binding="{Binding Waehrung}" Width="85"/>
                         <DataGridTextColumn Header="Stück" Binding="{Binding AnzahlText}" Width="90"/>
                         <DataGridTextColumn Header="Einstandswert" Binding="{Binding EinstandText}" Width="130"/>
                         <DataGridTextColumn Header="Marktwert" Binding="{Binding AktuellText}" Width="130"/>
