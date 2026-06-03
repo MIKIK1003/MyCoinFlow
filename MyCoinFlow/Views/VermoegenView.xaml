@@ -25,7 +25,8 @@
 
                     <TextBox MinHeight="40"
                              Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                             materialDesign:HintAssist.Hint="Titel, ISIN, Depot…"/>
+                             materialDesign:HintAssist.Hint="Titel, ISIN, Depot…"
+                             Text="{Binding Suchtext, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <TextBlock Text="Depot"
                                Style="{StaticResource SidebarGroupHeader}"
@@ -33,6 +34,9 @@
 
                     <ComboBox MinHeight="36"
                               Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              ItemsSource="{Binding DepotFilterListe}"
+                              SelectedItem="{Binding SelectedDepotFilter, Mode=TwoWay}"
+                              DisplayMemberPath="Name"
                               materialDesign:HintAssist.Hint="Depot wählen…"/>
 
                     <TextBlock Text="Anlageklasse"
@@ -41,6 +45,8 @@
 
                     <ComboBox MinHeight="36"
                               Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              ItemsSource="{Binding AnlageklasseFilterListe}"
+                              SelectedItem="{Binding SelectedAnlageklasseFilter, Mode=TwoWay}"
                               materialDesign:HintAssist.Hint="Anlageklasse wählen…"/>
 
                     <StackPanel Orientation="Horizontal" Margin="0,14,0,6">
@@ -50,84 +56,88 @@
                                 MinHeight="40"
                                 Margin="0,0,10,0"
                                 Width="118"
-                                IsDefault="True"/>
+                                IsDefault="True"
+                                Command="{Binding SucheCommand}"/>
 
                         <Button Style="{StaticResource IconTextButton}"
                                 Tag="CloseCircle"
                                 Content="Leeren"
                                 MinHeight="40"
-                                Width="118"/>
+                                Width="118"
+                                Command="{Binding FilterLeerenCommand}"/>
                     </StackPanel>
 
                     <Separator Margin="0,10,0,12"/>
 
-                    <TextBlock Text="Depots"
-           Style="{StaticResource SidebarGroupHeader}"
-           Margin="0,0,0,8"/>
-
-                    <ComboBox MinHeight="36"
-          Style="{StaticResource MaterialDesignOutlinedComboBox}"
-          ItemsSource="{Binding Depots}"
-          SelectedItem="{Binding SelectedDepot, Mode=TwoWay}"
-          DisplayMemberPath="Name"
-          materialDesign:HintAssist.Hint="Depot wählen…"
-          Margin="0,0,0,10"/>
+                    <TextBlock Text="Depotverwaltung"
+                               Style="{StaticResource SidebarGroupHeader}"
+                               Margin="0,0,0,8"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-        Tag="PlusCircleOutline"
-        Content="Depot neu"
-        MinHeight="40"
-        Margin="0,0,0,10"
-        Command="{Binding NeuesDepotCommand}"/>
+                            Tag="PlusCircleOutline"
+                            Content="Depot neu"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Command="{Binding NeuesDepotCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-        Tag="PencilOutline"
-        Content="Depot bearbeiten"
-        MinHeight="40"
-        Margin="0,0,0,10"
-        Command="{Binding DepotBearbeitenCommand}"/>
+                            Tag="PencilOutline"
+                            Content="Depot bearbeiten"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Command="{Binding DepotBearbeitenCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton.Danger}"
-        Tag="DeleteOutline"
-        Content="Depot ausblenden"
-        MinHeight="40"
-        Margin="0,0,0,12"
-        Command="{Binding DepotLoeschenCommand}"/>
+                            Tag="DeleteOutline"
+                            Content="Depot ausblenden"
+                            MinHeight="40"
+                            Margin="0,0,0,12"
+                            Command="{Binding DepotLoeschenCommand}"/>
 
                     <Separator Margin="0,10,0,12"/>
-
-
 
                     <TextBlock Text="Positionen"
                                Style="{StaticResource SidebarGroupHeader}"
                                Margin="0,0,0,8"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-        Tag="PlusCircleOutline"
-        Content="Neu"
-        MinHeight="40"
-        Margin="0,0,0,10"
-        Command="{Binding NeuePositionCommand}"/>
+                            Tag="PlusCircleOutline"
+                            Content="Neu"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Command="{Binding NeuePositionCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton}"
-        Tag="PencilOutline"
-        Content="Bearbeiten"
-        MinHeight="40"
-        Margin="0,0,0,10"
-        Command="{Binding PositionBearbeitenCommand}"/>
+                            Tag="PencilOutline"
+                            Content="Bearbeiten"
+                            MinHeight="40"
+                            Margin="0,0,0,10"
+                            Command="{Binding PositionBearbeitenCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton.Danger}"
-        Tag="DeleteOutline"
-        Content="Löschen"
-        MinHeight="40"
-        Command="{Binding PositionLoeschenCommand}"/>
+                            Tag="DeleteOutline"
+                            Content="Löschen"
+                            MinHeight="40"
+                            Command="{Binding PositionLoeschenCommand}"/>
 
                     <Separator Margin="0,12,0,12"/>
 
+                    <TextBlock Text="Kurse"
+           Style="{StaticResource SidebarGroupHeader}"
+           Margin="0,0,0,8"/>
+
                     <Button Style="{StaticResource IconTextButton}"
-                            Tag="ChartLine"
-                            Content="Kurse aktualisieren"
-                            MinHeight="40"/>
+        Tag="KeyVariant"
+        Content="API-Key"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding ApiEinstellungCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+        Tag="ChartLine"
+        Content="Kurse aktualisieren"
+        MinHeight="40"
+        Command="{Binding KurseAktualisierenCommand}"/>
 
                 </StackPanel>
             </ScrollViewer>
@@ -150,26 +160,34 @@
                     <TextBlock Text="Vermögen"
                                FontSize="22"
                                FontWeight="SemiBold"
-                               Margin="0,0,0,10"/>
+                               Margin="0,0,0,4"/>
+
+                    <TextBlock Text="{Binding FilterTitelText}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                               Margin="0,0,0,6"/>
 
                     <TextBlock Text="{Binding StatusText}"
                                Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                                Margin="0,0,0,12"/>
 
                     <UniformGrid Columns="3">
-                        <Border Padding="12" Margin="0,0,10,0"
+                        <Border Padding="12"
+                                Margin="0,0,10,0"
                                 Background="{DynamicResource MaterialDesignCardBackground}"
                                 CornerRadius="{StaticResource AppCornerRadius.Card}">
                             <StackPanel>
                                 <TextBlock Text="Depotwert"
                                            Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
                                 <TextBlock Text="{Binding DepotwertText}"
-                                            FontSize="22"
-                                            FontWeight="SemiBold"/>
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Padding="12" Margin="0,0,10,0"
+                        <Border Padding="12"
+                                Margin="0,0,10,0"
                                 Background="{DynamicResource MaterialDesignCardBackground}"
                                 CornerRadius="{StaticResource AppCornerRadius.Card}">
                             <StackPanel>
@@ -213,13 +231,34 @@
                           RowHeight="40">
 
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Depot" Binding="{Binding Depot}" Width="160"/>
+
+                        <DataGridTemplateColumn Header="" Width="44" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button ToolTip="Kursverlauf anzeigen"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Padding="0"
+                    Command="{Binding DataContext.KursHistorieCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                    CommandParameter="{Binding}">
+                                        <materialDesign:PackIcon Kind="ChartLine"
+                                         Style="{StaticResource DefaultIconStyle}"
+                                         Width="22"
+                                         Height="22"/>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+
+                        <DataGridTextColumn Header="Depot" Binding="{Binding Depot}" Width="150"/>
                         <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="*"/>
-                        <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="140"/>
+                        <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="125"/>
+                        <DataGridTextColumn Header="Anlageklasse" Binding="{Binding Anlageklasse}" Width="120"/>
                         <DataGridTextColumn Header="Stück" Binding="{Binding AnzahlText}" Width="90"/>
-                        <DataGridTextColumn Header="Einstand" Binding="{Binding EinstandText}" Width="120"/>
-                        <DataGridTextColumn Header="Aktuell" Binding="{Binding AktuellText}" Width="120"/>
-                        <DataGridTextColumn Header="Gewinn" Binding="{Binding GewinnText}" Width="120"/>
+                        <DataGridTextColumn Header="Einstandswert" Binding="{Binding EinstandText}" Width="130"/>
+                        <DataGridTextColumn Header="Marktwert" Binding="{Binding AktuellText}" Width="130"/>
+                        <DataGridTextColumn Header="Gewinn / Verlust" Binding="{Binding GewinnText}" Width="190"/>
+                        <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursdatumText}" Width="105"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

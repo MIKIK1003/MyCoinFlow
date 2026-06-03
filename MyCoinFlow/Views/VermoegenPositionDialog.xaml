@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Vermögensposition"
                  Width="620"
-                 Height="720"
+                 Height="1000"
                  SizeToContent="Manual"
                  WindowStartupLocation="CenterOwner">
 
@@ -42,10 +42,29 @@
                          Margin="0,0,0,12"/>
 
                 <TextBox MinHeight="40"
+         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+         materialDesign:HintAssist.Hint="ISIN"
+         Text="{Binding Model.ISIN, UpdateSourceTrigger=PropertyChanged}"
+         Margin="0,0,0,12"/>
+
+                <TextBox MinHeight="40"
+         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+         materialDesign:HintAssist.Hint="Valor"
+         Text="{Binding Model.Valor, UpdateSourceTrigger=PropertyChanged}"
+         Margin="0,0,0,12"/>
+
+                <TextBox MinHeight="40"
                          Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                         materialDesign:HintAssist.Hint="ISIN"
-                         Text="{Binding Model.ISIN, UpdateSourceTrigger=PropertyChanged}"
+                         materialDesign:HintAssist.Hint="Symbol für Kursabfrage, z.B. NESN.SW"
+                         Text="{Binding Model.Symbol, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,12"/>
+
+                <ComboBox MinHeight="40"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Börse"
+                          ItemsSource="{Binding Boersen}"
+                          SelectedItem="{Binding Model.Boerse, Mode=TwoWay}"
+                          Margin="0,0,0,12"/>
 
                 <ComboBox MinHeight="40"
                           Style="{StaticResource MaterialDesignOutlinedComboBox}"
@@ -62,7 +81,7 @@
 
                 <TextBox MinHeight="40"
                          Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                         materialDesign:HintAssist.Hint="Einstandspreis"
+                         materialDesign:HintAssist.Hint="Einstand pro Stück"
                          Text="{Binding EinstandspreisText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,12"/>
 
@@ -73,7 +92,7 @@
 
                 <TextBox MinHeight="40"
                          Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                         materialDesign:HintAssist.Hint="Aktueller Kurs"
+                         materialDesign:HintAssist.Hint="Aktueller Kurs pro Stück"
                          Text="{Binding AktuellerKursText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,12"/>
 

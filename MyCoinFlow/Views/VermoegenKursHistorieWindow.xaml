@@ -1,0 +1,53 @@
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.VermoegenKursHistorieWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Kursverlauf"
+                 Width="820"
+                 Height="520"
+                 SizeToContent="Manual"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="{Binding TitelText}"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
+
+        <TextBlock Grid.Row="2"
+                   Text="{Binding UntertitelText}"
+                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+        <DataGrid Grid.Row="4"
+                  ItemsSource="{Binding Historie}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0"
+                  SelectionUnit="FullRow"
+                  Background="White"
+                  RowBackground="White"
+                  AlternatingRowBackground="{x:Null}"
+                  materialDesign:DataGridAssist.CellPadding="8"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                  RowHeight="38">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursDatumText}" Width="130"/>
+                <DataGridTextColumn Header="Kurs" Binding="{Binding KursText}" Width="130"/>
+                <DataGridTextColumn Header="Quelle" Binding="{Binding Quelle}" Width="120"/>
+                <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAmText}" Width="180"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</base:BaseWindow>

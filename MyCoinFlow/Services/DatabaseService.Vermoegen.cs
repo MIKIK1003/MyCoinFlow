@@ -41,6 +41,9 @@ BEGIN
 
         Titel NVARCHAR(250) NOT NULL,
         ISIN NVARCHAR(20) NULL,
+        Valor NVARCHAR(50) NULL,
+        Symbol NVARCHAR(50) NULL,
+        Boerse NVARCHAR(50) NULL,
         Anlageklasse NVARCHAR(50) NOT NULL CONSTRAINT DF_VermoegenPosition_Anlageklasse DEFAULT ('Aktie'),
 
         Anzahl DECIMAL(28,8) NOT NULL,
@@ -57,6 +60,66 @@ BEGIN
         CONSTRAINT FK_VermoegenPosition_Depot
             FOREIGN KEY (DepotId) REFERENCES dbo.VermoegenDepot(Id)
     );
+END;
+
+IF COL_LENGTH('dbo.VermoegenPosition', 'Valor') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenPosition
+    ADD Valor NVARCHAR(50) NULL;
+END;
+
+IF COL_LENGTH('dbo.VermoegenPosition', 'Symbol') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenPosition
+    ADD Symbol NVARCHAR(50) NULL;
+END;
+
+IF COL_LENGTH('dbo.VermoegenPosition', 'Boerse') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenPosition
+    ADD Boerse NVARCHAR(50) NULL;
+END;
+
+IF OBJECT_ID('dbo.VermoegenEinstellung', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VermoegenEinstellung
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_VermoegenEinstellung PRIMARY KEY,
+        ApiProvider NVARCHAR(50) NOT NULL CONSTRAINT DF_VermoegenEinstellung_ApiProvider DEFAULT ('EODHD'),
+        ApiKey NVARCHAR(500) NULL,
+        Aktiv BIT NOT NULL CONSTRAINT DF_VermoegenEinstellung_Aktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_VermoegenEinstellung_ErstelltAm DEFAULT SYSUTCDATETIME()
+    );
+
+    INSERT INTO dbo.VermoegenEinstellung (ApiProvider, ApiKey, Aktiv)
+    VALUES ('EODHD', NULL, 1);
+END;
+
+IF OBJECT_ID('dbo.VermoegenKursHistorie', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VermoegenKursHistorie
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_VermoegenKursHistorie PRIMARY KEY,
+        PositionId INT NOT NULL,
+        KursDatum DATE NOT NULL,
+        Kurs DECIMAL(19,6) NOT NULL,
+        Quelle NVARCHAR(50) NOT NULL,
+        ErfasstAm DATETIME2 NOT NULL CONSTRAINT DF_VermoegenKursHistorie_ErfasstAm DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_VermoegenKursHistorie_Position
+            FOREIGN KEY (PositionId) REFERENCES dbo.VermoegenPosition(Id)
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'UX_VermoegenKursHistorie_Position_Datum'
+      AND object_id = OBJECT_ID('dbo.VermoegenKursHistorie')
+)
+BEGIN
+    CREATE UNIQUE INDEX UX_VermoegenKursHistorie_Position_Datum
+    ON dbo.VermoegenKursHistorie(PositionId, KursDatum);
 END;
 
 IF NOT EXISTS (
@@ -169,6 +232,9 @@ SELECT
     d.Name AS DepotName,
     p.Titel,
     p.ISIN,
+    ISNULL(p.Valor, '') AS Valor,
+    ISNULL(p.Symbol, '') AS Symbol,
+    ISNULL(p.Boerse, '') AS Boerse,
     p.Anlageklasse,
     p.Anzahl,
     p.Einstandspreis,
@@ -193,14 +259,17 @@ ORDER BY d.Name, p.Titel;";
                     DepotName = r.GetString(2),
                     Titel = r.GetString(3),
                     ISIN = r.IsDBNull(4) ? "" : r.GetString(4),
-                    Anlageklasse = r.GetString(5),
-                    Anzahl = r.GetDecimal(6),
-                    Einstandspreis = r.GetDecimal(7),
-                    EinstandDatum = r.IsDBNull(8) ? null : r.GetDateTime(8),
-                    AktuellerKurs = r.IsDBNull(9) ? null : r.GetDecimal(9),
-                    KursDatum = r.IsDBNull(10) ? null : r.GetDateTime(10),
-                    Notiz = r.IsDBNull(11) ? "" : r.GetString(11),
-                    IstAktiv = r.GetBoolean(12)
+                    Valor = r.GetString(5),
+                    Symbol = r.GetString(6),
+                    Boerse = r.GetString(7),
+                    Anlageklasse = r.GetString(8),
+                    Anzahl = r.GetDecimal(9),
+                    Einstandspreis = r.GetDecimal(10),
+                    EinstandDatum = r.IsDBNull(11) ? null : r.GetDateTime(11),
+                    AktuellerKurs = r.IsDBNull(12) ? null : r.GetDecimal(12),
+                    KursDatum = r.IsDBNull(13) ? null : r.GetDateTime(13),
+                    Notiz = r.IsDBNull(14) ? "" : r.GetString(14),
+                    IstAktiv = r.GetBoolean(15)
                 });
             }
 
@@ -295,6 +364,9 @@ INSERT INTO dbo.VermoegenPosition
     DepotId,
     Titel,
     ISIN,
+    Valor,
+    Symbol,
+    Boerse,
     Anlageklasse,
     Anzahl,
     Einstandspreis,
@@ -310,6 +382,9 @@ VALUES
     @DepotId,
     @Titel,
     @ISIN,
+    @Valor,
+    @Symbol,
+    @Boerse,
     @Anlageklasse,
     @Anzahl,
     @Einstandspreis,
@@ -325,6 +400,9 @@ VALUES
             cmd.Parameters.AddWithValue("@DepotId", model.DepotId);
             cmd.Parameters.AddWithValue("@Titel", model.Titel.Trim());
             cmd.Parameters.AddWithValue("@ISIN", string.IsNullOrWhiteSpace(model.ISIN) ? DBNull.Value : model.ISIN.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Valor", string.IsNullOrWhiteSpace(model.Valor) ? DBNull.Value : model.Valor.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
@@ -351,6 +429,9 @@ SET
     DepotId = @DepotId,
     Titel = @Titel,
     ISIN = @ISIN,
+    Valor = @Valor,
+    Symbol = @Symbol,
+    Boerse = @Boerse,
     Anlageklasse = @Anlageklasse,
     Anzahl = @Anzahl,
     Einstandspreis = @Einstandspreis,
@@ -367,6 +448,9 @@ WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@DepotId", model.DepotId);
             cmd.Parameters.AddWithValue("@Titel", model.Titel.Trim());
             cmd.Parameters.AddWithValue("@ISIN", string.IsNullOrWhiteSpace(model.ISIN) ? DBNull.Value : model.ISIN.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Valor", string.IsNullOrWhiteSpace(model.Valor) ? DBNull.Value : model.Valor.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
@@ -394,6 +478,178 @@ WHERE Id = @Id;";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
+        }
+
+        public VermoegenApiEinstellung VermoegenApiEinstellungGet()
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1
+    Id,
+    ApiProvider,
+    ApiKey,
+    Aktiv
+FROM dbo.VermoegenEinstellung
+ORDER BY Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            if (r.Read())
+            {
+                return new VermoegenApiEinstellung
+                {
+                    Id = r.GetInt32(0),
+                    ApiProvider = r.IsDBNull(1) ? "EODHD" : r.GetString(1),
+                    ApiKey = r.IsDBNull(2) ? "" : r.GetString(2),
+                    Aktiv = r.GetBoolean(3)
+                };
+            }
+
+            return new VermoegenApiEinstellung();
+        }
+
+        public void VermoegenApiEinstellungSave(VermoegenApiEinstellung model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+IF EXISTS (SELECT 1 FROM dbo.VermoegenEinstellung WHERE Id = @Id)
+BEGIN
+    UPDATE dbo.VermoegenEinstellung
+    SET
+        ApiProvider = @ApiProvider,
+        ApiKey = @ApiKey,
+        Aktiv = @Aktiv
+    WHERE Id = @Id;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.VermoegenEinstellung (ApiProvider, ApiKey, Aktiv)
+    VALUES (@ApiProvider, @ApiKey, @Aktiv);
+END;";
+
+            using var cmd = new SqlCommand(sql, c);
+
+            cmd.Parameters.AddWithValue("@Id", model.Id);
+            cmd.Parameters.AddWithValue("@ApiProvider", string.IsNullOrWhiteSpace(model.ApiProvider) ? "EODHD" : model.ApiProvider.Trim());
+            cmd.Parameters.AddWithValue("@ApiKey", string.IsNullOrWhiteSpace(model.ApiKey) ? DBNull.Value : model.ApiKey.Trim());
+            cmd.Parameters.AddWithValue("@Aktiv", model.Aktiv);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void VermoegenPositionKursUpdate(int id, decimal aktuellerKurs, DateTime kursDatum)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.VermoegenPosition
+SET
+    AktuellerKurs = @AktuellerKurs,
+    KursDatum = @KursDatum
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@AktuellerKurs", aktuellerKurs);
+            cmd.Parameters.AddWithValue("@KursDatum", kursDatum.Date);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void VermoegenKursHistorieInsertIfMissing(int positionId, DateTime kursDatum, decimal kurs, string quelle)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM dbo.VermoegenKursHistorie
+    WHERE PositionId = @PositionId
+      AND KursDatum = @KursDatum
+)
+BEGIN
+    INSERT INTO dbo.VermoegenKursHistorie
+    (
+        PositionId,
+        KursDatum,
+        Kurs,
+        Quelle
+    )
+    VALUES
+    (
+        @PositionId,
+        @KursDatum,
+        @Kurs,
+        @Quelle
+    );
+END;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@PositionId", positionId);
+            cmd.Parameters.AddWithValue("@KursDatum", kursDatum.Date);
+            cmd.Parameters.AddWithValue("@Kurs", kurs);
+            cmd.Parameters.AddWithValue("@Quelle", string.IsNullOrWhiteSpace(quelle) ? "Unbekannt" : quelle.Trim());
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<VermoegenKursHistorie> VermoegenKursHistorieGetByPosition(int positionId)
+        {
+            EnsureVermoegenSchema();
+
+            var list = new List<VermoegenKursHistorie>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    Id,
+    PositionId,
+    KursDatum,
+    Kurs,
+    Quelle,
+    ErfasstAm
+FROM dbo.VermoegenKursHistorie
+WHERE PositionId = @PositionId
+ORDER BY KursDatum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@PositionId", positionId);
+
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new VermoegenKursHistorie
+                {
+                    Id = r.GetInt32(0),
+                    PositionId = r.GetInt32(1),
+                    KursDatum = r.GetDateTime(2),
+                    Kurs = r.GetDecimal(3),
+                    Quelle = r.IsDBNull(4) ? "" : r.GetString(4),
+                    ErfasstAm = r.GetDateTime(5)
+                });
+            }
+
+            return list;
         }
 
 

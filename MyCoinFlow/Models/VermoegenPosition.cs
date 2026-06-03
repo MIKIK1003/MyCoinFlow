@@ -10,6 +10,11 @@ namespace MyCoinFlow.Models
 
         public string Titel { get; set; } = "";
         public string ISIN { get; set; } = "";
+        public string Valor { get; set; } = "";
+
+        public string Symbol { get; set; } = "";
+        public string Boerse { get; set; } = "";
+
         public string Anlageklasse { get; set; } = "Aktie";
 
         public decimal Anzahl { get; set; }

@@ -15,6 +15,18 @@ namespace MyCoinFlow.Views
 
         public ObservableCollection<VermoegenDepot> Depots { get; } = new();
 
+        public ObservableCollection<string> Boersen { get; } = new()
+        {
+            "SIX",
+            "NYSE",
+            "NASDAQ",
+            "XETRA",
+            "EURONEXT",
+            "LSE",
+            "KRYPTO",
+            "SONSTIGE"
+        };
+
         public ObservableCollection<string> Anlageklassen { get; } = new()
         {
             "Aktie",
@@ -58,6 +70,7 @@ namespace MyCoinFlow.Views
                 ? new VermoegenPosition
                 {
                     Anlageklasse = "Aktie",
+                    Boerse = "SIX",
                     IstAktiv = true,
                     KursDatum = DateTime.Today
                 }
@@ -68,6 +81,9 @@ namespace MyCoinFlow.Views
                     DepotName = model.DepotName,
                     Titel = model.Titel,
                     ISIN = model.ISIN,
+                    Valor = model.Valor,
+                    Symbol = model.Symbol,
+                    Boerse = string.IsNullOrWhiteSpace(model.Boerse) ? "SIX" : model.Boerse,
                     Anlageklasse = string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse,
                     Anzahl = model.Anzahl,
                     Einstandspreis = model.Einstandspreis,
@@ -157,6 +173,12 @@ namespace MyCoinFlow.Views
 
             Model.Titel = Model.Titel.Trim();
             Model.ISIN = (Model.ISIN ?? "").Trim().ToUpperInvariant();
+            Model.Valor = (Model.Valor ?? "").Trim().ToUpperInvariant();
+            Model.Symbol = (Model.Symbol ?? "").Trim().ToUpperInvariant();
+            Model.Boerse = string.IsNullOrWhiteSpace(Model.Boerse)
+                ? ""
+                : Model.Boerse.Trim().ToUpperInvariant();
+
             Model.Anlageklasse = string.IsNullOrWhiteSpace(Model.Anlageklasse)
                 ? "Aktie"
                 : Model.Anlageklasse.Trim();
