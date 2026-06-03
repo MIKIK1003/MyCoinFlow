@@ -1,0 +1,101 @@
+﻿<base:BaseWindow x:Class="MyCoinFlow.Views.VermoegenSymbolSucheWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Symbol suchen"
+                 Width="980"
+                 Height="620"
+                 SizeToContent="Manual"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Symbol suchen"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="150"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SuchBox"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Titel oder ISIN"
+                     Text="{Binding Suchtext, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <Button Grid.Column="2"
+                    Style="{StaticResource IconTextButton}"
+                    Tag="Magnify"
+                    Content="Suchen"
+                    IsDefault="True"
+                    Command="{Binding SucheCommand}"/>
+        </Grid>
+
+        <TextBlock Grid.Row="4"
+                   Text="{Binding StatusText}"
+                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                   Margin="0,0,0,8"
+                   VerticalAlignment="Top"/>
+
+        <DataGrid Grid.Row="4"
+                  Margin="0,28,0,0"
+                  ItemsSource="{Binding Treffer}"
+                  SelectedItem="{Binding SelectedTreffer, Mode=TwoWay}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0"
+                  SelectionUnit="FullRow"
+                  Background="White"
+                  RowBackground="White"
+                  AlternatingRowBackground="{x:Null}"
+                  materialDesign:DataGridAssist.CellPadding="8"
+                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                  RowHeight="38">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="2*"/>
+                <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}" Width="100"/>
+                <DataGridTextColumn Header="Börse" Binding="{Binding Boerse}" Width="100"/>
+                <DataGridTextColumn Header="EODHD" Binding="{Binding EodhdExchange}" Width="90"/>
+                <DataGridTextColumn Header="ISIN" Binding="{Binding ISIN}" Width="145"/>
+                <DataGridTextColumn Header="Typ" Binding="{Binding Typ}" Width="110"/>
+                <DataGridTextColumn Header="Land" Binding="{Binding Land}" Width="90"/>
+                <DataGridTextColumn Header="Währung" Binding="{Binding Waehrung}" Width="90"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="6"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="CheckCircleOutline"
+                    Content="Übernehmen"
+                    Width="140"
+                    Margin="0,0,10,0"
+                    Command="{Binding UebernehmenCommand}"/>
+
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Close"
+                    Content="Abbrechen"
+                    Width="130"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using MyCoinFlow.Services;
 using System.Linq;
 using System.Windows;
 
@@ -10,6 +11,7 @@ namespace MyCoinFlow.Views
     public partial class VermoegenPositionDialog
     {
         private static readonly CultureInfo ChCulture = CultureInfo.GetCultureInfo("de-CH");
+        private readonly DatabaseService _db = new();
 
         public VermoegenPosition Model { get; }
 
@@ -207,6 +209,63 @@ namespace MyCoinFlow.Views
                 NumberStyles.Number,
                 ChCulture,
                 out value);
+        }
+
+        private void SymbolSuchen_Click(object sender, RoutedEventArgs e)
+        {
+            var einstellung = _db.VermoegenApiEinstellungGet();
+
+            if (!einstellung.Aktiv || string.IsNullOrWhiteSpace(einstellung.ApiKey))
+            {
+                MessageBox.Show(
+                    "Bitte zuerst im Vermögensmodul den EODHD API-Key erfassen.",
+                    "Symbol suchen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var suchtext =
+                !string.IsNullOrWhiteSpace(Model.ISIN)
+                    ? Model.ISIN
+                    : Model.Titel;
+
+            var dlg = new VermoegenSymbolSucheWindow(suchtext, einstellung.ApiKey);
+            TrySetOwner(dlg);
+
+            if (dlg.ShowDialog() != true || dlg.Ergebnis == null)
+                return;
+
+            var result = dlg.Ergebnis;
+
+            if (!string.IsNullOrWhiteSpace(result.Titel))
+                Model.Titel = result.Titel.Trim();
+
+            if (!string.IsNullOrWhiteSpace(result.ISIN))
+                Model.ISIN = result.ISIN.Trim().ToUpperInvariant();
+
+            if (!string.IsNullOrWhiteSpace(result.Symbol))
+                Model.Symbol = result.Symbol.Trim().ToUpperInvariant();
+
+            if (!string.IsNullOrWhiteSpace(result.Boerse))
+                Model.Boerse = result.Boerse.Trim().ToUpperInvariant();
+
+            // Binding-Refresh, weil Model selbst kein INotifyPropertyChanged implementiert.
+            DataContext = null;
+            DataContext = this;
+        }
+
+        private static void TrySetOwner(Window dlg)
+        {
+            try
+            {
+                if (Application.Current?.MainWindow != null)
+                    dlg.Owner = Application.Current.MainWindow;
+            }
+            catch
+            {
+                // keine UI-Blockade
+            }
         }
     }
 }

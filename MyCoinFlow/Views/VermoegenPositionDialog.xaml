@@ -59,6 +59,13 @@
                          Text="{Binding Model.Symbol, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,12"/>
 
+                <Button Style="{StaticResource IconTextButton}"
+        Tag="Magnify"
+        Content="Symbol suchen"
+        MinHeight="40"
+        Margin="0,0,0,12"
+        Click="SymbolSuchen_Click"/>
+
                 <ComboBox MinHeight="40"
                           Style="{StaticResource MaterialDesignOutlinedComboBox}"
                           materialDesign:HintAssist.Hint="Börse"
