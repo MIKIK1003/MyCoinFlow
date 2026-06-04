@@ -958,6 +958,83 @@ ORDER BY b.KursDatum;";
             return result;
         }
 
+        public VermoegenKursHistorie? VermoegenKursHistorieGetLatestByPosition(int positionId)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1
+    Id,
+    PositionId,
+    KursDatum,
+    Kurs,
+    Quelle,
+    ErfasstAm
+FROM dbo.VermoegenKursHistorie
+WHERE PositionId = @PositionId
+ORDER BY KursDatum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@PositionId", positionId);
+
+            using var r = cmd.ExecuteReader();
+
+            if (!r.Read())
+                return null;
+
+            return new VermoegenKursHistorie
+            {
+                Id = r.GetInt32(0),
+                PositionId = r.GetInt32(1),
+                KursDatum = r.GetDateTime(2),
+                Kurs = r.GetDecimal(3),
+                Quelle = r.IsDBNull(4) ? "" : r.GetString(4),
+                ErfasstAm = r.GetDateTime(5)
+            };
+        }
+        public void VermoegenKursHistorieUpdate(int id, DateTime kursDatum, decimal kurs, string quelle)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.VermoegenKursHistorie
+SET
+    KursDatum = @KursDatum,
+    Kurs = @Kurs,
+    Quelle = @Quelle
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@KursDatum", kursDatum.Date);
+            cmd.Parameters.AddWithValue("@Kurs", kurs);
+            cmd.Parameters.AddWithValue("@Quelle", string.IsNullOrWhiteSpace(quelle) ? "Manuell" : quelle.Trim());
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void VermoegenKursHistorieDelete(int id)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+DELETE FROM dbo.VermoegenKursHistorie
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            cmd.ExecuteNonQuery();
+        }
     }
 
 }

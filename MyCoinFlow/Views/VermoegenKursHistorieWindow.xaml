@@ -5,62 +5,140 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
                  Title="Kursverlauf"
-                 Width="980"
-                 Height="720"
+                 Width="1100"
+                 Height="760"
                  SizeToContent="Manual"
                  WindowStartupLocation="CenterOwner">
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="260"/>
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <TextBlock Text="{Binding TitelText}"
-                   FontSize="22"
-                   FontWeight="SemiBold"/>
+        <!-- LINKS: SIDEBAR -->
+        <Border Grid.Column="0"
+                Style="{StaticResource SidebarCard}">
+            <StackPanel>
 
-        <TextBlock Grid.Row="2"
-                   Text="{Binding UntertitelText}"
-                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                <TextBlock Text="Aktionen"
+                           Style="{StaticResource SidebarSectionHeader}"/>
 
-        <Border Grid.Row="4"
-                Background="{DynamicResource MaterialDesignPaper}"
-                CornerRadius="{StaticResource AppCornerRadius.Card}"
-                Padding="8">
-            <lvc:CartesianChart Series="{Binding KursSeries}"
-                                XAxes="{Binding XAxes}"
-                                YAxes="{Binding YAxes}"
-                                LegendPosition="Hidden"/>
+                <TextBlock Text="Manueller Kurs"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                <DatePicker MinHeight="40"
+                            materialDesign:HintAssist.Hint="Kursdatum"
+                            SelectedDate="{Binding EingabeDatum, Mode=TwoWay}"
+                            Margin="0,0,0,12"/>
+
+                <TextBox MinHeight="40"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Kurs"
+                         Text="{Binding EingabeKursText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,12"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="ContentSave"
+                        Content="Kurs speichern"
+                        MinHeight="40"
+                        Margin="0,0,0,10"
+                        Click="KursSpeichern_Click"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="PencilOutline"
+                        Content="Auswahl aktualisieren"
+                        MinHeight="40"
+                        Margin="0,0,0,10"
+                        Click="KursAktualisieren_Click"/>
+
+                <Button Style="{StaticResource IconTextButton.Danger}"
+                        Tag="DeleteOutline"
+                        Content="Auswahl löschen"
+                        MinHeight="40"
+                        Margin="0,0,0,12"
+                        Click="KursLoeschen_Click"/>
+
+                <Separator Margin="0,10,0,12"/>
+
+                <TextBlock Text="Hinweis"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                <TextBlock Text="Wähle einen Eintrag in der Tabelle, um ihn zu bearbeiten oder zu löschen."
+                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12"/>
+
+                <Separator Margin="0,10,0,12"/>
+
+                <TextBlock Text="Status"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                           TextWrapping="Wrap"/>
+
+            </StackPanel>
         </Border>
 
-        <DataGrid Grid.Row="6"
-                  ItemsSource="{Binding Historie}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  GridLinesVisibility="Horizontal"
-                  RowHeaderWidth="0"
-                  SelectionUnit="FullRow"
-                  Background="White"
-                  RowBackground="White"
-                  AlternatingRowBackground="{x:Null}"
-                  materialDesign:DataGridAssist.CellPadding="8"
-                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
-                  RowHeight="38">
+        <!-- RECHTS: CHART + TABELLE -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="14"/>
+                <RowDefinition Height="260"/>
+                <RowDefinition Height="14"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursDatumText}" Width="130"/>
-                <DataGridTextColumn Header="Kurs" Binding="{Binding KursText}" Width="130"/>
-                <DataGridTextColumn Header="Quelle" Binding="{Binding Quelle}" Width="120"/>
-                <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAmText}" Width="180"/>
-            </DataGrid.Columns>
-        </DataGrid>
+            <TextBlock Text="{Binding TitelText}"
+                       FontSize="22"
+                       FontWeight="SemiBold"/>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding UntertitelText}"
+                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+            <Border Grid.Row="4"
+                    Background="{DynamicResource MaterialDesignPaper}"
+                    CornerRadius="{StaticResource AppCornerRadius.Card}"
+                    Padding="8">
+                <lvc:CartesianChart Series="{Binding KursSeries}"
+                                    XAxes="{Binding XAxes}"
+                                    YAxes="{Binding YAxes}"
+                                    LegendPosition="Hidden"/>
+            </Border>
+
+            <DataGrid Grid.Row="6"
+                      ItemsSource="{Binding Historie}"
+                      SelectedItem="{Binding SelectedHistorie, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      RowHeaderWidth="0"
+                      SelectionUnit="FullRow"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="{x:Null}"
+                      materialDesign:DataGridAssist.CellPadding="8"
+                      materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                      RowHeight="38">
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursDatumText}" Width="130"/>
+                    <DataGridTextColumn Header="Kurs" Binding="{Binding KursText}" Width="130"/>
+                    <DataGridTextColumn Header="Quelle" Binding="{Binding Quelle}" Width="120"/>
+                    <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAmText}" Width="180"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
     </Grid>
 </base:BaseWindow>

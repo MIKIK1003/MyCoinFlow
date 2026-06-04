@@ -1,9 +1,10 @@
-﻿using MyCoinFlow.Helpers;
+﻿using DocumentFormat.OpenXml.Wordprocessing;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using MyCoinFlow.Helpers;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using MyCoinFlow.Views;
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -29,6 +30,13 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<VermoegenPositionRow> Positionen { get; } = new();
 
         private ISeries[] _depotVerlaufSeries = Array.Empty<ISeries>();
+
+        private ISeries[] _vermoegenAufteilungSeries = Array.Empty<ISeries>();
+        public ISeries[] VermoegenAufteilungSeries
+        {
+            get => _vermoegenAufteilungSeries;
+            set { _vermoegenAufteilungSeries = value; OnPropertyChanged(); }
+        }
         public ISeries[] DepotVerlaufSeries
         {
             get => _depotVerlaufSeries;
@@ -276,6 +284,7 @@ namespace MyCoinFlow.ViewModels
             UpdateSummary(list);
             UpdateFilterTitel();
             UpdateDepotVerlauf();
+            UpdateVermoegenAufteilung(list);
 
             StatusText = Positionen.Count == 0
                 ? "Keine passenden Vermögenspositionen vorhanden."
@@ -379,6 +388,44 @@ namespace MyCoinFlow.ViewModels
             };
         }
 
+        private void UpdateVermoegenAufteilung(List<VermoegenPosition> list)
+        {
+            var daten = list
+                .Select(p =>
+                {
+                    var fx = GetFxKursNachChf(p.Waehrung);
+
+                    if (!p.Marktwert.HasValue || !fx.HasValue)
+                        return null;
+
+                    return new
+                    {
+                        Anlageklasse = string.IsNullOrWhiteSpace(p.Anlageklasse)
+                            ? "Sonstiges"
+                            : p.Anlageklasse.Trim(),
+                        MarktwertChf = p.Marktwert.Value * fx.Value
+                    };
+                })
+                .Where(x => x != null && x.MarktwertChf > 0)
+                .GroupBy(x => x!.Anlageklasse)
+                .Select(g => new
+                {
+                    Anlageklasse = g.Key,
+                    Wert = g.Sum(x => x!.MarktwertChf)
+                })
+                .OrderByDescending(x => x.Wert)
+                .ToList();
+
+            VermoegenAufteilungSeries = daten
+                .Select(x => (ISeries)new PieSeries<decimal>
+                {
+                    Values = new[] { x.Wert },
+                    Name = $"{x.Anlageklasse} · {FormatCurrency(x.Wert, "CHF")}",
+                    InnerRadius = 55
+                })
+                .ToArray();
+        }
+
 
 
         private void FilterLeeren()
@@ -406,9 +453,8 @@ namespace MyCoinFlow.ViewModels
             }
 
             var positionen = _allePositionen
-                .Where(p => p.IstAktiv)
-                .Where(p => !string.IsNullOrWhiteSpace(p.Symbol))
-                .ToList();
+    .Where(p => p.IstAktiv)
+    .ToList();
 
             if (positionen.Count == 0)
             {
@@ -431,27 +477,51 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var p in positionen)
             {
-                var result = await _kursService.HoleAktuellenKursAsync(
-                    p.Symbol,
-                    p.Boerse,
-                    einstellung.ApiKey);
+                if (!string.IsNullOrWhiteSpace(p.Symbol))
+                {
+                    var result = await _kursService.HoleAktuellenKursAsync(
+                        p.Symbol,
+                        p.Boerse,
+                        einstellung.ApiKey);
 
-                if (result == null)
+                    if (result != null)
+                    {
+                        _db.VermoegenPositionKursUpdate(
+                            p.Id,
+                            result.Kurs,
+                            result.KursDatum);
+
+                        _db.VermoegenKursHistorieInsertIfMissing(
+                            p.Id,
+                            result.KursDatum,
+                            result.Kurs,
+                            "EODHD");
+
+                        ok++;
+                        continue;
+                    }
+                }
+
+                var letzterKurs = _db.VermoegenKursHistorieGetLatestByPosition(p.Id);
+
+                if (letzterKurs == null)
                 {
                     fehler++;
                     continue;
                 }
 
+                var fortschreibDatum = DateTime.Today;
+
                 _db.VermoegenPositionKursUpdate(
                     p.Id,
-                    result.Kurs,
-                    result.KursDatum);
+                    letzterKurs.Kurs,
+                    fortschreibDatum);
 
                 _db.VermoegenKursHistorieInsertIfMissing(
                     p.Id,
-                    result.KursDatum,
-                    result.Kurs,
-                    "EODHD");
+                    fortschreibDatum,
+                    letzterKurs.Kurs,
+                    "Fortschreibung");
 
                 ok++;
             }
@@ -488,8 +558,8 @@ namespace MyCoinFlow.ViewModels
             Load();
 
             StatusText =
-                $"Kursaktualisierung abgeschlossen: {ok} Position(en), {fehler} ohne Ergebnis. " +
-                $"FX: {fxOk} gespeichert, {fxFehler} ohne Ergebnis.";
+    $"Kursaktualisierung abgeschlossen: {ok} Position(en) aktualisiert oder fortgeschrieben, " +
+    $"{fehler} ohne Kursbasis. FX: {fxOk} gespeichert, {fxFehler} ohne Ergebnis.";
         }
 
         private VermoegenPositionRow ToRow(VermoegenPosition p)
