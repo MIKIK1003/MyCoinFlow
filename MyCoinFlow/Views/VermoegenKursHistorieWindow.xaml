@@ -3,9 +3,10 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
                  Title="Kursverlauf"
-                 Width="820"
-                 Height="520"
+                 Width="980"
+                 Height="720"
                  SizeToContent="Manual"
                  WindowStartupLocation="CenterOwner">
 
@@ -14,6 +15,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="260"/>
             <RowDefinition Height="14"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -26,7 +29,17 @@
                    Text="{Binding UntertitelText}"
                    Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
 
-        <DataGrid Grid.Row="4"
+        <Border Grid.Row="4"
+                Background="{DynamicResource MaterialDesignPaper}"
+                CornerRadius="{StaticResource AppCornerRadius.Card}"
+                Padding="8">
+            <lvc:CartesianChart Series="{Binding KursSeries}"
+                                XAxes="{Binding XAxes}"
+                                YAxes="{Binding YAxes}"
+                                LegendPosition="Hidden"/>
+        </Border>
+
+        <DataGrid Grid.Row="6"
                   ItemsSource="{Binding Historie}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"

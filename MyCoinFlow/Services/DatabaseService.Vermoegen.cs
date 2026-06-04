@@ -810,6 +810,38 @@ ORDER BY KursDatum DESC;";
             };
         }
 
+        public decimal? VermoegenFxKursNachChfGetLatest(string waehrung)
+        {
+            EnsureVermoegenSchema();
+
+            var von = string.IsNullOrWhiteSpace(waehrung)
+                ? "CHF"
+                : waehrung.Trim().ToUpperInvariant();
+
+            if (von == "CHF")
+                return 1m;
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1 Kurs
+FROM dbo.VermoegenFxHistorie
+WHERE VonWaehrung = @VonWaehrung
+  AND NachWaehrung = 'CHF'
+ORDER BY KursDatum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@VonWaehrung", von);
+
+            var result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+                return null;
+
+            return Convert.ToDecimal(result);
+        }
+
     }
 
 }

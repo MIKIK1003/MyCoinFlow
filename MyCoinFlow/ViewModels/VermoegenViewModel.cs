@@ -19,6 +19,7 @@ namespace MyCoinFlow.ViewModels
         private readonly DatabaseService _db = new();
         private readonly KursService _kursService = new();
         private readonly List<VermoegenPosition> _allePositionen = new();
+        private readonly Dictionary<string, decimal?> _fxNachChfCache = new();
 
         public ObservableCollection<VermoegenDepot> Depots { get; } = new();
         public ObservableCollection<VermoegenDepot> DepotFilterListe { get; } = new();
@@ -129,8 +130,8 @@ namespace MyCoinFlow.ViewModels
             NeuePositionCommand = new RelayCommand(_ => NeuePosition(), _ => Depots.Any());
             PositionBearbeitenCommand = new RelayCommand(_ => PositionBearbeiten(), _ => SelectedPosition != null);
             PositionLoeschenCommand = new RelayCommand(_ => PositionLoeschen(), _ => SelectedPosition != null);
-            ApiEinstellungCommand = new RelayCommand(_ => ApiEinstellung());
 
+            ApiEinstellungCommand = new RelayCommand(_ => ApiEinstellung());
             KurseAktualisierenCommand = new RelayCommand(_ => KurseAktualisieren(), _ => _allePositionen.Any(p => p.IstAktiv));
             KursHistorieCommand = new RelayCommand(p => KursHistorieAnzeigen(p), p => p is VermoegenPositionRow);
 
@@ -148,6 +149,7 @@ namespace MyCoinFlow.ViewModels
             AnlageklasseFilterListe.Clear();
             Positionen.Clear();
             _allePositionen.Clear();
+            _fxNachChfCache.Clear();
 
             _db.EnsureVermoegenSchema();
 
@@ -261,22 +263,42 @@ namespace MyCoinFlow.ViewModels
 
         private void UpdateSummary(List<VermoegenPosition> list)
         {
-            var einstand = list.Sum(p => p.EinstandWert);
-            var depotwert = list.Where(p => p.Marktwert.HasValue).Sum(p => p.Marktwert!.Value);
-            var gewinn = depotwert - einstand;
+            decimal einstandChf = 0m;
+            decimal depotwertChf = 0m;
+            int fehlendeFx = 0;
 
-            EinstandText = FormatCurrency(einstand);
-            DepotwertText = FormatCurrency(depotwert);
-
-            if (einstand > 0)
+            foreach (var p in list)
             {
-                var performance = gewinn / einstand * 100m;
-                GewinnVerlustText = $"{FormatCurrency(gewinn)} ({FormatPercent(performance)})";
+                var fx = GetFxKursNachChf(p.Waehrung);
+                if (!fx.HasValue)
+                {
+                    fehlendeFx++;
+                    continue;
+                }
+
+                einstandChf += p.EinstandWert * fx.Value;
+
+                if (p.Marktwert.HasValue)
+                    depotwertChf += p.Marktwert.Value * fx.Value;
+            }
+
+            var gewinnChf = depotwertChf - einstandChf;
+
+            EinstandText = FormatCurrency(einstandChf, "CHF");
+            DepotwertText = FormatCurrency(depotwertChf, "CHF");
+
+            if (einstandChf > 0)
+            {
+                var performance = gewinnChf / einstandChf * 100m;
+                GewinnVerlustText = $"{FormatCurrency(gewinnChf, "CHF")} ({FormatPercent(performance)})";
             }
             else
             {
-                GewinnVerlustText = FormatCurrency(gewinn);
+                GewinnVerlustText = FormatCurrency(gewinnChf, "CHF");
             }
+
+            if (fehlendeFx > 0)
+                StatusText = $"{fehlendeFx} Position(en) ohne FX-Kurs.";
         }
 
         private void UpdateFilterTitel()
@@ -406,6 +428,16 @@ namespace MyCoinFlow.ViewModels
 
         private VermoegenPositionRow ToRow(VermoegenPosition p)
         {
+            var fx = GetFxKursNachChf(p.Waehrung);
+
+            decimal? marktwertChf = p.Marktwert.HasValue && fx.HasValue
+                ? p.Marktwert.Value * fx.Value
+                : null;
+
+            decimal? gewinnChf = p.GewinnVerlust.HasValue && fx.HasValue
+                ? p.GewinnVerlust.Value * fx.Value
+                : null;
+
             return new VermoegenPositionRow
             {
                 Id = p.Id,
@@ -414,7 +446,6 @@ namespace MyCoinFlow.ViewModels
                 Titel = p.Titel,
                 ISIN = p.ISIN,
                 Anlageklasse = p.Anlageklasse,
-
                 Waehrung = p.Waehrung,
 
                 Anzahl = p.Anzahl,
@@ -427,6 +458,18 @@ namespace MyCoinFlow.ViewModels
                     : "-",
 
                 GewinnText = BuildGewinnText(p),
+
+                FxKursText = fx.HasValue
+                    ? FormatFx(fx.Value)
+                    : "-",
+
+                MarktwertChfText = marktwertChf.HasValue
+                    ? FormatCurrency(marktwertChf.Value, "CHF")
+                    : "-",
+
+                GewinnChfText = gewinnChf.HasValue
+                    ? FormatCurrency(gewinnChf.Value, "CHF")
+                    : "-",
 
                 KursdatumText = p.KursDatum.HasValue
                     ? p.KursDatum.Value.ToString("dd.MM.yyyy")
@@ -446,6 +489,20 @@ namespace MyCoinFlow.ViewModels
             }
 
             return FormatCurrency(p.GewinnVerlust.Value, p.Waehrung);
+        }
+
+        private decimal? GetFxKursNachChf(string waehrung)
+        {
+            var w = string.IsNullOrWhiteSpace(waehrung)
+                ? "CHF"
+                : waehrung.Trim().ToUpperInvariant();
+
+            if (_fxNachChfCache.TryGetValue(w, out var cached))
+                return cached;
+
+            var fx = _db.VermoegenFxKursNachChfGetLatest(w);
+            _fxNachChfCache[w] = fx;
+            return fx;
         }
 
         private void NeuesDepot()
@@ -644,6 +701,11 @@ namespace MyCoinFlow.ViewModels
             return string.Format(CultureInfo.GetCultureInfo("de-CH"), "{0} {1:N2}", w, value);
         }
 
+        private static string FormatFx(decimal value)
+        {
+            return value.ToString("N6", CultureInfo.GetCultureInfo("de-CH"));
+        }
+
         private static string FormatPercent(decimal value)
         {
             return string.Format(CultureInfo.GetCultureInfo("de-CH"), "{0:+0.00;-0.00;0.00}%", value);
@@ -665,12 +727,18 @@ namespace MyCoinFlow.ViewModels
         public string ISIN { get; set; } = "";
         public string Anlageklasse { get; set; } = "";
         public string Waehrung { get; set; } = "CHF";
+
         public decimal Anzahl { get; set; }
         public string AnzahlText { get; set; } = "";
 
         public string EinstandText { get; set; } = "";
         public string AktuellText { get; set; } = "";
         public string GewinnText { get; set; } = "";
+
+        public string FxKursText { get; set; } = "";
+        public string MarktwertChfText { get; set; } = "";
+        public string GewinnChfText { get; set; } = "";
+
         public string KursdatumText { get; set; } = "";
     }
 }

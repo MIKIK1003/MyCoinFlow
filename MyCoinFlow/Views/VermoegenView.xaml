@@ -259,6 +259,9 @@
                         <DataGridTextColumn Header="Einstandswert" Binding="{Binding EinstandText}" Width="130"/>
                         <DataGridTextColumn Header="Marktwert" Binding="{Binding AktuellText}" Width="130"/>
                         <DataGridTextColumn Header="Gewinn / Verlust" Binding="{Binding GewinnText}" Width="190"/>
+                        <DataGridTextColumn Header="FX" Binding="{Binding FxKursText}" Width="90"/>
+                        <DataGridTextColumn Header="Marktwert CHF" Binding="{Binding MarktwertChfText}" Width="135"/>
+                        <DataGridTextColumn Header="Gewinn CHF" Binding="{Binding GewinnChfText}" Width="135"/>
                         <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursdatumText}" Width="105"/>
                     </DataGrid.Columns>
                 </DataGrid>
