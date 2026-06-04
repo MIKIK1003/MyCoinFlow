@@ -32,6 +32,7 @@ namespace MyCoinFlow.Views
         public ObservableCollection<string> Anlageklassen { get; } = new()
         {
             "Aktie",
+            "Fonds",
             "ETF",
             "Obligation",
             "Kryptowährung",

@@ -842,6 +842,122 @@ ORDER BY KursDatum DESC;";
             return Convert.ToDecimal(result);
         }
 
+        public List<VermoegenDepotVerlaufRow> VermoegenDepotVerlaufGet(int? depotId)
+        {
+            EnsureVermoegenSchema();
+
+            var result = new List<VermoegenDepotVerlaufRow>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+;WITH KursTage AS
+(
+    SELECT DISTINCT KursDatum
+    FROM dbo.VermoegenKursHistorie
+),
+PositionBewertung AS
+(
+    SELECT
+        kt.KursDatum,
+        p.Id AS PositionId,
+        p.DepotId,
+        p.Anzahl,
+        p.EinstandDatum,
+        ISNULL(p.Waehrung, 'CHF') AS Waehrung,
+
+        (
+            SELECT TOP 1 kh.Kurs
+            FROM dbo.VermoegenKursHistorie kh
+            WHERE kh.PositionId = p.Id
+              AND kh.KursDatum <= kt.KursDatum
+            ORDER BY kh.KursDatum DESC
+        ) AS LetzterKurs,
+
+        CASE
+            WHEN ISNULL(p.Waehrung, 'CHF') = 'CHF' THEN 1
+            ELSE
+            (
+                SELECT TOP 1 fx.Kurs
+                FROM dbo.VermoegenFxHistorie fx
+                WHERE fx.VonWaehrung = ISNULL(p.Waehrung, 'CHF')
+                  AND fx.NachWaehrung = 'CHF'
+                  AND fx.KursDatum <= kt.KursDatum
+                ORDER BY fx.KursDatum DESC
+            )
+        END AS FxNachChf
+
+    FROM KursTage kt
+    CROSS JOIN dbo.VermoegenPosition p
+    WHERE p.IstAktiv = 1
+      AND (@DepotId IS NULL OR p.DepotId = @DepotId)
+      AND (
+            p.EinstandDatum IS NULL
+            OR p.EinstandDatum <= kt.KursDatum
+          )
+),
+GueltigeBewertung AS
+(
+    SELECT *
+    FROM PositionBewertung
+    WHERE LetzterKurs IS NOT NULL
+      AND FxNachChf IS NOT NULL
+),
+BewertungProTag AS
+(
+    SELECT
+        KursDatum,
+        COUNT(*) AS BewertetePositionen,
+        SUM(Anzahl * LetzterKurs * FxNachChf) AS DepotwertChf
+    FROM GueltigeBewertung
+    GROUP BY KursDatum
+),
+ErwartetePositionen AS
+(
+    SELECT
+        kt.KursDatum,
+        COUNT(*) AS SollPositionen
+    FROM KursTage kt
+    CROSS JOIN dbo.VermoegenPosition p
+    WHERE p.IstAktiv = 1
+      AND (@DepotId IS NULL OR p.DepotId = @DepotId)
+      AND (
+            p.EinstandDatum IS NULL
+            OR p.EinstandDatum <= kt.KursDatum
+          )
+    GROUP BY kt.KursDatum
+)
+SELECT
+    b.KursDatum,
+    b.DepotwertChf
+FROM BewertungProTag b
+JOIN ErwartetePositionen e
+    ON e.KursDatum = b.KursDatum
+WHERE b.BewertetePositionen = e.SollPositionen
+ORDER BY b.KursDatum;";
+
+            using var cmd = new SqlCommand(sql, c);
+
+            if (depotId.HasValue && depotId.Value > 0)
+                cmd.Parameters.AddWithValue("@DepotId", depotId.Value);
+            else
+                cmd.Parameters.AddWithValue("@DepotId", DBNull.Value);
+
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                result.Add(new VermoegenDepotVerlaufRow
+                {
+                    Datum = r.GetDateTime(0),
+                    DepotwertChf = r.GetDecimal(1)
+                });
+            }
+
+            return result;
+        }
+
     }
 
 }

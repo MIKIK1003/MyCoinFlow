@@ -1,7 +1,8 @@
 ﻿<UserControl x:Class="MyCoinFlow.Views.VermoegenView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
 
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
@@ -153,6 +154,8 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="16"/>
+                    <RowDefinition Height="230"/>
+                    <RowDefinition Height="16"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -213,7 +216,18 @@
                     </UniformGrid>
                 </StackPanel>
 
-                <DataGrid Grid.Row="2"
+                <Border Grid.Row="2"
+        Background="{DynamicResource MaterialDesignPaper}"
+        CornerRadius="{StaticResource AppCornerRadius.Card}"
+        Padding="8">
+                    <lvc:CartesianChart Series="{Binding DepotVerlaufSeries}"
+                        XAxes="{Binding DepotVerlaufXAxes}"
+                        YAxes="{Binding DepotVerlaufYAxes}"
+                        LegendPosition="Hidden"/>
+                </Border>
+
+
+                <DataGrid Grid.Row="4"
                           ItemsSource="{Binding Positionen}"
                           SelectedItem="{Binding SelectedPosition, Mode=TwoWay}"
                           AutoGenerateColumns="False"

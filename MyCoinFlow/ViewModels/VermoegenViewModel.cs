@@ -2,6 +2,8 @@
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using MyCoinFlow.Views;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -25,6 +27,27 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<VermoegenDepot> DepotFilterListe { get; } = new();
         public ObservableCollection<string> AnlageklasseFilterListe { get; } = new();
         public ObservableCollection<VermoegenPositionRow> Positionen { get; } = new();
+
+        private ISeries[] _depotVerlaufSeries = Array.Empty<ISeries>();
+        public ISeries[] DepotVerlaufSeries
+        {
+            get => _depotVerlaufSeries;
+            set { _depotVerlaufSeries = value; OnPropertyChanged(); }
+        }
+
+        private Axis[] _depotVerlaufXAxes = Array.Empty<Axis>();
+        public Axis[] DepotVerlaufXAxes
+        {
+            get => _depotVerlaufXAxes;
+            set { _depotVerlaufXAxes = value; OnPropertyChanged(); }
+        }
+
+        private Axis[] _depotVerlaufYAxes = Array.Empty<Axis>();
+        public Axis[] DepotVerlaufYAxes
+        {
+            get => _depotVerlaufYAxes;
+            set { _depotVerlaufYAxes = value; OnPropertyChanged(); }
+        }
 
         private string _suchtext = "";
         public string Suchtext
@@ -204,6 +227,7 @@ namespace MyCoinFlow.ViewModels
             }
 
             AddAnlageklasseIfMissing("Aktie");
+            AddAnlageklasseIfMissing("Fonds");
             AddAnlageklasseIfMissing("ETF");
             AddAnlageklasseIfMissing("Obligation");
             AddAnlageklasseIfMissing("Kryptowährung");
@@ -251,6 +275,7 @@ namespace MyCoinFlow.ViewModels
 
             UpdateSummary(list);
             UpdateFilterTitel();
+            UpdateDepotVerlauf();
 
             StatusText = Positionen.Count == 0
                 ? "Keine passenden Vermögenspositionen vorhanden."
@@ -314,6 +339,47 @@ namespace MyCoinFlow.ViewModels
 
             FilterTitelText = depotText + klasseText;
         }
+
+        private void UpdateDepotVerlauf()
+        {
+            var depotId = SelectedDepotFilter != null && SelectedDepotFilter.Id > 0
+                ? SelectedDepotFilter.Id
+                : (int?)null;
+
+            var daten = _db.VermoegenDepotVerlaufGet(depotId)
+                .OrderBy(x => x.Datum)
+                .ToList();
+
+            DepotVerlaufSeries = new ISeries[]
+            {
+        new LineSeries<decimal>
+        {
+            Values = daten.Select(x => x.DepotwertChf).ToArray(),
+            Name = "Depotwert CHF",
+            GeometrySize = 6,
+            Fill = null
+        }
+            };
+
+            DepotVerlaufXAxes = new Axis[]
+            {
+        new Axis
+        {
+            Labels = daten.Select(x => x.Datum.ToString("dd.MM.yy")).ToArray(),
+            LabelsRotation = 35
+        }
+            };
+
+            DepotVerlaufYAxes = new Axis[]
+            {
+        new Axis
+        {
+            Labeler = value => value.ToString("N0", CultureInfo.GetCultureInfo("de-CH"))
+        }
+            };
+        }
+
+
 
         private void FilterLeeren()
         {
