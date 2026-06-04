@@ -119,6 +119,20 @@ BEGIN
     );
 END;
 
+IF OBJECT_ID('dbo.VermoegenFxHistorie', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VermoegenFxHistorie
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_VermoegenFxHistorie PRIMARY KEY,
+        VonWaehrung NVARCHAR(10) NOT NULL,
+        NachWaehrung NVARCHAR(10) NOT NULL,
+        KursDatum DATE NOT NULL,
+        Kurs DECIMAL(19,8) NOT NULL,
+        Quelle NVARCHAR(50) NOT NULL,
+        ErfasstAm DATETIME2 NOT NULL CONSTRAINT DF_VermoegenFxHistorie_ErfasstAm DEFAULT SYSUTCDATETIME()
+    );
+END;
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
@@ -128,6 +142,17 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX UX_VermoegenKursHistorie_Position_Datum
     ON dbo.VermoegenKursHistorie(PositionId, KursDatum);
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'UX_VermoegenFxHistorie_Paar_Datum'
+      AND object_id = OBJECT_ID('dbo.VermoegenFxHistorie')
+)
+BEGIN
+    CREATE UNIQUE INDEX UX_VermoegenFxHistorie_Paar_Datum
+    ON dbo.VermoegenFxHistorie(VonWaehrung, NachWaehrung, KursDatum);
 END;
 
 IF NOT EXISTS (
@@ -667,6 +692,123 @@ ORDER BY KursDatum DESC;";
             return list;
         }
 
+        public void VermoegenFxHistorieInsertIfMissing(
+    string vonWaehrung,
+    string nachWaehrung,
+    DateTime kursDatum,
+    decimal kurs,
+    string quelle)
+        {
+            EnsureVermoegenSchema();
+
+            var von = string.IsNullOrWhiteSpace(vonWaehrung)
+                ? ""
+                : vonWaehrung.Trim().ToUpperInvariant();
+
+            var nach = string.IsNullOrWhiteSpace(nachWaehrung)
+                ? ""
+                : nachWaehrung.Trim().ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(von) || string.IsNullOrWhiteSpace(nach))
+                return;
+
+            if (kurs <= 0)
+                return;
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM dbo.VermoegenFxHistorie
+    WHERE VonWaehrung = @VonWaehrung
+      AND NachWaehrung = @NachWaehrung
+      AND KursDatum = @KursDatum
+)
+BEGIN
+    INSERT INTO dbo.VermoegenFxHistorie
+    (
+        VonWaehrung,
+        NachWaehrung,
+        KursDatum,
+        Kurs,
+        Quelle
+    )
+    VALUES
+    (
+        @VonWaehrung,
+        @NachWaehrung,
+        @KursDatum,
+        @Kurs,
+        @Quelle
+    );
+END;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@VonWaehrung", von);
+            cmd.Parameters.AddWithValue("@NachWaehrung", nach);
+            cmd.Parameters.AddWithValue("@KursDatum", kursDatum.Date);
+            cmd.Parameters.AddWithValue("@Kurs", kurs);
+            cmd.Parameters.AddWithValue("@Quelle", string.IsNullOrWhiteSpace(quelle) ? "Unbekannt" : quelle.Trim());
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public VermoegenFxHistorie? VermoegenFxHistorieGetLatest(
+            string vonWaehrung,
+            string nachWaehrung)
+        {
+            EnsureVermoegenSchema();
+
+            var von = string.IsNullOrWhiteSpace(vonWaehrung)
+                ? ""
+                : vonWaehrung.Trim().ToUpperInvariant();
+
+            var nach = string.IsNullOrWhiteSpace(nachWaehrung)
+                ? ""
+                : nachWaehrung.Trim().ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(von) || string.IsNullOrWhiteSpace(nach))
+                return null;
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1
+    Id,
+    VonWaehrung,
+    NachWaehrung,
+    KursDatum,
+    Kurs,
+    Quelle,
+    ErfasstAm
+FROM dbo.VermoegenFxHistorie
+WHERE VonWaehrung = @VonWaehrung
+  AND NachWaehrung = @NachWaehrung
+ORDER BY KursDatum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@VonWaehrung", von);
+            cmd.Parameters.AddWithValue("@NachWaehrung", nach);
+
+            using var r = cmd.ExecuteReader();
+
+            if (!r.Read())
+                return null;
+
+            return new VermoegenFxHistorie
+            {
+                Id = r.GetInt32(0),
+                VonWaehrung = r.GetString(1),
+                NachWaehrung = r.GetString(2),
+                KursDatum = r.GetDateTime(3),
+                Kurs = r.GetDecimal(4),
+                Quelle = r.GetString(5),
+                ErfasstAm = r.GetDateTime(6)
+            };
+        }
 
     }
 

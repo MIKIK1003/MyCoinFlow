@@ -336,6 +336,8 @@ namespace MyCoinFlow.ViewModels
 
             int ok = 0;
             int fehler = 0;
+            int fxOk = 0;
+            int fxFehler = 0;
 
             StatusText = "Kurse werden aktualisiert...";
 
@@ -353,9 +355,9 @@ namespace MyCoinFlow.ViewModels
                 }
 
                 _db.VermoegenPositionKursUpdate(
-    p.Id,
-    result.Kurs,
-    result.KursDatum);
+                    p.Id,
+                    result.Kurs,
+                    result.KursDatum);
 
                 _db.VermoegenKursHistorieInsertIfMissing(
                     p.Id,
@@ -366,9 +368,40 @@ namespace MyCoinFlow.ViewModels
                 ok++;
             }
 
+            var fremdwaehrungen = positionen
+                .Select(p => string.IsNullOrWhiteSpace(p.Waehrung) ? "CHF" : p.Waehrung.Trim().ToUpperInvariant())
+                .Where(w => w != "CHF")
+                .Distinct()
+                .ToList();
+
+            foreach (var waehrung in fremdwaehrungen)
+            {
+                var fx = await _kursService.HoleFxKursAsync(
+                    waehrung,
+                    "CHF",
+                    einstellung.ApiKey);
+
+                if (fx == null)
+                {
+                    fxFehler++;
+                    continue;
+                }
+
+                _db.VermoegenFxHistorieInsertIfMissing(
+                    fx.VonWaehrung,
+                    fx.NachWaehrung,
+                    fx.KursDatum,
+                    fx.Kurs,
+                    "EODHD");
+
+                fxOk++;
+            }
+
             Load();
 
-            StatusText = $"Kursaktualisierung abgeschlossen: {ok} aktualisiert, {fehler} ohne Ergebnis.";
+            StatusText =
+                $"Kursaktualisierung abgeschlossen: {ok} Position(en), {fehler} ohne Ergebnis. " +
+                $"FX: {fxOk} gespeichert, {fxFehler} ohne Ergebnis.";
         }
 
         private VermoegenPositionRow ToRow(VermoegenPosition p)
@@ -409,10 +442,10 @@ namespace MyCoinFlow.ViewModels
             if (p.EinstandWert > 0)
             {
                 var performance = p.GewinnVerlust.Value / p.EinstandWert * 100m;
-                return $"{FormatCurrency(p.GewinnVerlust.Value)} ({FormatPercent(performance)})";
+                return $"{FormatCurrency(p.GewinnVerlust.Value, p.Waehrung)} ({FormatPercent(performance)})";
             }
 
-            return FormatCurrency(p.GewinnVerlust.Value);
+            return FormatCurrency(p.GewinnVerlust.Value, p.Waehrung);
         }
 
         private void NeuesDepot()
