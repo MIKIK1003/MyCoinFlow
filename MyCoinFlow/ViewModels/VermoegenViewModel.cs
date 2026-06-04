@@ -2,6 +2,8 @@
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using MyCoinFlow.Helpers;
+using Microsoft.Win32;
+using MyCoinFlow.Importing;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using MyCoinFlow.Views;
@@ -142,6 +144,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand DepotLoeschenCommand { get; }
 
         public ICommand NeuePositionCommand { get; }
+        public ICommand PositionenImportierenCommand { get; }
         public ICommand PositionBearbeitenCommand { get; }
         public ICommand PositionLoeschenCommand { get; }
 
@@ -159,6 +162,7 @@ namespace MyCoinFlow.ViewModels
             DepotLoeschenCommand = new RelayCommand(_ => DepotLoeschen(), _ => SelectedDepotFilter != null && SelectedDepotFilter.Id > 0);
 
             NeuePositionCommand = new RelayCommand(_ => NeuePosition(), _ => Depots.Any());
+            PositionenImportierenCommand = new RelayCommand(_ => PositionenImportieren(), _ => SelectedDepotFilter != null && SelectedDepotFilter.Id > 0);
             PositionBearbeitenCommand = new RelayCommand(_ => PositionBearbeiten(), _ => SelectedPosition != null);
             PositionLoeschenCommand = new RelayCommand(_ => PositionLoeschen(), _ => SelectedPosition != null);
 
@@ -695,6 +699,62 @@ namespace MyCoinFlow.ViewModels
             _db.VermoegenDepotDelete(depot.Id);
             Load();
             StatusText = "Depot ausgeblendet.";
+        }
+
+        private void PositionenImportieren()
+        {
+            if (SelectedDepotFilter == null || SelectedDepotFilter.Id <= 0)
+            {
+                MessageBox.Show(
+                    "Bitte zuerst ein konkretes Depot auswählen. Der Import kann nicht in 'Alle Depots' erfolgen.",
+                    "Positionen importieren",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var dlg = new OpenFileDialog
+            {
+                Title = "Depotpositionen aus Excel importieren",
+                Filter = "Excel-Dateien (*.xlsx;*.xls)|*.xlsx;*.xls|Alle Dateien (*.*)|*.*",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+
+            if (dlg.ShowDialog() != true)
+                return;
+
+            try
+            {
+                var importer = new VermoegenPositionExcelImporter();
+                var result = importer.Import(dlg.FileName, SelectedDepotFilter.Id);
+
+                Load();
+
+                MessageBox.Show(
+                    $"Import abgeschlossen.\n\n" +
+                    $"- Gelesene Zeilen: {result.RowsRead}\n" +
+                    $"- Importiert: {result.RowsImported}\n" +
+                    $"- Übersprungen: {result.RowsSkipped}\n" +
+                    $"- Fehler: {result.RowsWithErrors}",
+                    "Positionen importieren",
+                    MessageBoxButton.OK,
+                    result.RowsWithErrors > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+
+                StatusText =
+                    $"Import abgeschlossen: {result.RowsImported} importiert, " +
+                    $"{result.RowsSkipped} übersprungen, {result.RowsWithErrors} Fehler.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Import fehlgeschlagen:\n" + ex.Message,
+                    "Positionen importieren",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                StatusText = "Import fehlgeschlagen.";
+            }
         }
 
         private void NeuePosition()

@@ -109,6 +109,13 @@
                             Command="{Binding NeuePositionCommand}"/>
 
                     <Button Style="{StaticResource IconTextButton}"
+        Tag="FileExcelOutline"
+        Content="Positionen importieren"
+        MinHeight="40"
+        Margin="0,0,0,10"
+        Command="{Binding PositionenImportierenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
                             Tag="PencilOutline"
                             Content="Bearbeiten"
                             MinHeight="40"
