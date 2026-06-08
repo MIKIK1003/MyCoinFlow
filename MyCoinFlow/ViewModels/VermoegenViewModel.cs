@@ -420,12 +420,21 @@ namespace MyCoinFlow.ViewModels
                 .OrderByDescending(x => x.Wert)
                 .ToList();
 
+            var total = daten.Sum(x => x.Wert);
+
             VermoegenAufteilungSeries = daten
-                .Select(x => (ISeries)new PieSeries<decimal>
+                .Select(x =>
                 {
-                    Values = new[] { x.Wert },
-                    Name = $"{x.Anlageklasse} · {FormatCurrency(x.Wert, "CHF")}",
-                    InnerRadius = 55
+                    var percent = total > 0
+                        ? x.Wert / total * 100m
+                        : 0m;
+
+                    return (ISeries)new PieSeries<decimal>
+                    {
+                        Values = new[] { x.Wert },
+                        Name = $"{x.Anlageklasse} · {percent:N1}% · {FormatCurrency(x.Wert, "CHF")}",
+                        InnerRadius = 55
+                    };
                 })
                 .ToArray();
         }
@@ -442,128 +451,41 @@ namespace MyCoinFlow.ViewModels
 
         private async void KurseAktualisieren()
         {
-            var einstellung = _db.VermoegenApiEinstellungGet();
-
-            if (!einstellung.Aktiv || string.IsNullOrWhiteSpace(einstellung.ApiKey))
+            try
             {
+                StatusText = "Kurse werden aktualisiert...";
+
+                var service = new VermoegenKursUpdateService();
+                var result = await service.AktualisierenAsync();
+
+                Load();
+
+                StatusText = string.IsNullOrWhiteSpace(result.Meldung)
+                    ? "Kursaktualisierung abgeschlossen."
+                    : result.Meldung;
+
+                if (result.PositionenAktualisiert == 0 &&
+                    result.PositionenOhneKursbasis == 0 &&
+                    result.FxGespeichert == 0 &&
+                    result.FxOhneErgebnis == 0)
+                {
+                    MessageBox.Show(
+                        StatusText,
+                        "Kurse aktualisieren",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Kursaktualisierung fehlgeschlagen.";
+
                 MessageBox.Show(
-                    "Bitte zuerst den EODHD API-Key erfassen.",
+                    "Kursaktualisierung fehlgeschlagen:\n" + ex.Message,
                     "Kurse aktualisieren",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-
-                StatusText = "Kein aktiver API-Key vorhanden.";
-                return;
+                    MessageBoxImage.Error);
             }
-
-            var positionen = _allePositionen
-    .Where(p => p.IstAktiv)
-    .ToList();
-
-            if (positionen.Count == 0)
-            {
-                MessageBox.Show(
-                    "Es sind keine aktiven Positionen mit Symbol vorhanden.",
-                    "Kurse aktualisieren",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-
-                StatusText = "Keine Positionen mit Symbol vorhanden.";
-                return;
-            }
-
-            int ok = 0;
-            int fehler = 0;
-            int fxOk = 0;
-            int fxFehler = 0;
-
-            StatusText = "Kurse werden aktualisiert...";
-
-            foreach (var p in positionen)
-            {
-                if (!string.IsNullOrWhiteSpace(p.Symbol))
-                {
-                    var result = await _kursService.HoleAktuellenKursAsync(
-                        p.Symbol,
-                        p.Boerse,
-                        einstellung.ApiKey);
-
-                    if (result != null)
-                    {
-                        _db.VermoegenPositionKursUpdate(
-                            p.Id,
-                            result.Kurs,
-                            result.KursDatum);
-
-                        _db.VermoegenKursHistorieInsertIfMissing(
-                            p.Id,
-                            result.KursDatum,
-                            result.Kurs,
-                            "EODHD");
-
-                        ok++;
-                        continue;
-                    }
-                }
-
-                var letzterKurs = _db.VermoegenKursHistorieGetLatestByPosition(p.Id);
-
-                if (letzterKurs == null)
-                {
-                    fehler++;
-                    continue;
-                }
-
-                var fortschreibDatum = DateTime.Today;
-
-                _db.VermoegenPositionKursUpdate(
-                    p.Id,
-                    letzterKurs.Kurs,
-                    fortschreibDatum);
-
-                _db.VermoegenKursHistorieInsertIfMissing(
-                    p.Id,
-                    fortschreibDatum,
-                    letzterKurs.Kurs,
-                    "Fortschreibung");
-
-                ok++;
-            }
-
-            var fremdwaehrungen = positionen
-                .Select(p => string.IsNullOrWhiteSpace(p.Waehrung) ? "CHF" : p.Waehrung.Trim().ToUpperInvariant())
-                .Where(w => w != "CHF")
-                .Distinct()
-                .ToList();
-
-            foreach (var waehrung in fremdwaehrungen)
-            {
-                var fx = await _kursService.HoleFxKursAsync(
-                    waehrung,
-                    "CHF",
-                    einstellung.ApiKey);
-
-                if (fx == null)
-                {
-                    fxFehler++;
-                    continue;
-                }
-
-                _db.VermoegenFxHistorieInsertIfMissing(
-                    fx.VonWaehrung,
-                    fx.NachWaehrung,
-                    fx.KursDatum,
-                    fx.Kurs,
-                    "EODHD");
-
-                fxOk++;
-            }
-
-            Load();
-
-            StatusText =
-    $"Kursaktualisierung abgeschlossen: {ok} Position(en) aktualisiert oder fortgeschrieben, " +
-    $"{fehler} ohne Kursbasis. FX: {fxOk} gespeichert, {fxFehler} ohne Ergebnis.";
         }
 
         private VermoegenPositionRow ToRow(VermoegenPosition p)
