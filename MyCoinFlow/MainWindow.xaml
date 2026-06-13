@@ -15,7 +15,6 @@
 
     <Window.Resources>
 
-        <!-- Ruhige Hauptnavigation (hell/grau, Text/Icons dunkel) -->
         <Style x:Key="NavTileButton"
                TargetType="Button"
                BasedOn="{StaticResource MaterialDesignFlatButton}">
@@ -60,13 +59,19 @@
             </Setter>
         </Style>
 
-        <!-- kleines Helfer-Layout für Icon + Text -->
         <Style x:Key="NavTileIcon" TargetType="materialDesign:PackIcon">
             <Setter Property="Width" Value="35"/>
             <Setter Property="Height" Value="35"/>
             <Setter Property="Margin" Value="0,0,16,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+        </Style>
+
+        <Style x:Key="NavGroupHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+            <Setter Property="Margin" Value="4,18,0,6"/>
         </Style>
 
     </Window.Resources>
@@ -77,7 +82,6 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- LINKS: Hauptmenü -->
         <Border Grid.Column="0"
                 Style="{StaticResource SidebarCard}"
                 Margin="12">
@@ -92,6 +96,9 @@
 
                         <TextBlock Text="MyCoinFlow"
                                    Style="{StaticResource SidebarSectionHeader}"/>
+
+                        <TextBlock Text="Finanzen"
+                                   Style="{StaticResource NavGroupHeader}"/>
 
                         <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowDashboardCommand}"
@@ -110,17 +117,6 @@
                                 <materialDesign:PackIcon Kind="SwapHorizontal"
                                                          Style="{StaticResource NavTileIcon}"/>
                                 <TextBlock Text="Transaktionen" VerticalAlignment="Center"/>
-                            </DockPanel>
-                        </Button>
-
-                        <Button x:Name="NavStweSetsButton"
-                                Style="{StaticResource NavTileButton}"
-                                Command="{Binding ShowTransaktionSetsCommand}"
-                                Margin="0,0,0,8">
-                            <DockPanel LastChildFill="True">
-                                <materialDesign:PackIcon Kind="PlaylistPlus"
-                                                         Style="{StaticResource NavTileIcon}"/>
-                                <TextBlock Text="STWE-Sets" VerticalAlignment="Center"/>
                             </DockPanel>
                         </Button>
 
@@ -164,6 +160,20 @@
                             </DockPanel>
                         </Button>
 
+                        <TextBlock Text="Immobilien"
+                                   Style="{StaticResource NavGroupHeader}"/>
+
+                        <Button x:Name="NavStweSetsButton"
+                                Style="{StaticResource NavTileButton}"
+                                Command="{Binding ShowTransaktionSetsCommand}"
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="PlaylistPlus"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="STWE" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
+
                         <Button x:Name="NavLiegenschaftenButton"
                                 Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowLiegenschaftenCommand}"
@@ -175,15 +185,38 @@
                             </DockPanel>
                         </Button>
 
+                        <TextBlock Text="Module"
+                                   Style="{StaticResource NavGroupHeader}"/>
+
                         <Button Style="{StaticResource NavTileButton}"
-        Command="{Binding ShowVermoegenCommand}"
-        Margin="0,0,0,8">
+                                Command="{Binding ShowVermoegenCommand}"
+                                Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="ChartLine"
-                                 Style="{StaticResource NavTileIcon}"/>
-                                <TextBlock Text="Vermögen" VerticalAlignment="Center"/>
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <TextBlock Text="Wealth" VerticalAlignment="Center"/>
                             </DockPanel>
                         </Button>
+
+                        <Button Style="{StaticResource NavTileButton}"
+                                IsEnabled="False"
+                                Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <materialDesign:PackIcon Kind="HomeOutline"
+                                                         Style="{StaticResource NavTileIcon}"/>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Haushalt" VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="LockOutline"
+                                                             Width="20"
+                                                             Height="20"
+                                                             Margin="10,2,0,0"
+                                                             VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Button>
+
+                        <TextBlock Text="System"
+                                   Style="{StaticResource NavGroupHeader}"/>
 
                         <Button Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowAdminCommand}"
@@ -198,7 +231,6 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Footer -->
                 <Grid Grid.Row="1" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -223,7 +255,6 @@
             </Grid>
         </Border>
 
-        <!-- RECHTS: Inhalt -->
         <ContentControl Grid.Column="1"
                         Content="{Binding CurrentViewModel}"
                         RenderTransformOrigin="0.5,0.5">
