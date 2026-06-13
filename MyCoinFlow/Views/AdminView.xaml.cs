@@ -115,6 +115,7 @@ namespace MyCoinFlow.Views
                 var lic = new LicenseService();
                 lic.TryLoadAndApply(out var msg);
                 LicenseInfoText.Text = msg;
+                RefreshLicenseModuleStatus();
             }
 
 
@@ -994,6 +995,60 @@ ORDER BY name;";
                     if (fallback != null)
                         NavList.SelectedItem = fallback;
                 }
+            }
+        }
+
+        private void RefreshLicenseModuleStatus()
+        {
+            try
+            {
+                AppModules.Load();
+
+                if (LicenseModulesText != null)
+                {
+                    LicenseModulesText.Text =
+                        $"✓ Finanzen: aktiv\n" +
+                        $"{(AppModules.IsPropertyEnabled ? "✓" : "–")} Immobilien: {(AppModules.IsPropertyEnabled ? "aktiv" : "nicht aktiv")}\n" +
+                        $"{(AppModules.IsWealthEnabled ? "✓" : "–")} Wealth: {(AppModules.IsWealthEnabled ? "aktiv" : "nicht aktiv")}\n" +
+                        $"{(AppModules.IsHomeEnabled ? "✓" : "–")} Haushalt: {(AppModules.IsHomeEnabled ? "aktiv" : "nicht aktiv")}";
+                }
+            }
+            catch
+            {
+                if (LicenseModulesText != null)
+                    LicenseModulesText.Text = "Modulstatus konnte nicht gelesen werden.";
+            }
+        }
+
+        private void License_ImportFile_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LicenseStatusText.Text = "";
+
+                var lic = new LicenseService();
+
+                if (lic.ImportLicenseFile(Window.GetWindow(this), out var message))
+                {
+                    LicenseInfoText.Text = message;
+                    LicenseStatusText.Text = "Lizenzdatei importiert. Änderungen sind beim nächsten Start vollständig wirksam.";
+                    RefreshLicenseModuleStatus();
+
+                    MessageBox.Show(
+                        Window.GetWindow(this) ?? Application.Current.MainWindow,
+                        message,
+                        "Lizenz importiert",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    LicenseStatusText.Text = message;
+                }
+            }
+            catch (Exception ex)
+            {
+                LicenseStatusText.Text = "Fehler: " + ex.Message;
             }
         }
 

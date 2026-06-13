@@ -166,51 +166,97 @@
                         <Button x:Name="NavStweSetsButton"
                                 Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowTransaktionSetsCommand}"
+                                Click="LicensedNavButton_Click"
                                 Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="PlaylistPlus"
-                                                         Style="{StaticResource NavTileIcon}"/>
-                                <TextBlock Text="STWE" VerticalAlignment="Center"/>
+                             Style="{StaticResource NavTileIcon}"/>
+
+                                <StackPanel Orientation="Horizontal"
+                VerticalAlignment="Center">
+
+                                    <TextBlock Text="STWE"
+                   VerticalAlignment="Center"/>
+
+                                    <materialDesign:PackIcon x:Name="NavStweLockIcon"
+                                 Kind="LockOutline"
+                                 Width="20"
+                                 Height="20"
+                                 Margin="10,2,0,0"
+                                 Visibility="Collapsed"/>
+                                </StackPanel>
                             </DockPanel>
                         </Button>
 
                         <Button x:Name="NavLiegenschaftenButton"
                                 Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowLiegenschaftenCommand}"
+                                Click="LicensedNavButton_Click"
                                 Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="HomeCityOutline"
-                                                         Style="{StaticResource NavTileIcon}"/>
-                                <TextBlock Text="Liegenschaften" VerticalAlignment="Center"/>
+                             Style="{StaticResource NavTileIcon}"/>
+
+                                <StackPanel Orientation="Horizontal"
+                VerticalAlignment="Center">
+
+                                    <TextBlock Text="Liegenschaften"
+                   VerticalAlignment="Center"/>
+
+                                    <materialDesign:PackIcon x:Name="NavLiegenschaftenLockIcon"
+                                 Kind="LockOutline"
+                                 Width="20"
+                                 Height="20"
+                                 Margin="10,2,0,0"
+                                 Visibility="Collapsed"/>
+                                </StackPanel>
                             </DockPanel>
                         </Button>
 
                         <TextBlock Text="Module"
                                    Style="{StaticResource NavGroupHeader}"/>
 
-                        <Button Style="{StaticResource NavTileButton}"
+                        <Button x:Name="NavWealthButton"
+                                Style="{StaticResource NavTileButton}"
                                 Command="{Binding ShowVermoegenCommand}"
+                                Click="LicensedNavButton_Click"
                                 Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="ChartLine"
-                                                         Style="{StaticResource NavTileIcon}"/>
-                                <TextBlock Text="Wealth" VerticalAlignment="Center"/>
+                             Style="{StaticResource NavTileIcon}"/>
+
+                                <StackPanel Orientation="Horizontal"
+                VerticalAlignment="Center">
+
+                                    <TextBlock Text="Wealth"
+                   VerticalAlignment="Center"/>
+
+                                    <materialDesign:PackIcon x:Name="NavWealthLockIcon"
+                                 Kind="LockOutline"
+                                 Width="20"
+                                 Height="20"
+                                 Margin="10,2,0,0"
+                                 Visibility="Collapsed"/>
+                                </StackPanel>
                             </DockPanel>
                         </Button>
 
-                        <Button Style="{StaticResource NavTileButton}"
-                                IsEnabled="False"
+                        <Button x:Name="NavHomeButton"
+                                Style="{StaticResource NavTileButton}"
+                                Click="LockedModuleButton_Click"
                                 Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="HomeOutline"
                                                          Style="{StaticResource NavTileIcon}"/>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Haushalt" VerticalAlignment="Center"/>
-                                    <materialDesign:PackIcon Kind="LockOutline"
-                                                             Width="20"
-                                                             Height="20"
-                                                             Margin="10,2,0,0"
-                                                             VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon x:Name="NavHomeLockIcon"
+                         Kind="LockOutline"
+                         Width="20"
+                         Height="20"
+                         Margin="10,2,0,0"
+                         VerticalAlignment="Center"
+                         Visibility="Collapsed"/>
                                 </StackPanel>
                             </DockPanel>
                         </Button>

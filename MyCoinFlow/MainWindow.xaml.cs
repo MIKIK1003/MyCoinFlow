@@ -68,26 +68,108 @@ namespace MyCoinFlow
                 true // WICHTIG: handledEventsToo
             );
 
-            // ✅ PLUS/BASIC anwenden (2 Buttons links)
-            ApplyEditionVisibility();
+            // MyCoinFlow 2.0 Modulrechte anwenden
+            ApplyModuleVisibility();
         }
 
-        private void ApplyEditionVisibility()
+        private void ApplyModuleVisibility()
         {
             try
             {
-                var isPlus = AppEdition.IsPlus;
+                var lic = new LicenseService();
+                lic.TryLoadAndApply(out _);
 
-                if (NavStweSetsButton != null)
-                    NavStweSetsButton.Visibility = isPlus ? Visibility.Visible : Visibility.Collapsed;
+                AppModules.Load();
 
-                if (NavLiegenschaftenButton != null)
-                    NavLiegenschaftenButton.Visibility = isPlus ? Visibility.Visible : Visibility.Collapsed;
+                ApplyButtonState(
+                    NavStweSetsButton,
+                    AppModules.IsPropertyEnabled,
+                    "Immobilien");
+
+                ApplyButtonState(
+                    NavLiegenschaftenButton,
+                    AppModules.IsPropertyEnabled,
+                    "Immobilien");
+
+                ApplyButtonState(
+                    NavWealthButton,
+                    AppModules.IsWealthEnabled,
+                    "Wealth");
+
+                ApplyButtonState(
+                    NavHomeButton,
+                    AppModules.IsHomeEnabled,
+                    "Haushalt");
             }
             catch
             {
-                // still
+                // Hauptfenster darf wegen Lizenzstatus nie blockieren.
             }
+        }
+
+        private void ApplyButtonState(
+    System.Windows.Controls.Button? button,
+    bool isEnabled,
+    string moduleName)
+        {
+            if (button == null)
+                return;
+
+            button.Opacity = isEnabled ? 1.0 : 0.55;
+            button.Tag = isEnabled ? null : moduleName;
+
+            if (moduleName == "Immobilien")
+            {
+                if (NavStweLockIcon != null)
+                    NavStweLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+
+                if (NavLiegenschaftenLockIcon != null)
+                    NavLiegenschaftenLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (moduleName == "Wealth")
+            {
+                if (NavWealthLockIcon != null)
+                    NavWealthLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (moduleName == "Haushalt")
+            {
+                if (NavHomeLockIcon != null)
+                    NavHomeLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void LicensedNavButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button button)
+                return;
+
+            if (button.Tag is not string moduleName)
+                return;
+
+            MessageBox.Show(
+                this,
+                $"Das Modul \"{moduleName}\" ist nicht aktiviert.\n\nBitte importieren Sie unter Einstellungen → Lizenz eine gültige Lizenzdatei.",
+                "Modul nicht aktiviert",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void LockedModuleButton_Click(object sender, RoutedEventArgs e)
+        {
+            var moduleName = (sender as System.Windows.Controls.Button)?.Tag as string ?? "Haushalt";
+
+            MessageBox.Show(
+                this,
+                $"Das Modul \"{moduleName}\" ist noch nicht aktiviert.\n\nBitte importieren Sie unter Einstellungen → Lizenz eine gültige Lizenzdatei.",
+                "Modul nicht aktiviert",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         private static void PostInstallSyncFromJson()

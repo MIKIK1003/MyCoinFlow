@@ -4,14 +4,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              Loaded="AdminView_Loaded">
 
-    <!--
-        AdminView – Einheitliches Layout
-        - Links: Einstellungen-Navigation (ListBox)
-        - Rechts: Content-Host (Card) mit Sections (Nummernkreise / Pfade / Kontenplan / Kreditkarten / Mandanten / Update / Backup / Lizenz)
-        - Keine Funktionsänderungen: x:Name / Tag / Click / SelectionChanged bleiben identisch.
-    -->
-
-    <Grid Margin="16">
+        <Grid Margin="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="270"/>
             <ColumnDefinition Width="16"/>
@@ -959,11 +952,18 @@
                                            Style="{StaticResource SidebarGroupHeader}"
                                            Margin="0,0,0,8"/>
 
+                                <Button Click="License_ImportFile_Click"
+        Style="{StaticResource IconTextButton}"
+        Tag="FileImport"
+        Content="Lizenzdatei importieren"
+        MinHeight="40"
+        Margin="0,0,0,10"/>
+
                                 <Button Click="License_Save_Click"
-                                        Style="{StaticResource IconTextButton}"
-                                        Tag="KeyPlus"
-                                        Content="Speichern"
-                                        MinHeight="40"/>
+        Style="{StaticResource IconTextButton}"
+        Tag="KeyPlus"
+        Content="MCF1-Key speichern"
+        MinHeight="40"/>
 
                                 <Separator Margin="0,14,0,12"/>
 
@@ -1000,6 +1000,23 @@
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                                            Margin="0,0,0,12"/>
+
+                                <Border Padding="12"
+        CornerRadius="10"
+        Background="{DynamicResource MaterialDesignPaper}"
+        Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="Aktive Module"
+                   FontSize="15"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,8"/>
+
+                                        <TextBlock x:Name="LicenseModulesText"
+                   TextWrapping="Wrap"
+                   FontSize="14"
+                   Foreground="{DynamicResource MaterialDesignBody}"/>
+                                    </StackPanel>
+                                </Border>
 
                                 <TextBlock Text="Lizenzschlüssel"
                                            FontWeight="SemiBold"

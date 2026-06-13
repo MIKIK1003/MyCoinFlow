@@ -12,6 +12,7 @@ namespace MyCoinFlow.Views
         private readonly AuthService _auth = new();
         private readonly SqlExpressProvisioningService _provisioning = new();
         private readonly LicenseService _license = new();
+        private readonly ActivationService _activation = new();
         private readonly DatabaseService _db = new();
 
 
@@ -27,15 +28,18 @@ namespace MyCoinFlow.Views
             {
                 StatusText.Text = "";
 
-                // --- Lizenz-Gate: ohne gültige Lizenz keine Nutzung ---
-                if (!_license.TryLoadAndApply(out var licMsg))
+                // --- Aktivierungs-Gate: Lizenz oder Testversion erforderlich ---
+                var activationStatus = _activation.GetStatus(out var activationMessage);
+
+                if (activationStatus != AppActivationStatus.Licensed &&
+                    activationStatus != AppActivationStatus.Trial)
                 {
-                    StatusText.Text = "Lizenz erforderlich: " + licMsg;
-                    ShowLicenseUiAndLock();
+                    StatusText.Text = activationMessage;
+                    ShowLicenseUiAndLock(activationMessage);
                     return;
                 }
 
-                // Lizenz ok -> Login normal
+                // Aktivierung ok -> Login normal
                 HideLicenseUiAndUnlock();
 
                 // PHASE 4: Auf frischen PCs sicherstellen, dass es mindestens eine Default-DB gibt.
@@ -266,12 +270,11 @@ ORDER BY name;
         private void StackPanel_TimeChanged(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e) { }
         private void StackPanel_TimeChanged_1(object sender, MaterialDesignThemes.Wpf.TimeChangedEventArgs e) { }
 
-        private void ShowLicenseUiAndLock()
+        private void ShowLicenseUiAndLock(string message)
         {
-            // Lizenzbereich anzeigen
             LicensePanel.Visibility = Visibility.Visible;
+            LicenseStatusText.Text = message ?? "";
 
-            // Login sperren
             DbCombo.IsEnabled = false;
             LoginUserBox.IsEnabled = false;
             LoginPwdBox.IsEnabled = false;
@@ -280,9 +283,17 @@ ORDER BY name;
             FirstUserExpander.IsEnabled = false;
             FirstUserExpander.IsExpanded = false;
 
-            // Lizenz-Eingabe aktiv
-            LicenseKeyBox.IsEnabled = true;
-            SaveLicenseButton.IsEnabled = true;
+            if (LicenseKeyBox != null)
+                LicenseKeyBox.IsEnabled = true;
+
+            if (SaveLicenseButton != null)
+                SaveLicenseButton.IsEnabled = true;
+
+            if (ImportLicenseFileButton != null)
+                ImportLicenseFileButton.IsEnabled = true;
+
+            if (StartTrialButton != null)
+                StartTrialButton.IsEnabled = true;
         }
 
         private void HideLicenseUiAndUnlock()
@@ -297,6 +308,48 @@ ORDER BY name;
             LoginButton.IsEnabled = true;
 
             // Erstbenutzer wird später in InitializeAsync() anhand HasAnyUser gesetzt
+        }
+
+        private async void ImportLicenseFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LicenseStatusText.Text = "";
+
+                if (_license.ImportLicenseFile(this, out var message))
+                {
+                    LicenseStatusText.Text = message;
+                    await InitializeAsync();
+                    return;
+                }
+
+                LicenseStatusText.Text = message;
+            }
+            catch (Exception ex)
+            {
+                LicenseStatusText.Text = "Fehler beim Import: " + ex.Message;
+            }
+        }
+
+        private async void StartTrialButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LicenseStatusText.Text = "";
+
+                if (_activation.StartTrial(out var message))
+                {
+                    LicenseStatusText.Text = message;
+                    await InitializeAsync();
+                    return;
+                }
+
+                LicenseStatusText.Text = message;
+            }
+            catch (Exception ex)
+            {
+                LicenseStatusText.Text = "Fehler beim Start der Testversion: " + ex.Message;
+            }
         }
 
         private async void SaveLicenseButton_Click(object sender, RoutedEventArgs e)
@@ -324,7 +377,7 @@ ORDER BY name;
                 if (!_license.TryLoadAndApply(out var msg))
                 {
                     LicenseStatusText.Text = "Lizenz gespeichert, aber ungültig: " + msg;
-                    ShowLicenseUiAndLock();
+                    ShowLicenseUiAndLock(msg);
                     return;
                 }
 
