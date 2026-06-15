@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Depot"
                  Width="520"
-                 Height="450"
+                 Height="470"
                  SizeToContent="Manual"
                  WindowStartupLocation="CenterOwner">
 
@@ -32,12 +32,12 @@
                      Margin="0,0,0,12"/>
 
             <ComboBox MinHeight="40"
-          Style="{StaticResource MaterialDesignOutlinedComboBox}"
-          materialDesign:HintAssist.Hint="Verknüpftes Geldinstitut"
-          ItemsSource="{Binding Geldinstitute}"
-          SelectedItem="{Binding SelectedGeldinstitut, Mode=TwoWay}"
-          DisplayMemberPath="AnzeigeText"
-          Margin="0,0,0,12"/>
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Verknüpftes Geldinstitut"
+                      ItemsSource="{Binding Geldinstitute}"
+                      SelectedItem="{Binding SelectedGeldinstitut, Mode=TwoWay}"
+                      DisplayMemberPath="AnzeigeText"
+                      Margin="0,0,0,12"/>
 
             <TextBox MinHeight="40"
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
@@ -53,7 +53,11 @@
                       Margin="0,0,0,12"/>
 
             <CheckBox Content="Aktiv"
-                      IsChecked="{Binding Model.IstAktiv, Mode=TwoWay}"/>
+                      IsChecked="{Binding Model.IstAktiv, Mode=TwoWay}"
+                      Margin="0,0,0,8"/>
+
+            <CheckBox Content="Als Standard-Depot verwenden"
+                      IsChecked="{Binding Model.IstStandard, Mode=TwoWay}"/>
 
         </StackPanel>
 

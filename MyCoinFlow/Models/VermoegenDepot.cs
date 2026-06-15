@@ -10,6 +10,9 @@
         public string Name { get; set; } = "";
         public string Institut { get; set; } = "";
         public string Waehrung { get; set; } = "CHF";
+
         public bool IstAktiv { get; set; } = true;
+
+        public bool IstStandard { get; set; }
     }
 }

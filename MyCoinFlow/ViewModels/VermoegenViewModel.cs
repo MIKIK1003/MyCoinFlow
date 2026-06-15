@@ -207,9 +207,18 @@ namespace MyCoinFlow.ViewModels
 
             BuildAnlageklasseFilterListe();
 
-            SelectedDepotFilter = selectedFilterId.HasValue
-                ? DepotFilterListe.FirstOrDefault(d => d.Id == selectedFilterId.Value) ?? DepotFilterListe.FirstOrDefault()
-                : DepotFilterListe.FirstOrDefault();
+            if (selectedFilterId.HasValue)
+            {
+                SelectedDepotFilter =
+                    DepotFilterListe.FirstOrDefault(d => d.Id == selectedFilterId.Value)
+                    ?? DepotFilterListe.FirstOrDefault();
+            }
+            else
+            {
+                SelectedDepotFilter =
+                    DepotFilterListe.FirstOrDefault(d => d.Id > 0 && d.IstStandard && d.IstAktiv)
+                    ?? DepotFilterListe.FirstOrDefault();
+            }
 
             SelectedAnlageklasseFilter =
                 !string.IsNullOrWhiteSpace(selectedAnlageklasse) && AnlageklasseFilterListe.Contains(selectedAnlageklasse)

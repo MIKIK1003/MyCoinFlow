@@ -32,6 +32,14 @@ BEGIN
     ADD GeldinstitutId INT NULL;
 END;
 
+IF COL_LENGTH('dbo.VermoegenDepot', 'IstStandard') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenDepot
+    ADD IstStandard BIT NOT NULL
+        CONSTRAINT DF_VermoegenDepot_IstStandard DEFAULT (0);
+END;
+
+
 IF OBJECT_ID('dbo.VermoegenPosition', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.VermoegenPosition
@@ -187,10 +195,11 @@ SELECT
     d.Name,
     d.Institut,
     d.Waehrung,
-    d.IstAktiv
+    d.IstAktiv,
+    d.IstStandard
 FROM dbo.VermoegenDepot d
 LEFT JOIN dbo.Geldinstitut g ON g.Id = d.GeldinstitutId
-ORDER BY d.Name;";
+ORDER BY d.IstStandard DESC, d.Name;";
 
             using var cmd = new SqlCommand(sql, c);
             using var r = cmd.ExecuteReader();
@@ -205,7 +214,8 @@ ORDER BY d.Name;";
                     Name = r.GetString(3),
                     Institut = r.IsDBNull(4) ? "" : r.GetString(4),
                     Waehrung = r.GetString(5),
-                    IstAktiv = r.GetBoolean(6)
+                    IstAktiv = r.GetBoolean(6),
+                    IstStandard = r.GetBoolean(7)
                 });
             }
 
@@ -219,15 +229,26 @@ ORDER BY d.Name;";
 
             using var c = CreateConnection();
             c.Open();
+            using var tx = c.BeginTransaction();
 
-            const string sql = @"
+            try
+            {
+                if (model.IstStandard)
+                {
+                    using var reset = new SqlCommand(
+                        "UPDATE dbo.VermoegenDepot SET IstStandard = 0;", c, tx);
+                    reset.ExecuteNonQuery();
+                }
+
+                const string sql = @"
 INSERT INTO dbo.VermoegenDepot
 (
     GeldinstitutId,
     Name,
     Institut,
     Waehrung,
-    IstAktiv
+    IstAktiv,
+    IstStandard
 )
 OUTPUT INSERTED.Id
 VALUES
@@ -236,17 +257,28 @@ VALUES
     @Name,
     @Institut,
     @Waehrung,
-    @IstAktiv
+    @IstAktiv,
+    @IstStandard
 );";
 
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@GeldinstitutId", model.GeldinstitutId.HasValue ? model.GeldinstitutId.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@Name", model.Name.Trim());
-            cmd.Parameters.AddWithValue("@Institut", string.IsNullOrWhiteSpace(model.Institut) ? DBNull.Value : model.Institut.Trim());
-            cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim());
-            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+                using var cmd = new SqlCommand(sql, c, tx);
+                cmd.Parameters.AddWithValue("@GeldinstitutId", model.GeldinstitutId.HasValue ? model.GeldinstitutId.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Name", model.Name.Trim());
+                cmd.Parameters.AddWithValue("@Institut", string.IsNullOrWhiteSpace(model.Institut) ? DBNull.Value : model.Institut.Trim());
+                cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim());
+                cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+                cmd.Parameters.AddWithValue("@IstStandard", model.IstStandard);
 
-            return Convert.ToInt32(cmd.ExecuteScalar());
+                var id = Convert.ToInt32(cmd.ExecuteScalar());
+
+                tx.Commit();
+                return id;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
         }
 
         public List<VermoegenPosition> VermoegenPositionenGetAll()
@@ -318,26 +350,47 @@ ORDER BY d.Name, p.Titel;";
 
             using var c = CreateConnection();
             c.Open();
+            using var tx = c.BeginTransaction();
 
-            const string sql = @"
+            try
+            {
+                if (model.IstStandard)
+                {
+                    using var reset = new SqlCommand(
+                        "UPDATE dbo.VermoegenDepot SET IstStandard = 0 WHERE Id <> @Id;", c, tx);
+                    reset.Parameters.AddWithValue("@Id", model.Id);
+                    reset.ExecuteNonQuery();
+                }
+
+                const string sql = @"
 UPDATE dbo.VermoegenDepot
 SET
     GeldinstitutId = @GeldinstitutId,
     Name = @Name,
     Institut = @Institut,
     Waehrung = @Waehrung,
-    IstAktiv = @IstAktiv
+    IstAktiv = @IstAktiv,
+    IstStandard = @IstStandard
 WHERE Id = @Id;";
 
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@Id", model.Id);
-            cmd.Parameters.AddWithValue("@GeldinstitutId", model.GeldinstitutId.HasValue ? model.GeldinstitutId.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@Name", model.Name.Trim());
-            cmd.Parameters.AddWithValue("@Institut", string.IsNullOrWhiteSpace(model.Institut) ? DBNull.Value : model.Institut.Trim());
-            cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim());
-            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+                using var cmd = new SqlCommand(sql, c, tx);
+                cmd.Parameters.AddWithValue("@Id", model.Id);
+                cmd.Parameters.AddWithValue("@GeldinstitutId", model.GeldinstitutId.HasValue ? model.GeldinstitutId.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Name", model.Name.Trim());
+                cmd.Parameters.AddWithValue("@Institut", string.IsNullOrWhiteSpace(model.Institut) ? DBNull.Value : model.Institut.Trim());
+                cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim());
+                cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+                cmd.Parameters.AddWithValue("@IstStandard", model.IstStandard);
 
-            cmd.ExecuteNonQuery();
+                cmd.ExecuteNonQuery();
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
         }
 
         public void VermoegenDepotDelete(int id)
@@ -852,10 +905,23 @@ ORDER BY KursDatum DESC;";
             c.Open();
 
             const string sql = @"
-;WITH KursTage AS
+;WITH RelevantePositionen AS
 (
-    SELECT DISTINCT KursDatum
-    FROM dbo.VermoegenKursHistorie
+    SELECT
+        p.Id,
+        p.DepotId,
+        p.Anzahl,
+        p.EinstandDatum,
+        ISNULL(p.Waehrung, 'CHF') AS Waehrung
+    FROM dbo.VermoegenPosition p
+    WHERE p.IstAktiv = 1
+      AND (@DepotId IS NULL OR p.DepotId = @DepotId)
+),
+KursTage AS
+(
+    SELECT DISTINCT kh.KursDatum
+    FROM dbo.VermoegenKursHistorie kh
+    JOIN RelevantePositionen p ON p.Id = kh.PositionId
 ),
 PositionBewertung AS
 (
@@ -865,7 +931,7 @@ PositionBewertung AS
         p.DepotId,
         p.Anzahl,
         p.EinstandDatum,
-        ISNULL(p.Waehrung, 'CHF') AS Waehrung,
+        p.Waehrung,
 
         (
             SELECT TOP 1 kh.Kurs
@@ -876,12 +942,12 @@ PositionBewertung AS
         ) AS LetzterKurs,
 
         CASE
-            WHEN ISNULL(p.Waehrung, 'CHF') = 'CHF' THEN 1
+            WHEN p.Waehrung = 'CHF' THEN 1
             ELSE
             (
                 SELECT TOP 1 fx.Kurs
                 FROM dbo.VermoegenFxHistorie fx
-                WHERE fx.VonWaehrung = ISNULL(p.Waehrung, 'CHF')
+                WHERE fx.VonWaehrung = p.Waehrung
                   AND fx.NachWaehrung = 'CHF'
                   AND fx.KursDatum <= kt.KursDatum
                 ORDER BY fx.KursDatum DESC
@@ -889,13 +955,9 @@ PositionBewertung AS
         END AS FxNachChf
 
     FROM KursTage kt
-    CROSS JOIN dbo.VermoegenPosition p
-    WHERE p.IstAktiv = 1
-      AND (@DepotId IS NULL OR p.DepotId = @DepotId)
-      AND (
-            p.EinstandDatum IS NULL
-            OR p.EinstandDatum <= kt.KursDatum
-          )
+    CROSS JOIN RelevantePositionen p
+    WHERE p.EinstandDatum IS NULL
+       OR p.EinstandDatum <= kt.KursDatum
 ),
 GueltigeBewertung AS
 (
@@ -919,13 +981,9 @@ ErwartetePositionen AS
         kt.KursDatum,
         COUNT(*) AS SollPositionen
     FROM KursTage kt
-    CROSS JOIN dbo.VermoegenPosition p
-    WHERE p.IstAktiv = 1
-      AND (@DepotId IS NULL OR p.DepotId = @DepotId)
-      AND (
-            p.EinstandDatum IS NULL
-            OR p.EinstandDatum <= kt.KursDatum
-          )
+    CROSS JOIN RelevantePositionen p
+    WHERE p.EinstandDatum IS NULL
+       OR p.EinstandDatum <= kt.KursDatum
     GROUP BY kt.KursDatum
 )
 SELECT
