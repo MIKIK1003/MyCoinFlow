@@ -242,21 +242,22 @@
                         </Button>
 
                         <Button x:Name="NavHomeButton"
-                                Style="{StaticResource NavTileButton}"
-                                Click="LockedModuleButton_Click"
-                                Margin="0,0,0,8">
+        Style="{StaticResource NavTileButton}"
+        Command="{Binding ShowHaushaltCommand}"
+        Click="LicensedNavButton_Click"
+        Margin="0,0,0,8">
                             <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="HomeOutline"
-                                                         Style="{StaticResource NavTileIcon}"/>
+                                 Style="{StaticResource NavTileIcon}"/>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Haushalt" VerticalAlignment="Center"/>
                                     <materialDesign:PackIcon x:Name="NavHomeLockIcon"
-                         Kind="LockOutline"
-                         Width="20"
-                         Height="20"
-                         Margin="10,2,0,0"
-                         VerticalAlignment="Center"
-                         Visibility="Collapsed"/>
+                                     Kind="LockOutline"
+                                     Width="20"
+                                     Height="20"
+                                     Margin="10,2,0,0"
+                                     VerticalAlignment="Center"
+                                     Visibility="Collapsed"/>
                                 </StackPanel>
                             </DockPanel>
                         </Button>

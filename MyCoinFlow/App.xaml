@@ -46,7 +46,9 @@
                 <views:VermoegenView />
             </DataTemplate>
 
-
+            <DataTemplate DataType="{x:Type vm:HaushaltViewModel}">
+                <views:HaushaltView />
+            </DataTemplate>
 
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
