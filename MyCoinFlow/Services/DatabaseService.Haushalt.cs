@@ -63,6 +63,28 @@ BEGIN
         FOREIGN KEY (StandortId) REFERENCES dbo.HaushaltStandort(Id);
 END;
 
+IF OBJECT_ID('dbo.HaushaltObjektKategorie', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.HaushaltObjektKategorie
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltObjektKategorie PRIMARY KEY,
+        Bezeichnung NVARCHAR(200) NOT NULL,
+        IconKey NVARCHAR(100) NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IconKey DEFAULT ('PackageVariantClosed'),
+        Bemerkung NVARCHAR(1000) NULL,
+        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IstAktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_ErstelltAm DEFAULT SYSUTCDATETIME(),
+        GeaendertAm DATETIME2 NULL
+    );
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'KategorieId') IS NULL
+   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD KategorieId INT NULL;
+END;
+
+
 IF OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.HaushaltObjekt
@@ -387,6 +409,130 @@ WHERE Id = @Id;";
             cmd.ExecuteNonQuery();
         }
 
+        public List<HaushaltObjektKategorie> HaushaltObjektKategorienGetAll()
+        {
+            EnsureHaushaltSchema();
+
+            var list = new List<HaushaltObjektKategorie>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    Id,
+    Bezeichnung,
+    IconKey,
+    ISNULL(Bemerkung, '') AS Bemerkung,
+    IstAktiv,
+    ErstelltAm,
+    GeaendertAm
+FROM dbo.HaushaltObjektKategorie
+WHERE IstAktiv = 1
+ORDER BY Bezeichnung;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new HaushaltObjektKategorie
+                {
+                    Id = r.GetInt32(0),
+                    Bezeichnung = r.GetString(1),
+                    IconKey = r.GetString(2),
+                    Bemerkung = r.GetString(3),
+                    IstAktiv = r.GetBoolean(4),
+                    ErstelltAm = r.GetDateTime(5),
+                    GeaendertAm = r.IsDBNull(6) ? null : r.GetDateTime(6)
+                });
+            }
+
+            return list;
+        }
+
+        public int HaushaltObjektKategorieInsert(HaushaltObjektKategorie model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.HaushaltObjektKategorie
+(
+    Bezeichnung,
+    IconKey,
+    Bemerkung,
+    IstAktiv
+)
+OUTPUT INSERTED.Id
+VALUES
+(
+    @Bezeichnung,
+    @IconKey,
+    @Bemerkung,
+    @IstAktiv
+);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());
+            cmd.Parameters.AddWithValue("@Bemerkung", string.IsNullOrWhiteSpace(model.Bemerkung) ? DBNull.Value : model.Bemerkung.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void HaushaltObjektKategorieUpdate(HaushaltObjektKategorie model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltObjektKategorie
+SET
+    Bezeichnung = @Bezeichnung,
+    IconKey = @IconKey,
+    Bemerkung = @Bemerkung,
+    IstAktiv = @IstAktiv,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", model.Id);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());
+            cmd.Parameters.AddWithValue("@Bemerkung", string.IsNullOrWhiteSpace(model.Bemerkung) ? DBNull.Value : model.Bemerkung.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void HaushaltObjektKategorieDelete(int id)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltObjektKategorie
+SET
+    IstAktiv = 0,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+
         public List<HaushaltObjekt> HaushaltObjekteGetByRaum(int raumId)
         {
             EnsureHaushaltSchema();
@@ -401,6 +547,9 @@ SELECT
     o.Id,
     o.RaumId,
     r.Bezeichnung AS RaumBezeichnung,
+    o.KategorieId,
+    ISNULL(k.Bezeichnung, ISNULL(o.Kategorie, '')) AS KategorieBezeichnung,
+    ISNULL(k.IconKey, o.IconKey) AS KategorieIconKey,
     o.Bezeichnung,
     ISNULL(o.Kategorie, '') AS Kategorie,
     o.IconKey,
@@ -415,6 +564,7 @@ SELECT
     o.GeaendertAm
 FROM dbo.HaushaltObjekt o
 JOIN dbo.HaushaltRaum r ON r.Id = o.RaumId
+LEFT JOIN dbo.HaushaltObjektKategorie k ON k.Id = o.KategorieId
 WHERE o.IstAktiv = 1
   AND o.RaumId = @RaumId
 ORDER BY o.Bezeichnung;";
@@ -431,18 +581,87 @@ ORDER BY o.Bezeichnung;";
                     Id = r.GetInt32(0),
                     RaumId = r.GetInt32(1),
                     RaumBezeichnung = r.GetString(2),
-                    Bezeichnung = r.GetString(3),
-                    Kategorie = r.GetString(4),
-                    IconKey = r.GetString(5),
-                    Hersteller = r.GetString(6),
-                    Modell = r.GetString(7),
-                    Seriennummer = r.GetString(8),
-                    Kaufdatum = r.IsDBNull(9) ? null : r.GetDateTime(9),
-                    Kaufpreis = r.IsDBNull(10) ? null : r.GetDecimal(10),
-                    Bemerkung = r.GetString(11),
-                    IstAktiv = r.GetBoolean(12),
-                    ErstelltAm = r.GetDateTime(13),
-                    GeaendertAm = r.IsDBNull(14) ? null : r.GetDateTime(14)
+                    KategorieId = r.IsDBNull(3) ? null : r.GetInt32(3),
+                    KategorieBezeichnung = r.GetString(4),
+                    KategorieIconKey = r.GetString(5),
+                    Bezeichnung = r.GetString(6),
+                    Kategorie = r.GetString(7),
+                    IconKey = r.GetString(8),
+                    Hersteller = r.GetString(9),
+                    Modell = r.GetString(10),
+                    Seriennummer = r.GetString(11),
+                    Kaufdatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
+                    Kaufpreis = r.IsDBNull(13) ? null : r.GetDecimal(13),
+                    Bemerkung = r.GetString(14),
+                    IstAktiv = r.GetBoolean(15),
+                    ErstelltAm = r.GetDateTime(16),
+                    GeaendertAm = r.IsDBNull(17) ? null : r.GetDateTime(17)
+                });
+            }
+
+            return list;
+        }
+
+        public List<HaushaltObjekt> HaushaltObjekteGetAll()
+        {
+            EnsureHaushaltSchema();
+
+            var list = new List<HaushaltObjekt>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    o.Id,
+    o.RaumId,
+    r.Bezeichnung AS RaumBezeichnung,
+    o.KategorieId,
+    ISNULL(k.Bezeichnung, ISNULL(o.Kategorie, '')) AS KategorieBezeichnung,
+    ISNULL(k.IconKey, o.IconKey) AS KategorieIconKey,
+    o.Bezeichnung,
+    ISNULL(o.Kategorie, '') AS Kategorie,
+    o.IconKey,
+    ISNULL(o.Hersteller, '') AS Hersteller,
+    ISNULL(o.Modell, '') AS Modell,
+    ISNULL(o.Seriennummer, '') AS Seriennummer,
+    o.Kaufdatum,
+    o.Kaufpreis,
+    ISNULL(o.Bemerkung, '') AS Bemerkung,
+    o.IstAktiv,
+    o.ErstelltAm,
+    o.GeaendertAm
+FROM dbo.HaushaltObjekt o
+JOIN dbo.HaushaltRaum r ON r.Id = o.RaumId
+LEFT JOIN dbo.HaushaltObjektKategorie k ON k.Id = o.KategorieId
+WHERE o.IstAktiv = 1
+ORDER BY o.Bezeichnung;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new HaushaltObjekt
+                {
+                    Id = r.GetInt32(0),
+                    RaumId = r.GetInt32(1),
+                    RaumBezeichnung = r.GetString(2),
+                    KategorieId = r.IsDBNull(3) ? null : r.GetInt32(3),
+                    KategorieBezeichnung = r.GetString(4),
+                    KategorieIconKey = r.GetString(5),
+                    Bezeichnung = r.GetString(6),
+                    Kategorie = r.GetString(7),
+                    IconKey = r.GetString(8),
+                    Hersteller = r.GetString(9),
+                    Modell = r.GetString(10),
+                    Seriennummer = r.GetString(11),
+                    Kaufdatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
+                    Kaufpreis = r.IsDBNull(13) ? null : r.GetDecimal(13),
+                    Bemerkung = r.GetString(14),
+                    IstAktiv = r.GetBoolean(15),
+                    ErstelltAm = r.GetDateTime(16),
+                    GeaendertAm = r.IsDBNull(17) ? null : r.GetDateTime(17)
                 });
             }
 
@@ -461,6 +680,7 @@ ORDER BY o.Bezeichnung;";
 INSERT INTO dbo.HaushaltObjekt
 (
     RaumId,
+    KategorieId,
     Bezeichnung,
     Kategorie,
     IconKey,
@@ -476,6 +696,7 @@ OUTPUT INSERTED.Id
 VALUES
 (
     @RaumId,
+    @KategorieId,
     @Bezeichnung,
     @Kategorie,
     @IconKey,
@@ -490,6 +711,7 @@ VALUES
 
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@RaumId", model.RaumId);
+            cmd.Parameters.AddWithValue("@KategorieId", model.KategorieId.HasValue ? model.KategorieId.Value : DBNull.Value);
             cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
             cmd.Parameters.AddWithValue("@Kategorie", string.IsNullOrWhiteSpace(model.Kategorie) ? DBNull.Value : model.Kategorie.Trim());
             cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());
@@ -516,6 +738,7 @@ VALUES
 UPDATE dbo.HaushaltObjekt
 SET
     RaumId = @RaumId,
+    KategorieId = @KategorieId,
     Bezeichnung = @Bezeichnung,
     Kategorie = @Kategorie,
     IconKey = @IconKey,
@@ -532,6 +755,7 @@ WHERE Id = @Id;";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@Id", model.Id);
             cmd.Parameters.AddWithValue("@RaumId", model.RaumId);
+            cmd.Parameters.AddWithValue("@KategorieId", model.KategorieId.HasValue ? model.KategorieId.Value : DBNull.Value);
             cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
             cmd.Parameters.AddWithValue("@Kategorie", string.IsNullOrWhiteSpace(model.Kategorie) ? DBNull.Value : model.Kategorie.Trim());
             cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());

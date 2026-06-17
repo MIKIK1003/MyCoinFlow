@@ -96,11 +96,89 @@
                     <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
                             IsEnabled="{Binding HatAusgewaehltenRaum}"
                             Command="{Binding RaumLoeschenCommand}">
+                        
+                        
+                        
+                        
+                        
+                        
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
                             <TextBlock Text="Raum löschen"/>
                         </StackPanel>
                     </Button>
+
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <TextBlock Text="Objekte"
+           FontWeight="SemiBold"
+           Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        IsEnabled="{Binding IsRaumAnsicht}"
+        Command="{Binding NeuesObjektCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PlusCircleOutline"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Objekt neu"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        IsEnabled="{Binding HatAusgewaehltesObjekt}"
+        Command="{Binding ObjektBearbeitenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="PencilOutline"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Objekt bearbeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        IsEnabled="{Binding HatAusgewaehltesObjekt}"
+        Command="{Binding ObjektLoeschenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="DeleteOutline"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Objekt löschen"/>
+                        </StackPanel>
+                    </Button>
+
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <Separator Margin="0,6,0,10"/>
+
+                    <TextBlock Text="Objekt-Kategorien"
+           FontWeight="SemiBold"
+           Margin="0,0,0,6"/>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        Command="{Binding KategorienVerwaltenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ShapeOutline"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Kategorien verwalten"/>
+                        </StackPanel>
+                    </Button>
+
 
                     <Separator Margin="0,6,0,10"/>
 
@@ -222,7 +300,8 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <ItemsControl ItemsSource="{Binding Objekte}" Visibility="{Binding RaumVisibility}">
+                <ItemsControl ItemsSource="{Binding Objekte}"
+              Visibility="{Binding RaumVisibility}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -231,12 +310,40 @@
 
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
+
                             <Button Width="220"
-                                    Height="130"
-                                    Margin="0,0,14,14"
-                                    Style="{StaticResource MaterialDesignRaisedButton}"
-                                    Command="{Binding DataContext.ObjektAuswaehlenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                    CommandParameter="{Binding}">
+                    Height="130"
+                    Margin="0,0,14,14"
+                    Command="{Binding DataContext.ObjektOeffnenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    CommandParameter="{Binding}">
+
+                                <Button.InputBindings>
+                                    <MouseBinding MouseAction="RightClick"
+                                  Command="{Binding DataContext.ObjektMarkierenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                  CommandParameter="{Binding}"/>
+                                </Button.InputBindings>
+
+                                <Button.Style>
+                                    <Style TargetType="Button"
+                           BasedOn="{StaticResource MaterialDesignRaisedButton}">
+
+                                        <Setter Property="Background"
+                                Value="{Binding StandortBrush}" />
+
+                                        <Setter Property="Foreground"
+                                Value="White" />
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}"
+                                         Value="True">
+                                                <Setter Property="Opacity"
+                                        Value="0.72"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+
+                                    </Style>
+                                </Button.Style>
+
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -245,23 +352,25 @@
                                     </Grid.RowDefinitions>
 
                                     <materialDesign:PackIcon Grid.Row="0"
-                                                             Kind="{Binding Icon}"
-                                                             Width="34"
-                                                             Height="34"
-                                                             Margin="0,0,0,10"/>
+                                             Kind="{Binding Icon}"
+                                             Width="34"
+                                             Height="34"
+                                             Margin="0,0,0,10"/>
 
                                     <TextBlock Grid.Row="1"
-                                               Text="{Binding Bezeichnung}"
-                                               FontSize="20"
-                                               FontWeight="SemiBold"
-                                               TextWrapping="Wrap"/>
+                               Text="{Binding Bezeichnung}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
 
                                     <TextBlock Grid.Row="2"
-                                               Text="{Binding Kategorie}"
-                                               FontSize="13"
-                                               Opacity="0.8"/>
+                               Text="{Binding Kategorie}"
+                               FontSize="13"
+                               Opacity="0.8"/>
                                 </Grid>
+
                             </Button>
+
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

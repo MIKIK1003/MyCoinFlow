@@ -22,5 +22,8 @@ namespace MyCoinFlow.Models
         public bool IstAktiv { get; set; } = true;
         public DateTime ErstelltAm { get; set; }
         public DateTime? GeaendertAm { get; set; }
+        public int? KategorieId { get; set; }
+        public string KategorieBezeichnung { get; set; } = "";
+        public string KategorieIconKey { get; set; } = "PackageVariantClosed";
     }
 }
