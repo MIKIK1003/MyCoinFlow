@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Objekt"
                  Width="560"
-                 Height="520"
+                 Height="650"
                  WindowStartupLocation="CenterOwner"
                  ResizeMode="NoResize">
 
@@ -22,18 +22,43 @@
                    FontSize="22"
                    FontWeight="SemiBold"/>
 
-        <ScrollViewer Grid.Row="2"
-                      VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
                 <ComboBox x:Name="KategorieBox"
-          MinHeight="44"
-          Padding="8,6,8,6"
-          Style="{StaticResource MaterialDesignOutlinedComboBox}"
-          materialDesign:HintAssist.Hint="Objekt-Kategorie"
-          DisplayMemberPath="Bezeichnung"
-          SelectedValuePath="Id"
-          Margin="0,8,0,14"/>
+                          MinHeight="44"
+                          Padding="8,6,8,6"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Objekt-Kategorie"
+                          DisplayMemberPath="Bezeichnung"
+                          SelectedValuePath="Id"
+                          Margin="0,8,0,14"/>
+
+                <ComboBox x:Name="TaetigkeitBox"
+                          MinHeight="44"
+                          Padding="8,6,8,6"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Tätigkeit"
+                          DisplayMemberPath="Bezeichnung"
+                          SelectedValuePath="Id"
+                          Margin="0,0,0,14"/>
+
+                <ComboBox x:Name="ZeitintervallBox"
+                          MinHeight="44"
+                          Padding="8,6,8,6"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Zeitintervall"
+                          DisplayMemberPath="Bezeichnung"
+                          SelectedValuePath="Id"
+                          Margin="0,0,0,14"/>
+
+                <TextBox x:Name="VorlaufTageBox"
+                         MinHeight="40"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Aktivierung vorher in Tagen"
+                         Margin="0,0,0,18"/>
+
+                <Separator Margin="0,0,0,18"/>
 
                 <TextBox x:Name="HerstellerBox"
                          MinHeight="40"
@@ -75,9 +100,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <DockPanel Grid.Row="4"
-                   LastChildFill="False">
-
+        <DockPanel Grid.Row="4" LastChildFill="False">
             <Button Content="Abbrechen"
                     Width="120"
                     Margin="0,0,8,0"

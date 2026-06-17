@@ -25,5 +25,16 @@ namespace MyCoinFlow.Models
         public int? KategorieId { get; set; }
         public string KategorieBezeichnung { get; set; } = "";
         public string KategorieIconKey { get; set; } = "PackageVariantClosed";
+
+        public int? ArbeitsanweisungId { get; set; }
+        public string ArbeitsanweisungBezeichnung { get; set; } = "";
+        public string ArbeitsanweisungBeschreibung { get; set; } = "";
+
+        public int? ZeitintervallId { get; set; }
+        public string ZeitintervallBezeichnung { get; set; } = "";
+        public int? ZeitintervallTage { get; set; }
+
+        public int VorlaufTage { get; set; }
+        public DateTime? LetzteAusfuehrungAm { get; set; }
     }
 }

@@ -179,6 +179,33 @@
                         </StackPanel>
                     </Button>
 
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        Command="{Binding ArbeitsanweisungenVerwaltenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ClipboardTextOutline"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Tätigkeiten"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+        Padding="12,8"
+        Margin="0,0,0,8"
+        Command="{Binding ZeitintervalleVerwaltenCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Calendar"
+                                 Width="18"
+                                 Height="18"
+                                 Margin="0,0,8,0"/>
+                            <TextBlock Text="Zeitintervalle"/>
+                        </StackPanel>
+                    </Button>
+
+
 
                     <Separator Margin="0,6,0,10"/>
 

@@ -63,6 +63,64 @@ BEGIN
         FOREIGN KEY (StandortId) REFERENCES dbo.HaushaltStandort(Id);
 END;
 
+IF OBJECT_ID('dbo.HaushaltArbeitsanweisung', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.HaushaltArbeitsanweisung
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltArbeitsanweisung PRIMARY KEY,
+        Bezeichnung NVARCHAR(200) NOT NULL,
+        Beschreibung NVARCHAR(2000) NULL,
+        IconKey NVARCHAR(100) NOT NULL CONSTRAINT DF_HaushaltArbeitsanweisung_IconKey DEFAULT ('ClipboardTextOutline'),
+        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltArbeitsanweisung_IstAktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltArbeitsanweisung_ErstelltAm DEFAULT SYSUTCDATETIME(),
+        GeaendertAm DATETIME2 NULL
+    );
+END;
+
+IF OBJECT_ID('dbo.HaushaltZeitintervall', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.HaushaltZeitintervall
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltZeitintervall PRIMARY KEY,
+        Bezeichnung NVARCHAR(200) NOT NULL,
+        Tage INT NOT NULL,
+        Bemerkung NVARCHAR(1000) NULL,
+        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltZeitintervall_IstAktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltZeitintervall_ErstelltAm DEFAULT SYSUTCDATETIME(),
+        GeaendertAm DATETIME2 NULL
+    );
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'ArbeitsanweisungId') IS NULL
+   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD ArbeitsanweisungId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'ZeitintervallId') IS NULL
+   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD ZeitintervallId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'VorlaufTage') IS NULL
+   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD VorlaufTage INT NOT NULL CONSTRAINT DF_HaushaltObjekt_VorlaufTage DEFAULT (0);
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'LetzteAusfuehrungAm') IS NULL
+   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD LetzteAusfuehrungAm DATE NULL;
+END;
+
+
+
 IF OBJECT_ID('dbo.HaushaltObjektKategorie', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.HaushaltObjektKategorie
@@ -408,6 +466,253 @@ WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id);
             cmd.ExecuteNonQuery();
         }
+
+        public List<HaushaltArbeitsanweisung> HaushaltArbeitsanweisungenGetAll()
+        {
+            EnsureHaushaltSchema();
+
+            var list = new List<HaushaltArbeitsanweisung>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    Id,
+    Bezeichnung,
+    ISNULL(Beschreibung, '') AS Beschreibung,
+    IconKey,
+    IstAktiv,
+    ErstelltAm,
+    GeaendertAm
+FROM dbo.HaushaltArbeitsanweisung
+WHERE IstAktiv = 1
+ORDER BY Bezeichnung;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new HaushaltArbeitsanweisung
+                {
+                    Id = r.GetInt32(0),
+                    Bezeichnung = r.GetString(1),
+                    Beschreibung = r.GetString(2),
+                    IconKey = r.GetString(3),
+                    IstAktiv = r.GetBoolean(4),
+                    ErstelltAm = r.GetDateTime(5),
+                    GeaendertAm = r.IsDBNull(6) ? null : r.GetDateTime(6)
+                });
+            }
+
+            return list;
+        }
+
+        public int HaushaltArbeitsanweisungInsert(HaushaltArbeitsanweisung model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.HaushaltArbeitsanweisung
+(
+    Bezeichnung,
+    Beschreibung,
+    IconKey,
+    IstAktiv
+)
+OUTPUT INSERTED.Id
+VALUES
+(
+    @Bezeichnung,
+    @Beschreibung,
+    @IconKey,
+    @IstAktiv
+);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@Beschreibung", string.IsNullOrWhiteSpace(model.Beschreibung) ? DBNull.Value : model.Beschreibung.Trim());
+            cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "ClipboardTextOutline" : model.IconKey.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void HaushaltArbeitsanweisungUpdate(HaushaltArbeitsanweisung model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltArbeitsanweisung
+SET
+    Bezeichnung = @Bezeichnung,
+    Beschreibung = @Beschreibung,
+    IconKey = @IconKey,
+    IstAktiv = @IstAktiv,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", model.Id);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@Beschreibung", string.IsNullOrWhiteSpace(model.Beschreibung) ? DBNull.Value : model.Beschreibung.Trim());
+            cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "ClipboardTextOutline" : model.IconKey.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void HaushaltArbeitsanweisungDelete(int id)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltArbeitsanweisung
+SET
+    IstAktiv = 0,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<HaushaltZeitintervall> HaushaltZeitintervalleGetAll()
+        {
+            EnsureHaushaltSchema();
+
+            var list = new List<HaushaltZeitintervall>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    Id,
+    Bezeichnung,
+    Tage,
+    ISNULL(Bemerkung, '') AS Bemerkung,
+    IstAktiv,
+    ErstelltAm,
+    GeaendertAm
+FROM dbo.HaushaltZeitintervall
+WHERE IstAktiv = 1
+ORDER BY Tage, Bezeichnung;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new HaushaltZeitintervall
+                {
+                    Id = r.GetInt32(0),
+                    Bezeichnung = r.GetString(1),
+                    Tage = r.GetInt32(2),
+                    Bemerkung = r.GetString(3),
+                    IstAktiv = r.GetBoolean(4),
+                    ErstelltAm = r.GetDateTime(5),
+                    GeaendertAm = r.IsDBNull(6) ? null : r.GetDateTime(6)
+                });
+            }
+
+            return list;
+        }
+
+        public int HaushaltZeitintervallInsert(HaushaltZeitintervall model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.HaushaltZeitintervall
+(
+    Bezeichnung,
+    Tage,
+    Bemerkung,
+    IstAktiv
+)
+OUTPUT INSERTED.Id
+VALUES
+(
+    @Bezeichnung,
+    @Tage,
+    @Bemerkung,
+    @IstAktiv
+);";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@Tage", model.Tage);
+            cmd.Parameters.AddWithValue("@Bemerkung", string.IsNullOrWhiteSpace(model.Bemerkung) ? DBNull.Value : model.Bemerkung.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void HaushaltZeitintervallUpdate(HaushaltZeitintervall model)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltZeitintervall
+SET
+    Bezeichnung = @Bezeichnung,
+    Tage = @Tage,
+    Bemerkung = @Bemerkung,
+    IstAktiv = @IstAktiv,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", model.Id);
+            cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
+            cmd.Parameters.AddWithValue("@Tage", model.Tage);
+            cmd.Parameters.AddWithValue("@Bemerkung", string.IsNullOrWhiteSpace(model.Bemerkung) ? DBNull.Value : model.Bemerkung.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void HaushaltZeitintervallDelete(int id)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltZeitintervall
+SET
+    IstAktiv = 0,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.ExecuteNonQuery();
+        }
+
 
         public List<HaushaltObjektKategorie> HaushaltObjektKategorienGetAll()
         {

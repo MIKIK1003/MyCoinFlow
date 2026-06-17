@@ -127,6 +127,9 @@ namespace MyCoinFlow.ViewModels
 
         public ICommand KategorienVerwaltenCommand { get; }
 
+        public ICommand ArbeitsanweisungenVerwaltenCommand { get; }
+        public ICommand ZeitintervalleVerwaltenCommand { get; }
+
 
 
         public HaushaltViewModel()
@@ -199,6 +202,8 @@ namespace MyCoinFlow.ViewModels
             ObjektLoeschenCommand = new RelayCommand(_ => ObjektLoeschen());
 
             KategorienVerwaltenCommand = new RelayCommand(_ => KategorienVerwalten());
+            ArbeitsanweisungenVerwaltenCommand = new RelayCommand(_ => ArbeitsanweisungenVerwalten());
+            ZeitintervalleVerwaltenCommand = new RelayCommand(_ => ZeitintervalleVerwalten());
 
             _db.EnsureHaushaltSchema();
 
@@ -643,6 +648,26 @@ namespace MyCoinFlow.ViewModels
         private void KategorienVerwalten()
         {
             var dlg = new HaushaltObjektKategorieVerwaltungDialog
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            dlg.ShowDialog();
+        }
+
+        private void ArbeitsanweisungenVerwalten()
+        {
+            var dlg = new HaushaltArbeitsanweisungVerwaltungDialog
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            dlg.ShowDialog();
+        }
+
+        private void ZeitintervalleVerwalten()
+        {
+            var dlg = new HaushaltZeitintervallVerwaltungDialog
             {
                 Owner = Application.Current?.MainWindow
             };
