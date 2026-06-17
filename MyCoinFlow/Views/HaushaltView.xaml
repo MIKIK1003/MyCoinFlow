@@ -353,10 +353,8 @@
                                 <Button.Style>
                                     <Style TargetType="Button"
                            BasedOn="{StaticResource MaterialDesignRaisedButton}">
-
                                         <Setter Property="Background"
                                 Value="{Binding StandortBrush}" />
-
                                         <Setter Property="Foreground"
                                 Value="White" />
 
@@ -367,7 +365,6 @@
                                         Value="0.72"/>
                                             </DataTrigger>
                                         </Style.Triggers>
-
                                     </Style>
                                 </Button.Style>
 
@@ -388,12 +385,13 @@
                                Text="{Binding Bezeichnung}"
                                FontSize="20"
                                FontWeight="SemiBold"
-                               TextWrapping="Wrap"/>
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center"/>
 
                                     <TextBlock Grid.Row="2"
-                               Text="{Binding Kategorie}"
+                               Text="{Binding TaetigkeitText}"
                                FontSize="13"
-                               Opacity="0.8"/>
+                               Opacity="0.85"/>
                                 </Grid>
 
                             </Button>
@@ -403,35 +401,110 @@
                 </ItemsControl>
 
                 <Border Visibility="{Binding ObjektVisibility}"
-                        Background="{DynamicResource MaterialDesignPaper}"
-                        Padding="20"
-                        MaxWidth="720"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top">
+        Background="{DynamicResource MaterialDesignPaper}"
+        Padding="22"
+        MaxWidth="760"
+        HorizontalAlignment="Left"
+        VerticalAlignment="Top">
+
                     <StackPanel>
-                        <materialDesign:PackIcon Kind="{Binding SelectedObjekt.Icon}"
-                                                 Width="42"
-                                                 Height="42"
-                                                 Margin="0,0,0,12"/>
 
-                        <TextBlock Text="{Binding SelectedObjekt.Bezeichnung}"
-                                   FontSize="26"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,6"/>
+                        <materialDesign:PackIcon Kind="{Binding GeoeffnetesObjekt.Icon}"
+                                 Width="46"
+                                 Height="46"
+                                 Margin="0,0,0,12"/>
 
-                        <TextBlock Text="{Binding SelectedObjekt.Kategorie}"
-                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                                   Margin="0,0,0,20"/>
+                        <TextBlock Text="{Binding GeoeffnetesObjekt.Bezeichnung}"
+                   FontSize="26"
+                   FontWeight="SemiBold"/>
 
-                        <TextBlock Text="Eigenschaften" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <TextBlock Text="Noch keine Eigenschaften zugewiesen"
-                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                                   Margin="0,0,0,18"/>
+                        <TextBlock Text="{Binding GeoeffnetesObjekt.Kategorie}"
+                   Margin="0,4,0,22"
+                   Opacity="0.75"/>
 
-                        <TextBlock Text="Arbeitsanweisungen" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <TextBlock Text="Noch keine Arbeitsanweisungen zugewiesen"
-                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                        <Grid>
+
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Tätigkeit"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.ArbeitsanweisungBezeichnung}"/>
+
+                            <TextBlock Grid.Row="2"
+                       Text="Zeitintervall"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="2"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.ZeitintervallBezeichnung}"/>
+
+                            <TextBlock Grid.Row="4"
+                       Text="Aktivierung"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="4"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.VorlaufTage,StringFormat={}{0} Tage vorher}"/>
+
+                            <TextBlock Grid.Row="6"
+                       Text="Hersteller"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="6"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.Hersteller}"/>
+
+                            <TextBlock Grid.Row="8"
+                       Text="Modell"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="8"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.Modell}"/>
+
+                            <TextBlock Grid.Row="10"
+                       Text="Seriennummer"
+                       FontWeight="SemiBold"/>
+
+                            <TextBlock Grid.Row="10"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.Seriennummer}"/>
+
+                            <TextBlock Grid.Row="12"
+                       Text="Bemerkung"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Top"/>
+
+                            <TextBlock Grid.Row="12"
+                       Grid.Column="1"
+                       Text="{Binding GeoeffnetesObjekt.Bemerkung}"
+                       TextWrapping="Wrap"/>
+
+                        </Grid>
+
                     </StackPanel>
+
                 </Border>
 
             </Grid>

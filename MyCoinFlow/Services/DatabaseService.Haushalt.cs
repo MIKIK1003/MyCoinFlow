@@ -852,24 +852,41 @@ SELECT
     o.Id,
     o.RaumId,
     r.Bezeichnung AS RaumBezeichnung,
+
     o.KategorieId,
     ISNULL(k.Bezeichnung, ISNULL(o.Kategorie, '')) AS KategorieBezeichnung,
     ISNULL(k.IconKey, o.IconKey) AS KategorieIconKey,
+
+    o.ArbeitsanweisungId,
+    ISNULL(a.Bezeichnung, '') AS ArbeitsanweisungBezeichnung,
+    ISNULL(a.Beschreibung, '') AS ArbeitsanweisungBeschreibung,
+
+    o.ZeitintervallId,
+    ISNULL(z.Bezeichnung, '') AS ZeitintervallBezeichnung,
+    z.Tage AS ZeitintervallTage,
+
+    o.VorlaufTage,
+    o.LetzteAusfuehrungAm,
+
     o.Bezeichnung,
     ISNULL(o.Kategorie, '') AS Kategorie,
     o.IconKey,
+
     ISNULL(o.Hersteller, '') AS Hersteller,
     ISNULL(o.Modell, '') AS Modell,
     ISNULL(o.Seriennummer, '') AS Seriennummer,
     o.Kaufdatum,
     o.Kaufpreis,
     ISNULL(o.Bemerkung, '') AS Bemerkung,
+
     o.IstAktiv,
     o.ErstelltAm,
     o.GeaendertAm
 FROM dbo.HaushaltObjekt o
 JOIN dbo.HaushaltRaum r ON r.Id = o.RaumId
 LEFT JOIN dbo.HaushaltObjektKategorie k ON k.Id = o.KategorieId
+LEFT JOIN dbo.HaushaltArbeitsanweisung a ON a.Id = o.ArbeitsanweisungId
+LEFT JOIN dbo.HaushaltZeitintervall z ON z.Id = o.ZeitintervallId
 WHERE o.IstAktiv = 1
   AND o.RaumId = @RaumId
 ORDER BY o.Bezeichnung;";
@@ -886,21 +903,36 @@ ORDER BY o.Bezeichnung;";
                     Id = r.GetInt32(0),
                     RaumId = r.GetInt32(1),
                     RaumBezeichnung = r.GetString(2),
+
                     KategorieId = r.IsDBNull(3) ? null : r.GetInt32(3),
                     KategorieBezeichnung = r.GetString(4),
                     KategorieIconKey = r.GetString(5),
-                    Bezeichnung = r.GetString(6),
-                    Kategorie = r.GetString(7),
-                    IconKey = r.GetString(8),
-                    Hersteller = r.GetString(9),
-                    Modell = r.GetString(10),
-                    Seriennummer = r.GetString(11),
-                    Kaufdatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
-                    Kaufpreis = r.IsDBNull(13) ? null : r.GetDecimal(13),
-                    Bemerkung = r.GetString(14),
-                    IstAktiv = r.GetBoolean(15),
-                    ErstelltAm = r.GetDateTime(16),
-                    GeaendertAm = r.IsDBNull(17) ? null : r.GetDateTime(17)
+
+                    ArbeitsanweisungId = r.IsDBNull(6) ? null : r.GetInt32(6),
+                    ArbeitsanweisungBezeichnung = r.GetString(7),
+                    ArbeitsanweisungBeschreibung = r.GetString(8),
+
+                    ZeitintervallId = r.IsDBNull(9) ? null : r.GetInt32(9),
+                    ZeitintervallBezeichnung = r.GetString(10),
+                    ZeitintervallTage = r.IsDBNull(11) ? null : r.GetInt32(11),
+
+                    VorlaufTage = r.GetInt32(12),
+                    LetzteAusfuehrungAm = r.IsDBNull(13) ? null : r.GetDateTime(13),
+
+                    Bezeichnung = r.GetString(14),
+                    Kategorie = r.GetString(15),
+                    IconKey = r.GetString(16),
+
+                    Hersteller = r.GetString(17),
+                    Modell = r.GetString(18),
+                    Seriennummer = r.GetString(19),
+                    Kaufdatum = r.IsDBNull(20) ? null : r.GetDateTime(20),
+                    Kaufpreis = r.IsDBNull(21) ? null : r.GetDecimal(21),
+                    Bemerkung = r.GetString(22),
+
+                    IstAktiv = r.GetBoolean(23),
+                    ErstelltAm = r.GetDateTime(24),
+                    GeaendertAm = r.IsDBNull(25) ? null : r.GetDateTime(25)
                 });
             }
 
@@ -986,9 +1018,15 @@ INSERT INTO dbo.HaushaltObjekt
 (
     RaumId,
     KategorieId,
+    ArbeitsanweisungId,
+    ZeitintervallId,
+    VorlaufTage,
+    LetzteAusfuehrungAm,
+
     Bezeichnung,
     Kategorie,
     IconKey,
+
     Hersteller,
     Modell,
     Seriennummer,
@@ -1002,9 +1040,15 @@ VALUES
 (
     @RaumId,
     @KategorieId,
+    @ArbeitsanweisungId,
+    @ZeitintervallId,
+    @VorlaufTage,
+    @LetzteAusfuehrungAm,
+
     @Bezeichnung,
     @Kategorie,
     @IconKey,
+
     @Hersteller,
     @Modell,
     @Seriennummer,
@@ -1015,11 +1059,18 @@ VALUES
 );";
 
             using var cmd = new SqlCommand(sql, c);
+
             cmd.Parameters.AddWithValue("@RaumId", model.RaumId);
             cmd.Parameters.AddWithValue("@KategorieId", model.KategorieId.HasValue ? model.KategorieId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@ArbeitsanweisungId", model.ArbeitsanweisungId.HasValue ? model.ArbeitsanweisungId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@ZeitintervallId", model.ZeitintervallId.HasValue ? model.ZeitintervallId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@VorlaufTage", model.VorlaufTage);
+            cmd.Parameters.AddWithValue("@LetzteAusfuehrungAm", model.LetzteAusfuehrungAm.HasValue ? model.LetzteAusfuehrungAm.Value.Date : DBNull.Value);
+
             cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
             cmd.Parameters.AddWithValue("@Kategorie", string.IsNullOrWhiteSpace(model.Kategorie) ? DBNull.Value : model.Kategorie.Trim());
             cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());
+
             cmd.Parameters.AddWithValue("@Hersteller", string.IsNullOrWhiteSpace(model.Hersteller) ? DBNull.Value : model.Hersteller.Trim());
             cmd.Parameters.AddWithValue("@Modell", string.IsNullOrWhiteSpace(model.Modell) ? DBNull.Value : model.Modell.Trim());
             cmd.Parameters.AddWithValue("@Seriennummer", string.IsNullOrWhiteSpace(model.Seriennummer) ? DBNull.Value : model.Seriennummer.Trim());
@@ -1044,9 +1095,15 @@ UPDATE dbo.HaushaltObjekt
 SET
     RaumId = @RaumId,
     KategorieId = @KategorieId,
+    ArbeitsanweisungId = @ArbeitsanweisungId,
+    ZeitintervallId = @ZeitintervallId,
+    VorlaufTage = @VorlaufTage,
+    LetzteAusfuehrungAm = @LetzteAusfuehrungAm,
+
     Bezeichnung = @Bezeichnung,
     Kategorie = @Kategorie,
     IconKey = @IconKey,
+
     Hersteller = @Hersteller,
     Modell = @Modell,
     Seriennummer = @Seriennummer,
@@ -1058,12 +1115,19 @@ SET
 WHERE Id = @Id;";
 
             using var cmd = new SqlCommand(sql, c);
+
             cmd.Parameters.AddWithValue("@Id", model.Id);
             cmd.Parameters.AddWithValue("@RaumId", model.RaumId);
             cmd.Parameters.AddWithValue("@KategorieId", model.KategorieId.HasValue ? model.KategorieId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@ArbeitsanweisungId", model.ArbeitsanweisungId.HasValue ? model.ArbeitsanweisungId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@ZeitintervallId", model.ZeitintervallId.HasValue ? model.ZeitintervallId.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@VorlaufTage", model.VorlaufTage);
+            cmd.Parameters.AddWithValue("@LetzteAusfuehrungAm", model.LetzteAusfuehrungAm.HasValue ? model.LetzteAusfuehrungAm.Value.Date : DBNull.Value);
+
             cmd.Parameters.AddWithValue("@Bezeichnung", model.Bezeichnung.Trim());
             cmd.Parameters.AddWithValue("@Kategorie", string.IsNullOrWhiteSpace(model.Kategorie) ? DBNull.Value : model.Kategorie.Trim());
             cmd.Parameters.AddWithValue("@IconKey", string.IsNullOrWhiteSpace(model.IconKey) ? "PackageVariantClosed" : model.IconKey.Trim());
+
             cmd.Parameters.AddWithValue("@Hersteller", string.IsNullOrWhiteSpace(model.Hersteller) ? DBNull.Value : model.Hersteller.Trim());
             cmd.Parameters.AddWithValue("@Modell", string.IsNullOrWhiteSpace(model.Modell) ? DBNull.Value : model.Modell.Trim());
             cmd.Parameters.AddWithValue("@Seriennummer", string.IsNullOrWhiteSpace(model.Seriennummer) ? DBNull.Value : model.Seriennummer.Trim());

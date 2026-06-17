@@ -171,6 +171,8 @@ namespace MyCoinFlow.ViewModels
                     return;
 
                 GeoeffnetesObjekt = objekt;
+
+                AktualisiereAnsicht();
             });
 
             ZurueckZuRaeumenCommand = new RelayCommand(_ =>
@@ -463,6 +465,17 @@ namespace MyCoinFlow.ViewModels
                 KategorieBezeichnung = SelectedObjekt.Kategorie,
                 KategorieIconKey = SelectedObjekt.Icon,
 
+                ArbeitsanweisungId = SelectedObjekt.ArbeitsanweisungId,
+                ArbeitsanweisungBezeichnung = SelectedObjekt.ArbeitsanweisungBezeichnung,
+                ArbeitsanweisungBeschreibung = SelectedObjekt.ArbeitsanweisungBeschreibung,
+
+                ZeitintervallId = SelectedObjekt.ZeitintervallId,
+                ZeitintervallBezeichnung = SelectedObjekt.ZeitintervallBezeichnung,
+                ZeitintervallTage = SelectedObjekt.ZeitintervallTage,
+
+                VorlaufTage = SelectedObjekt.VorlaufTage,
+                LetzteAusfuehrungAm = SelectedObjekt.LetzteAusfuehrungAm,
+
                 Bezeichnung = SelectedObjekt.Bezeichnung,
                 Kategorie = SelectedObjekt.Kategorie,
                 IconKey = SelectedObjekt.Icon,
@@ -605,14 +618,21 @@ namespace MyCoinFlow.ViewModels
 
                     KategorieId = o.KategorieId,
 
-                    Bezeichnung = o.Bezeichnung,
-                    Icon = string.IsNullOrWhiteSpace(o.KategorieIconKey)
-                        ? "PackageVariantClosed"
-                        : o.KategorieIconKey,
+                    ArbeitsanweisungId = o.ArbeitsanweisungId,
+                    ArbeitsanweisungBezeichnung = o.ArbeitsanweisungBezeichnung,
+                    ArbeitsanweisungBeschreibung = o.ArbeitsanweisungBeschreibung,
 
-                    Kategorie = string.IsNullOrWhiteSpace(o.KategorieBezeichnung)
-                        ? "Ohne Kategorie"
-                        : o.KategorieBezeichnung,
+                    ZeitintervallId = o.ZeitintervallId,
+                    ZeitintervallBezeichnung = o.ZeitintervallBezeichnung,
+                    ZeitintervallTage = o.ZeitintervallTage,
+
+                    VorlaufTage = o.VorlaufTage,
+                    LetzteAusfuehrungAm = o.LetzteAusfuehrungAm,
+
+                    Bezeichnung = o.Bezeichnung,
+                    Icon = string.IsNullOrWhiteSpace(o.KategorieIconKey) ? "PackageVariantClosed" : o.KategorieIconKey,
+
+                    Kategorie = string.IsNullOrWhiteSpace(o.KategorieBezeichnung) ? "Ohne Kategorie" : o.KategorieBezeichnung,
 
                     Hersteller = o.Hersteller,
                     Modell = o.Modell,
@@ -620,6 +640,7 @@ namespace MyCoinFlow.ViewModels
                     Kaufdatum = o.Kaufdatum,
                     Kaufpreis = o.Kaufpreis,
                     Bemerkung = o.Bemerkung,
+
                     StandortFarbeKey = GeoeffneterRaum?.StandortFarbeKey ?? "DeepPurple",
                     IsSelected = o.Id == selectedObjektId
                 });
@@ -627,6 +648,12 @@ namespace MyCoinFlow.ViewModels
 
             if (selectedObjektId > 0)
                 SelectedObjekt = Objekte.FirstOrDefault(x => x.Id == selectedObjektId);
+            
+            if (GeoeffnetesObjekt != null)
+            {
+                GeoeffnetesObjekt =
+                    Objekte.FirstOrDefault(x => x.Id == GeoeffnetesObjekt.Id);
+            }
         }
 
         private void AktualisiereRaumAuswahl()
@@ -777,6 +804,30 @@ namespace MyCoinFlow.ViewModels
         public int Id { get; set; }
         public int RaumId { get; set; }
         public int? KategorieId { get; set; }
+
+        public int? ArbeitsanweisungId { get; set; }
+        public string ArbeitsanweisungBezeichnung { get; set; } = "";
+        public string ArbeitsanweisungBeschreibung { get; set; } = "";
+
+        public int? ZeitintervallId { get; set; }
+        public string ZeitintervallBezeichnung { get; set; } = "";
+        public int? ZeitintervallTage { get; set; }
+
+        public string TaetigkeitText =>
+    string.IsNullOrWhiteSpace(ArbeitsanweisungBezeichnung)
+        ? "Keine Tätigkeit"
+        : ArbeitsanweisungBezeichnung;
+
+        public string IntervallText =>
+            string.IsNullOrWhiteSpace(ZeitintervallBezeichnung)
+                ? "Kein Intervall"
+                : VorlaufTage > 0
+                    ? $"{ZeitintervallBezeichnung} · {VorlaufTage} Tage Vorlauf"
+                    : ZeitintervallBezeichnung;
+
+        public int VorlaufTage { get; set; }
+        public DateTime? LetzteAusfuehrungAm { get; set; }
+
         public string Bezeichnung { get; set; } = "";
         public string Icon { get; set; } = "PackageVariantClosed";
         public string Kategorie { get; set; } = "";
