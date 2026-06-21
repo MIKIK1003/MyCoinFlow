@@ -124,6 +124,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand NeuesObjektCommand { get; }
         public ICommand ObjektBearbeitenCommand { get; }
         public ICommand ObjektLoeschenCommand { get; }
+        public ICommand ObjektAlsErledigtMarkierenCommand { get; }
 
         public ICommand KategorienVerwaltenCommand { get; }
 
@@ -202,6 +203,7 @@ namespace MyCoinFlow.ViewModels
             NeuesObjektCommand = new RelayCommand(_ => NeuesObjekt());
             ObjektBearbeitenCommand = new RelayCommand(_ => ObjektBearbeiten());
             ObjektLoeschenCommand = new RelayCommand(_ => ObjektLoeschen());
+            ObjektAlsErledigtMarkierenCommand = new RelayCommand(_ => ObjektAlsErledigtMarkieren());
 
             KategorienVerwaltenCommand = new RelayCommand(_ => KategorienVerwalten());
             ArbeitsanweisungenVerwaltenCommand = new RelayCommand(_ => ArbeitsanweisungenVerwalten());
@@ -538,6 +540,36 @@ namespace MyCoinFlow.ViewModels
             AktualisiereAnsicht();
         }
 
+        private void ObjektAlsErledigtMarkieren()
+        {
+            if (!IsObjektAnsicht || GeoeffneterRaum == null || GeoeffnetesObjekt == null)
+            {
+                MessageBox.Show(
+                    "Bitte zuerst ein Objekt öffnen.",
+                    "Als erledigt markieren",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var antwort = MessageBox.Show(
+                $"Soll \"{GeoeffnetesObjekt.Bezeichnung}\" als heute erledigt markiert werden?",
+                "Als erledigt markieren",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (antwort != MessageBoxResult.Yes)
+                return;
+
+            _db.HaushaltObjektLetzteAusfuehrungSetzen(GeoeffnetesObjekt.Id, DateTime.Today);
+
+            LadeObjekteFuerRaum(GeoeffneterRaum.Id);
+
+            GeoeffnetesObjekt = Objekte.FirstOrDefault(x => x.Id == GeoeffnetesObjekt.Id);
+
+            AktualisiereAnsicht();
+        }
+
         private void LadeStandorte()
         {
             var selectedId = SelectedStandort?.Id ?? 0;
@@ -827,6 +859,49 @@ namespace MyCoinFlow.ViewModels
 
         public int VorlaufTage { get; set; }
         public DateTime? LetzteAusfuehrungAm { get; set; }
+
+        public DateTime? FaelligAm =>
+    LetzteAusfuehrungAm.HasValue && ZeitintervallTage.HasValue
+        ? LetzteAusfuehrungAm.Value.Date.AddDays(ZeitintervallTage.Value)
+        : null;
+
+        public DateTime? AktivAb =>
+            FaelligAm.HasValue
+                ? FaelligAm.Value.Date.AddDays(-VorlaufTage)
+                : null;
+
+        public string AufgabenStatus
+        {
+            get
+            {
+                if (!FaelligAm.HasValue || !AktivAb.HasValue)
+                    return "Nicht geplant";
+
+                var heute = DateTime.Today;
+
+                if (heute < AktivAb.Value.Date)
+                    return "Ruhe";
+
+                if (heute > FaelligAm.Value.Date)
+                    return "Überfällig";
+
+                var restTage = (FaelligAm.Value.Date - heute).Days;
+
+                if (restTage <= 2)
+                    return "Bald fällig";
+
+                return "Aktiv";
+            }
+        }
+
+        public string AktivAbText =>
+            AktivAb.HasValue ? AktivAb.Value.ToString("dd.MM.yyyy") : "–";
+
+        public string FaelligAmText =>
+            FaelligAm.HasValue ? FaelligAm.Value.ToString("dd.MM.yyyy") : "–";
+
+        public string LetzteAusfuehrungText =>
+            LetzteAusfuehrungAm.HasValue ? LetzteAusfuehrungAm.Value.ToString("dd.MM.yyyy") : "Noch nie";
 
         public string Bezeichnung { get; set; } = "";
         public string Icon { get; set; } = "PackageVariantClosed";

@@ -1139,6 +1139,29 @@ WHERE Id = @Id;";
             cmd.ExecuteNonQuery();
         }
 
+
+        public void HaushaltObjektLetzteAusfuehrungSetzen(int objektId, DateTime datum)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltObjekt
+SET
+    LetzteAusfuehrungAm = @Datum,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", objektId);
+            cmd.Parameters.AddWithValue("@Datum", datum.Date);
+
+            cmd.ExecuteNonQuery();
+        }
+
+
         public void HaushaltObjektDelete(int id)
         {
             EnsureHaushaltSchema();

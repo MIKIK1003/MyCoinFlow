@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\Icons\piggybank.ico</ApplicationIcon>
     <!-- Versionsangaben: JSON ist die Quelle der Wahrheit. Assembly-/Datei-Version bleiben fix für Fallback & Dateieigenschaften. -->
-    <Version>2.0.0.1</Version>
-    <AssemblyVersion>2.0.0.1</AssemblyVersion>
-    <FileVersion>2.0.0.1</FileVersion>
+    <Version>2.0.0.2</Version>
+    <AssemblyVersion>2.0.0.2</AssemblyVersion>
+    <FileVersion>2.0.0.2</FileVersion>
 </PropertyGroup>
 
 	
