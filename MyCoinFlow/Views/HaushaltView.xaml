@@ -13,9 +13,16 @@
         <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="Haushalt" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Filter" FontWeight="SemiBold" Margin="0,6,0,6"/>
+                    <TextBlock Text="Haushalt"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Filter"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,6"/>
+
                     <ComboBox ItemsSource="{Binding Standorte}"
                               SelectedItem="{Binding SelectedStandort}"
                               DisplayMemberPath="Bezeichnung"
@@ -23,209 +30,243 @@
 
                     <Separator Margin="0,6,0,10"/>
 
-                    <TextBlock Text="Standorte" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Standorte"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             Command="{Binding NeuerStandortCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="Plus"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Standort neu"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             Command="{Binding StandortBearbeitenCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Pencil" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="Pencil"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Standort bearbeiten"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             Command="{Binding StandortLoeschenCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Delete" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="Delete"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Standort löschen"/>
                         </StackPanel>
                     </Button>
 
                     <Separator Margin="0,6,0,10"/>
 
-                    <TextBlock Text="Navigation" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Navigation"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             IsEnabled="{Binding IsRaumAnsicht}"
                             Command="{Binding ZurueckZuRaeumenCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ArrowLeft" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="ArrowLeft"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Zurück zu Räume"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             IsEnabled="{Binding IsObjektAnsicht}"
                             Command="{Binding ZurueckZumRaumCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ArrowLeft" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="ArrowLeft"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Zurück zum Raum"/>
                         </StackPanel>
                     </Button>
 
                     <Separator Margin="0,6,0,10"/>
 
-                    <TextBlock Text="Räume" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Räume"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             IsEnabled="{Binding IsRaeumeAnsicht}"
                             Command="{Binding NeuerRaumCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PlusCircleOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="PlusCircleOutline"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Raum neu"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             IsEnabled="{Binding HatAusgewaehltenRaum}"
                             Command="{Binding RaumBearbeitenCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="PencilOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="PencilOutline"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Raum bearbeiten"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
                             IsEnabled="{Binding HatAusgewaehltenRaum}"
                             Command="{Binding RaumLoeschenCommand}">
-                        
-                        
-                        
-                        
-                        
-                        
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="DeleteOutline" Width="18" Height="18" Margin="0,0,8,0"/>
+                            <materialDesign:PackIcon Kind="DeleteOutline"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Raum löschen"/>
                         </StackPanel>
                     </Button>
 
-
                     <Separator Margin="0,6,0,10"/>
 
                     <TextBlock Text="Objekte"
-           FontWeight="SemiBold"
-           Margin="0,0,0,6"/>
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        IsEnabled="{Binding IsRaumAnsicht}"
-        Command="{Binding NeuesObjektCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding IsRaumAnsicht}"
+                            Command="{Binding NeuesObjektCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="PlusCircleOutline"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Objekt neu"/>
                         </StackPanel>
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        IsEnabled="{Binding HatAusgewaehltesObjekt}"
-        Command="{Binding ObjektBearbeitenCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding HatAusgewaehltesObjekt}"
+                            Command="{Binding ObjektBearbeitenCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="PencilOutline"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Objekt bearbeiten"/>
                         </StackPanel>
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        IsEnabled="{Binding HatAusgewaehltesObjekt}"
-        Command="{Binding ObjektLoeschenCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            IsEnabled="{Binding HatAusgewaehltesObjekt}"
+                            Command="{Binding ObjektLoeschenCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="DeleteOutline"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Objekt löschen"/>
                         </StackPanel>
                     </Button>
 
-
                     <Separator Margin="0,6,0,10"/>
 
-                    <Separator Margin="0,6,0,10"/>
-
-                    <TextBlock Text="Objekt-Kategorien"
-           FontWeight="SemiBold"
-           Margin="0,0,0,6"/>
+                    <TextBlock Text="Stammdaten"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        Command="{Binding KategorienVerwaltenCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            Command="{Binding KategorienVerwaltenCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ShapeOutline"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Kategorien verwalten"/>
                         </StackPanel>
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        Command="{Binding ArbeitsanweisungenVerwaltenCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            Command="{Binding ArbeitsanweisungenVerwaltenCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ClipboardTextOutline"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Tätigkeiten"/>
                         </StackPanel>
                     </Button>
 
                     <Button Style="{StaticResource MaterialDesignRaisedButton}"
-        Padding="12,8"
-        Margin="0,0,0,8"
-        Command="{Binding ZeitintervalleVerwaltenCommand}">
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            Command="{Binding ZeitintervalleVerwaltenCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="Calendar"
-                                 Width="18"
-                                 Height="18"
-                                 Margin="0,0,8,0"/>
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
                             <TextBlock Text="Zeitintervalle"/>
                         </StackPanel>
                     </Button>
 
-
-
                     <Separator Margin="0,6,0,10"/>
 
-                    <TextBlock Text="Zuweisungen" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Text="Aufgaben"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
-                            IsEnabled="{Binding IsObjektAnsicht}">
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Padding="12,8"
+                            Margin="0,0,0,8"
+                            Command="{Binding AufgabenAktualisierenCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FormatListChecks" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Eigenschaften"/>
+                            <materialDesign:PackIcon Kind="Sync"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Margin="0,0,8,0"/>
+                            <TextBlock Text="Aufgaben aktualisieren"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource MaterialDesignRaisedButton}" Padding="12,8" Margin="0,0,0,8"
-                            IsEnabled="{Binding IsObjektAnsicht}">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ClipboardTextOutline" Width="18" Height="18" Margin="0,0,8,0"/>
-                            <TextBlock Text="Arbeitsanweisungen"/>
-                        </StackPanel>
-                    </Button>
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -241,18 +282,25 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Text="{Binding Titel}" FontSize="26" FontWeight="SemiBold"/>
+            <TextBlock Grid.Row="0"
+                       Text="{Binding Titel}"
+                       FontSize="26"
+                       FontWeight="SemiBold"/>
 
             <TextBlock Grid.Row="2"
                        Text="{Binding StatusText}"
                        Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
                        TextWrapping="Wrap"/>
 
-            <TextBlock Grid.Row="4" Text="{Binding InhaltsTitel}" FontSize="20" FontWeight="SemiBold"/>
+            <TextBlock Grid.Row="4"
+                       Text="{Binding InhaltsTitel}"
+                       FontSize="20"
+                       FontWeight="SemiBold"/>
 
             <Grid Grid.Row="6">
 
-                <ItemsControl ItemsSource="{Binding Raeume}" Visibility="{Binding RaeumeVisibility}">
+                <ItemsControl ItemsSource="{Binding Raeume}"
+                              Visibility="{Binding RaeumeVisibility}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -262,10 +310,11 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Width="230"
-        Height="140"
-        Margin="0,0,14,14"
-        Command="{Binding DataContext.RaumOeffnenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-        CommandParameter="{Binding}">
+                                    Height="140"
+                                    Margin="0,0,14,14"
+                                    Command="{Binding DataContext.RaumOeffnenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}">
+
                                 <Button.InputBindings>
                                     <MouseBinding MouseAction="RightClick"
                                                   Command="{Binding DataContext.RaumMarkierenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
@@ -273,18 +322,18 @@
                                 </Button.InputBindings>
 
                                 <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                    <Style TargetType="Button"
+                                           BasedOn="{StaticResource MaterialDesignRaisedButton}">
                                         <Setter Property="Background"
-                Value="{Binding StandortBrush}" />
-
+                                                Value="{Binding StandortBrush}"/>
                                         <Setter Property="Foreground"
-                Value="White" />
+                                                Value="White"/>
 
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected}"
-                         Value="True">
+                                                         Value="True">
                                                 <Setter Property="Opacity"
-                        Value="0.72" />
+                                                        Value="0.72"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -328,7 +377,7 @@
                 </ItemsControl>
 
                 <ItemsControl ItemsSource="{Binding Objekte}"
-              Visibility="{Binding RaumVisibility}">
+                              Visibility="{Binding RaumVisibility}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -337,32 +386,31 @@
 
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-
                             <Button Width="220"
-                    Height="130"
-                    Margin="0,0,14,14"
-                    Command="{Binding DataContext.ObjektOeffnenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                    CommandParameter="{Binding}">
+                                    Height="130"
+                                    Margin="0,0,14,14"
+                                    Command="{Binding DataContext.ObjektOeffnenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}">
 
                                 <Button.InputBindings>
                                     <MouseBinding MouseAction="RightClick"
-                                  Command="{Binding DataContext.ObjektMarkierenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                  CommandParameter="{Binding}"/>
+                                                  Command="{Binding DataContext.ObjektMarkierenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                  CommandParameter="{Binding}"/>
                                 </Button.InputBindings>
 
                                 <Button.Style>
                                     <Style TargetType="Button"
-                           BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                           BasedOn="{StaticResource MaterialDesignRaisedButton}">
                                         <Setter Property="Background"
-                                Value="{Binding StandortBrush}" />
+                                                Value="{Binding StandortBrush}"/>
                                         <Setter Property="Foreground"
-                                Value="White" />
+                                                Value="White"/>
 
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected}"
-                                         Value="True">
+                                                         Value="True">
                                                 <Setter Property="Opacity"
-                                        Value="0.72"/>
+                                                        Value="0.72"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -376,51 +424,49 @@
                                     </Grid.RowDefinitions>
 
                                     <materialDesign:PackIcon Grid.Row="0"
-                                             Kind="{Binding Icon}"
-                                             Width="34"
-                                             Height="34"
-                                             Margin="0,0,0,10"/>
+                                                             Kind="{Binding Icon}"
+                                                             Width="34"
+                                                             Height="34"
+                                                             Margin="0,0,0,10"/>
 
                                     <TextBlock Grid.Row="1"
-                               Text="{Binding Bezeichnung}"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Center"/>
+                                               Text="{Binding Bezeichnung}"
+                                               FontSize="20"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"
+                                               VerticalAlignment="Center"/>
 
                                     <TextBlock Grid.Row="2"
-                               Text="{Binding TaetigkeitText}"
-                               FontSize="13"
-                               Opacity="0.85"/>
+                                               Text="{Binding TaetigkeitText}"
+                                               FontSize="13"
+                                               Opacity="0.85"/>
                                 </Grid>
-
                             </Button>
-
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
                 <Border Visibility="{Binding ObjektVisibility}"
-        Background="{DynamicResource MaterialDesignPaper}"
-        Padding="22"
-        MaxWidth="760"
-        HorizontalAlignment="Left"
-        VerticalAlignment="Top">
+                        Background="{DynamicResource MaterialDesignPaper}"
+                        Padding="22"
+                        MaxWidth="760"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top">
 
                     <StackPanel>
 
                         <materialDesign:PackIcon Kind="{Binding GeoeffnetesObjekt.Icon}"
-                                 Width="46"
-                                 Height="46"
-                                 Margin="0,0,0,12"/>
+                                                 Width="46"
+                                                 Height="46"
+                                                 Margin="0,0,0,12"/>
 
                         <TextBlock Text="{Binding GeoeffnetesObjekt.Bezeichnung}"
-                   FontSize="26"
-                   FontWeight="SemiBold"/>
+                                   FontSize="26"
+                                   FontWeight="SemiBold"/>
 
                         <TextBlock Text="{Binding GeoeffnetesObjekt.Kategorie}"
-                   Margin="0,4,0,22"
-                   Opacity="0.75"/>
+                                   Margin="0,4,0,22"
+                                   Opacity="0.75"/>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -452,57 +498,57 @@
 
                             <TextBlock Text="Tätigkeit" FontWeight="SemiBold"/>
                             <TextBlock Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.ArbeitsanweisungBezeichnung}"/>
+                                       Text="{Binding GeoeffnetesObjekt.ArbeitsanweisungBezeichnung}"/>
 
                             <TextBlock Grid.Row="2" Text="Zeitintervall" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="2" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.ZeitintervallBezeichnung}"/>
+                                       Text="{Binding GeoeffnetesObjekt.ZeitintervallBezeichnung}"/>
 
                             <TextBlock Grid.Row="4" Text="Aktivierung" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="4" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.VorlaufTage,StringFormat={}{0} Tage vorher}"/>
+                                       Text="{Binding GeoeffnetesObjekt.VorlaufTage,StringFormat={}{0} Tage vorher}"/>
 
                             <TextBlock Grid.Row="6" Text="Status" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="6" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.AufgabenStatus}"/>
+                                       Text="{Binding GeoeffnetesObjekt.AufgabenStatus}"/>
 
                             <TextBlock Grid.Row="8" Text="Aktiv ab" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="8" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.AktivAbText}"/>
+                                       Text="{Binding GeoeffnetesObjekt.AktivAbText}"/>
 
                             <TextBlock Grid.Row="10" Text="Fällig am" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="10" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.FaelligAmText}"/>
+                                       Text="{Binding GeoeffnetesObjekt.FaelligAmText}"/>
 
                             <TextBlock Grid.Row="12" Text="Letzte Ausführung" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="12" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.LetzteAusfuehrungText}"/>
+                                       Text="{Binding GeoeffnetesObjekt.LetzteAusfuehrungText}"/>
 
                             <TextBlock Grid.Row="14" Text="Hersteller" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="14" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.Hersteller}"/>
+                                       Text="{Binding GeoeffnetesObjekt.Hersteller}"/>
 
                             <TextBlock Grid.Row="16" Text="Modell" FontWeight="SemiBold"/>
                             <TextBlock Grid.Row="16" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.Modell}"/>
+                                       Text="{Binding GeoeffnetesObjekt.Modell}"/>
 
                             <TextBlock Grid.Row="18" Text="Bemerkung" FontWeight="SemiBold" VerticalAlignment="Top"/>
                             <TextBlock Grid.Row="18" Grid.Column="1"
-               Text="{Binding GeoeffnetesObjekt.Bemerkung}"
-               TextWrapping="Wrap"/>
+                                       Text="{Binding GeoeffnetesObjekt.Bemerkung}"
+                                       TextWrapping="Wrap"/>
                         </Grid>
 
                         <Button Content="Als erledigt markieren"
-                Width="220"
-                Height="42"
-                Margin="0,24,0,0"
-                HorizontalAlignment="Left"
-                Style="{StaticResource MaterialDesignRaisedButton}"
-                Command="{Binding ObjektAlsErledigtMarkierenCommand}"/>
+                                Width="220"
+                                Height="42"
+                                Margin="0,24,0,0"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Command="{Binding ObjektAlsErledigtMarkierenCommand}"/>
 
                     </StackPanel>
-
                 </Border>
+
             </Grid>
         </Grid>
     </Grid>

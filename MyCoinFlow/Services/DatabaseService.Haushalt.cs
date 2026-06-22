@@ -39,10 +39,7 @@ BEGIN
         Bemerkung NVARCHAR(1000) NULL,
         IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltRaum_IstAktiv DEFAULT (1),
         ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltRaum_ErstelltAm DEFAULT SYSUTCDATETIME(),
-        GeaendertAm DATETIME2 NULL,
-
-        CONSTRAINT FK_HaushaltRaum_Standort
-            FOREIGN KEY (StandortId) REFERENCES dbo.HaushaltStandort(Id)
+        GeaendertAm DATETIME2 NULL
     );
 END;
 
@@ -61,6 +58,20 @@ BEGIN
     ALTER TABLE dbo.HaushaltRaum
     ADD CONSTRAINT FK_HaushaltRaum_Standort
         FOREIGN KEY (StandortId) REFERENCES dbo.HaushaltStandort(Id);
+END;
+
+IF OBJECT_ID('dbo.HaushaltObjektKategorie', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.HaushaltObjektKategorie
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltObjektKategorie PRIMARY KEY,
+        Bezeichnung NVARCHAR(200) NOT NULL,
+        IconKey NVARCHAR(100) NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IconKey DEFAULT ('PackageVariantClosed'),
+        Bemerkung NVARCHAR(1000) NULL,
+        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IstAktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_ErstelltAm DEFAULT SYSUTCDATETIME(),
+        GeaendertAm DATETIME2 NULL
+    );
 END;
 
 IF OBJECT_ID('dbo.HaushaltArbeitsanweisung', 'U') IS NULL
@@ -91,64 +102,18 @@ BEGIN
     );
 END;
 
-IF COL_LENGTH('dbo.HaushaltObjekt', 'ArbeitsanweisungId') IS NULL
-   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
-BEGIN
-    ALTER TABLE dbo.HaushaltObjekt
-    ADD ArbeitsanweisungId INT NULL;
-END;
-
-IF COL_LENGTH('dbo.HaushaltObjekt', 'ZeitintervallId') IS NULL
-   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
-BEGIN
-    ALTER TABLE dbo.HaushaltObjekt
-    ADD ZeitintervallId INT NULL;
-END;
-
-IF COL_LENGTH('dbo.HaushaltObjekt', 'VorlaufTage') IS NULL
-   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
-BEGIN
-    ALTER TABLE dbo.HaushaltObjekt
-    ADD VorlaufTage INT NOT NULL CONSTRAINT DF_HaushaltObjekt_VorlaufTage DEFAULT (0);
-END;
-
-IF COL_LENGTH('dbo.HaushaltObjekt', 'LetzteAusfuehrungAm') IS NULL
-   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
-BEGIN
-    ALTER TABLE dbo.HaushaltObjekt
-    ADD LetzteAusfuehrungAm DATE NULL;
-END;
-
-
-
-IF OBJECT_ID('dbo.HaushaltObjektKategorie', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.HaushaltObjektKategorie
-    (
-        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltObjektKategorie PRIMARY KEY,
-        Bezeichnung NVARCHAR(200) NOT NULL,
-        IconKey NVARCHAR(100) NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IconKey DEFAULT ('PackageVariantClosed'),
-        Bemerkung NVARCHAR(1000) NULL,
-        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_IstAktiv DEFAULT (1),
-        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltObjektKategorie_ErstelltAm DEFAULT SYSUTCDATETIME(),
-        GeaendertAm DATETIME2 NULL
-    );
-END;
-
-IF COL_LENGTH('dbo.HaushaltObjekt', 'KategorieId') IS NULL
-   AND OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NOT NULL
-BEGIN
-    ALTER TABLE dbo.HaushaltObjekt
-    ADD KategorieId INT NULL;
-END;
-
-
 IF OBJECT_ID('dbo.HaushaltObjekt', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.HaushaltObjekt
     (
         Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltObjekt PRIMARY KEY,
         RaumId INT NOT NULL,
+
+        KategorieId INT NULL,
+        ArbeitsanweisungId INT NULL,
+        ZeitintervallId INT NULL,
+        VorlaufTage INT NOT NULL CONSTRAINT DF_HaushaltObjekt_VorlaufTage DEFAULT (0),
+        LetzteAusfuehrungAm DATE NULL,
 
         Bezeichnung NVARCHAR(200) NOT NULL,
         Kategorie NVARCHAR(100) NULL,
@@ -163,11 +128,78 @@ BEGIN
 
         IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltObjekt_IstAktiv DEFAULT (1),
         ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltObjekt_ErstelltAm DEFAULT SYSUTCDATETIME(),
-        GeaendertAm DATETIME2 NULL,
-
-        CONSTRAINT FK_HaushaltObjekt_Raum
-            FOREIGN KEY (RaumId) REFERENCES dbo.HaushaltRaum(Id)
+        GeaendertAm DATETIME2 NULL
     );
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'KategorieId') IS NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD KategorieId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'ArbeitsanweisungId') IS NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD ArbeitsanweisungId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'ZeitintervallId') IS NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD ZeitintervallId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'VorlaufTage') IS NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD VorlaufTage INT NOT NULL CONSTRAINT DF_HaushaltObjekt_VorlaufTage DEFAULT (0);
+END;
+
+IF COL_LENGTH('dbo.HaushaltObjekt', 'LetzteAusfuehrungAm') IS NULL
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD LetzteAusfuehrungAm DATE NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.foreign_keys
+    WHERE name = 'FK_HaushaltObjekt_Raum'
+)
+BEGIN
+    ALTER TABLE dbo.HaushaltObjekt
+    ADD CONSTRAINT FK_HaushaltObjekt_Raum
+        FOREIGN KEY (RaumId) REFERENCES dbo.HaushaltRaum(Id);
+END;
+
+IF OBJECT_ID('dbo.HaushaltAufgabe', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.HaushaltAufgabe
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HaushaltAufgabe PRIMARY KEY,
+        ObjektId INT NOT NULL,
+        Titel NVARCHAR(200) NOT NULL,
+        Status NVARCHAR(30) NOT NULL,
+        AktivAb DATE NOT NULL,
+        FaelligAm DATE NOT NULL,
+        ErledigtAm DATE NULL,
+        MicrosoftTaskId NVARCHAR(200) NULL,
+        IstAktiv BIT NOT NULL CONSTRAINT DF_HaushaltAufgabe_IstAktiv DEFAULT (1),
+        ErstelltAm DATETIME2 NOT NULL CONSTRAINT DF_HaushaltAufgabe_ErstelltAm DEFAULT SYSUTCDATETIME(),
+        GeaendertAm DATETIME2 NULL
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.foreign_keys
+    WHERE name = 'FK_HaushaltAufgabe_Objekt'
+)
+BEGIN
+    ALTER TABLE dbo.HaushaltAufgabe
+    ADD CONSTRAINT FK_HaushaltAufgabe_Objekt
+        FOREIGN KEY (ObjektId) REFERENCES dbo.HaushaltObjekt(Id);
 END;
 
 IF NOT EXISTS (
@@ -190,6 +222,17 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX IX_HaushaltObjekt_RaumId
     ON dbo.HaushaltObjekt(RaumId);
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_HaushaltAufgabe_ObjektId'
+      AND object_id = OBJECT_ID('dbo.HaushaltAufgabe')
+)
+BEGIN
+    CREATE INDEX IX_HaushaltAufgabe_ObjektId
+    ON dbo.HaushaltAufgabe(ObjektId);
 END;
 ";
 
@@ -953,24 +996,41 @@ SELECT
     o.Id,
     o.RaumId,
     r.Bezeichnung AS RaumBezeichnung,
+
     o.KategorieId,
     ISNULL(k.Bezeichnung, ISNULL(o.Kategorie, '')) AS KategorieBezeichnung,
     ISNULL(k.IconKey, o.IconKey) AS KategorieIconKey,
+
+    o.ArbeitsanweisungId,
+    ISNULL(a.Bezeichnung, '') AS ArbeitsanweisungBezeichnung,
+    ISNULL(a.Beschreibung, '') AS ArbeitsanweisungBeschreibung,
+
+    o.ZeitintervallId,
+    ISNULL(z.Bezeichnung, '') AS ZeitintervallBezeichnung,
+    z.Tage AS ZeitintervallTage,
+
+    o.VorlaufTage,
+    o.LetzteAusfuehrungAm,
+
     o.Bezeichnung,
     ISNULL(o.Kategorie, '') AS Kategorie,
     o.IconKey,
+
     ISNULL(o.Hersteller, '') AS Hersteller,
     ISNULL(o.Modell, '') AS Modell,
     ISNULL(o.Seriennummer, '') AS Seriennummer,
     o.Kaufdatum,
     o.Kaufpreis,
     ISNULL(o.Bemerkung, '') AS Bemerkung,
+
     o.IstAktiv,
     o.ErstelltAm,
     o.GeaendertAm
 FROM dbo.HaushaltObjekt o
 JOIN dbo.HaushaltRaum r ON r.Id = o.RaumId
 LEFT JOIN dbo.HaushaltObjektKategorie k ON k.Id = o.KategorieId
+LEFT JOIN dbo.HaushaltArbeitsanweisung a ON a.Id = o.ArbeitsanweisungId
+LEFT JOIN dbo.HaushaltZeitintervall z ON z.Id = o.ZeitintervallId
 WHERE o.IstAktiv = 1
 ORDER BY o.Bezeichnung;";
 
@@ -984,21 +1044,36 @@ ORDER BY o.Bezeichnung;";
                     Id = r.GetInt32(0),
                     RaumId = r.GetInt32(1),
                     RaumBezeichnung = r.GetString(2),
+
                     KategorieId = r.IsDBNull(3) ? null : r.GetInt32(3),
                     KategorieBezeichnung = r.GetString(4),
                     KategorieIconKey = r.GetString(5),
-                    Bezeichnung = r.GetString(6),
-                    Kategorie = r.GetString(7),
-                    IconKey = r.GetString(8),
-                    Hersteller = r.GetString(9),
-                    Modell = r.GetString(10),
-                    Seriennummer = r.GetString(11),
-                    Kaufdatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
-                    Kaufpreis = r.IsDBNull(13) ? null : r.GetDecimal(13),
-                    Bemerkung = r.GetString(14),
-                    IstAktiv = r.GetBoolean(15),
-                    ErstelltAm = r.GetDateTime(16),
-                    GeaendertAm = r.IsDBNull(17) ? null : r.GetDateTime(17)
+
+                    ArbeitsanweisungId = r.IsDBNull(6) ? null : r.GetInt32(6),
+                    ArbeitsanweisungBezeichnung = r.GetString(7),
+                    ArbeitsanweisungBeschreibung = r.GetString(8),
+
+                    ZeitintervallId = r.IsDBNull(9) ? null : r.GetInt32(9),
+                    ZeitintervallBezeichnung = r.GetString(10),
+                    ZeitintervallTage = r.IsDBNull(11) ? null : r.GetInt32(11),
+
+                    VorlaufTage = r.GetInt32(12),
+                    LetzteAusfuehrungAm = r.IsDBNull(13) ? null : r.GetDateTime(13),
+
+                    Bezeichnung = r.GetString(14),
+                    Kategorie = r.GetString(15),
+                    IconKey = r.GetString(16),
+
+                    Hersteller = r.GetString(17),
+                    Modell = r.GetString(18),
+                    Seriennummer = r.GetString(19),
+                    Kaufdatum = r.IsDBNull(20) ? null : r.GetDateTime(20),
+                    Kaufpreis = r.IsDBNull(21) ? null : r.GetDecimal(21),
+                    Bemerkung = r.GetString(22),
+
+                    IstAktiv = r.GetBoolean(23),
+                    ErstelltAm = r.GetDateTime(24),
+                    GeaendertAm = r.IsDBNull(25) ? null : r.GetDateTime(25)
                 });
             }
 
@@ -1160,6 +1235,132 @@ WHERE Id = @Id;";
 
             cmd.ExecuteNonQuery();
         }
+
+        public HaushaltAufgabe? HaushaltAktiveAufgabeGetByObjekt(int objektId)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP 1
+    a.Id,
+    a.ObjektId,
+    o.Bezeichnung AS ObjektBezeichnung,
+    a.Titel,
+    a.Status,
+    a.AktivAb,
+    a.FaelligAm,
+    a.ErledigtAm,
+    ISNULL(a.MicrosoftTaskId, '') AS MicrosoftTaskId,
+    a.IstAktiv,
+    a.ErstelltAm,
+    a.GeaendertAm
+FROM dbo.HaushaltAufgabe a
+JOIN dbo.HaushaltObjekt o ON o.Id = a.ObjektId
+WHERE a.ObjektId = @ObjektId
+  AND a.IstAktiv = 1
+  AND a.ErledigtAm IS NULL
+ORDER BY a.FaelligAm;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@ObjektId", objektId);
+
+            using var r = cmd.ExecuteReader();
+
+            if (!r.Read())
+                return null;
+
+            return new HaushaltAufgabe
+            {
+                Id = r.GetInt32(0),
+                ObjektId = r.GetInt32(1),
+                ObjektBezeichnung = r.GetString(2),
+                Titel = r.GetString(3),
+                Status = r.GetString(4),
+                AktivAb = r.GetDateTime(5),
+                FaelligAm = r.GetDateTime(6),
+                ErledigtAm = r.IsDBNull(7) ? null : r.GetDateTime(7),
+                MicrosoftTaskId = r.GetString(8),
+                IstAktiv = r.GetBoolean(9),
+                ErstelltAm = r.GetDateTime(10),
+                GeaendertAm = r.IsDBNull(11) ? null : r.GetDateTime(11)
+            };
+        }
+
+        public int HaushaltAufgabeInsert(HaushaltAufgabe model)
+        {
+            if (model == null)
+                throw new ArgumentNullException(nameof(model));
+
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+INSERT INTO dbo.HaushaltAufgabe
+(
+    ObjektId,
+    Titel,
+    Status,
+    AktivAb,
+    FaelligAm,
+    ErledigtAm,
+    MicrosoftTaskId,
+    IstAktiv
+)
+OUTPUT INSERTED.Id
+VALUES
+(
+    @ObjektId,
+    @Titel,
+    @Status,
+    @AktivAb,
+    @FaelligAm,
+    @ErledigtAm,
+    @MicrosoftTaskId,
+    @IstAktiv
+);";
+
+            using var cmd = new SqlCommand(sql, c);
+
+            cmd.Parameters.AddWithValue("@ObjektId", model.ObjektId);
+            cmd.Parameters.AddWithValue("@Titel", model.Titel.Trim());
+            cmd.Parameters.AddWithValue("@Status", model.Status.Trim());
+            cmd.Parameters.AddWithValue("@AktivAb", model.AktivAb.Date);
+            cmd.Parameters.AddWithValue("@FaelligAm", model.FaelligAm.Date);
+            cmd.Parameters.AddWithValue("@ErledigtAm", model.ErledigtAm.HasValue ? model.ErledigtAm.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@MicrosoftTaskId", string.IsNullOrWhiteSpace(model.MicrosoftTaskId) ? DBNull.Value : model.MicrosoftTaskId.Trim());
+            cmd.Parameters.AddWithValue("@IstAktiv", model.IstAktiv);
+
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public void HaushaltAufgabeErledigen(int aufgabeId, DateTime erledigtAm)
+        {
+            EnsureHaushaltSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.HaushaltAufgabe
+SET
+    Status = 'Erledigt',
+    ErledigtAm = @ErledigtAm,
+    IstAktiv = 0,
+    GeaendertAm = SYSUTCDATETIME()
+WHERE Id = @Id;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Id", aufgabeId);
+            cmd.Parameters.AddWithValue("@ErledigtAm", erledigtAm.Date);
+
+            cmd.ExecuteNonQuery();
+        }
+
 
 
         public void HaushaltObjektDelete(int id)

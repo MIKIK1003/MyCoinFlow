@@ -130,6 +130,7 @@ namespace MyCoinFlow.ViewModels
 
         public ICommand ArbeitsanweisungenVerwaltenCommand { get; }
         public ICommand ZeitintervalleVerwaltenCommand { get; }
+        public ICommand AufgabenAktualisierenCommand { get; }
 
 
 
@@ -208,6 +209,7 @@ namespace MyCoinFlow.ViewModels
             KategorienVerwaltenCommand = new RelayCommand(_ => KategorienVerwalten());
             ArbeitsanweisungenVerwaltenCommand = new RelayCommand(_ => ArbeitsanweisungenVerwalten());
             ZeitintervalleVerwaltenCommand = new RelayCommand(_ => ZeitintervalleVerwalten());
+            AufgabenAktualisierenCommand = new RelayCommand(_ => AufgabenAktualisieren());
 
             _db.EnsureHaushaltSchema();
 
@@ -561,11 +563,37 @@ namespace MyCoinFlow.ViewModels
             if (antwort != MessageBoxResult.Yes)
                 return;
 
-            _db.HaushaltObjektLetzteAusfuehrungSetzen(GeoeffnetesObjekt.Id, DateTime.Today);
+            var heute = DateTime.Today;
+
+            var aktiveAufgabe = _db.HaushaltAktiveAufgabeGetByObjekt(GeoeffnetesObjekt.Id);
+
+            if (aktiveAufgabe != null)
+                _db.HaushaltAufgabeErledigen(aktiveAufgabe.Id, heute);
+
+            _db.HaushaltObjektLetzteAusfuehrungSetzen(GeoeffnetesObjekt.Id, heute);
 
             LadeObjekteFuerRaum(GeoeffneterRaum.Id);
 
             GeoeffnetesObjekt = Objekte.FirstOrDefault(x => x.Id == GeoeffnetesObjekt.Id);
+
+            if (GeoeffnetesObjekt != null)
+            {
+                var objektModel = new HaushaltObjekt
+                {
+                    Id = GeoeffnetesObjekt.Id,
+                    Bezeichnung = GeoeffnetesObjekt.Bezeichnung,
+                    ArbeitsanweisungBezeichnung = GeoeffnetesObjekt.ArbeitsanweisungBezeichnung,
+                    ZeitintervallTage = GeoeffnetesObjekt.ZeitintervallTage,
+                    VorlaufTage = GeoeffnetesObjekt.VorlaufTage,
+                    LetzteAusfuehrungAm = GeoeffnetesObjekt.LetzteAusfuehrungAm
+                };
+
+                var service = new HaushaltAufgabenService(_db);
+                service.AufgabeFuerObjektErzeugenWennNoetig(objektModel);
+            }
+
+            LadeObjekteFuerRaum(GeoeffneterRaum.Id);
+            GeoeffnetesObjekt = Objekte.FirstOrDefault(x => x.Id == GeoeffnetesObjekt?.Id);
 
             AktualisiereAnsicht();
         }
@@ -732,6 +760,25 @@ namespace MyCoinFlow.ViewModels
             };
 
             dlg.ShowDialog();
+        }
+
+        private void AufgabenAktualisieren()
+        {
+            var objekte = _db.HaushaltObjekteGetAll();
+
+            var service = new HaushaltAufgabenService(_db);
+            var erstellt = service.AufgabenFuerAlleObjekteAktualisieren(objekte);
+
+            MessageBox.Show(
+                $"Aufgaben aktualisiert.\n\nNeu erstellt: {erstellt}",
+                "Haushalt Aufgaben",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            if (GeoeffneterRaum != null)
+                LadeObjekteFuerRaum(GeoeffneterRaum.Id);
+
+            AktualisiereAnsicht();
         }
 
         private void AktualisiereAnsicht()
