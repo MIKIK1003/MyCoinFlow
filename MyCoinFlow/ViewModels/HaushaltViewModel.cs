@@ -19,10 +19,14 @@ namespace MyCoinFlow.ViewModels
         private HaushaltRaumTileVm? _geoeffneterRaum;
         private HaushaltObjektTileVm? _selectedObjekt;
         private HaushaltObjektTileVm? _geoeffnetesObjekt;
+        private HaushaltAufgabeTileVm? _selectedAufgabe;
 
         public ObservableCollection<HaushaltStandortAuswahlVm> Standorte { get; } = new();
         public ObservableCollection<HaushaltRaumTileVm> Raeume { get; } = new();
         public ObservableCollection<HaushaltObjektTileVm> Objekte { get; } = new();
+
+        public ObservableCollection<HaushaltAufgabeTileVm> Aufgaben { get; } = new();
+
 
         public HaushaltStandortAuswahlVm? SelectedStandort
         {
@@ -88,24 +92,44 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
+        public HaushaltAufgabeTileVm? SelectedAufgabe
+        {
+            get => _selectedAufgabe;
+            set
+            {
+                _selectedAufgabe = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HatAusgewaehlteAufgabe));
+            }
+        }
+
+
         public string Titel { get; private set; } = "Haushalt";
         public string StatusText { get; private set; } = "";
         public string InhaltsTitel { get; private set; } = "Räume";
 
-        public bool IsRaeumeAnsicht => GeoeffneterRaum == null && GeoeffnetesObjekt == null;
-        public bool IsRaumAnsicht => GeoeffneterRaum != null && GeoeffnetesObjekt == null;
-        public bool IsObjektAnsicht => GeoeffneterRaum != null && GeoeffnetesObjekt != null;
+        public bool IsRaeumeAnsicht => !IsAufgabenAnsicht && GeoeffneterRaum == null && GeoeffnetesObjekt == null;
+        public bool IsRaumAnsicht => !IsAufgabenAnsicht && GeoeffneterRaum != null && GeoeffnetesObjekt == null;
+        public bool IsObjektAnsicht => !IsAufgabenAnsicht && GeoeffneterRaum != null && GeoeffnetesObjekt != null;
+
+        public bool IsAufgabenAnsicht { get; private set; }
+        public bool KannZurueckZuRaeumen => IsRaumAnsicht || IsObjektAnsicht || IsAufgabenAnsicht;
 
         public Visibility RaeumeVisibility => IsRaeumeAnsicht ? Visibility.Visible : Visibility.Collapsed;
         public Visibility RaumVisibility => IsRaumAnsicht ? Visibility.Visible : Visibility.Collapsed;
         public Visibility ObjektVisibility => IsObjektAnsicht ? Visibility.Visible : Visibility.Collapsed;
 
+        public Visibility AufgabenVisibility => IsAufgabenAnsicht ? Visibility.Visible : Visibility.Collapsed;
+
         public bool HatEchtenStandort => SelectedStandort != null && SelectedStandort.Id > 0;
         public bool HatAusgewaehltenRaum => SelectedRaum != null;
         public bool HatAusgewaehltesObjekt => SelectedObjekt != null;
+        public bool HatAusgewaehlteAufgabe => SelectedAufgabe != null;
+
 
         public ICommand RaumMarkierenCommand { get; }
         public ICommand RaumOeffnenCommand { get; }
+
 
         public ICommand ObjektMarkierenCommand { get; }
         public ICommand ObjektOeffnenCommand { get; }
@@ -132,6 +156,10 @@ namespace MyCoinFlow.ViewModels
         public ICommand ZeitintervalleVerwaltenCommand { get; }
         public ICommand AufgabenAktualisierenCommand { get; }
 
+        public ICommand AufgabenAnzeigenCommand { get; }
+        public ICommand AufgabeErledigenCommand { get; }
+
+
 
 
         public HaushaltViewModel()
@@ -150,6 +178,8 @@ namespace MyCoinFlow.ViewModels
             {
                 if (p is not HaushaltRaumTileVm raum)
                     return;
+
+                IsAufgabenAnsicht = false;
 
                 GeoeffneterRaum = raum;
                 SelectedObjekt = null;
@@ -172,17 +202,23 @@ namespace MyCoinFlow.ViewModels
                 if (p is not HaushaltObjektTileVm objekt)
                     return;
 
-                GeoeffnetesObjekt = objekt;
+                IsAufgabenAnsicht = false;
 
+                GeoeffnetesObjekt = objekt;
                 AktualisiereAnsicht();
             });
 
             ZurueckZuRaeumenCommand = new RelayCommand(_ =>
             {
+                IsAufgabenAnsicht = false;
+
+                SelectedAufgabe = null;
                 SelectedObjekt = null;
                 GeoeffnetesObjekt = null;
                 GeoeffneterRaum = null;
+
                 LadeRaeume();
+                AktualisiereAnsicht();
             });
 
             ZurueckZumRaumCommand = new RelayCommand(_ =>
@@ -210,6 +246,10 @@ namespace MyCoinFlow.ViewModels
             ArbeitsanweisungenVerwaltenCommand = new RelayCommand(_ => ArbeitsanweisungenVerwalten());
             ZeitintervalleVerwaltenCommand = new RelayCommand(_ => ZeitintervalleVerwalten());
             AufgabenAktualisierenCommand = new RelayCommand(_ => AufgabenAktualisieren());
+
+            AufgabenAnzeigenCommand = new RelayCommand(_ => AufgabenAnzeigen());
+            AufgabeErledigenCommand = new RelayCommand(_ => AufgabeErledigen());
+
 
             _db.EnsureHaushaltSchema();
 
@@ -781,8 +821,109 @@ namespace MyCoinFlow.ViewModels
             AktualisiereAnsicht();
         }
 
+        private void AufgabenAnzeigen()
+        {
+            SelectedRaum = null;
+            GeoeffneterRaum = null;
+            SelectedObjekt = null;
+            GeoeffnetesObjekt = null;
+
+            LadeAufgaben();
+
+            IsAufgabenAnsicht = true;
+            AktualisiereAnsicht();
+        }
+
+        private void AufgabeErledigen()
+        {
+            if (!IsAufgabenAnsicht || SelectedAufgabe == null)
+            {
+                MessageBox.Show(
+                    "Bitte zuerst eine Aufgabe auswählen.",
+                    "Aufgabe erledigen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var antwort = MessageBox.Show(
+                $"Soll die Aufgabe \"{SelectedAufgabe.Titel}\" als heute erledigt markiert werden?",
+                "Aufgabe erledigen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (antwort != MessageBoxResult.Yes)
+                return;
+
+            var heute = DateTime.Today;
+
+            _db.HaushaltAufgabeErledigen(SelectedAufgabe.Id, heute);
+            _db.HaushaltObjektLetzteAusfuehrungSetzen(SelectedAufgabe.ObjektId, heute);
+
+            SelectedAufgabe = null;
+
+            AufgabenAktualisieren();
+            LadeAufgaben();
+
+            AktualisiereAnsicht();
+        }
+
+        private void LadeAufgaben()
+        {
+            Aufgaben.Clear();
+
+            foreach (var a in _db.HaushaltOffeneAufgabenGetAll())
+            {
+                Aufgaben.Add(new HaushaltAufgabeTileVm
+                {
+                    Id = a.Id,
+                    ObjektId = a.ObjektId,
+                    Titel = a.Titel,
+                    Status = a.Status,
+                    AktivAb = a.AktivAb,
+                    FaelligAm = a.FaelligAm
+                });
+            }
+        }
+
+        private void NotifyAnsicht()
+        {
+            OnPropertyChanged(nameof(Titel));
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(InhaltsTitel));
+
+            OnPropertyChanged(nameof(IsRaeumeAnsicht));
+            OnPropertyChanged(nameof(IsRaumAnsicht));
+            OnPropertyChanged(nameof(IsObjektAnsicht));
+            OnPropertyChanged(nameof(IsAufgabenAnsicht));
+
+            OnPropertyChanged(nameof(RaeumeVisibility));
+            OnPropertyChanged(nameof(RaumVisibility));
+            OnPropertyChanged(nameof(ObjektVisibility));
+            OnPropertyChanged(nameof(AufgabenVisibility));
+
+            OnPropertyChanged(nameof(HatEchtenStandort));
+            OnPropertyChanged(nameof(HatAusgewaehltenRaum));
+            OnPropertyChanged(nameof(HatAusgewaehltesObjekt));
+            OnPropertyChanged(nameof(HatAusgewaehlteAufgabe));
+            OnPropertyChanged(nameof(KannZurueckZuRaeumen));
+        }
+
+
         private void AktualisiereAnsicht()
         {
+            if (IsAufgabenAnsicht)
+            {
+                Titel = "Haushalt > Aufgaben";
+                InhaltsTitel = "Offene Aufgaben";
+                StatusText = Aufgaben.Any()
+                    ? "Offene Aufgaben nach Fälligkeit sortiert."
+                    : "Keine offenen Aufgaben vorhanden.";
+
+                NotifyAnsicht();
+                return;
+            }
+
             if (IsRaeumeAnsicht)
             {
                 Titel = "Haushalt";
@@ -815,21 +956,10 @@ namespace MyCoinFlow.ViewModels
             {
                 Titel = $"Haushalt > {GeoeffneterRaum!.StandortBezeichnung} > {GeoeffneterRaum.Bezeichnung} > {GeoeffnetesObjekt!.Bezeichnung}";
                 InhaltsTitel = GeoeffnetesObjekt.Bezeichnung;
-                StatusText = "Objekt-Detailansicht mit späteren Eigenschaften und Arbeitsanweisungen.";
+                StatusText = "Objekt-Detailansicht mit Aufgabenbasis.";
             }
 
-            OnPropertyChanged(nameof(Titel));
-            OnPropertyChanged(nameof(StatusText));
-            OnPropertyChanged(nameof(InhaltsTitel));
-            OnPropertyChanged(nameof(IsRaeumeAnsicht));
-            OnPropertyChanged(nameof(IsRaumAnsicht));
-            OnPropertyChanged(nameof(IsObjektAnsicht));
-            OnPropertyChanged(nameof(RaeumeVisibility));
-            OnPropertyChanged(nameof(RaumVisibility));
-            OnPropertyChanged(nameof(ObjektVisibility));
-            OnPropertyChanged(nameof(HatEchtenStandort));
-            OnPropertyChanged(nameof(HatAusgewaehltenRaum));
-            OnPropertyChanged(nameof(HatAusgewaehltesObjekt));
+            NotifyAnsicht();
         }
     }
 
@@ -976,7 +1106,27 @@ namespace MyCoinFlow.ViewModels
         public bool IsSelected
         {
             get => _isSelected;
-            set { _isSelected = value; OnPropertyChanged(); }
+            set { _isSelected = value; OnPropertyChanged();
+            }
+
         }
+     
+        
     }
+
+    public class HaushaltAufgabeTileVm
+    {
+        public int Id { get; set; }
+        public int ObjektId { get; set; }
+
+        public string Titel { get; set; } = "";
+        public string Status { get; set; } = "";
+
+        public DateTime AktivAb { get; set; }
+        public DateTime FaelligAm { get; set; }
+
+        public string AktivAbText => AktivAb.ToString("dd.MM.yyyy");
+        public string FaelligAmText => FaelligAm.ToString("dd.MM.yyyy");
+    }
+
 }

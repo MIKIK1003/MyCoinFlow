@@ -1289,6 +1289,60 @@ ORDER BY a.FaelligAm;";
             };
         }
 
+        public List<HaushaltAufgabe> HaushaltOffeneAufgabenGetAll()
+        {
+            EnsureHaushaltSchema();
+
+            var list = new List<HaushaltAufgabe>();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    a.Id,
+    a.ObjektId,
+    o.Bezeichnung AS ObjektBezeichnung,
+    a.Titel,
+    a.Status,
+    a.AktivAb,
+    a.FaelligAm,
+    a.ErledigtAm,
+    ISNULL(a.MicrosoftTaskId, '') AS MicrosoftTaskId,
+    a.IstAktiv,
+    a.ErstelltAm,
+    a.GeaendertAm
+FROM dbo.HaushaltAufgabe a
+JOIN dbo.HaushaltObjekt o ON o.Id = a.ObjektId
+WHERE a.IstAktiv = 1
+  AND a.ErledigtAm IS NULL
+ORDER BY a.FaelligAm, a.AktivAb, a.Titel;";
+
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new HaushaltAufgabe
+                {
+                    Id = r.GetInt32(0),
+                    ObjektId = r.GetInt32(1),
+                    ObjektBezeichnung = r.GetString(2),
+                    Titel = r.GetString(3),
+                    Status = r.GetString(4),
+                    AktivAb = r.GetDateTime(5),
+                    FaelligAm = r.GetDateTime(6),
+                    ErledigtAm = r.IsDBNull(7) ? null : r.GetDateTime(7),
+                    MicrosoftTaskId = r.GetString(8),
+                    IstAktiv = r.GetBoolean(9),
+                    ErstelltAm = r.GetDateTime(10),
+                    GeaendertAm = r.IsDBNull(11) ? null : r.GetDateTime(11)
+                });
+            }
+
+            return list;
+        }
+
         public int HaushaltAufgabeInsert(HaushaltAufgabe model)
         {
             if (model == null)
