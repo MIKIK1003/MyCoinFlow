@@ -492,32 +492,48 @@
                                    Opacity="0.8"
                                    Margin="0,6,0,0"/>
                                     </StackPanel>
-
                                     <Grid Grid.Row="2"
-                          Margin="0,10,0,0">
+      Margin="0,10,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="Aktiv ab"
-                                       FontSize="11"
-                                       Opacity="0.7"/>
+                   FontSize="11"
+                   Opacity="0.7"/>
                                             <TextBlock Text="{Binding AktivAbText}"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"/>
+                   FontSize="13"
+                   FontWeight="SemiBold"/>
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="Fällig"
-                                       FontSize="11"
-                                       Opacity="0.7"/>
+                   FontSize="11"
+                   Opacity="0.7"/>
                                             <TextBlock Text="{Binding FaelligAmText}"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"/>
+                   FontSize="13"
+                   FontWeight="SemiBold"/>
                                         </StackPanel>
+
+                                        <Button Grid.Column="2"
+            Width="36"
+            Height="36"
+            Padding="0"
+            ToolTip="Aufgabe erledigen"
+            Command="{Binding DataContext.AufgabeDirektErledigenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+            CommandParameter="{Binding}">
+                                            <materialDesign:PackIcon Kind="Check"
+                                 Width="20"
+                                 Height="20"/>
+                                        </Button>
                                     </Grid>
+
+
+
+
                                 </Grid>
                             </Button>
                         </DataTemplate>

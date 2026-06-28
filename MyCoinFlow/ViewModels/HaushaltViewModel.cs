@@ -158,6 +158,7 @@ namespace MyCoinFlow.ViewModels
 
         public ICommand AufgabenAnzeigenCommand { get; }
         public ICommand AufgabeErledigenCommand { get; }
+        public ICommand AufgabeDirektErledigenCommand { get; }
         public ICommand AufgabeMarkierenCommand { get; }
 
 
@@ -250,6 +251,15 @@ namespace MyCoinFlow.ViewModels
 
             AufgabenAnzeigenCommand = new RelayCommand(_ => AufgabenAnzeigen());
             AufgabeErledigenCommand = new RelayCommand(_ => AufgabeErledigen());
+            AufgabeDirektErledigenCommand = new RelayCommand(p =>
+            {
+                if (p is not HaushaltAufgabeTileVm aufgabe)
+                    return;
+
+                SelectedAufgabe = aufgabe;
+                AktualisiereAufgabeAuswahl();
+                AufgabeErledigen();
+            });
 
             AufgabeMarkierenCommand = new RelayCommand(p =>
             {
