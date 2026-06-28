@@ -158,6 +158,7 @@ namespace MyCoinFlow.ViewModels
 
         public ICommand AufgabenAnzeigenCommand { get; }
         public ICommand AufgabeErledigenCommand { get; }
+        public ICommand AufgabeMarkierenCommand { get; }
 
 
 
@@ -249,6 +250,18 @@ namespace MyCoinFlow.ViewModels
 
             AufgabenAnzeigenCommand = new RelayCommand(_ => AufgabenAnzeigen());
             AufgabeErledigenCommand = new RelayCommand(_ => AufgabeErledigen());
+
+            AufgabeMarkierenCommand = new RelayCommand(p =>
+            {
+                if (p is not HaushaltAufgabeTileVm aufgabe)
+                    return;
+
+                SelectedAufgabe = SelectedAufgabe != null && SelectedAufgabe.Id == aufgabe.Id
+                    ? null
+                    : aufgabe;
+
+                AktualisiereAufgabeAuswahl();
+            });
 
 
             _db.EnsureHaushaltSchema();
@@ -772,6 +785,14 @@ namespace MyCoinFlow.ViewModels
             OnPropertyChanged(nameof(HatAusgewaehltesObjekt));
         }
 
+        private void AktualisiereAufgabeAuswahl()
+        {
+            foreach (var aufgabe in Aufgaben)
+                aufgabe.IsSelected = SelectedAufgabe != null && aufgabe.Id == SelectedAufgabe.Id;
+
+            OnPropertyChanged(nameof(HatAusgewaehlteAufgabe));
+        }
+
         private void KategorienVerwalten()
         {
             var dlg = new HaushaltObjektKategorieVerwaltungDialog
@@ -870,6 +891,8 @@ namespace MyCoinFlow.ViewModels
 
         private void LadeAufgaben()
         {
+            var selectedAufgabeId = SelectedAufgabe?.Id ?? 0;
+
             Aufgaben.Clear();
 
             foreach (var a in _db.HaushaltOffeneAufgabenGetAll())
@@ -881,9 +904,13 @@ namespace MyCoinFlow.ViewModels
                     Titel = a.Titel,
                     Status = a.Status,
                     AktivAb = a.AktivAb,
-                    FaelligAm = a.FaelligAm
+                    FaelligAm = a.FaelligAm,
+                    IsSelected = a.Id == selectedAufgabeId
                 });
             }
+
+            if (selectedAufgabeId > 0)
+                SelectedAufgabe = Aufgaben.FirstOrDefault(x => x.Id == selectedAufgabeId);
         }
 
         private void NotifyAnsicht()
@@ -1114,8 +1141,10 @@ namespace MyCoinFlow.ViewModels
         
     }
 
-    public class HaushaltAufgabeTileVm
+    public class HaushaltAufgabeTileVm : BaseViewModel
     {
+        private bool _isSelected;
+
         public int Id { get; set; }
         public int ObjektId { get; set; }
 
@@ -1127,6 +1156,65 @@ namespace MyCoinFlow.ViewModels
 
         public string AktivAbText => AktivAb.ToString("dd.MM.yyyy");
         public string FaelligAmText => FaelligAm.ToString("dd.MM.yyyy");
+
+        public int RestTage => (FaelligAm.Date - DateTime.Today).Days;
+
+        public string StatusAmpelText
+        {
+            get
+            {
+                if (DateTime.Today > FaelligAm.Date)
+                    return "Überfällig";
+
+                if (RestTage <= 2)
+                    return "Bald fällig";
+
+                return "Aktiv";
+            }
+        }
+
+        public string StatusIcon => "Circle";
+
+        public Brush StatusBrush
+        {
+            get
+            {
+                if (DateTime.Today > FaelligAm.Date)
+                    return Brushes.IndianRed;
+
+                if (RestTage <= 2)
+                    return Brushes.DarkOrange;
+
+                return Brushes.SeaGreen;
+            }
+        }
+
+        public string RestTageText
+        {
+            get
+            {
+                if (DateTime.Today > FaelligAm.Date)
+                    return $"Überfällig seit {Math.Abs(RestTage)} Tag(en)";
+
+                if (RestTage == 0)
+                    return "Heute fällig";
+
+                if (RestTage == 1)
+                    return "Morgen fällig";
+
+                return $"Noch {RestTage} Tage";
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
 }

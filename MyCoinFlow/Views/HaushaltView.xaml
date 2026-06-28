@@ -428,19 +428,101 @@
                     </StackPanel>
                 </Border>
 
-                <DataGrid ItemsSource="{Binding Aufgaben}"
-                          SelectedItem="{Binding SelectedAufgabe}"
-                          Visibility="{Binding AufgabenVisibility}"
-                          AutoGenerateColumns="False"
-                          IsReadOnly="True"
-                          CanUserAddRows="False">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Fällig am" Binding="{Binding FaelligAmText}" Width="120"/>
-                        <DataGridTextColumn Header="Aktiv ab" Binding="{Binding AktivAbText}" Width="120"/>
-                        <DataGridTextColumn Header="Titel" Binding="{Binding Titel}" Width="*"/>
-                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                <ItemsControl ItemsSource="{Binding Aufgaben}"
+              Visibility="{Binding AufgabenVisibility}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Width="300"
+                    Height="160"
+                    Margin="0,0,14,14"
+                    Command="{Binding DataContext.AufgabeMarkierenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    CommandParameter="{Binding}">
+
+                                <Button.Style>
+                                    <Style TargetType="Button"
+                           BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                        <Setter Property="Background" Value="#F2F2F2"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}"
+                                         Value="True">
+                                                <Setter Property="Opacity"
+                                        Value="0.72"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0"
+                                Orientation="Horizontal"
+                                Margin="0,0,0,10">
+                                        <materialDesign:PackIcon Kind="{Binding StatusIcon}"
+                                                 Width="18"
+                                                 Height="18"
+                                                 Foreground="{Binding StatusBrush}"
+                                                 Margin="0,2,8,0"/>
+
+                                        <TextBlock Text="{Binding StatusAmpelText}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="1">
+                                        <TextBlock Text="{Binding Titel}"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+
+                                        <TextBlock Text="{Binding RestTageText}"
+                                   FontSize="13"
+                                   Opacity="0.8"
+                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+
+                                    <Grid Grid.Row="2"
+                          Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Aktiv ab"
+                                       FontSize="11"
+                                       Opacity="0.7"/>
+                                            <TextBlock Text="{Binding AktivAbText}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Fällig"
+                                       FontSize="11"
+                                       Opacity="0.7"/>
+                                            <TextBlock Text="{Binding FaelligAmText}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
             </Grid>
         </Grid>
