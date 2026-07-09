@@ -1,0 +1,74 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.DmsDocumentDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Dokument"
+                 Width="520"
+                 Height="420"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="HeaderText"
+                   Text="Dokument"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
+
+        <StackPanel Grid.Row="2">
+
+            <StackPanel x:Name="DateiPanel" Margin="0,8,0,14">
+                <TextBlock Text="Datei" Margin="0,0,0,6"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Right"
+                            Style="{StaticResource IconTextButton}"
+                            Tag="FileOutline"
+                            Content="Datei wählen"
+                            Margin="8,0,0,0"
+                            Click="DateiWaehlen_Click"/>
+                    <TextBox x:Name="DateiPfadBox"
+                             IsReadOnly="True"
+                             MinHeight="40"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Keine Datei ausgewählt"/>
+                </DockPanel>
+            </StackPanel>
+
+            <TextBox x:Name="TitelBox"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Titel (optional, sonst Dateiname)"
+                     Margin="0,0,0,14"/>
+
+            <ComboBox x:Name="KategorieBox"
+                      IsEditable="True"
+                      MinHeight="44"
+                      Padding="8,6,8,6"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Kategorie (frei wählbar, z.B. Versicherung, Vertrag)"
+                      Margin="0,0,0,14"/>
+
+        </StackPanel>
+
+        <DockPanel Grid.Row="4" LastChildFill="False">
+            <Button Content="Abbrechen"
+                    Width="120"
+                    Margin="0,0,8,0"
+                    Click="Abbrechen_Click"/>
+
+            <Button Content="Speichern"
+                    Width="120"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Click="Speichern_Click"/>
+        </DockPanel>
+    </Grid>
+</base:BaseWindow>

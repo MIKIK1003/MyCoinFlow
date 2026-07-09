@@ -1,0 +1,111 @@
+<UserControl x:Class="MyCoinFlow.Views.DmsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!-- Sidebar | Divider | Suchleiste + Tabelle -->
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ================== SIDEBAR ================== -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <StackPanel>
+                <TextBlock Text="DMS"
+                           FontSize="18" Margin="0,0,0,12"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Upload"
+                        Content="Dokument hochladen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding HochladenCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="FileEye"
+                        Content="Öffnen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding OeffnenCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Pencil"
+                        Content="Bearbeiten"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding BearbeitenCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton.Danger}"
+                        Tag="Delete"
+                        Content="Löschen"
+                        MinHeight="40" Margin="0,0,0,16"
+                        Command="{Binding LoeschenCommand}"/>
+
+                <TextBlock Text="Kategorie"
+                           Margin="0,0,0,6"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <ComboBox ItemsSource="{Binding Kategorien}"
+                          SelectedItem="{Binding KategorieFilter}"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          MinHeight="40"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ================== INHALT ================== -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="12"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" LastChildFill="True">
+                <Button DockPanel.Dock="Right"
+                        Style="{StaticResource IconTextButton}"
+                        Tag="Magnify"
+                        Content="Suchen"
+                        Margin="8,0,0,0"
+                        Command="{Binding SuchenCommand}"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Volltextsuche (Dateiname, Titel, Kategorie, Inhalt)"
+                         MinHeight="40">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding SuchenCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+            </DockPanel>
+
+            <DataGrid Grid.Row="2"
+                      ItemsSource="{Binding Dokumente}"
+                      SelectedItem="{Binding AusgewaehltesDokument}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True"
+                      materialDesign:DataGridAssist.CellPadding="8"
+                      materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                      RowHeaderWidth="0"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="{x:Null}">
+
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Titel / Datei" Binding="{Binding TitelAnzeige}" Width="*"/>
+                    <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="160"/>
+                    <DataGridTextColumn Header="Verknüpft mit" Binding="{Binding VerknuepftMitAnzeige}" Width="160"/>
+                    <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="90"/>
+                    <DataGridTextColumn Header="Datum" Binding="{Binding ImportedAtUtc, StringFormat=dd.MM.yyyy}" Width="100"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="90"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</UserControl>

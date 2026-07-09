@@ -4426,6 +4426,72 @@ END;
             using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
             cmd.ExecuteNonQuery();
+
+            // =========================================================
+            // NEU (DMS): dbo.Attachment generischer machen
+            // - EntityType/EntityId: künftige Verknüpfung mit Adressen/
+            //   Liegenschaften/STWE/Wealth statt nur Transaktionen
+            // - Titel/Kategorie: für freistehende DMS-Dokumente
+            // - TransaktionId nullable: freistehende Dokumente haben keine
+            // =========================================================
+            // Schritt 1: Spalten anlegen / TransaktionId nullable machen.
+            // Muss als EIGENER Batch laufen, sonst prüft SQL Server die
+            // untenstehenden Statements (die die neuen Spalten referenzieren)
+            // bereits beim Parsen des Batches, bevor die Spalten existieren
+            // ("Invalid column name").
+            var dmsSchemaSql = @"
+IF COL_LENGTH('dbo.Attachment', 'EntityType') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD EntityType NVARCHAR(32) NULL;
+END;
+
+IF COL_LENGTH('dbo.Attachment', 'EntityId') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD EntityId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.Attachment', 'Titel') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD Titel NVARCHAR(200) NULL;
+END;
+
+IF COL_LENGTH('dbo.Attachment', 'Kategorie') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD Kategorie NVARCHAR(100) NULL;
+END;
+
+IF EXISTS (
+    SELECT 1 FROM sys.columns c
+    JOIN sys.tables t ON t.object_id = c.object_id
+    WHERE t.name = 'Attachment' AND c.name = 'TransaktionId' AND c.is_nullable = 0
+)
+BEGIN
+    ALTER TABLE dbo.Attachment ALTER COLUMN TransaktionId INT NULL;
+END;
+";
+            using (var dmsSchemaCmd = conn.CreateCommand())
+            {
+                dmsSchemaCmd.CommandText = dmsSchemaSql;
+                dmsSchemaCmd.ExecuteNonQuery();
+            }
+
+            // Schritt 2: jetzt existieren die Spalten wirklich -> Backfill + Index
+            // dürfen (in einem eigenen, zweiten Batch) darauf zugreifen.
+            var dmsDataSql = @"
+UPDATE dbo.Attachment
+SET EntityType = 'Transaktion', EntityId = TransaktionId
+WHERE EntityType IS NULL AND TransaktionId IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Attachment_EntityType_EntityId' AND object_id = OBJECT_ID('dbo.Attachment'))
+BEGIN
+    CREATE INDEX IX_Attachment_EntityType_EntityId ON dbo.Attachment(EntityType, EntityId);
+END;
+";
+            using (var dmsDataCmd = conn.CreateCommand())
+            {
+                dmsDataCmd.CommandText = dmsDataSql;
+                dmsDataCmd.ExecuteNonQuery();
+            }
         }
 
         /// <summary>
@@ -4719,25 +4785,122 @@ END;
         /// <summary>
         /// Legt einen Attachment-Datensatz an. Gibt die neue Id zurück.
         /// </summary>
-        public int SaveAttachment(int transaktionId, string fileName, string? originalName, string folderRel, long? sizeBytes, string? ocrStatus)
+        public int SaveAttachment(int? transaktionId, string fileName, string? originalName, string folderRel, long? sizeBytes, string? ocrStatus,
+            string? entityType = null, int? entityId = null, string? titel = null, string? kategorie = null)
         {
+            // Rückwärtskompatibel: bisherige Aufrufer übergeben nur transaktionId,
+            // EntityType/EntityId werden dann automatisch daraus abgeleitet.
+            if (entityType == null && entityId == null && transaktionId.HasValue)
+            {
+                entityType = "Transaktion";
+                entityId = transaktionId;
+            }
+
             using var c = CreateConnection();
             c.Open();
             const string sql = @"
-INSERT INTO dbo.Attachment (TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, OcrStatus)
-VALUES (@t, @f, @o, @folder, @sz, @ocr);
+INSERT INTO dbo.Attachment (TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, OcrStatus, EntityType, EntityId, Titel, Kategorie)
+VALUES (@t, @f, @o, @folder, @sz, @ocr, @et, @eid, @titel, @kat);
 SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
             using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@t", transaktionId);
+            cmd.Parameters.AddWithValue("@t", (object?)transaktionId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@f", fileName);
             cmd.Parameters.AddWithValue("@o", (object?)originalName ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@folder", folderRel);
             cmd.Parameters.AddWithValue("@sz", (object?)sizeBytes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@ocr", (object?)ocrStatus ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@et", (object?)entityType ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@eid", (object?)entityId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@titel", (object?)titel ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@kat", (object?)kategorie ?? DBNull.Value);
 
             var idObj = cmd.ExecuteScalar();
             return (idObj is int i) ? i : Convert.ToInt32(idObj);
+        }
+
+        /// <summary>
+        /// DMS: liefert alle Dokumente (transaktionsgebunden + freistehend), optional gefiltert
+        /// nach Volltext (Dateiname/Titel/Kategorie/OCR-Text) und/oder Kategorie.
+        /// </summary>
+        public List<DmsDocument> LoadAllDocuments(string? searchText, string? kategorie)
+        {
+            var list = new List<DmsDocument>();
+            using var c = CreateConnection();
+            c.Open();
+
+            var sql = @"
+SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
+       a.FileName, a.OriginalName, a.FolderRel, a.SizeBytes, a.ImportedAtUtc, a.OcrStatus
+FROM dbo.Attachment a
+LEFT JOIN dbo.AttachmentText t ON t.AttachmentId = a.Id
+WHERE (@q IS NULL OR
+       a.FileName LIKE '%' + @q + '%' OR
+       a.Titel LIKE '%' + @q + '%' OR
+       a.Kategorie LIKE '%' + @q + '%' OR
+       t.[Text] LIKE '%' + @q + '%')
+  AND (@kat IS NULL OR a.Kategorie = @kat)
+ORDER BY a.ImportedAtUtc DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@q", string.IsNullOrWhiteSpace(searchText) ? DBNull.Value : (object)searchText.Trim());
+            cmd.Parameters.AddWithValue("@kat", string.IsNullOrWhiteSpace(kategorie) ? DBNull.Value : (object)kategorie.Trim());
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var transaktionId = r.IsDBNull(1) ? (int?)null : r.GetInt32(1);
+                var entityType = r.IsDBNull(2) ? null : r.GetString(2);
+                var entityId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
+
+                list.Add(new DmsDocument
+                {
+                    Id = r.GetInt32(0),
+                    TransaktionId = transaktionId,
+                    EntityType = entityType,
+                    EntityId = entityId,
+                    Titel = r.IsDBNull(4) ? null : r.GetString(4),
+                    Kategorie = r.IsDBNull(5) ? null : r.GetString(5),
+                    FileName = r.GetString(6),
+                    OriginalName = r.IsDBNull(7) ? null : r.GetString(7),
+                    FolderRel = r.GetString(8),
+                    SizeBytes = r.IsDBNull(9) ? (long?)null : r.GetInt64(9),
+                    ImportedAtUtc = r.GetDateTime(10),
+                    OcrStatus = r.IsDBNull(11) ? null : r.GetString(11)
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// DMS: aktualisiert Titel/Kategorie eines Dokuments (Datei bleibt unverändert).
+        /// </summary>
+        public void UpdateAttachmentMeta(int attachmentId, string? titel, string? kategorie)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET Titel = @titel, Kategorie = @kat WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@titel", (object?)titel ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@kat", (object?)kategorie ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: liefert alle bisher verwendeten Kategorien (für Vorschlagsliste im Upload-Dialog).
+        /// </summary>
+        public List<string> GetDistinctKategorien()
+        {
+            var list = new List<string>();
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT DISTINCT Kategorie FROM dbo.Attachment WHERE Kategorie IS NOT NULL AND Kategorie <> '' ORDER BY Kategorie";
+            using var cmd = new SqlCommand(sql, c);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(r.GetString(0));
+            return list;
         }
 
         /// <summary>

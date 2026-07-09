@@ -89,6 +89,7 @@ Console.WriteLine("Finanzen: immer aktiv");
 var property = ReadYesNo("Immobilien aktivieren?", defaultYes: true);
 var wealth = ReadYesNo("Wealth aktivieren?", defaultYes: false);
 var home = ReadYesNo("Haushalt aktivieren?", defaultYes: false);
+var dms = ReadYesNo("DMS aktivieren?", defaultYes: false);
 
 var expiresUtc = ReadOptionalUtcDate("Ablaufdatum (UTC, YYYY-MM-DD)");
 
@@ -98,7 +99,8 @@ var payload = license.GenerateModuleLicense(
     property: property,
     wealth: wealth,
     home: home,
-    expiresUtc: expiresUtc);
+    expiresUtc: expiresUtc,
+    dms: dms);
 
 var outDir = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
@@ -127,6 +129,7 @@ Console.WriteLine($"Finanzen:   aktiv");
 Console.WriteLine($"Immobilien: {(payload.Property ? "aktiv" : "nicht aktiv")}");
 Console.WriteLine($"Wealth:     {(payload.Wealth ? "aktiv" : "nicht aktiv")}");
 Console.WriteLine($"Haushalt:   {(payload.Home ? "aktiv" : "nicht aktiv")}");
+Console.WriteLine($"DMS:        {(payload.Dms ? "aktiv" : "nicht aktiv")}");
 
 Console.WriteLine();
 Console.WriteLine("→ Diese JSON-Datei in MyCoinFlow unter Einstellungen → Lizenz importieren.");

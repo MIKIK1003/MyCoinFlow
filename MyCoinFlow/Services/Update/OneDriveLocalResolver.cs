@@ -48,7 +48,7 @@ namespace MyCoinFlow.Services.Update
             return File.Exists(p) ? p : null;
         }
 
-        private static string? GetOneDriveRoot()
+        public static string? GetOneDriveRoot()
         {
             // gängige Variablen
             var c = Environment.GetEnvironmentVariable("OneDrive");

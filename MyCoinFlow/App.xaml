@@ -50,6 +50,10 @@
                 <views:HaushaltView />
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type vm:DmsViewModel}">
+                <views:DmsView />
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
             </DataTemplate>

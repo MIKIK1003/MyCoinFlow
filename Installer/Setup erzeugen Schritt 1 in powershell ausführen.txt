@@ -1,4 +1,0 @@
-dotnet publish C:\Dev\MyCoinFlow\MyCoinFlow\MyCoinFlow.csproj `
-  -c Release -r win-x64 --self-contained true `
-  -o C:\installer\publish\win-x64
-

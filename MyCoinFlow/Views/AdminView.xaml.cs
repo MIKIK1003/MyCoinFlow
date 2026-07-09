@@ -1010,7 +1010,8 @@ ORDER BY name;";
                         $"✓ Finanzen: aktiv\n" +
                         $"{(AppModules.IsPropertyEnabled ? "✓" : "–")} Immobilien: {(AppModules.IsPropertyEnabled ? "aktiv" : "nicht aktiv")}\n" +
                         $"{(AppModules.IsWealthEnabled ? "✓" : "–")} Wealth: {(AppModules.IsWealthEnabled ? "aktiv" : "nicht aktiv")}\n" +
-                        $"{(AppModules.IsHomeEnabled ? "✓" : "–")} Haushalt: {(AppModules.IsHomeEnabled ? "aktiv" : "nicht aktiv")}";
+                        $"{(AppModules.IsHomeEnabled ? "✓" : "–")} Haushalt: {(AppModules.IsHomeEnabled ? "aktiv" : "nicht aktiv")}\n" +
+                        $"{(AppModules.IsDmsEnabled ? "✓" : "–")} DMS: {(AppModules.IsDmsEnabled ? "aktiv" : "nicht aktiv")}";
                 }
             }
             catch
@@ -1221,6 +1222,7 @@ ORDER BY name;";
 
         private void Paths_CreateFolder_Click(object sender, RoutedEventArgs e) => GetPathsView()?.CreateFolder_Click(sender, e);
         private void Paths_OpenExplorer_Click(object sender, RoutedEventArgs e) => GetPathsView()?.OpenInExplorer_Click(sender, e);
+        private void Paths_SuggestOneDrive_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SuggestOneDriveFolder_Click(sender, e);
         private void Paths_Save_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Save_Click(sender, e);
         private void Paths_BrowseTesseract_Click(object sender, RoutedEventArgs e) => GetPathsView()?.BrowseTesseract_Click(sender, e);
         private void Paths_SaveOcr_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SaveOcr_Click(sender, e);

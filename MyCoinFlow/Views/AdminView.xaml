@@ -320,6 +320,13 @@
                                             Click="Paths_OpenExplorer_Click"/>
 
                                     <Button Style="{StaticResource IconTextButton}"
+                                            Tag="Cloud"
+                                            Content="OneDrive-Ordner vorschlagen"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"
+                                            Click="Paths_SuggestOneDrive_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
                                             Tag="ContentSave"
                                             Content="Speichern"
                                             MinHeight="40"

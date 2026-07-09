@@ -100,6 +100,11 @@ namespace MyCoinFlow
                     NavHomeButton,
                     AppModules.IsHomeEnabled,
                     "Haushalt");
+
+                ApplyButtonState(
+                    NavDmsButton,
+                    AppModules.IsDmsEnabled,
+                    "DMS");
             }
             catch
             {
@@ -140,6 +145,13 @@ namespace MyCoinFlow
             {
                 if (NavHomeLockIcon != null)
                     NavHomeLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (moduleName == "DMS")
+            {
+                if (NavDmsLockIcon != null)
+                    NavDmsLockIcon.Visibility =
                         isEnabled ? Visibility.Collapsed : Visibility.Visible;
             }
         }

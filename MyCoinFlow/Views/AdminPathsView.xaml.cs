@@ -156,6 +156,26 @@ namespace MyCoinFlow.Views
             }
         }
 
+        public void SuggestOneDriveFolder_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var oneDriveRoot = MyCoinFlow.Services.Update.OneDriveLocalResolver.GetOneDriveRoot();
+                if (string.IsNullOrWhiteSpace(oneDriveRoot))
+                {
+                    Status("Kein OneDrive-Ordner auf diesem PC gefunden.");
+                    return;
+                }
+
+                AttachRootBox.Text = Path.Combine(oneDriveRoot, "MyCoinFlow", "Dokumente");
+                Status("OneDrive-Ordner eingetragen. Bitte \"Ordner erstellen\" und danach \"Speichern\" klicken.");
+            }
+            catch (Exception ex)
+            {
+                Status("OneDrive-Ordner konnte nicht ermittelt werden: " + ex.Message);
+            }
+        }
+
         public void OpenInExplorer_Click(object? sender, RoutedEventArgs e)
         {
             try
