@@ -486,27 +486,4 @@ namespace MyCoinFlow.Services
             return dp[m, n];
         }
     }
-
-    // Minimaler Header-Reader (du kannst hier deine vorhandenen Excel/CSV-Leser nutzen)
-    internal static class SimpleTableReader
-    {
-        public static DataTable? ReadHeadersOnly(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return null;
-
-            // Falls du bereits EPPlus/ClosedXML einsetzt: dort einfach Sheet erste Zeile lesen
-            // Hier Dummy: CSV nur als Beispiel
-            if (Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase))
-            {
-                var first = File.ReadLines(path).FirstOrDefault();
-                if (first == null) return null;
-                var cols = first.Split(';', ',', '\t');
-                var dt = new DataTable();
-                foreach (var c in cols) dt.Columns.Add(c.Trim());
-                return dt;
-            }
-            // Für .xlsx/.xls -> nimm deinen bestehenden Reader
-            return null;
-        }
-    }
 }
