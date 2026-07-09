@@ -13,6 +13,13 @@
     <FileVersion>2.0.0.3</FileVersion>
 </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="release\**" />
+    <EmbeddedResource Remove="release\**" />
+    <None Remove="release\**" />
+    <Page Remove="release\**" />
+  </ItemGroup>
+
 	
   <ItemGroup>
     <None Remove="Assets\Icons\piggybank.ico" />
@@ -55,10 +62,6 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="release\" />
   </ItemGroup>
 
 </Project>
