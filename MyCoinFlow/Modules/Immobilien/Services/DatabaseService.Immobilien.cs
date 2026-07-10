@@ -980,71 +980,6 @@ VALUES (@lid, @tid, @t, @ic);";
 
 
 
-        public List<MyCoinFlow.Models.StweSetRow> StweSetsGetByLiegenschaft(int liegenschaftId)
-        {
-            EnsureStweSchema();
-
-            var list = new List<MyCoinFlow.Models.StweSetRow>();
-
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-SELECT 
-    s.Id,
-    s.LiegenschaftId,
-    s.TransaktionId,
-    t.Datum,
-    t.BudgetDatum
-
-    -- SIGNED Total (Belastung = +, Gutschrift = -)
-    CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END AS BetragSigned,
-
-    COALESCE(NULLIF(s.Titel,''), COALESCE(NULLIF(t.Notiz,''),'(ohne Text)')) AS Titel,
-    s.IsClosed,
-    ISNULL(s.IsCredit, 0) AS IsCredit,
-
-    ISNULL(x.Verteilt, 0) AS Verteilt,
-
-    (CASE WHEN ISNULL(s.IsCredit, 0) = 1 THEN -t.Betrag ELSE t.Betrag END) - ISNULL(x.Verteilt, 0) AS Rest
-FROM dbo.StweSet s
-JOIN dbo.Transaktion t ON t.Id = s.TransaktionId
-OUTER APPLY (
-    SELECT SUM(l.Betrag) AS Verteilt
-    FROM dbo.StweSetLine l
-    WHERE l.SetId = s.Id
-) x
-WHERE s.LiegenschaftId = @lid
-ORDER BY t.Datum DESC, s.Id DESC;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-
-            var p = cmd.CreateParameter();
-            p.ParameterName = "@lid";
-            p.Value = liegenschaftId;
-            cmd.Parameters.Add(p);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                list.Add(new MyCoinFlow.Models.StweSetRow
-                {
-                    Id = r.GetInt32(0),
-                    LiegenschaftId = r.GetInt32(1),
-                    TransaktionId = r.GetInt32(2),
-                    Datum = r.GetDateTime(3),
-                    Betrag = r.GetDecimal(4),
-                    Titel = r.GetString(5),
-                    IsClosed = r.GetBoolean(6),
-                    IsCredit = r.GetBoolean(7),
-                    Verteilt = r.GetDecimal(8),
-                    Rest = r.GetDecimal(9)
-                });
-            }
-
-            return list;
-        }
 
 
         public List<MyCoinFlow.Models.StweSchluessel> StweSchluesselGetByLiegenschaft(int liegenschaftId)
@@ -1368,26 +1303,6 @@ VALUES
             }
         }
 
-        public void StweSetLineInsert(int setId, int? einheitId, int? eigentuemerId, string schluessel, decimal betrag)
-        {
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-INSERT INTO dbo.StweSetLine (SetId, EinheitId, EigentuemerId, Schluessel, Betrag)
-VALUES (@sid, @eid, @oid, @s, @b);";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-
-            var p1 = cmd.CreateParameter(); p1.ParameterName = "@sid"; p1.Value = setId; cmd.Parameters.Add(p1);
-            var p2 = cmd.CreateParameter(); p2.ParameterName = "@eid"; p2.Value = (object?)einheitId ?? DBNull.Value; cmd.Parameters.Add(p2);
-            var p3 = cmd.CreateParameter(); p3.ParameterName = "@oid"; p3.Value = (object?)eigentuemerId ?? DBNull.Value; cmd.Parameters.Add(p3);
-            var p4 = cmd.CreateParameter(); p4.ParameterName = "@s"; p4.Value = schluessel; cmd.Parameters.Add(p4);
-            var p5 = cmd.CreateParameter(); p5.ParameterName = "@b"; p5.Value = betrag; cmd.Parameters.Add(p5);
-
-            cmd.ExecuteNonQuery();
-        }
 
         public List<MyCoinFlow.Models.StweSetLine> StweSetLinesGet(int setId)
         {
@@ -1547,21 +1462,6 @@ WHERE Id = @id;";
         }
 
 
-        public bool StweZaehlerUsedInEnergieSets(int zaehlerId)
-        {
-            EnsureStweSchema();
-
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"SELECT TOP(1) 1 FROM dbo.StweEnergieSetZaehler WHERE ZaehlerId = @id;";
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@id", zaehlerId);
-
-            var v = cmd.ExecuteScalar();
-            return v != null && v != DBNull.Value;
-        }
 
         public void StweZaehlerDelete(int zaehlerId)
         {
@@ -1628,194 +1528,6 @@ WHERE Id = @id;";
         }
 
 
-        public List<(int ZaehlerId, decimal AltKwh, decimal NeuKwh)> StweEnergieZaehlerGetBySet(int setId)
-        {
-            EnsureStweSchema();
-
-            var list = new List<(int, decimal, decimal)>();
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-SELECT ZaehlerId, AltKwh, NeuKwh
-FROM dbo.StweEnergieSetZaehler
-WHERE SetId = @sid
-ORDER BY ZaehlerId;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@sid", setId);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                list.Add((r.GetInt32(0), r.GetDecimal(1), r.GetDecimal(2)));
-            }
-
-            return list;
-        }
-
-        public Dictionary<int, decimal> StweEnergieLastNeuStaendeGet(int liegenschaftId, DateTime stichtag)
-        {
-            EnsureStweSchema();
-
-            var result = new Dictionary<int, decimal>();
-            using var c = CreateConnection();
-            c.Open();
-
-            // Letzter erfasster Neu-KWh Stand je Zähler (nur aus Sets derselben Liegenschaft),
-            // aber nur aus Sets, deren Transaktionsdatum vor dem Stichtag liegt.
-            // Damit füllen wir bei einer neuen Rechnung automatisch "Alt" vor.
-            const string sql = @"
-;WITH x AS
-(
-    SELECT
-        ez.ZaehlerId,
-        ez.NeuKwh,
-        t.Datum,
-        ROW_NUMBER() OVER (PARTITION BY ez.ZaehlerId ORDER BY t.Datum DESC, s.Id DESC) AS rn
-    FROM dbo.StweEnergieSetZaehler ez
-    JOIN dbo.StweSet s         ON s.Id = ez.SetId
-    JOIN dbo.Transaktion t     ON t.Id = s.TransaktionId
-    WHERE s.LiegenschaftId = @lid
-      AND t.Datum < @d
-)
-SELECT ZaehlerId, NeuKwh
-FROM x
-WHERE rn = 1
-ORDER BY ZaehlerId;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@lid", liegenschaftId);
-            cmd.Parameters.AddWithValue("@d", stichtag.Date);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var zaehlerId = r.GetInt32(0);
-                var neuKwh = r.GetDecimal(1);
-
-                // Defensive: pro ZaehlerId nur einmal.
-                if (!result.ContainsKey(zaehlerId))
-                    result.Add(zaehlerId, neuKwh);
-            }
-
-            return result;
-        }
-
-
-
-        public void StweEnergieZaehlerReplace(int setId, List<(int ZaehlerId, decimal AltKwh, decimal NeuKwh)> rows)
-        {
-            EnsureStweSchema();
-
-            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
-            rows ??= new();
-
-            using var c = CreateConnection();
-            c.Open();
-            using var tx = c.BeginTransaction();
-
-            try
-            {
-                using (var del = c.CreateCommand())
-                {
-                    del.Transaction = tx;
-                    del.CommandText = "DELETE FROM dbo.StweEnergieSetZaehler WHERE SetId = @sid;";
-                    del.Parameters.AddWithValue("@sid", setId);
-                    del.ExecuteNonQuery();
-                }
-
-                foreach (var (zaehlerId, alt, neu) in rows)
-                {
-                    using var ins = c.CreateCommand();
-                    ins.Transaction = tx;
-                    ins.CommandText = @"
-INSERT INTO dbo.StweEnergieSetZaehler (SetId, ZaehlerId, AltKwh, NeuKwh)
-VALUES (@sid, @zid, @a, @n);";
-
-                    ins.Parameters.AddWithValue("@sid", setId);
-                    ins.Parameters.AddWithValue("@zid", zaehlerId);
-                    ins.Parameters.AddWithValue("@a", alt);
-                    ins.Parameters.AddWithValue("@n", neu);
-
-                    ins.ExecuteNonQuery();
-                }
-
-                tx.Commit();
-            }
-            catch
-            {
-                try { tx.Rollback(); } catch { }
-                throw;
-            }
-        }
-
-        public (decimal? EvuKwh, decimal? PvGutschriftChf, int? PvKontoId, string? Notiz) StweEnergieMetaGet(int setId)
-        {
-            EnsureStweSchema();
-
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-SELECT EvuKwh, PvGutschriftChf, PvKontoId, Notiz
-FROM dbo.StweEnergieSetMeta
-WHERE SetId = @sid;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@sid", setId);
-
-            using var r = cmd.ExecuteReader();
-            if (!r.Read())
-                return (null, null, null, null);
-
-            return (
-                r.IsDBNull(0) ? (decimal?)null : r.GetDecimal(0),
-                r.IsDBNull(1) ? (decimal?)null : r.GetDecimal(1),
-                r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                r.IsDBNull(3) ? null : r.GetString(3)
-            );
-        }
-
-        public void StweEnergieMetaUpsert(int setId, decimal? evuKwh, decimal? pvGutschriftChf, int? pvKontoId, string? notiz)
-        {
-            EnsureStweSchema();
-
-            if (setId <= 0) throw new ArgumentOutOfRangeException(nameof(setId));
-
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-IF EXISTS (SELECT 1 FROM dbo.StweEnergieSetMeta WHERE SetId = @sid)
-BEGIN
-    UPDATE dbo.StweEnergieSetMeta SET
-        EvuKwh          = @e,
-        PvGutschriftChf = @p,
-        PvKontoId       = @k,
-        Notiz           = @n,
-        UpdatedAtUtc    = SYSUTCDATETIME()
-    WHERE SetId = @sid;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.StweEnergieSetMeta (SetId, EvuKwh, PvGutschriftChf, PvKontoId, Notiz)
-    VALUES (@sid, @e, @p, @k, @n);
-END;";
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@sid", setId);
-            cmd.Parameters.AddWithValue("@e", (object?)evuKwh ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@p", (object?)pvGutschriftChf ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@k", (object?)pvKontoId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@n", (object?)notiz ?? DBNull.Value);
-
-            cmd.ExecuteNonQuery();
-        }
 
 
 
@@ -1888,36 +1600,6 @@ ORDER BY GueltigVon DESC, Id DESC;";
             cmd.ExecuteNonQuery();
         }
 
-        public void StweSetSetIsCredit(int setId, bool isCredit)
-        {
-            EnsureStweSchema();
-
-            using var c = CreateConnection();
-            c.Open();
-
-            // Defensive: Closed schützt auch DB-seitig
-            using (var chk = c.CreateCommand())
-            {
-                chk.CommandText = "SELECT IsClosed FROM dbo.StweSet WHERE Id=@id;";
-                chk.Parameters.AddWithValue("@id", setId);
-                var v = chk.ExecuteScalar();
-                if (v != null && v != DBNull.Value && Convert.ToBoolean(v))
-                {
-                    System.Windows.MessageBox.Show(
-                        "Dieses Set ist geschlossen. Bitte zuerst „Wieder öffnen“.",
-                        "Set-Typ ändern nicht möglich",
-                        System.Windows.MessageBoxButton.OK,
-                        System.Windows.MessageBoxImage.Information);
-                    return;
-                }
-            }
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "UPDATE dbo.StweSet SET IsCredit = @x WHERE Id = @id;";
-            cmd.Parameters.AddWithValue("@id", setId);
-            cmd.Parameters.AddWithValue("@x", isCredit ? 1 : 0);
-            cmd.ExecuteNonQuery();
-        }
 
 
 
@@ -2748,18 +2430,6 @@ WHERE s.LiegenschaftId = @lid
             }
         }
 
-        public bool StweSetGetIsCredit(int setId)
-        {
-            EnsureStweSchema();
-            using var c = CreateConnection();
-            c.Open();
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT IsCredit FROM dbo.StweSet WHERE Id = @id;";
-            cmd.Parameters.AddWithValue("@id", setId);
-            var v = cmd.ExecuteScalar();
-            return v != null && v != DBNull.Value && Convert.ToBoolean(v);
-        }
 
         public void StweSetFlipCreditAndLines(int setId, bool isCredit)
         {

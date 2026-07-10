@@ -808,61 +808,6 @@ END;";
             cmd.ExecuteNonQuery();
         }
 
-        public VermoegenFxHistorie? VermoegenFxHistorieGetLatest(
-            string vonWaehrung,
-            string nachWaehrung)
-        {
-            EnsureVermoegenSchema();
-
-            var von = string.IsNullOrWhiteSpace(vonWaehrung)
-                ? ""
-                : vonWaehrung.Trim().ToUpperInvariant();
-
-            var nach = string.IsNullOrWhiteSpace(nachWaehrung)
-                ? ""
-                : nachWaehrung.Trim().ToUpperInvariant();
-
-            if (string.IsNullOrWhiteSpace(von) || string.IsNullOrWhiteSpace(nach))
-                return null;
-
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-SELECT TOP 1
-    Id,
-    VonWaehrung,
-    NachWaehrung,
-    KursDatum,
-    Kurs,
-    Quelle,
-    ErfasstAm
-FROM dbo.VermoegenFxHistorie
-WHERE VonWaehrung = @VonWaehrung
-  AND NachWaehrung = @NachWaehrung
-ORDER BY KursDatum DESC;";
-
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@VonWaehrung", von);
-            cmd.Parameters.AddWithValue("@NachWaehrung", nach);
-
-            using var r = cmd.ExecuteReader();
-
-            if (!r.Read())
-                return null;
-
-            return new VermoegenFxHistorie
-            {
-                Id = r.GetInt32(0),
-                VonWaehrung = r.GetString(1),
-                NachWaehrung = r.GetString(2),
-                KursDatum = r.GetDateTime(3),
-                Kurs = r.GetDecimal(4),
-                Quelle = r.GetString(5),
-                ErfasstAm = r.GetDateTime(6)
-            };
-        }
-
         public decimal? VermoegenFxKursNachChfGetLatest(string waehrung)
         {
             EnsureVermoegenSchema();

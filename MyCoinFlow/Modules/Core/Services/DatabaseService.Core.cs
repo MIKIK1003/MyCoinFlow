@@ -647,47 +647,6 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
         }
 
 
-        public void BudgetwertSpeichern(int zeitraumId, int kontoId, decimal wert)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-
-                // Existiert bereits ein Eintrag?
-                string sqlCheck = "SELECT COUNT(*) FROM BudgetDetail WHERE ZeitraumId = @ZeitraumId AND KontoId = @KontoId";
-                using (var checkCmd = new SqlCommand(sqlCheck, connection))
-                {
-                    checkCmd.Parameters.AddWithValue("@ZeitraumId", zeitraumId);
-                    checkCmd.Parameters.AddWithValue("@KontoId", kontoId);
-                    int count = (int)checkCmd.ExecuteScalar();
-
-                    if (count > 0)
-                    {
-                        // Update
-                        string sqlUpdate = "UPDATE BudgetDetail SET Budgetwert = @Wert WHERE ZeitraumId = @ZeitraumId AND KontoId = @KontoId";
-                        using (var updateCmd = new SqlCommand(sqlUpdate, connection))
-                        {
-                            updateCmd.Parameters.AddWithValue("@Wert", wert);
-                            updateCmd.Parameters.AddWithValue("@ZeitraumId", zeitraumId);
-                            updateCmd.Parameters.AddWithValue("@KontoId", kontoId);
-                            updateCmd.ExecuteNonQuery();
-                        }
-                    }
-                    else
-                    {
-                        // Insert
-                        string sqlInsert = "INSERT INTO BudgetDetail (ZeitraumId, KontoId, Budgetwert) VALUES (@ZeitraumId, @KontoId, @Wert)";
-                        using (var insertCmd = new SqlCommand(sqlInsert, connection))
-                        {
-                            insertCmd.Parameters.AddWithValue("@ZeitraumId", zeitraumId);
-                            insertCmd.Parameters.AddWithValue("@KontoId", kontoId);
-                            insertCmd.Parameters.AddWithValue("@Wert", wert);
-                            insertCmd.ExecuteNonQuery();
-                        }
-                    }
-                }
-            }
-        }
 
         /// public void ArtHinzufuegen(string bezeichnung)
         /// {
@@ -736,23 +695,6 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-        public void AktualisiereKontenArt(int id, string bezeichnung)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-
-                string sql = "UPDATE KontenArt SET Bezeichnung = @Bez WHERE Id = @Id";
-
-                using (var command = new SqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.Parameters.AddWithValue("@Bez", bezeichnung);
-
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
 
         
 
@@ -797,20 +739,6 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-        public void AktualisiereKontenGruppe(int id, string bezeichnung)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                const string sql = "UPDATE KontenGruppe SET Bezeichnung = @Bez WHERE Id = @Id";
-                using (var command = new SqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.Parameters.AddWithValue("@Bez", bezeichnung);
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
 
         public void RenameKontenArt(string oldName, string newName)
         {
@@ -1180,20 +1108,6 @@ ORDER BY k.Art, k.Gruppe, k.Untergruppe, k.Kontonummer, k.Detail;
             }
         }
 
-        public void AktualisiereKontenUnterGruppe(int id, string bezeichnung)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                const string sql = "UPDATE KontenUnterGruppe SET Bezeichnung = @Bez WHERE Id = @Id";
-                using (var command = new SqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.Parameters.AddWithValue("@Bez", bezeichnung);
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
 
         
 
@@ -1764,75 +1678,6 @@ END;
             }
         }
 
-        public System.Collections.Generic.Dictionary<string, bool?> LadeArtFlagProLabel(string labelColumn)
-        {
-            var col = (labelColumn ?? "").Trim();
-            if (col != "Art" && col != "Gruppe" && col != "Untergruppe")
-                throw new ArgumentException("labelColumn muss 'Art', 'Gruppe' oder 'Untergruppe' sein.", nameof(labelColumn));
-
-            EnsureNumberRangeRulesTable();
-
-            using var c = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
-            c.Open();
-
-            // Regel zuerst, sonst Text-Heuristik (keine fixen 3xxx/7xxx/4xxx-6xxx mehr!)
-            var sql = $@"
-SELECT 
-  COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)') AS Label,
-  SUM(CASE 
-        WHEN nr.Richtung = N'Einnahme' OR (
-             nr.Richtung IS NULL AND (
-               UPPER(ISNULL(kp.Art,'')) LIKE '%EINNAHM%' OR
-               UPPER(ISNULL(kp.Art,'')) LIKE '%ERTR%'   OR
-               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%EINNAHM%' OR
-               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%ERTR%'   OR
-               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%EINNAHM%' OR
-               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%ERTR%'   OR
-               UPPER(ISNULL(kp.Detail,'')) LIKE '%EINNAHM%' OR
-               UPPER(ISNULL(kp.Detail,'')) LIKE '%ERTR%'
-             )
-        )
-      THEN 1 ELSE 0 END) AS Ein,
-  SUM(CASE 
-        WHEN nr.Richtung = N'Ausgabe' OR (
-             nr.Richtung IS NULL AND (
-               UPPER(ISNULL(kp.Art,'')) LIKE '%AUSGAB%' OR
-               UPPER(ISNULL(kp.Art,'')) LIKE '%AUFW%'   OR
-               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUSGAB%' OR
-               UPPER(ISNULL(kp.Gruppe,'')) LIKE '%AUFW%'   OR
-               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUSGAB%' OR
-               UPPER(ISNULL(kp.Untergruppe,'')) LIKE '%AUFW%'   OR
-               UPPER(ISNULL(kp.Detail,'')) LIKE '%AUSGAB%' OR
-               UPPER(ISNULL(kp.Detail,'')) LIKE '%AUFW%'
-             )
-        )
-      THEN 1 ELSE 0 END) AS Aus
-FROM Kontenplan kp
-OUTER APPLY (
-  SELECT TOP 1 Richtung
-  FROM NumberRangeRules
-  WHERE kp.Kontonummer IS NOT NULL
-    AND kp.Kontonummer BETWEEN RangeStart AND RangeEnd
-  ORDER BY (RangeEnd - RangeStart) ASC, RangeStart ASC
-) nr
-GROUP BY COALESCE(NULLIF(kp.{col}, ''), '(ohne Zuordnung)')
-ORDER BY Label";
-            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, c);
-            using var r = cmd.ExecuteReader();
-
-            var dict = new System.Collections.Generic.Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
-            while (r.Read())
-            {
-                var label = r.GetString(0);
-                var ein = r.IsDBNull(1) ? 0 : r.GetInt32(1);
-                var aus = r.IsDBNull(2) ? 0 : r.GetInt32(2);
-                bool? flag = null; // null = unklar/gemischt
-                if (ein > 0 && aus == 0) flag = true;      // Einnahme
-                if (aus > 0 && ein == 0) flag = false;     // Ausgabe
-                dict[label] = flag;
-            }
-            return dict;
-        }
 
 
         // -----------Löscht eine importierte BankImportItem-Zeile-------------
@@ -1904,52 +1749,6 @@ ORDER BY Label";
         }
 
 
-        public List<Transaktion> LadeTransaktionen(DateTime? bisDatum = null)
-        {
-            var list = new List<Transaktion>();
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string sql = @"
-SELECT t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
-       t.Betrag, t.Notiz,
-       t.AdresseId, a.Name as AdresseName,
-       t.GeldinstitutId, g.Name as BankName,
-       t.ImportQuelle
-FROM Transaktion t
-LEFT JOIN Adresse a     ON t.AdresseId = a.Id
-LEFT JOIN Geldinstitut g ON t.GeldinstitutId = g.Id
-WHERE (@bis IS NULL OR t.Datum <= @bis)
-ORDER BY t.Datum DESC";
-
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@bis", (object?)bisDatum ?? DBNull.Value);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                list.Add(new Transaktion
-                {
-                    Id = r.GetInt32(0),
-                    Datum = r.GetDateTime(1),
-
-                    // NEU: BudgetDatum mitladen (optional)
-                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
-
-                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
-                    Betrag = r.GetDecimal(5),
-                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
-                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
-                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
-                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
-                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
-                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
-                });
-            }
-
-            return list;
-        }
 
         // Neu:Budgetdatum
         public MyCoinFlow.Models.Transaktion? HoleTransaktion(int id)
@@ -2162,20 +1961,6 @@ ORDER BY Id DESC;";
         private static string NormalizeIban(string? iban)
             => string.IsNullOrWhiteSpace(iban) ? "" : iban.Replace(" ", "").ToUpperInvariant();
 
-        /// <summary>
-        /// Liefert die DefaultKontoId direkt aus der Tabelle Adresse.
-        /// </summary>
-        public int? HoleDefaultKontoIdByAdresse(int adresseId)
-        {
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string sql = "SELECT DefaultKontoId FROM Adresse WHERE Id = @adr;";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@adr", adresseId);
-            var v = cmd.ExecuteScalar();
-            return v == null || v == DBNull.Value ? (int?)null : Convert.ToInt32(v);
-        }
 
         /// <summary>
         /// Liefert DefaultKontoId über IBAN-Match (Adresse.IBAN).
@@ -2199,20 +1984,6 @@ WHERE REPLACE(UPPER(ISNULL(IBAN,'')),' ','') = @ibanNorm;";
             return v == null || v == DBNull.Value ? (int?)null : Convert.ToInt32(v);
         }
 
-        /// <summary>
-        /// Setzt die DefaultKontoId für eine Adresse.
-        /// </summary>
-        public void SetDefaultKontoFuerAdresse(int adresseId, int kontoId)
-        {
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string sql = "UPDATE Adresse SET DefaultKontoId = @k WHERE Id = @a;";
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@a", adresseId);
-            cmd.Parameters.AddWithValue("@k", kontoId);
-            cmd.ExecuteNonQuery();
-        }
 
 
         // KREDITKARTEN MST 250825
@@ -2298,75 +2069,6 @@ ORDER BY Kontonummer, Detail;";
 
 
 
-        // ---- Kategorie → Konto (persistentes Mapping) ----
-        public List<KategorieKontoMapping> LadeKategorieKontoMappings()
-        {
-            var list = new List<KategorieKontoMapping>();
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string sql = @"SELECT Id, Kategorie, KontoId FROM KategorieKontoMapping ORDER BY Kategorie";
-            using var cmd = new SqlCommand(sql, c);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                list.Add(new KategorieKontoMapping
-                {
-                    Id = r.GetInt32(0),
-                    Kategorie = r.GetString(1),
-                    KontoId = r.GetInt32(2)
-                });
-            }
-            return list;
-        }
-
-        public int? HoleKontoIdFuerKategorie(string? kategorie)
-        {
-            if (string.IsNullOrWhiteSpace(kategorie)) return null;
-
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string sql = @"
-SELECT TOP 1 KontoId
-FROM KategorieKontoMapping
-WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
-
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@kat", kategorie);
-
-            var v = cmd.ExecuteScalar();
-            return v == null || v == DBNull.Value ? (int?)null : Convert.ToInt32(v);
-        }
-
-        public void UpsertKategorieKonto(string kategorie, int kontoId)
-        {
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-
-            const string check = @"SELECT Id FROM KategorieKontoMapping
-                           WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
-            using var ck = new SqlCommand(check, c);
-            ck.Parameters.AddWithValue("@kat", kategorie);
-            var idObj = ck.ExecuteScalar();
-
-            if (idObj != null && idObj != DBNull.Value)
-            {
-                const string upd = @"UPDATE KategorieKontoMapping SET KontoId=@k WHERE Id=@id";
-                using var u = new SqlCommand(upd, c);
-                u.Parameters.AddWithValue("@k", kontoId);
-                u.Parameters.AddWithValue("@id", (int)idObj);
-                u.ExecuteNonQuery();
-            }
-            else
-            {
-                const string ins = @"INSERT INTO KategorieKontoMapping (Kategorie, KontoId) VALUES (@kat, @k)";
-                using var i = new SqlCommand(ins, c);
-                i.Parameters.AddWithValue("@kat", kategorie.Trim());
-                i.Parameters.AddWithValue("@k", kontoId);
-                i.ExecuteNonQuery();
-            }
-        }
 
         // ---- Adresse (nur Name) ----
         public int? FindeOderErzeugeAdresseByName(string? name)
@@ -2404,18 +2106,6 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
             return sb.ToString();
         }
 
-        /// Stabiler Hash: Datum|Betrag(2)|Beschreibung|Händler|Kartennummer (Upper/Trim)
-        public string BaueImportHash(DateTime datum, decimal betragPositiv, string beschreibung, string? haendler, string? kartennummer)
-        {
-            var key = string.Join("|",
-                datum.ToString("yyyy-MM-dd"),
-                betragPositiv.ToString("F2", CultureInfo.InvariantCulture),
-                (beschreibung ?? "").Trim().ToUpperInvariant(),
-                (haendler ?? "").Trim().ToUpperInvariant(),
-                (kartennummer ?? "").Replace(" ", "").ToUpperInvariant()
-            );
-            return ComputeSha256Hex(key);
-        }
 
         private static string BaueImportHashV2(DateTime datum, decimal betragPositiv,
                                        string? beschreibung, string? haendler,
@@ -3010,78 +2700,6 @@ WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@kat)))";
             }
         }
 
-        public (int inserted, int skipped, int duplicates) VerbucheCreditCardRowsMitKreditkartenkonto(
-            IEnumerable<CreditCardImportRow> rows,
-            int kreditkartenKontoId,
-            int? geldinstitutId = null)
-        {
-            int inserted = 0, skipped = 0, duplicates = 0;
-
-            foreach (var r in rows)
-            {
-                // a) nur Zeilen mit Ziel-Konto
-                if (!r.KontoId.HasValue) { skipped++; continue; }
-
-                // b) Debit ODER Kredit zulassen (Synonyme)
-                var dk = (r.DebitKredit ?? "").Trim();
-
-                bool IstBelastung(string? s)
-                {
-                    var x = (s ?? "").Trim().ToUpperInvariant();
-                    return x is "BELASTUNG" or "DEBIT" or "SOLL" or "CHARGE" or "AUSGABE" or "DEBITO";
-                }
-
-                bool IstGutschrift(string? s)
-                {
-                    var x = (s ?? "").Trim().ToUpperInvariant();
-                    return x is "KREDIT" or "GUTSCHRIFT" or "CREDIT" or "CRDT" or "HABEN";
-                }
-
-                int? von = null, nach = null;
-
-                if (IstBelastung(dk))
-                {
-                    // Belastung: Ausgleich vom KK-Konto -> Zielkonto
-                    von = kreditkartenKontoId;
-                    nach = r.KontoId.Value;
-                }
-                else if (IstGutschrift(dk))
-                {
-                    // Gutschrift (Rückzahlung): Zielkonto -> KK-Konto
-                    von = r.KontoId.Value;
-                    nach = kreditkartenKontoId;
-                }
-                else
-                {
-                    skipped++;
-                    continue;
-                }
-
-                // c) Adresse (nur Name) anlegen, falls Händler vorhanden
-                int? adresseId = FindeOderErzeugeAdresseByName(r.Haendler);
-
-                // d) Dedupe per Hash
-                var hash = BaueImportHashV2(r.Datum, r.Betrag, r.Beschreibung, r.Haendler, r.Kartennummer, r.DebitKredit);
-
-                if (SucheTransaktionIdByHash(hash).HasValue) { duplicates++; continue; }
-
-                // e) Buchung mit positivem Betrag (r.Betrag ist bereits Math.Abs in deinem Reader)
-                InsertTransaktionMitImport(
-                    r.Datum,
-                    vonKontoId: von,
-                    nachKontoId: nach,
-                    betragPositiv: r.Betrag,
-                    notiz: r.Beschreibung,
-                    adresseId: adresseId,
-                    geldinstitutId: geldinstitutId,
-                    importQuelle: "KreditkartenExcel",
-                    importHash: hash);
-
-                inserted++;
-            }
-
-            return (inserted, skipped, duplicates);
-        }
 
 
         public decimal HoleSaldoFuerKonto(int kontoId, DateTime? bisDatum = null)
@@ -3293,14 +2911,6 @@ ORDER BY s.Datum, s.Id";
             return (stagingCount, archiveCount);
         }
 
-        public int ClearCcStaging(int batchId)
-        {
-            using var c = new SqlConnection(_connectionString);
-            c.Open();
-            using var cmd = new SqlCommand("DELETE FROM CreditCardImportStaging WHERE BatchId=@b", c);
-            cmd.Parameters.AddWithValue("@b", batchId);
-            return cmd.ExecuteNonQuery();
-        }
 
         public void DeleteCcStagingRows(IEnumerable<int> ids)
         {
@@ -3762,41 +3372,12 @@ WHERE Id = @Id";
 
 
 
-        /// <summary>
-        /// Liefert true, wenn diese Transaktion für das angegebene Konto als "Ausgabe" angezeigt werden soll.
-        /// Standard: Von=Konto -> Ausgabe, Nach=Konto -> Einnahme.
-        /// Spezialfall: KreditkartenExcel-Import -> auf Nicht-Einnahmenkonten stets Ausgabe (auch wenn Nach=Konto).
-        /// </summary>
-        public bool IstAusgabeFuerKonto(int kontoId, Transaktion t, string? importQuelle)
-        {
-            // 1) Kreditkarten-Detailbuchungen (Konto->Konto-Umbuchung der KK-Verteilung)
-            if (string.Equals(importQuelle, "KreditkartenExcel", StringComparison.OrdinalIgnoreCase))
-            {
-                // Wenn das angefragte Konto kein Einnahmenkonto ist, als Ausgabe darstellen.
-                // (Dein Budget-/Kostenkonto bleibt damit visuell "Ausgabe", auch wenn es Nach=Konto ist.)
-                if (!IstEinnahmenKonto(kontoId))
-                    return true;
-                // Einnahmenkonten (z. B. Lohn) dürfen bei KK-Gutschriften als Einnahme erscheinen:
-                if (t.NachKontoId == kontoId) return false;
-                if (t.VonKontoId == kontoId) return true;
-                // Fallback
-                return false;
-            }
-
-            // 2) Standardfall (ohne Import-Speziallogik)
-            if (t.VonKontoId == kontoId) return true;   // Ausgabe
-            if (t.NachKontoId == kontoId) return false; // Einnahme
-
-            // Fallback: wenn das Konto grundsätzlich ein Ausgabenkonto ist, als Ausgabe darstellen
-            return !IstEinnahmenKonto(kontoId);
-        }
 
 
 
 
 
 
-        public bool IstAusgabenKonto(int kontoId) => !IstEinnahmenKonto(kontoId);
 
         public void EnsureNumberRangeRulesTable()
         {
@@ -4461,25 +4042,6 @@ WHERE (@von IS NULL OR ISNULL(t.BudgetDatum, t.Datum) >= @von)  -- NEU: BudgetDa
             return o != null && o != DBNull.Value;
         }
 
-        public bool KontoHatBuchungenImZeitraumByKontoId(int kontoId, DateTime? von, DateTime? bis)
-        {
-            using var c = CreateConnection();
-            c.Open();
-
-            const string sql = @"
-SELECT TOP(1) 1
-FROM dbo.Transaktion t
-WHERE (@von IS NULL OR t.Datum >= @von)
-  AND (@bis IS NULL OR t.Datum <= @bis)
-  AND (t.VonKontoId = @id OR t.NachKontoId = @id);";
-
-            using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@id", kontoId);
-            cmd.Parameters.AddWithValue("@von", (object?)von ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@bis", (object?)bis ?? DBNull.Value);
-            var o = cmd.ExecuteScalar();
-            return o != null && o != DBNull.Value;
-        }
 
         public void EnsureTransaktionBudgetDatumColumn()
         {

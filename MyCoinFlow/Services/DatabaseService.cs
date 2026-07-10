@@ -33,26 +33,6 @@ namespace MyCoinFlow.Services
 
 
 
-        /// <summary>
-        /// Prüft testweise, ob die Datenbankverbindung funktioniert.
-        /// </summary>
-        public bool TestConnection()
-        {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    connection.Open();
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Fehler beim Verbinden mit der Datenbank: {ex.Message}");
-                return false;
-            }
-        }
-
         private Dictionary<string, int> GetReferencingCounts(string schemaName, string tableName, string pkColumn, int id)
         {
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
