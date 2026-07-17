@@ -6,3 +6,8 @@ obj/
 *.cache
 
 /_git_broken_*
+
+# Installer-/Paketierungs-Ausgaben: gehören nicht ins Code-Repo (grosse Binärdateien,
+# Drittanbieter-Redistributables, Build-Output). Liegen jetzt separat bei Michel.
+/Installer/
+/InnoSetup/
