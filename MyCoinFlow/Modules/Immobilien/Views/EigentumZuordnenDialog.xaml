@@ -5,9 +5,9 @@
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Eigentümer zuordnen"
         Width="520"
-        Height="280"
+        Height="340"
         SizeToContent="Manual"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
     <Grid Margin="20">

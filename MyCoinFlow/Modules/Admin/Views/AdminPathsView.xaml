@@ -29,6 +29,12 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="12"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="220"/>
@@ -64,6 +70,29 @@
                          materialDesign:HintAssist.Hint="Standard: 20"
                          Width="160"
                          HorizontalAlignment="Left"/>
+
+                <TextBlock Grid.Row="6"
+                           Text="DMS-Arbeitsordner"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}" />
+
+                <TextBox x:Name="WorkFolderBox"
+                         Grid.Row="6"
+                         Grid.Column="1"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Ordner, der laufend auf neue Dokumente überwacht wird"
+                         HorizontalAlignment="Stretch"/>
+
+                <TextBlock Grid.Row="8"
+                           Text=""
+                           VerticalAlignment="Center"/>
+
+                <CheckBox x:Name="WatcherEnabledBox"
+                          Grid.Row="8"
+                          Grid.Column="1"
+                          Content="Überwachung aktiv"
+                          IsChecked="True"
+                          VerticalAlignment="Center"/>
             </Grid>
 
             <!-- Panel 1: OCR -->

@@ -6,7 +6,7 @@
         Title="Geldinstitut"
         Height="550" Width="520"
         SizeToContent="Manual"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{DynamicResource MaterialDesignPaper}">
 

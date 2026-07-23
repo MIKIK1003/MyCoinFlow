@@ -5,8 +5,8 @@
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Schlüssel umbenennen"
         Width="520"
-        Height="220"
-        WindowStartupLocation="Manual"
+        Height="260"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
     <Grid Margin="16">

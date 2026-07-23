@@ -5,9 +5,9 @@
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Einheit anlegen"
         Width="520"
-        Height="340"
+        Height="500"
         SizeToContent="Manual"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
     <Grid Margin="20">

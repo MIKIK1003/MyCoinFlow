@@ -17,6 +17,8 @@ namespace MyCoinFlow.Views
         private const string KeyMax = "AttachmentMaxMB";
         private const string KeyTessExe = "TesseractExePath";
         private const string KeyTessLang = "TesseractLanguages";
+        private const string KeyWorkFolder = "DmsWorkingFolder";
+        private const string KeyWatcherEnabled = "DmsWatcherEnabled";
 
         public AdminPathsView()
         {
@@ -58,6 +60,10 @@ namespace MyCoinFlow.Views
                 var langs = _db.GetAppSetting(KeyTessLang);
                 LangsBox.Text = string.IsNullOrWhiteSpace(langs) ? "deu+eng" : langs.Trim();
 
+                WorkFolderBox.Text = _db.GetAppSetting(KeyWorkFolder) ?? "";
+                var watcherEnabled = _db.GetAppSetting(KeyWatcherEnabled);
+                WatcherEnabledBox.IsChecked = string.IsNullOrWhiteSpace(watcherEnabled) || watcherEnabled == "1";
+
                 Status("Einstellungen geladen.");
             }
             catch (Exception ex)
@@ -94,11 +100,58 @@ namespace MyCoinFlow.Views
                 _db.SetAppSetting(KeyRoot, root);
                 _db.SetAppSetting(KeyMax, mb.ToString(CultureInfo.InvariantCulture));
 
+                var workFolder = (WorkFolderBox.Text ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(workFolder))
+                {
+                    try { Directory.CreateDirectory(workFolder); } catch { /* später erneut prüfen */ }
+                }
+                _db.SetAppSetting(KeyWorkFolder, string.IsNullOrWhiteSpace(workFolder) ? null : workFolder);
+                _db.SetAppSetting(KeyWatcherEnabled, (WatcherEnabledBox.IsChecked == true) ? "1" : "0");
+
+                MyCoinFlow.Services.DmsWatcherService.Instance.Restart();
+
                 Status("Verzeichnis-Einstellungen gespeichert.");
             }
             catch (Exception ex)
             {
                 Status("Speichern fehlgeschlagen: " + ex.Message);
+            }
+        }
+
+        public void CreateWorkFolder_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var folder = (WorkFolderBox.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(folder))
+                {
+                    Status("Bitte zuerst einen Arbeitsordner-Pfad eingeben.");
+                    return;
+                }
+                Directory.CreateDirectory(folder);
+                Status(Directory.Exists(folder) ? "Arbeitsordner ist vorhanden." : "Arbeitsordner konnte nicht angelegt werden.");
+            }
+            catch (Exception ex)
+            {
+                Status("Fehler: " + ex.Message);
+            }
+        }
+
+        public void OpenWorkFolderInExplorer_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var folder = (WorkFolderBox.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                {
+                    Status("Arbeitsordner nicht gefunden.");
+                    return;
+                }
+                Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Status("Explorer konnte nicht geöffnet werden: " + ex.Message);
             }
         }
 

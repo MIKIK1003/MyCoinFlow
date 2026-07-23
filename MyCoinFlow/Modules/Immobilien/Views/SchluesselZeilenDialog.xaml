@@ -6,7 +6,7 @@
         Title="Schlüssel-Zeilen bearbeiten"
         Width="900"
         Height="650"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize">
 
     <Grid Margin="16">

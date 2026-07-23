@@ -6,7 +6,7 @@
         Title="{Binding Titel}"
         Height="800" Width="1200"
         SizeToContent="Manual"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource MaterialDesignPaper}">
 

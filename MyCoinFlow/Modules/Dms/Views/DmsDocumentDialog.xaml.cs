@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using Microsoft.Win32;
 using MyCoinFlow.Models;
@@ -13,6 +14,8 @@ namespace MyCoinFlow.Views
         public string? Titel { get; private set; }
         public string? Kategorie { get; private set; }
         public string? AusgewaehlteDateiPfad { get; private set; }
+        public bool IstGarantieschein { get; private set; }
+        public DateTime? GarantieAblaufDatum { get; private set; }
 
         public DmsDocumentDialog(DmsDocument? bestehend = null)
         {
@@ -31,7 +34,17 @@ namespace MyCoinFlow.Views
             {
                 TitelBox.Text = bestehend.Titel ?? "";
                 KategorieBox.Text = bestehend.Kategorie ?? "";
+                GarantieCheckBox.IsChecked = bestehend.IstGarantieschein;
+                if (bestehend.GarantieAblaufDatum.HasValue)
+                    GarantieAblaufPicker.SelectedDate = bestehend.GarantieAblaufDatum.Value;
             }
+
+            GarantiePanel.Visibility = GarantieCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void GarantieCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            GarantiePanel.Visibility = GarantieCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void DateiWaehlen_Click(object sender, RoutedEventArgs e)
@@ -62,6 +75,8 @@ namespace MyCoinFlow.Views
 
             Titel = string.IsNullOrWhiteSpace(TitelBox.Text) ? null : TitelBox.Text.Trim();
             Kategorie = string.IsNullOrWhiteSpace(KategorieBox.Text) ? null : KategorieBox.Text.Trim();
+            IstGarantieschein = GarantieCheckBox.IsChecked == true;
+            GarantieAblaufDatum = IstGarantieschein ? GarantieAblaufPicker.SelectedDate : null;
 
             DialogResult = true;
         }

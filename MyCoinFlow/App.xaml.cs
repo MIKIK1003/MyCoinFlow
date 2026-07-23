@@ -48,7 +48,15 @@ namespace MyCoinFlow
 
             RegisterGlobalExceptionHandlers();
 
+            try { MyCoinFlow.Services.DmsWatcherService.Instance.Start(); } catch { /* Arbeitsordner evtl. nicht konfiguriert */ }
+
             base.OnStartup(e);
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try { MyCoinFlow.Services.DmsWatcherService.Instance.Stop(); } catch { /* sauberes Beenden hat Vorrang, still */ }
+            base.OnExit(e);
         }
 
         private void RegisterGlobalExceptionHandlers()

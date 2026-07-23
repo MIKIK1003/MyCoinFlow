@@ -97,6 +97,39 @@ namespace MyCoinFlow.Views
             }
         }
 
+        private void Zurueckstellen_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AllowDelete) return;
+
+            if (GridFiles.SelectedItem is not Row row) return;
+
+            var ask = MessageBox.Show(
+                $"Anhang „{row.FileName}“ von dieser Transaktion zurückstellen?\n" +
+                "Die Datei bleibt erhalten und ist weiterhin im DMS verfügbar, wird aber nicht mehr mit dieser Transaktion verknüpft.",
+                "Zurückstellen bestätigen",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (ask != MessageBoxResult.Yes) return;
+
+            try
+            {
+                _db.UnlinkAttachment(row.Id);
+                _changed = true;
+                LoadList();
+
+                if ((GridFiles.Items?.Count ?? 0) == 0)
+                {
+                    this.DialogResult = true;
+                    this.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Zurückstellen fehlgeschlagen: " + ex.Message,
+                    "Anhänge verwalten", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (!AllowDelete) return;

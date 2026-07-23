@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Dokument"
                  Width="520"
-                 Height="420"
+                 Height="500"
                  WindowStartupLocation="CenterOwner"
                  ResizeMode="NoResize">
 
@@ -56,6 +56,19 @@
                       Style="{StaticResource MaterialDesignOutlinedComboBox}"
                       materialDesign:HintAssist.Hint="Kategorie (frei wählbar, z.B. Versicherung, Vertrag)"
                       Margin="0,0,0,14"/>
+
+            <CheckBox x:Name="GarantieCheckBox"
+                      Content="Garantieschein"
+                      Margin="0,0,0,10"
+                      Checked="GarantieCheckBox_CheckedChanged"
+                      Unchecked="GarantieCheckBox_CheckedChanged"/>
+
+            <StackPanel x:Name="GarantiePanel" Visibility="Collapsed">
+                <TextBlock Text="Garantie-Ablaufdatum" Margin="0,0,0,6"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                <DatePicker x:Name="GarantieAblaufPicker"
+                            MinHeight="40"/>
+            </StackPanel>
 
         </StackPanel>
 

@@ -78,12 +78,19 @@ namespace MyCoinFlow.Services
                 if (!IsValidSize(bounds))
                     return;
 
+                bool canResize = window.ResizeMode != ResizeMode.NoResize;
+
                 all[key] = new WindowPlacement
                 {
                     Left = bounds.Left,
                     Top = bounds.Top,
-                    Width = bounds.Width,
-                    Height = bounds.Height,
+                    // Bei fixer Grösse (ResizeMode=NoResize) NICHT die Grösse speichern – die
+                    // kommt immer aus der aktuellen XAML. Sonst überschreibt eine früher
+                    // gespeicherte Grösse jede spätere XAML-Anpassung (Inhalte werden dann
+                    // stillschweigend abgeschnitten, ohne dass der Grösse-Wert in der XAML noch
+                    // irgendeine Wirkung hätte).
+                    Width = canResize ? bounds.Width : window.Width,
+                    Height = canResize ? bounds.Height : window.Height,
                     WindowState = window.WindowState == WindowState.Maximized
                         ? WindowState.Maximized
                         : WindowState.Normal
@@ -112,6 +119,17 @@ namespace MyCoinFlow.Services
 
                 if (!IsValidSize(state))
                     return;
+
+                bool canResize = window.ResizeMode != ResizeMode.NoResize;
+
+                if (!canResize)
+                {
+                    // Grösse bleibt, wie in der XAML festgelegt – nur die Position übernehmen.
+                    var posOnly = EnsureWindowVisible(new Rect(state.Left, state.Top, window.Width, window.Height));
+                    window.Left = posOnly.Left;
+                    window.Top = posOnly.Top;
+                    return;
+                }
 
                 var rect = new Rect(state.Left, state.Top, state.Width, state.Height);
                 var safeRect = EnsureWindowVisible(rect);

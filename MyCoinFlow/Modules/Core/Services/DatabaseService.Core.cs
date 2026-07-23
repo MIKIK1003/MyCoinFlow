@@ -1793,6 +1793,117 @@ WHERE t.Id = @id;";
             };
         }
 
+        /// <summary>
+        /// DMS-Matching: liefert Transaktionen, deren Betrag exakt (betragsmässig, ohne Vorzeichen)
+        /// zum übergebenen Betrag passt und deren Datum im Fenster um das Dokumentdatum liegt.
+        /// Transaktionen, die bereits ein Attachment haben, werden ausgeschlossen (kein erneuter
+        /// Vorschlag für bereits dokumentierte Buchungen).
+        /// </summary>
+        public List<Transaktion> FindCandidateTransaktionenForMatch(decimal betrag, DateTime docDatum, int tageVorher, int tageNachher)
+        {
+            var list = new List<Transaktion>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
+       t.Betrag, t.Notiz,
+       t.AdresseId, a.Name AS AdresseName,
+       t.GeldinstitutId, g.Name AS BankName,
+       t.ImportQuelle
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
+LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+WHERE ABS(t.Betrag) = ABS(@betrag)
+  AND t.Datum BETWEEN @von AND @bis
+  AND NOT EXISTS (SELECT 1 FROM dbo.Attachment att WHERE att.TransaktionId = t.Id)
+ORDER BY t.Datum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@betrag", betrag);
+            cmd.Parameters.AddWithValue("@von", docDatum.Date.AddDays(-Math.Abs(tageVorher)));
+            cmd.Parameters.AddWithValue("@bis", docDatum.Date.AddDays(Math.Abs(tageNachher)));
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new Transaktion
+                {
+                    Id = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
+                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// DMS: einfache Suche für das manuelle Zuweisen eines Dokuments zu einer Transaktion
+        /// (Betrag/Datumsbereich/Freitext optional, alle kombinierbar). Für den
+        /// DmsAssignTransactionDialog-Suchmodus.
+        /// </summary>
+        public List<Transaktion> SearchTransaktionenForZuordnung(string? text, decimal? betrag, DateTime? von, DateTime? bis, int maxResults = 50)
+        {
+            var list = new List<Transaktion>();
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT TOP (@max) t.Id, t.Datum, t.BudgetDatum, t.VonKontoId, t.NachKontoId,
+       t.Betrag, t.Notiz,
+       t.AdresseId, a.Name AS AdresseName,
+       t.GeldinstitutId, g.Name AS BankName,
+       t.ImportQuelle
+FROM dbo.Transaktion t
+LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
+LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
+WHERE (@betrag IS NULL OR ABS(t.Betrag) = ABS(@betrag))
+  AND (@von IS NULL OR t.Datum >= @von)
+  AND (@bis IS NULL OR t.Datum <= @bis)
+  AND (@q IS NULL OR
+       t.Notiz LIKE '%' + @q + '%' OR
+       a.Name LIKE '%' + @q + '%' OR
+       g.Name LIKE '%' + @q + '%')
+ORDER BY t.Datum DESC;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@max", maxResults);
+            cmd.Parameters.AddWithValue("@betrag", (object?)betrag ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@von", (object?)von ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bis", (object?)bis ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@q", string.IsNullOrWhiteSpace(text) ? DBNull.Value : (object)text.Trim());
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new Transaktion
+                {
+                    Id = r.GetInt32(0),
+                    Datum = r.GetDateTime(1),
+                    BudgetDatum = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
+                    VonKontoId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                    NachKontoId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                    Betrag = r.GetDecimal(5),
+                    Notiz = r.IsDBNull(6) ? null : r.GetString(6),
+                    AdresseId = r.IsDBNull(7) ? (int?)null : r.GetInt32(7),
+                    AdresseName = r.IsDBNull(8) ? null : r.GetString(8),
+                    GeldinstitutId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    BankName = r.IsDBNull(10) ? null : r.GetString(10),
+                    ImportQuelle = r.IsDBNull(11) ? null : r.GetString(11)
+                });
+            }
+            return list;
+        }
+
 
         // NEU: Gefilterte Transaktionen für ein Geldinstitut
         public List<Transaktion> LadeTransaktionenByGeldinstitut(

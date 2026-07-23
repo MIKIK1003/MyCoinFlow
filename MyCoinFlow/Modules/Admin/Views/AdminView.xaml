@@ -326,6 +326,22 @@
                                             Margin="0,0,0,10"
                                             Click="Paths_SuggestOneDrive_Click"/>
 
+                                    <Separator Margin="0,4,0,10"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                                            Tag="FolderPlus"
+                                            Content="Arbeitsordner erstellen"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"
+                                            Click="Paths_CreateWorkFolder_Click"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                                            Tag="FolderOpen"
+                                            Content="Arbeitsordner öffnen"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"
+                                            Click="Paths_OpenWorkFolderExplorer_Click"/>
+
                                     <Button Style="{StaticResource IconTextButton}"
                                             Tag="ContentSave"
                                             Content="Speichern"

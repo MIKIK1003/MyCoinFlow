@@ -5,8 +5,8 @@
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Schlüssel anlegen"
         Width="520"
-        Height="300"
-        WindowStartupLocation="Manual"
+        Height="340"
+        WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
     <Grid Margin="20">

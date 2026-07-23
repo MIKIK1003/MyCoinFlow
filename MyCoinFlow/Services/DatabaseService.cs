@@ -176,6 +176,24 @@ BEGIN
     ALTER TABLE dbo.Attachment ADD Kategorie NVARCHAR(100) NULL;
 END;
 
+-- NEU: erkanntes/angenommenes Dokumentdatum (fürs Fälligkeits-Tracking: Datum + 30 Tage,
+-- solange keine Transaktion zugeordnet ist).
+IF COL_LENGTH('dbo.Attachment', 'DokumentDatum') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD DokumentDatum DATE NULL;
+END;
+
+-- NEU: Garantieschein-Kennzeichnung mit Ablaufdatum.
+IF COL_LENGTH('dbo.Attachment', 'IstGarantieschein') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD IstGarantieschein BIT NOT NULL CONSTRAINT DF_Attachment_IstGarantieschein DEFAULT 0;
+END;
+
+IF COL_LENGTH('dbo.Attachment', 'GarantieAblaufDatum') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD GarantieAblaufDatum DATE NULL;
+END;
+
 IF EXISTS (
     SELECT 1 FROM sys.columns c
     JOIN sys.tables t ON t.object_id = c.object_id
@@ -502,7 +520,7 @@ END;
         /// Legt einen Attachment-Datensatz an. Gibt die neue Id zurück.
         /// </summary>
         public int SaveAttachment(int? transaktionId, string fileName, string? originalName, string folderRel, long? sizeBytes, string? ocrStatus,
-            string? entityType = null, int? entityId = null, string? titel = null, string? kategorie = null)
+            string? entityType = null, int? entityId = null, string? titel = null, string? kategorie = null, DateTime? dokumentDatum = null)
         {
             // Rückwärtskompatibel: bisherige Aufrufer übergeben nur transaktionId,
             // EntityType/EntityId werden dann automatisch daraus abgeleitet.
@@ -515,8 +533,8 @@ END;
             using var c = CreateConnection();
             c.Open();
             const string sql = @"
-INSERT INTO dbo.Attachment (TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, OcrStatus, EntityType, EntityId, Titel, Kategorie)
-VALUES (@t, @f, @o, @folder, @sz, @ocr, @et, @eid, @titel, @kat);
+INSERT INTO dbo.Attachment (TransaktionId, FileName, OriginalName, FolderRel, SizeBytes, OcrStatus, EntityType, EntityId, Titel, Kategorie, DokumentDatum)
+VALUES (@t, @f, @o, @folder, @sz, @ocr, @et, @eid, @titel, @kat, @dokDatum);
 SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
             using var cmd = new SqlCommand(sql, c);
@@ -530,9 +548,26 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
             cmd.Parameters.AddWithValue("@eid", (object?)entityId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@titel", (object?)titel ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@kat", (object?)kategorie ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@dokDatum", (object?)dokumentDatum?.Date ?? DBNull.Value);
 
             var idObj = cmd.ExecuteScalar();
             return (idObj is int i) ? i : Convert.ToInt32(idObj);
+        }
+
+        /// <summary>
+        /// DMS: markiert ein Dokument als Garantieschein (mit Ablaufdatum) oder hebt die
+        /// Kennzeichnung wieder auf (istGarantieschein = false, ablaufDatum wird dann ignoriert).
+        /// </summary>
+        public void UpdateAttachmentGarantie(int attachmentId, bool istGarantieschein, DateTime? ablaufDatum)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET IstGarantieschein = @ist, GarantieAblaufDatum = @ablauf WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@ist", istGarantieschein);
+            cmd.Parameters.AddWithValue("@ablauf", istGarantieschein && ablaufDatum.HasValue ? (object)ablaufDatum.Value.Date : DBNull.Value);
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
@@ -547,7 +582,8 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
             var sql = @"
 SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
-       a.FileName, a.OriginalName, a.FolderRel, a.SizeBytes, a.ImportedAtUtc, a.OcrStatus
+       a.FileName, a.OriginalName, a.FolderRel, a.SizeBytes, a.ImportedAtUtc, a.OcrStatus,
+       a.DokumentDatum, a.IstGarantieschein, a.GarantieAblaufDatum
 FROM dbo.Attachment a
 LEFT JOIN dbo.AttachmentText t ON t.AttachmentId = a.Id
 WHERE (@q IS NULL OR
@@ -582,7 +618,10 @@ ORDER BY a.ImportedAtUtc DESC;";
                     FolderRel = r.GetString(8),
                     SizeBytes = r.IsDBNull(9) ? (long?)null : r.GetInt64(9),
                     ImportedAtUtc = r.GetDateTime(10),
-                    OcrStatus = r.IsDBNull(11) ? null : r.GetString(11)
+                    OcrStatus = r.IsDBNull(11) ? null : r.GetString(11),
+                    DokumentDatum = r.IsDBNull(12) ? (DateTime?)null : r.GetDateTime(12),
+                    IstGarantieschein = r.GetBoolean(13),
+                    GarantieAblaufDatum = r.IsDBNull(14) ? (DateTime?)null : r.GetDateTime(14)
                 });
             }
             return list;
@@ -670,21 +709,36 @@ ORDER BY Id";
         }
 
         /// <summary>
-        /// Load by Id – minimal für Delete / Open.
+        /// Load by Id – minimal für Delete / Open / Re-Matching.
         /// </summary>
-        public (int Id, int TransaktionId, string FileName, string FolderRel)? GetAttachmentById(int attachmentId)
+        public (int Id, int? TransaktionId, string FileName, string FolderRel, DateTime ImportedAtUtc)? GetAttachmentById(int attachmentId)
         {
             using var c = CreateConnection();
             c.Open();
-            const string sql = @"SELECT Id, TransaktionId, FileName, FolderRel FROM dbo.Attachment WHERE Id=@id";
+            const string sql = @"SELECT Id, TransaktionId, FileName, FolderRel, ImportedAtUtc FROM dbo.Attachment WHERE Id=@id";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@id", attachmentId);
             using var r = cmd.ExecuteReader();
             if (r.Read())
             {
-                return (r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetString(3));
+                return (r.GetInt32(0), r.IsDBNull(1) ? (int?)null : r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetDateTime(4));
             }
             return null;
+        }
+
+        /// <summary>
+        /// DMS: liest den gespeicherten OCR-/Textlayer-Inhalt eines Attachments (für erneutes
+        /// Transaktions-Matching, ohne die Datei nochmals per OCR verarbeiten zu müssen).
+        /// </summary>
+        public string? GetAttachmentText(int attachmentId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT [Text] FROM dbo.AttachmentText WHERE AttachmentId=@id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            var obj = cmd.ExecuteScalar();
+            return (obj == null || obj == DBNull.Value) ? null : Convert.ToString(obj);
         }
 
         /// <summary>
@@ -721,6 +775,75 @@ ORDER BY Id";
             }
         }
 
+
+        /// <summary>
+        /// DMS: verknüpft ein bestehendes (freistehendes) Dokument mit einer Transaktion
+        /// (automatisches Matching oder manuelles Zuweisen). Datei bleibt am aktuellen Ort.
+        /// </summary>
+        public void LinkAttachmentToTransaktion(int attachmentId, int transaktionId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"
+UPDATE dbo.Attachment
+SET TransaktionId = @tid, EntityType = 'Transaktion', EntityId = @tid
+WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@tid", transaktionId);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: aktualisiert Dateiname und Kategorie eines Dokuments (z. B. nach dem Umbenennen
+        /// bei Zuordnung zu einer Transaktion). Titel bleibt unverändert.
+        /// </summary>
+        public void UpdateAttachmentFileNameAndKategorie(int attachmentId, string fileName, string? kategorie)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET FileName = @fn, Kategorie = @kat WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@fn", fileName);
+            cmd.Parameters.AddWithValue("@kat", (object?)kategorie ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: löst die Verknüpfung eines Dokuments von seiner Transaktion (Gegenteil von
+        /// LinkAttachmentToTransaktion). Datei und DB-Zeile bleiben erhalten – im Unterschied
+        /// zu DeleteAttachment. Das Dokument erscheint danach als freistehend im DMS.
+        /// </summary>
+        public void UnlinkAttachment(int attachmentId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"
+UPDATE dbo.Attachment
+SET TransaktionId = NULL, EntityType = NULL, EntityId = NULL
+WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Aktualisiert das erkannte Dokumentdatum eines Attachments (Basis fürs
+        /// Fälligkeits-Tracking). Wird u. a. beim erneuten Matching (DmsWatcherService) genutzt,
+        /// um ältere Dokumente (angelegt, bevor DokumentDatum existierte, oder ohne Treffer beim
+        /// ersten Lauf) nachträglich zu befüllen.
+        /// </summary>
+        public void UpdateAttachmentDokumentDatum(int attachmentId, DateTime datum)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET DokumentDatum = @d WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@d", datum.Date);
+            cmd.ExecuteNonQuery();
+        }
 
         /// <summary>
         /// Setzt den OCR-Status eines Attachments (z. B. "Text", "Image", "OCR", "Error").

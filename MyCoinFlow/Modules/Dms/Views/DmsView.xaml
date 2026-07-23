@@ -3,6 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+    </UserControl.Resources>
+
     <!-- Sidebar | Divider | Suchleiste + Tabelle -->
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
@@ -16,14 +20,32 @@
                 Background="{DynamicResource MaterialDesignPaper}">
             <StackPanel>
                 <TextBlock Text="DMS"
-                           FontSize="18" Margin="0,0,0,12"
-                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                           Style="{StaticResource SidebarSectionHeader}"/>
+
+                <!-- Gruppe: Erfassen -->
+                <TextBlock Text="Erfassen"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Scanner"
+                        Content="Scannen"
+                        ToolTip="Papierdokument über den angeschlossenen Scanner einlesen und in den Arbeitsordner legen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding ScannenCommand}"/>
 
                 <Button Style="{StaticResource IconTextButton}"
                         Tag="Upload"
                         Content="Dokument hochladen"
-                        MinHeight="40" Margin="0,0,0,8"
+                        MinHeight="40"
                         Command="{Binding HochladenCommand}"/>
+
+                <Separator Margin="0,14,0,12"/>
+
+                <!-- Gruppe: Dokument -->
+                <TextBlock Text="Dokument"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
 
                 <Button Style="{StaticResource IconTextButton}"
                         Tag="FileEye"
@@ -40,12 +62,41 @@
                 <Button Style="{StaticResource IconTextButton.Danger}"
                         Tag="Delete"
                         Content="Löschen"
-                        MinHeight="40" Margin="0,0,0,16"
+                        MinHeight="40"
                         Command="{Binding LoeschenCommand}"/>
 
+                <Separator Margin="0,14,0,12"/>
+
+                <!-- Gruppe: Transaktions-Zuordnung -->
+                <TextBlock Text="Transaktions-Zuordnung"
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="LinkVariant"
+                        Content="Transaktion zuweisen"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding TransaktionZuweisenCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Refresh"
+                        Content="Suche erneut"
+                        ToolTip="Automatisches Matching für das ausgewählte Dokument erneut versuchen (z. B. wenn die Buchung erst jetzt erfasst wurde)"
+                        MinHeight="40" Margin="0,0,0,8"
+                        Command="{Binding SucheErneutCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Magnify"
+                        Content="Alle automatisch suchen"
+                        ToolTip="Automatisches Matching für alle noch nicht zugeordneten Dokumente erneut versuchen"
+                        MinHeight="40"
+                        Command="{Binding AlleErneutSuchenCommand}"/>
+
+                <Separator Margin="0,14,0,12"/>
+
                 <TextBlock Text="Kategorie"
-                           Margin="0,0,0,6"
-                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                           Style="{StaticResource SidebarGroupHeader}"
+                           Margin="0,0,0,8"/>
                 <ComboBox ItemsSource="{Binding Kategorien}"
                           SelectedItem="{Binding KategorieFilter}"
                           Style="{StaticResource MaterialDesignOutlinedComboBox}"
@@ -58,6 +109,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="12"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -78,7 +130,47 @@
                 </TextBox>
             </DockPanel>
 
-            <DataGrid Grid.Row="2"
+            <!-- Arbeitsordner-Verarbeitung: nur sichtbar, während der Watcher gerade aktiv ist -->
+            <Border Grid.Row="2"
+                    Padding="10"
+                    CornerRadius="8"
+                    Margin="0,0,0,12"
+                    Background="{DynamicResource MaterialDesignCardBackground}"
+                    Visibility="{Binding WatcherIsBusy, Converter={StaticResource BoolToVisConverter}}">
+                <DockPanel LastChildFill="True">
+                    <materialDesign:PackIcon DockPanel.Dock="Left"
+                                             Kind="Sync"
+                                             Width="20" Height="20"
+                                             VerticalAlignment="Center"
+                                             Margin="0,0,10,0"
+                                             RenderTransformOrigin="0.5,0.5">
+                        <materialDesign:PackIcon.RenderTransform>
+                            <RotateTransform/>
+                        </materialDesign:PackIcon.RenderTransform>
+                        <materialDesign:PackIcon.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(materialDesign:PackIcon.RenderTransform).(RotateTransform.Angle)"
+                                                         From="0" To="360" Duration="0:0:1.2" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </materialDesign:PackIcon.Triggers>
+                    </materialDesign:PackIcon>
+                    <TextBlock VerticalAlignment="Center">
+                        <Run Text="Verarbeite:"/>
+                        <Run Text="{Binding WatcherCurrentFile, Mode=OneWay}" FontWeight="SemiBold"/>
+                        <Run Text=" – "/>
+                        <Run Text="{Binding WatcherPhase, Mode=OneWay}"/>
+                        <Run Text=" · noch "/>
+                        <Run Text="{Binding WatcherQueueCount, Mode=OneWay}"/>
+                        <Run Text=" in Warteschlange"/>
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
+            <DataGrid Grid.Row="3"
                       ItemsSource="{Binding Dokumente}"
                       SelectedItem="{Binding AusgewaehltesDokument}"
                       AutoGenerateColumns="False"
@@ -97,10 +189,31 @@
                     </Style>
                 </DataGrid.ColumnHeaderStyle>
 
+                <!-- Überfällige Rechnungen (rot) bzw. ablaufende/abgelaufene Garantien (gelb/orange)
+                     farblich hervorheben, damit sie im Grid sofort auffallen. -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IstGarantieBaldAblaufend}" Value="True">
+                                <Setter Property="Background" Value="#FFFFF9E0"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IstGarantieAbgelaufen}" Value="True">
+                                <Setter Property="Background" Value="#FFFFF0D9"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IstUeberfaellig}" Value="True">
+                                <Setter Property="Background" Value="#FFFDECEA"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Titel / Datei" Binding="{Binding TitelAnzeige}" Width="*"/>
-                    <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="160"/>
-                    <DataGridTextColumn Header="Verknüpft mit" Binding="{Binding VerknuepftMitAnzeige}" Width="160"/>
+                    <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="140"/>
+                    <DataGridTextColumn Header="Verknüpft mit" Binding="{Binding VerknuepftMitAnzeige}" Width="140"/>
+                    <DataGridTextColumn Header="Fällig am" Binding="{Binding FaelligAnzeige}" Width="90"
+                                        ToolTipService.ToolTip="30 Tage ab erkanntem Dokumentdatum – rot, falls noch keine Transaktion zugeordnet und überfällig"/>
+                    <DataGridTextColumn Header="Garantie bis" Binding="{Binding GarantieAnzeige}" Width="130"/>
                     <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="90"/>
                     <DataGridTextColumn Header="Datum" Binding="{Binding ImportedAtUtc, StringFormat=dd.MM.yyyy}" Width="100"/>
                     <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="90"/>

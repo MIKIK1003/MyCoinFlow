@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using MyCoinFlow.ViewModels;
 
 namespace MyCoinFlow.Views
 {
@@ -8,6 +9,7 @@ namespace MyCoinFlow.Views
         {
             InitializeComponent();
             // DataContext kommt von außen (MainViewModel via DataTemplate)
+            Unloaded += (s, e) => (DataContext as DmsViewModel)?.Dispose();
         }
     }
 }

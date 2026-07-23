@@ -267,6 +267,7 @@
 
                     <!-- Daten-Spalten -->
                     <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
+                    <DataGridTextColumn Header="Transaktions-#" Binding="{Binding Id}" Width="110"/>
                     <DataGridTextColumn Header="Von"   Binding="{Binding VonAnzeige}" Width="*"/>
                     <DataGridTextColumn Header="Nach"  Binding="{Binding NachAnzeige}" Width="*"/>
                     <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:C2}}" Width="120">

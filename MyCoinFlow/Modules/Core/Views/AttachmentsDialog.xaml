@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Anhänge verwalten"
-        Height="420" Width="640"
+        Height="420" Width="740"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False">
@@ -35,7 +35,7 @@
                 <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
                 <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="120"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="120"/>
-                <DataGridTemplateColumn Header="" Width="200" IsReadOnly="True">
+                <DataGridTemplateColumn Header="" Width="300" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -46,6 +46,13 @@
                                         Content="Öffnen"
                                         Margin="0,0,8,0"
                                         Click="Open_Click"/>
+
+                                <Button Style="{StaticResource IconTextButton}"
+                                        Tag="LinkOff"
+                                        Content="Zurückstellen"
+                                        Margin="0,0,8,0"
+                                        Visibility="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=AllowDelete, Converter={StaticResource BoolToVis}}"
+                                        Click="Zurueckstellen_Click"/>
 
                                 <Button Style="{StaticResource IconTextButton.Danger}"
                                         Tag="Delete"

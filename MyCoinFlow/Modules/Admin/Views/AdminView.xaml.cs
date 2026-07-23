@@ -1224,6 +1224,8 @@ ORDER BY name;";
         private void Paths_OpenExplorer_Click(object sender, RoutedEventArgs e) => GetPathsView()?.OpenInExplorer_Click(sender, e);
         private void Paths_SuggestOneDrive_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SuggestOneDriveFolder_Click(sender, e);
         private void Paths_Save_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Save_Click(sender, e);
+        private void Paths_CreateWorkFolder_Click(object sender, RoutedEventArgs e) => GetPathsView()?.CreateWorkFolder_Click(sender, e);
+        private void Paths_OpenWorkFolderExplorer_Click(object sender, RoutedEventArgs e) => GetPathsView()?.OpenWorkFolderInExplorer_Click(sender, e);
         private void Paths_BrowseTesseract_Click(object sender, RoutedEventArgs e) => GetPathsView()?.BrowseTesseract_Click(sender, e);
         private void Paths_SaveOcr_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SaveOcr_Click(sender, e);
         private void Paths_Reindex_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Reindex_Click(sender, e);
