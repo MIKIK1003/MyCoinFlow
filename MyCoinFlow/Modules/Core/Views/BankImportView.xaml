@@ -103,6 +103,18 @@
                       materialDesign:DataGridAssist.CellPadding="6"
                       materialDesign:DataGridAssist.ColumnHeaderPadding="12">
 
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Buchungstext im Web recherchieren"
+                                  Command="{Binding PlacementTarget.DataContext.WebRechercheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="Magnify"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+
                 <DataGrid.Columns>
 
                     <!-- Status: vollständig => Bearbeiten -->
@@ -227,6 +239,32 @@
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IstSonderregelTreffer}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="" Width="44" MinWidth="44" MaxWidth="44" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid ToolTip="Unsichere Zuordnung: gleicher Buchungstext wurde bisher auf mehrere Konten mit überlappenden Beträgen gebucht – bitte prüfen.">
+                                    <materialDesign:PackIcon Kind="AlertCircleOutline"
+                                         Width="18"
+                                         Height="18"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Foreground="#FFB300">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IstUnsichereRegel}" Value="True">
                                                         <Setter Property="Visibility" Value="Visible"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>

@@ -59,6 +59,97 @@ namespace MyCoinFlow.Services
             };
         }
 
+        // Historische Tagesschlusskurse über den EOD-Endpunkt.
+        // Liefert alle verfügbaren Handelstage im Bereich [von, bis] mit einem einzigen API-Aufruf.
+        public async Task<List<EodKursTag>> HoleEodHistorieAsync(
+            string symbol,
+            string boerse,
+            string apiKey,
+            DateTime von,
+            DateTime bis)
+        {
+            if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(apiKey))
+                return new List<EodKursTag>();
+
+            var eodhdCode = BuildEodhdCode(symbol, boerse);
+            if (string.IsNullOrWhiteSpace(eodhdCode))
+                return new List<EodKursTag>();
+
+            return await HoleEodHistorieInternAsync(eodhdCode, apiKey, von, bis);
+        }
+
+        public async Task<List<EodKursTag>> HoleFxHistorieAsync(
+            string vonWaehrung,
+            string nachWaehrung,
+            string apiKey,
+            DateTime von,
+            DateTime bis)
+        {
+            var v = (vonWaehrung ?? "").Trim().ToUpperInvariant();
+            var n = (nachWaehrung ?? "").Trim().ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(v) || string.IsNullOrWhiteSpace(n) ||
+                v == n || string.IsNullOrWhiteSpace(apiKey))
+                return new List<EodKursTag>();
+
+            return await HoleEodHistorieInternAsync($"{v}{n}.FOREX", apiKey, von, bis);
+        }
+
+        private static async Task<List<EodKursTag>> HoleEodHistorieInternAsync(
+            string eodhdCode,
+            string apiKey,
+            DateTime von,
+            DateTime bis)
+        {
+            var list = new List<EodKursTag>();
+
+            var url =
+                $"https://eodhd.com/api/eod/{Uri.EscapeDataString(eodhdCode)}" +
+                $"?api_token={Uri.EscapeDataString(apiKey)}&fmt=json&period=d" +
+                $"&from={von:yyyy-MM-dd}&to={bis:yyyy-MM-dd}";
+
+            try
+            {
+                using var response = await _http.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                    return list;
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+
+                if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                    return list;
+
+                foreach (var item in doc.RootElement.EnumerateArray())
+                {
+                    var datumText = ReadString(item, "date");
+                    if (!DateTime.TryParseExact(
+                            datumText,
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out var datum))
+                        continue;
+
+                    var close = ReadDecimal(item, "close");
+                    if (!close.HasValue || close.Value <= 0)
+                        continue;
+
+                    list.Add(new EodKursTag
+                    {
+                        Datum = datum.Date,
+                        Kurs = close.Value
+                    });
+                }
+
+                return list;
+            }
+            catch
+            {
+                return list;
+            }
+        }
+
         public async Task<List<SymbolSucheResult>> SucheInstrumenteAsync(string suchtext, string apiKey)
         {
             var list = new List<SymbolSucheResult>();
@@ -235,6 +326,12 @@ namespace MyCoinFlow.Services
 
             return null;
         }
+    }
+
+    public class EodKursTag
+    {
+        public DateTime Datum { get; set; }
+        public decimal Kurs { get; set; }
     }
 
     public class KursResult

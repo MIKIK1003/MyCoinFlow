@@ -68,6 +68,20 @@ namespace MyCoinFlow.Import
             }
         }
 
+        // --- NEU: Sonderregel stammt aus widersprüchlicher Beleglage
+        // (gleicher Text, überlappende Beträge, unterschiedliche Konten) ---
+        private bool _istUnsichereRegel;
+        public bool IstUnsichereRegel
+        {
+            get => _istUnsichereRegel;
+            set
+            {
+                if (_istUnsichereRegel == value) return;
+                _istUnsichereRegel = value;
+                OnPropertyChanged();
+            }
+        }
+
         // --- Vorschläge (mit Änderungsbenachrichtigung) ---
         private int? _vorschlagAdresseId;
         public int? VorschlagAdresseId

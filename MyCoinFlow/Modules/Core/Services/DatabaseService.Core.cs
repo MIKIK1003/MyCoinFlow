@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Transactions;
@@ -1432,6 +1433,51 @@ BEGIN
     ALTER TABLE dbo.AdressBuchungsregel
     ADD BetragBis DECIMAL(18,2) NULL;
 END;
+
+-- NEU: Evidenz-Tracking statt Einzelbeispiel-Fixierung
+IF COL_LENGTH('dbo.AdressBuchungsregel', 'BelegAnzahl') IS NULL
+BEGIN
+    ALTER TABLE dbo.AdressBuchungsregel
+    ADD BelegAnzahl INT NOT NULL CONSTRAINT DF_AdressBuchungsregel_BelegAnzahl DEFAULT(1);
+END;
+
+IF COL_LENGTH('dbo.AdressBuchungsregel', 'LetzteBestaetigung') IS NULL
+BEGIN
+    ALTER TABLE dbo.AdressBuchungsregel
+    ADD LetzteBestaetigung DATETIME2 NULL;
+END;
+
+IF COL_LENGTH('dbo.AdressBuchungsregel', 'IstKonflikt') IS NULL
+BEGIN
+    ALTER TABLE dbo.AdressBuchungsregel
+    ADD IstKonflikt BIT NOT NULL CONSTRAINT DF_AdressBuchungsregel_IstKonflikt DEFAULT(0);
+END;
+
+-- NEU: Belege (Evidenz-Historie) je bestätigter Zuordnung.
+-- Grundlage für die Regel-Ableitung in LernAdressBuchungsregel().
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AdressBuchungsregelBeleg' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.AdressBuchungsregelBeleg
+    (
+        Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AdressBuchungsregelBeleg PRIMARY KEY,
+        AdresseId     INT NOT NULL,
+        IstEinnahme   BIT NOT NULL,
+        TextPattern   NVARCHAR(200) NOT NULL,
+        PatternModus  NVARCHAR(20) NOT NULL CONSTRAINT DF_AdressBuchungsregelBeleg_Modus DEFAULT('Contains'),
+        Betrag        DECIMAL(18,2) NOT NULL,
+        KontoId       INT NOT NULL,
+        ErstelltAmUtc DATETIME2 NOT NULL CONSTRAINT DF_AdressBuchungsregelBeleg_Created DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_AdressBuchungsregelBeleg_Adresse
+            FOREIGN KEY (AdresseId) REFERENCES dbo.Adresse(Id),
+
+        CONSTRAINT FK_AdressBuchungsregelBeleg_Konto
+            FOREIGN KEY (KontoId) REFERENCES dbo.Kontenplan(Id)
+    );
+
+    CREATE INDEX IX_AdressBuchungsregelBeleg_Lookup
+        ON dbo.AdressBuchungsregelBeleg(AdresseId, IstEinnahme, TextPattern, PatternModus);
+END;
 ";
 
             using var cmd = new SqlCommand(sql, c);
@@ -2648,6 +2694,8 @@ ORDER BY Kontonummer, Detail;";
         // ---- Alles-in-einem: Verbuchen (liefert Kennzahlen) ----
         public (int inserted, int skipped, int duplicates) VerbuchenCcStaging(int batchId, int kreditkartenKontoId, int? geldinstitutId)
         {
+            EnsureCreditCardImportAdresseColumn();
+
             int ins = 0, skip = 0, dup = 0;
 
             using var c = new SqlConnection(_connectionString);
@@ -2655,7 +2703,7 @@ ORDER BY Kontonummer, Detail;";
 
             // Nur gemappte Zeilen des Batches
             const string sel = @"
-            SELECT Id, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, KontoId, ImportHash
+            SELECT Id, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, KontoId, ImportHash, AdresseId
             FROM CreditCardImportStaging
             WHERE BatchId=@b AND KontoId IS NOT NULL
             ORDER BY Datum, Id";
@@ -2663,7 +2711,7 @@ ORDER BY Kontonummer, Detail;";
             using var cmd = new SqlCommand(sel, c);
             cmd.Parameters.AddWithValue("@b", batchId);
 
-            var rows = new List<(int Id, DateTime Datum, decimal Betrag, string DK, string? Bez, string? H, string? K, string? Card, int KontoId, string? Hash)>();
+            var rows = new List<(int Id, DateTime Datum, decimal Betrag, string DK, string? Bez, string? H, string? K, string? Card, int KontoId, string? Hash, int? AdresseId)>();
             using (var r = cmd.ExecuteReader())
             {
                 while (r.Read())
@@ -2678,7 +2726,8 @@ ORDER BY Kontonummer, Detail;";
                         r.IsDBNull(6) ? null : r.GetString(6),
                         r.IsDBNull(7) ? null : r.GetString(7),
                         r.GetInt32(8),
-                        r.IsDBNull(9) ? null : r.GetString(9)
+                        r.IsDBNull(9) ? null : r.GetString(9),
+                        r.IsDBNull(10) ? (int?)null : r.GetInt32(10)
                     ));
                 }
             }
@@ -2703,7 +2752,10 @@ ORDER BY Kontonummer, Detail;";
                 int? von = isBel ? kreditkartenKontoId : r.KontoId;
                 int? nach = isBel ? r.KontoId : kreditkartenKontoId;
 
-                var adrId = FindeOderErzeugeAdresseByName(r.H);
+                // Normalfall: Adresse wurde beim Staging/Zuweisen bereits über
+                // AdressErkennungService/ZuordnungDialog aufgelöst. Fallback nur
+                // für Alt-Zeilen aus der Zeit vor diesem Umbau.
+                var adrId = r.AdresseId ?? FindeOderErzeugeAdresseByName(r.H);
 
                 // **WICHTIG**: Keine Bank mehr referenzieren -> GeldinstitutId = null
                 // Damit ist es fachlich eine reine Konto->Konto-Buchung und taucht NICHT im Banksaldo auf.
@@ -2855,7 +2907,10 @@ SELECT
 
         public (int inserted, int skipped, int duplicates) SaveExcelRowsToStaging(int batchId, IEnumerable<CreditCardImportRow> rows)
         {
+            EnsureCreditCardImportAdresseColumn();
+
             int ins = 0, skip = 0, dup = 0;
+            var matcher = new AdressErkennungService();
 
             using var c = new SqlConnection(_connectionString);
             c.Open();
@@ -2865,32 +2920,37 @@ SELECT
                 // Nur Zeilen mit bekanntem Debit/Kredit – beides zulassen
                 if (!IstBelastung(r.DebitKredit) && !IstGutschrift(r.DebitKredit)) { skip++; continue; }
 
+                // Gleiche Erkennung wie beim CAMT-Import: Adresse fuzzy matchen,
+                // dann Konto über Sonderregel oder Adress-Standardkonto.
+                bool istEinnahme = IstGutschrift(r.DebitKredit);
+                var betragAbs = Math.Abs(r.Betrag);
+                var (adrId, kontoId) = ResolveCcZeile(matcher, r.Haendler, r.Beschreibung, r.Kategorie, betragAbs, istEinnahme);
 
+                // MappingKey bleibt als Metadatum erhalten (u.a. für das Archiv), wird aber
+                // nicht mehr zur automatischen Kontosuche verwendet.
                 var key = BaueMappingSchluessel(r.Beschreibung, r.Haendler, r.Kategorie);
-                var mapKonto = HoleKontoIdFuerMapping(key);
 
-                var hash = BaueImportHashV2(r.Datum, Math.Abs(r.Betrag), r.Beschreibung, r.Haendler, r.Kartennummer, r.DebitKredit);
-                // ... diesen hash in die Staging-Zeile schreiben
-
+                var hash = BaueImportHashV2(r.Datum, betragAbs, r.Beschreibung, r.Haendler, r.Kartennummer, r.DebitKredit);
 
                 // Dedupe über Staging/Archiv/Transaktion
                 if (HashExistsAnywhere(c, hash)) { dup++; continue; }
 
                 const string insSql = @"
 INSERT INTO CreditCardImportStaging
-(BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, ImportHash)
-VALUES (@b, @d, @w, @dk, @bez, @h, @kat, @card, @key, @konto, @hash)";
+(BatchId, Datum, Betrag, DebitKredit, Beschreibung, Haendler, Kategorie, Kartennummer, MappingKey, KontoId, AdresseId, ImportHash)
+VALUES (@b, @d, @w, @dk, @bez, @h, @kat, @card, @key, @konto, @adr, @hash)";
                 using var cmd = new SqlCommand(insSql, c);
                 cmd.Parameters.AddWithValue("@b", batchId);
                 cmd.Parameters.AddWithValue("@d", r.Datum.Date);
-                cmd.Parameters.AddWithValue("@w", Math.Abs(r.Betrag));
+                cmd.Parameters.AddWithValue("@w", betragAbs);
                 cmd.Parameters.AddWithValue("@dk", (object?)r.DebitKredit ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@bez", (object?)r.Beschreibung ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@h", (object?)r.Haendler ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@kat", (object?)r.Kategorie ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@card", (object?)r.Kartennummer ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@key", (object?)key ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@konto", (object?)mapKonto ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@konto", (object?)kontoId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@adr", (object?)adrId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@hash", (object?)hash ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
                 ins++;
@@ -2911,23 +2971,94 @@ SELECT 1 WHERE EXISTS(SELECT 1 FROM CreditCardImportStaging WHERE ImportHash=@h)
             }
         }
 
+        // Erweitert die Kreditkarten-Staging-/Archiv-Tabellen um AdresseId,
+        // damit derselbe adressbezogene Erkennungs- und Regel-Workflow wie beim
+        // CAMT-Bank-Import genutzt werden kann. Idempotent, wie die übrigen
+        // Ensure...Schema()-Methoden.
+        public void EnsureCreditCardImportAdresseColumn()
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+IF COL_LENGTH('dbo.CreditCardImportStaging', 'AdresseId') IS NULL
+BEGIN
+    ALTER TABLE dbo.CreditCardImportStaging ADD AdresseId INT NULL;
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CcStaging_Adresse')
+BEGIN
+    ALTER TABLE dbo.CreditCardImportStaging
+        ADD CONSTRAINT FK_CcStaging_Adresse FOREIGN KEY (AdresseId) REFERENCES dbo.Adresse(Id);
+END;
+
+IF COL_LENGTH('dbo.CreditCardImportArchive', 'AdresseId') IS NULL
+BEGIN
+    ALTER TABLE dbo.CreditCardImportArchive ADD AdresseId INT NULL;
+END;
+";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.ExecuteNonQuery();
+        }
+
+        // ---------------------------------------------
+        // Löst für eine Kreditkarten-Zeile Adresse + Konto genau so auf,
+        // wie es der CAMT-Bank-Import tut: fuzzy Adress-Matching über
+        // AdressErkennungService, dann Sonderregel (AdressBuchungsregel),
+        // sonst Standardkonto der Adresse. Keine automatische Neuanlage
+        // einer Adresse - das entscheidet der Nutzer im Zuordnungsdialog,
+        // genau wie bei CAMT.
+        // ---------------------------------------------
+        public (int? adresseId, int? kontoId) ResolveCcZeile(AdressErkennungService matcher, string? haendler, string? beschreibung, string? kategorie, decimal betragAbs, bool istEinnahme)
+        {
+            var name = !string.IsNullOrWhiteSpace(haendler) ? haendler : beschreibung;
+            var adrId = matcher.TryMatch(null, name, beschreibung);
+
+            int? kontoId = null;
+
+            if (adrId.HasValue)
+            {
+                kontoId = ResolveKontoByAdressBuchungsregel(adrId.Value, istEinnahme, beschreibung, kategorie, betragAbs, out _);
+
+                if (!kontoId.HasValue)
+                {
+                    var adr = HoleAdresse(adrId.Value);
+                    if (istEinnahme && adr?.IstBudgetiert == true && adr.StandardEinnahmenKontoId.HasValue)
+                        kontoId = adr.StandardEinnahmenKontoId;
+                    else if (!istEinnahme && adr?.DefaultKontoId.HasValue == true)
+                        kontoId = adr.DefaultKontoId;
+                }
+            }
+
+            // Fallback: Kategorie-Standardkonto. Greift unabhängig davon, ob eine
+            // Adresse erkannt wurde - Kreditkarten-Kategorien sind fix und decken
+            // oft schon den Grossteil der Zeilen ab, auch bei unbekanntem Händler.
+            if (!kontoId.HasValue)
+                kontoId = HoleKontoIdFuerKategorie(kategorie);
+
+            return (adrId, kontoId);
+        }
+
         public List<CreditCardImportRow> LadeCcStaging(int? batchId = null)
         {
+            EnsureCreditCardImportAdresseColumn();
+
             var list = new List<CreditCardImportRow>();
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"
 SELECT s.Id, s.BatchId, s.Datum, s.Betrag, s.DebitKredit, s.Beschreibung, s.Haendler, s.Kategorie,
-       s.Kartennummer, s.KontoId
+       s.Kartennummer, s.KontoId, s.AdresseId
 FROM CreditCardImportStaging s
 WHERE (@b IS NULL OR s.BatchId=@b)
 ORDER BY s.Datum, s.Id";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@b", (object?)batchId ?? DBNull.Value);
 
-            // Für Anzeige: Konto-Labels vorab laden
+            // Für Anzeige: Konto-/Adress-Labels vorab laden
             var labels = LadeKontoLookup().ToDictionary(x => x.Id, x => x.Anzeige);
+            var adressen = LadeAdressen().ToDictionary(a => a.Id, a => a.Name);
 
             using var r = cmd.ExecuteReader();
             while (r.Read())
@@ -2943,41 +3074,31 @@ ORDER BY s.Datum, s.Id";
                     Haendler = r.IsDBNull(6) ? null : r.GetString(6),
                     Kategorie = r.IsDBNull(7) ? null : r.GetString(7),
                     Kartennummer = r.IsDBNull(8) ? null : r.GetString(8),
-                    KontoId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9)
+                    KontoId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
+                    AdresseId = r.IsDBNull(10) ? (int?)null : r.GetInt32(10)
                 };
                 if (row.KontoId.HasValue && labels.TryGetValue(row.KontoId.Value, out var lbl))
                     row.Konto = lbl;
+                if (row.AdresseId.HasValue && adressen.TryGetValue(row.AdresseId.Value, out var an))
+                    row.Adresse = an;
 
                 list.Add(row);
             }
             return list;
         }
 
-        public void UpdateCcStagingZuordnung(int rowId, string mappingKey, int kontoId, bool applyToSameKey)
+        public void UpdateCcStagingZuordnung(int rowId, int? adresseId, int kontoId)
         {
+            EnsureCreditCardImportAdresseColumn();
+
             using var c = new SqlConnection(_connectionString);
             c.Open();
-            using var tx = c.BeginTransaction();
 
-            // 1) Row direkt setzen
-            using (var u = new SqlCommand("UPDATE CreditCardImportStaging SET KontoId=@k WHERE Id=@id", c, tx))
-            {
-                u.Parameters.AddWithValue("@k", kontoId);
-                u.Parameters.AddWithValue("@id", rowId);
-                u.ExecuteNonQuery();
-            }
-
-            // 2) Optional alle offenen mit gleichem Key mitziehen
-            if (applyToSameKey && !string.IsNullOrWhiteSpace(mappingKey))
-            {
-                using var u2 = new SqlCommand(
-                    "UPDATE CreditCardImportStaging SET KontoId=@k WHERE MappingKey=@key AND KontoId IS NULL", c, tx);
-                u2.Parameters.AddWithValue("@k", kontoId);
-                u2.Parameters.AddWithValue("@key", mappingKey);
-                u2.ExecuteNonQuery();
-            }
-
-            tx.Commit();
+            using var u = new SqlCommand("UPDATE CreditCardImportStaging SET KontoId=@k, AdresseId=@a WHERE Id=@id", c);
+            u.Parameters.AddWithValue("@k", kontoId);
+            u.Parameters.AddWithValue("@a", (object?)adresseId ?? DBNull.Value);
+            u.Parameters.AddWithValue("@id", rowId);
+            u.ExecuteNonQuery();
         }
 
         
@@ -4195,7 +4316,10 @@ SELECT
     BetragVon,
     BetragBis,
     Prioritaet,
-    IstAktiv
+    IstAktiv,
+    BelegAnzahl,
+    LetzteBestaetigung,
+    IstKonflikt
 FROM dbo.AdressBuchungsregel
 WHERE AdresseId = @aid
   AND IstEinnahme = @ein
@@ -4222,7 +4346,11 @@ ORDER BY Prioritaet ASC, Id ASC;";
                     BetragBis = r.IsDBNull(7) ? (decimal?)null : r.GetDecimal(7),
 
                     Prioritaet = r.IsDBNull(8) ? 100 : r.GetInt32(8),
-                    IstAktiv = !r.IsDBNull(9) && r.GetBoolean(9)
+                    IstAktiv = !r.IsDBNull(9) && r.GetBoolean(9),
+
+                    BelegAnzahl = r.IsDBNull(10) ? 1 : r.GetInt32(10),
+                    LetzteBestaetigung = r.IsDBNull(11) ? (DateTime?)null : r.GetDateTime(11),
+                    IstKonflikt = !r.IsDBNull(12) && r.GetBoolean(12)
                 });
             }
 
@@ -4230,12 +4358,210 @@ ORDER BY Prioritaet ASC, Id ASC;";
         }
 
         // ---------------------------------------------
-        // Adress-Buchungsregel speichern/überschreiben
-        // NEU: BetragVon/BetragBis gehören zur Eindeutigkeit der Regel.
-        // So können gleiche Adresse + gleicher Text bei unterschiedlichem
-        // Betrag auf verschiedene Konten gelernt werden.
+        // Konto über adressbezogene Buchungsregeln auflösen.
+        // Gemeinsame Logik für CAMT-Bank-Import (BankImportViewModel) und
+        // Kreditkarten-Import, damit beide Importwege dieselben gelernten
+        // Regeln nutzen. Es wird exakt dieselbe Regeltext-Bildung verwendet
+        // wie beim Anlernen im ZuordnungDialog (BuildAliasCandidate dort).
         // ---------------------------------------------
-        public void SpeichereAdressBuchungsregel(int adresseId, bool istEinnahme, string textPattern, string patternModus, int kontoId, decimal? betragVon, decimal? betragBis, int prioritaet = 100)
+        public int? ResolveKontoByAdressBuchungsregel(int adresseId, bool istEinnahme, string? text, string? serviceRef, decimal betrag, out bool istKonflikt)
+        {
+            istKonflikt = false;
+
+            if (adresseId <= 0)
+                return null;
+
+            var regeln = LadeAdressBuchungsregeln(adresseId, istEinnahme);
+            if (regeln == null || regeln.Count == 0)
+                return null;
+
+            var regelSuchtext = BuildAdressBuchungsregelCandidate(text, serviceRef);
+            if (string.IsNullOrWhiteSpace(regelSuchtext))
+                regelSuchtext = !string.IsNullOrWhiteSpace(text)
+                    ? text!.Trim()
+                    : (string.IsNullOrWhiteSpace(serviceRef) ? null : serviceRef!.Trim());
+
+            if (string.IsNullOrWhiteSpace(regelSuchtext))
+                return null;
+
+            var textNorm = NormalizeBookingRuleText(regelSuchtext);
+            var betragAbs = Math.Abs(betrag);
+
+            var treffer = regeln
+                .Where(r => !string.IsNullOrWhiteSpace(r.TextPattern))
+                .Where(r => BuchungsregelTextPasst(r.TextPattern, r.PatternModus, textNorm))
+                .Where(r => BuchungsregelBetragPasst(r, betragAbs))
+                .OrderBy(r => r.Prioritaet)
+                .ThenBy(r => r.Id)
+                .ToList();
+
+            AdressBuchungsregel? gewaehlt = null;
+
+            if (treffer.Count == 1)
+            {
+                gewaehlt = treffer[0];
+            }
+            else if (treffer.Count > 1)
+            {
+                var bestePrioritaet = treffer[0].Prioritaet;
+                var top = treffer.Where(x => x.Prioritaet == bestePrioritaet).ToList();
+
+                if (top.Count == 1)
+                    gewaehlt = top[0];
+            }
+
+            if (gewaehlt == null)
+                return null;
+
+            istKonflikt = gewaehlt.IstKonflikt;
+            return gewaehlt.KontoId;
+        }
+
+        private static string? BuildAdressBuchungsregelCandidate(string? text, string? serviceRef)
+        {
+            var src = !string.IsNullOrWhiteSpace(text) ? text : (serviceRef ?? "");
+            if (string.IsNullOrWhiteSpace(src)) return null;
+
+            // IBANs / lange Nummern entfernen
+            string t = Regex.Replace(src, @"[A-Z]{2}\d{2}[A-Z0-9]{4,}", " ", RegexOptions.IgnoreCase);
+            t = Regex.Replace(t, @"\b\d{5,}\b", " ");
+
+            // Wörter extrahieren (>=3 Zeichen)
+            var stop = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "RECHNUNG","REFERENZ","ZAHLUNG","GEBUEHR","KARTENZAHLUNG","BELASTUNG",
+        "GUTSCHRIFT","MITTEILUNG","VALUTA","SEPA","SWIFT","UETR","CHF","EUR","USD",
+        "VISA","MASTERCARD","TWINT","POSTFINANCE","UBS","CS","BANK","KONTO","IBAN"
+    };
+
+            var words = Regex.Matches(t.ToUpperInvariant(), @"[A-ZÄÖÜ0-9]{3,}")
+                             .Cast<Match>()
+                             .Select(m => m.Value)
+                             .Where(w => !stop.Contains(w))
+                             .ToList();
+
+            if (words.Count == 0) return null;
+
+            var picks = words.Take(4)
+                             .Select(w => w.Length <= 5 ? w : w.Substring(0, 5))
+                             .ToList();
+
+            var code = string.Join("-", picks);
+
+            if (code.Replace("-", "").Length < 8)
+            {
+                var fallback = words.OrderByDescending(w => w.Length)
+                                    .Take(2)
+                                    .Select(w => w.Length <= 6 ? w : w.Substring(0, 6));
+
+                code = string.Join("-", fallback);
+            }
+
+            return code;
+        }
+
+        private static bool BuchungsregelTextPasst(string patternRaw, string? modusRaw, string textNorm)
+        {
+            var pattern = NormalizeBookingRuleText(patternRaw);
+            if (string.IsNullOrWhiteSpace(pattern) || string.IsNullOrWhiteSpace(textNorm))
+                return false;
+
+            var modus = string.IsNullOrWhiteSpace(modusRaw) ? "Contains" : modusRaw.Trim();
+
+            return modus switch
+            {
+                "Exact" => string.Equals(textNorm, pattern, StringComparison.Ordinal),
+                "StartsWith" => textNorm.StartsWith(pattern, StringComparison.Ordinal),
+                "EndsWith" => textNorm.EndsWith(pattern, StringComparison.Ordinal),
+                "PrefixSeq" => PrefixSeqMatchForBookingRule(pattern, textNorm),
+                _ => textNorm.Contains(pattern, StringComparison.Ordinal)
+            };
+        }
+
+        // Kein Bereich gesetzt -> Betrag immer passend
+        private static bool BuchungsregelBetragPasst(AdressBuchungsregel regel, decimal betragAbs)
+        {
+            if (regel == null)
+                return false;
+
+            if (!regel.BetragVon.HasValue && !regel.BetragBis.HasValue)
+                return true;
+
+            if (regel.BetragVon.HasValue && betragAbs < regel.BetragVon.Value)
+                return false;
+
+            if (regel.BetragBis.HasValue && betragAbs > regel.BetragBis.Value)
+                return false;
+
+            return true;
+        }
+
+        private static bool PrefixSeqMatchForBookingRule(string patternNorm, string textNorm)
+        {
+            var parts = patternNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return false;
+
+            var tokens = textNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int pos = 0;
+
+            foreach (var p in parts)
+            {
+                bool found = false;
+
+                while (pos < tokens.Length)
+                {
+                    if (tokens[pos].StartsWith(p, StringComparison.Ordinal))
+                    {
+                        found = true;
+                        pos++;
+                        break;
+                    }
+                    pos++;
+                }
+
+                if (!found)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string NormalizeBookingRuleText(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return string.Empty;
+
+            var up = raw.ToUpperInvariant();
+            var cleaned = Regex.Replace(up, @"[^A-Z0-9]+", " ");
+            cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
+            return cleaned;
+        }
+
+        // ---------------------------------------------
+        // Neuen Beleg für eine Adress-Buchungsregel aufzeichnen und
+        // die aktive Regel daraus neu ableiten.
+        //
+        // Ersetzt das frühere Verhalten, bei dem eine Regel auf den
+        // Betrag der einen gelernten Buchung exakt fixiert wurde
+        // (BetragVon == BetragBis == dieser eine Betrag). Dadurch griff
+        // die Regel bei praktisch keiner folgenden Buchung mehr, weil
+        // sich Beträge zur selben Gegenpartei fast immer unterscheiden.
+        //
+        // Stattdessen wird jede Bestätigung als Beleg gespeichert und
+        // die Regel aus allen bisherigen Belegen zu diesem
+        // (AdresseId, IstEinnahme, TextPattern, PatternModus) neu berechnet:
+        //   - Ein einziges beobachtetes Konto  -> Regel ohne Betragsfilter.
+        //   - Mehrere Konten, Beträge überlappen sich nicht
+        //                                       -> je Konto eine Regel mit
+        //                                          dem beobachteten Betragsband.
+        //   - Mehrere Konten, Beträge überlappen sich (echter Konflikt)
+        //                                       -> Mehrheitskonto bleibt aktiv,
+        //                                          aber als IstKonflikt markiert,
+        //                                          damit die Oberfläche den
+        //                                          Treffer als unsicher kennzeichnet
+        //                                          statt ihn stillschweigend zu übernehmen.
+        // ---------------------------------------------
+        public void LernAdressBuchungsregel(int adresseId, bool istEinnahme, string textPattern, string patternModus, int kontoId, decimal betrag, int prioritaet = 100)
         {
             if (adresseId <= 0) throw new ArgumentOutOfRangeException(nameof(adresseId));
             if (kontoId <= 0) throw new ArgumentOutOfRangeException(nameof(kontoId));
@@ -4245,81 +4571,514 @@ ORDER BY Prioritaet ASC, Id ASC;";
                 throw new ArgumentException("TextPattern fehlt.", nameof(textPattern));
 
             var modus = string.IsNullOrWhiteSpace(patternModus) ? "Contains" : patternModus.Trim();
+            var betragAbs = Math.Abs(betrag);
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var insertBeleg = new SqlCommand(@"
+INSERT INTO dbo.AdressBuchungsregelBeleg (AdresseId, IstEinnahme, TextPattern, PatternModus, Betrag, KontoId)
+VALUES (@AdresseId, @IstEinnahme, @TextPattern, @PatternModus, @Betrag, @KontoId);", c, tx))
+                {
+                    insertBeleg.Parameters.AddWithValue("@AdresseId", adresseId);
+                    insertBeleg.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
+                    insertBeleg.Parameters.AddWithValue("@TextPattern", pattern);
+                    insertBeleg.Parameters.AddWithValue("@PatternModus", modus);
+                    insertBeleg.Parameters.AddWithValue("@Betrag", betragAbs);
+                    insertBeleg.Parameters.AddWithValue("@KontoId", kontoId);
+                    insertBeleg.ExecuteNonQuery();
+                }
+
+                var belege = new List<(int KontoId, decimal Betrag)>();
+                using (var loadBelege = new SqlCommand(@"
+SELECT KontoId, Betrag
+FROM dbo.AdressBuchungsregelBeleg
+WHERE AdresseId = @AdresseId AND IstEinnahme = @IstEinnahme
+  AND TextPattern = @TextPattern AND PatternModus = @PatternModus;", c, tx))
+                {
+                    loadBelege.Parameters.AddWithValue("@AdresseId", adresseId);
+                    loadBelege.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
+                    loadBelege.Parameters.AddWithValue("@TextPattern", pattern);
+                    loadBelege.Parameters.AddWithValue("@PatternModus", modus);
+
+                    using var r = loadBelege.ExecuteReader();
+                    while (r.Read())
+                        belege.Add((r.GetInt32(0), r.GetDecimal(1)));
+                }
+
+                using (var deleteAlt = new SqlCommand(@"
+DELETE FROM dbo.AdressBuchungsregel
+WHERE AdresseId = @AdresseId AND IstEinnahme = @IstEinnahme
+  AND TextPattern = @TextPattern AND PatternModus = @PatternModus;", c, tx))
+                {
+                    deleteAlt.Parameters.AddWithValue("@AdresseId", adresseId);
+                    deleteAlt.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
+                    deleteAlt.Parameters.AddWithValue("@TextPattern", pattern);
+                    deleteAlt.Parameters.AddWithValue("@PatternModus", modus);
+                    deleteAlt.ExecuteNonQuery();
+                }
+
+                var gruppen = belege
+                    .GroupBy(b => b.KontoId)
+                    .Select(g => new
+                    {
+                        KontoId = g.Key,
+                        Anzahl = g.Count(),
+                        Min = g.Min(x => x.Betrag),
+                        Max = g.Max(x => x.Betrag)
+                    })
+                    .OrderByDescending(g => g.Anzahl)
+                    .ToList();
+
+                void InsertRegel(int gKontoId, decimal? von, decimal? bis, int anzahl, int prio, bool konflikt)
+                {
+                    using var insertRegel = new SqlCommand(@"
+INSERT INTO dbo.AdressBuchungsregel
+    (AdresseId, IstEinnahme, TextPattern, PatternModus, KontoId, BetragVon, BetragBis, Prioritaet, IstAktiv, BelegAnzahl, LetzteBestaetigung, IstKonflikt)
+VALUES
+    (@AdresseId, @IstEinnahme, @TextPattern, @PatternModus, @KontoId, @BetragVon, @BetragBis, @Prioritaet, 1, @BelegAnzahl, SYSUTCDATETIME(), @IstKonflikt);", c, tx);
+
+                    insertRegel.Parameters.AddWithValue("@AdresseId", adresseId);
+                    insertRegel.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
+                    insertRegel.Parameters.AddWithValue("@TextPattern", pattern);
+                    insertRegel.Parameters.AddWithValue("@PatternModus", modus);
+                    insertRegel.Parameters.AddWithValue("@KontoId", gKontoId);
+                    insertRegel.Parameters.AddWithValue("@BetragVon", (object?)von ?? DBNull.Value);
+                    insertRegel.Parameters.AddWithValue("@BetragBis", (object?)bis ?? DBNull.Value);
+                    insertRegel.Parameters.AddWithValue("@Prioritaet", prio);
+                    insertRegel.Parameters.AddWithValue("@BelegAnzahl", anzahl);
+                    insertRegel.Parameters.AddWithValue("@IstKonflikt", konflikt);
+                    insertRegel.ExecuteNonQuery();
+                }
+
+                if (gruppen.Count == 1)
+                {
+                    // Ein einziges Konto über alle bisher beobachteten Beträge:
+                    // Regel gilt betragsunabhängig.
+                    InsertRegel(gruppen[0].KontoId, null, null, gruppen[0].Anzahl, prioritaet, konflikt: false);
+                }
+                else
+                {
+                    bool overlap = false;
+                    for (int i = 0; i < gruppen.Count && !overlap; i++)
+                        for (int j = i + 1; j < gruppen.Count; j++)
+                            if (gruppen[i].Min <= gruppen[j].Max && gruppen[j].Min <= gruppen[i].Max)
+                            {
+                                overlap = true;
+                                break;
+                            }
+
+                    if (!overlap)
+                    {
+                        // Beträge trennen die Konten sauber -> je Konto ein Betragsband.
+                        int prio = prioritaet;
+                        foreach (var g in gruppen.OrderBy(g => g.Min))
+                        {
+                            InsertRegel(g.KontoId, g.Min, g.Max, g.Anzahl, prio, konflikt: false);
+                            prio += 1;
+                        }
+                    }
+                    else
+                    {
+                        // Echter Konflikt: gleicher Text, überlappende Beträge, unterschiedliche Konten.
+                        // Mehrheitskonto bleibt aktiv, aber als unsicher markiert statt blind zu raten.
+                        var mehrheit = gruppen[0];
+                        var gesamtAnzahl = gruppen.Sum(g => g.Anzahl);
+                        InsertRegel(mehrheit.KontoId, null, null, gesamtAnzahl, prioritaet, konflikt: true);
+                    }
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        // ---------------------------------------------
+        // Konto-Schnellwahl: je Benutzer frei wählbare Konten,
+        // die im Zuordnungsdialog als Klick-Buttons erscheinen,
+        // statt sie jedes Mal aus dem Dropdown suchen zu müssen.
+        // ---------------------------------------------
+        public void EnsureKontoSchnellwahlSchema()
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'KontoSchnellwahl' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.KontoSchnellwahl
+    (
+        Id           INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_KontoSchnellwahl PRIMARY KEY,
+        Username     NVARCHAR(64) NOT NULL,
+        KontoId      INT NOT NULL,
+        Reihenfolge  INT NOT NULL CONSTRAINT DF_KontoSchnellwahl_Reihenfolge DEFAULT(100),
+
+        CONSTRAINT UQ_KontoSchnellwahl_User_Konto UNIQUE (Username, KontoId),
+        CONSTRAINT FK_KontoSchnellwahl_Konto FOREIGN KEY (KontoId) REFERENCES dbo.Kontenplan(Id)
+    );
+
+    CREATE INDEX IX_KontoSchnellwahl_Username ON dbo.KontoSchnellwahl(Username);
+END;
+";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<int> LadeKontoSchnellwahl(string username)
+        {
+            EnsureKontoSchnellwahlSchema();
+
+            var list = new List<int>();
+            if (string.IsNullOrWhiteSpace(username)) return list;
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            using var cmd = new SqlCommand(@"
+SELECT KontoId
+FROM dbo.KontoSchnellwahl
+WHERE Username = @Username
+ORDER BY Reihenfolge ASC, Id ASC;", c);
+            cmd.Parameters.AddWithValue("@Username", username.Trim());
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(r.GetInt32(0));
+
+            return list;
+        }
+
+        // Ersetzt die komplette Schnellwahl-Liste des Benutzers (Reihenfolge = Position in der übergebenen Liste).
+        public void SpeichereKontoSchnellwahl(string username, IEnumerable<int> kontoIds)
+        {
+            EnsureKontoSchnellwahlSchema();
+
+            if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("Username fehlt.", nameof(username));
+            var name = username.Trim();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                using (var del = new SqlCommand("DELETE FROM dbo.KontoSchnellwahl WHERE Username = @Username;", c, tx))
+                {
+                    del.Parameters.AddWithValue("@Username", name);
+                    del.ExecuteNonQuery();
+                }
+
+                int pos = 0;
+                foreach (var kontoId in kontoIds.Distinct())
+                {
+                    using var ins = new SqlCommand(@"
+INSERT INTO dbo.KontoSchnellwahl (Username, KontoId, Reihenfolge)
+VALUES (@Username, @KontoId, @Reihenfolge);", c, tx);
+                    ins.Parameters.AddWithValue("@Username", name);
+                    ins.Parameters.AddWithValue("@KontoId", kontoId);
+                    ins.Parameters.AddWithValue("@Reihenfolge", pos);
+                    ins.ExecuteNonQuery();
+                    pos++;
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        // ---------------------------------------------
+        // Verwaltung gelernter Zuordnungen (Aliase + Buchungsregeln),
+        // damit Fehlanlernungen über die Oberfläche gefunden und entfernt
+        // werden können statt direkt in der DB.
+        // ---------------------------------------------
+        public class AdressAliasAnzeige
+        {
+            public int Id { get; set; }
+            public int AdresseId { get; set; }
+            public string AdresseName { get; set; } = "";
+            public string Text { get; set; } = "";
+            public string Modus { get; set; } = "";
+        }
+
+        public List<AdressAliasAnzeige> LadeAdressAliaseMitNamen()
+        {
+            var adressen = LadeAdressen().ToDictionary(a => a.Id, a => a.Name);
+
+            return LadeAdressAliase()
+                .Select(a => new AdressAliasAnzeige
+                {
+                    Id = a.Id,
+                    AdresseId = a.AdresseId,
+                    AdresseName = adressen.TryGetValue(a.AdresseId, out var n) ? n : $"(Adresse #{a.AdresseId})",
+                    Text = a.Text,
+                    Modus = a.Modus
+                })
+                .OrderBy(a => a.AdresseName).ThenBy(a => a.Text)
+                .ToList();
+        }
+
+        public void LoescheAdressAlias(int id)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var cmd = new SqlCommand("DELETE FROM dbo.AdresseAlias WHERE Id=@id;", c);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        public class AdressBuchungsregelAnzeige
+        {
+            public int Id { get; set; }
+            public string AdresseName { get; set; } = "";
+            public bool IstEinnahme { get; set; }
+            public string TextPattern { get; set; } = "";
+            public string PatternModus { get; set; } = "";
+            public string KontoAnzeige { get; set; } = "";
+            public decimal? BetragVon { get; set; }
+            public decimal? BetragBis { get; set; }
+            public int BelegAnzahl { get; set; }
+            public bool IstKonflikt { get; set; }
+        }
+
+        public List<AdressBuchungsregelAnzeige> LadeAlleAdressBuchungsregelnMitNamen()
+        {
+            EnsureAdressBuchungsregelSchema();
+
+            var adressen = LadeAdressen().ToDictionary(a => a.Id, a => a.Name);
+            var konten = LadeKontoLookup().ToDictionary(k => k.Id, k => k.Anzeige);
+
+            var list = new List<AdressBuchungsregelAnzeige>();
 
             using var c = new SqlConnection(_connectionString);
             c.Open();
 
             const string sql = @"
-MERGE dbo.AdressBuchungsregel AS tgt
-USING
-(
-    SELECT
-        @AdresseId    AS AdresseId,
-        @IstEinnahme  AS IstEinnahme,
-        @TextPattern  AS TextPattern,
-        @PatternModus AS PatternModus,
-        @BetragVon    AS BetragVon,
-        @BetragBis    AS BetragBis
-) AS src
-ON  tgt.AdresseId    = src.AdresseId
-AND tgt.IstEinnahme  = src.IstEinnahme
-AND tgt.TextPattern  = src.TextPattern
-AND tgt.PatternModus = src.PatternModus
-AND
-(
-    (tgt.BetragVon = src.BetragVon)
-    OR (tgt.BetragVon IS NULL AND src.BetragVon IS NULL)
-)
-AND
-(
-    (tgt.BetragBis = src.BetragBis)
-    OR (tgt.BetragBis IS NULL AND src.BetragBis IS NULL)
-)
-WHEN MATCHED THEN
-    UPDATE SET
-        KontoId    = @KontoId,
-        Prioritaet = @Prioritaet,
-        IstAktiv   = 1
-WHEN NOT MATCHED THEN
-    INSERT
-    (
-        AdresseId,
-        IstEinnahme,
-        TextPattern,
-        PatternModus,
-        KontoId,
-        BetragVon,
-        BetragBis,
-        Prioritaet,
-        IstAktiv
-    )
-    VALUES
-    (
-        @AdresseId,
-        @IstEinnahme,
-        @TextPattern,
-        @PatternModus,
-        @KontoId,
-        @BetragVon,
-        @BetragBis,
-        @Prioritaet,
-        1
-    );";
+SELECT Id, AdresseId, IstEinnahme, TextPattern, PatternModus, KontoId, BetragVon, BetragBis, BelegAnzahl, IstKonflikt
+FROM dbo.AdressBuchungsregel
+WHERE IstAktiv = 1
+ORDER BY AdresseId, TextPattern;";
 
             using var cmd = new SqlCommand(sql, c);
-            cmd.Parameters.AddWithValue("@AdresseId", adresseId);
-            cmd.Parameters.AddWithValue("@IstEinnahme", istEinnahme);
-            cmd.Parameters.AddWithValue("@TextPattern", pattern);
-            cmd.Parameters.AddWithValue("@PatternModus", modus);
-            cmd.Parameters.AddWithValue("@KontoId", kontoId);
-            cmd.Parameters.AddWithValue("@BetragVon", (object?)betragVon ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@BetragBis", (object?)betragBis ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Prioritaet", prioritaet);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var adresseId = r.GetInt32(1);
+                var kontoId = r.GetInt32(5);
 
+                list.Add(new AdressBuchungsregelAnzeige
+                {
+                    Id = r.GetInt32(0),
+                    AdresseName = adressen.TryGetValue(adresseId, out var an) ? an : $"(Adresse #{adresseId})",
+                    IstEinnahme = r.GetBoolean(2),
+                    TextPattern = r.IsDBNull(3) ? "" : r.GetString(3),
+                    PatternModus = r.IsDBNull(4) ? "Contains" : r.GetString(4),
+                    KontoAnzeige = konten.TryGetValue(kontoId, out var ka) ? ka : $"(Konto #{kontoId})",
+                    BetragVon = r.IsDBNull(6) ? (decimal?)null : r.GetDecimal(6),
+                    BetragBis = r.IsDBNull(7) ? (decimal?)null : r.GetDecimal(7),
+                    BelegAnzahl = r.IsDBNull(8) ? 1 : r.GetInt32(8),
+                    IstKonflikt = !r.IsDBNull(9) && r.GetBoolean(9)
+                });
+            }
+
+            return list;
+        }
+
+        // Löscht eine gelernte Buchungsregel UND die zugrunde liegenden Belege
+        // für dieses Konto. Ohne das Entfernen der Belege würde die Regel beim
+        // nächsten Anlernen eines ähnlichen Falls aus der Beleghistorie sofort
+        // wieder abgeleitet werden - das Löschen wäre nur oberflächlich.
+        public void LoescheAdressBuchungsregel(int id)
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                int adresseId, kontoId;
+                bool istEinnahme;
+                string textPattern, patternModus;
+
+                using (var sel = new SqlCommand(
+                    "SELECT AdresseId, IstEinnahme, TextPattern, PatternModus, KontoId FROM dbo.AdressBuchungsregel WHERE Id=@id;", c, tx))
+                {
+                    sel.Parameters.AddWithValue("@id", id);
+                    using var r = sel.ExecuteReader();
+                    if (!r.Read())
+                    {
+                        tx.Rollback();
+                        return;
+                    }
+                    adresseId = r.GetInt32(0);
+                    istEinnahme = r.GetBoolean(1);
+                    textPattern = r.IsDBNull(2) ? "" : r.GetString(2);
+                    patternModus = r.IsDBNull(3) ? "Contains" : r.GetString(3);
+                    kontoId = r.GetInt32(4);
+                }
+
+                using (var delBeleg = new SqlCommand(@"
+DELETE FROM dbo.AdressBuchungsregelBeleg
+WHERE AdresseId=@a AND IstEinnahme=@e AND TextPattern=@t AND PatternModus=@m AND KontoId=@k;", c, tx))
+                {
+                    delBeleg.Parameters.AddWithValue("@a", adresseId);
+                    delBeleg.Parameters.AddWithValue("@e", istEinnahme);
+                    delBeleg.Parameters.AddWithValue("@t", textPattern);
+                    delBeleg.Parameters.AddWithValue("@m", patternModus);
+                    delBeleg.Parameters.AddWithValue("@k", kontoId);
+                    delBeleg.ExecuteNonQuery();
+                }
+
+                using (var delRegel = new SqlCommand("DELETE FROM dbo.AdressBuchungsregel WHERE Id=@id;", c, tx))
+                {
+                    delRegel.Parameters.AddWithValue("@id", id);
+                    delRegel.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        // ---------------------------------------------
+        // Kategorie-Standardkonto: fester, vom Nutzer gepflegter Fallback
+        // für den Kreditkarten-Import. Kreditkarten-Anbieter liefern eine
+        // kleine, feste Menge an Kategorien (Kartennummer/Händler dagegen
+        // wechseln pro Buchung) - darum eigenständige Tabelle statt der
+        // alten, mehrdeutigen KategorieKontoMapping (komposiver Schlüssel).
+        // ---------------------------------------------
+        public void EnsureKategorieStandardkontoSchema()
+        {
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'KategorieStandardkonto' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.KategorieStandardkonto
+    (
+        Id        INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_KategorieStandardkonto PRIMARY KEY,
+        Kategorie NVARCHAR(200) NOT NULL,
+        KontoId   INT NULL,
+
+        CONSTRAINT UQ_KategorieStandardkonto_Kategorie UNIQUE (Kategorie),
+        CONSTRAINT FK_KategorieStandardkonto_Konto FOREIGN KEY (KontoId) REFERENCES dbo.Kontenplan(Id)
+    );
+END;
+";
+            using var cmd = new SqlCommand(sql, c);
             cmd.ExecuteNonQuery();
         }
 
+        public List<KategorieStandardkonto> LadeKategorieStandardkonten()
+        {
+            EnsureKategorieStandardkontoSchema();
 
+            var konten = LadeKontoLookup().ToDictionary(k => k.Id, k => k.Anzeige);
+            var list = new List<KategorieStandardkonto>();
 
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            using var cmd = new SqlCommand(
+                "SELECT Id, Kategorie, KontoId FROM dbo.KategorieStandardkonto ORDER BY Kategorie;", c);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var kontoId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2);
+                list.Add(new KategorieStandardkonto
+                {
+                    Id = r.GetInt32(0),
+                    Kategorie = r.IsDBNull(1) ? "" : r.GetString(1),
+                    KontoId = kontoId,
+                    KontoAnzeige = kontoId.HasValue && konten.TryGetValue(kontoId.Value, out var a) ? a : null
+                });
+            }
+
+            return list;
+        }
+
+        // Fügt Kategorien ohne Konto hinzu, die noch nicht existieren (z. B. beim
+        // Einlesen einer Musterdatei). Bereits vorhandene Kategorien (mit oder
+        // ohne Konto) bleiben unverändert.
+        public void SeedKategorienOhneKonto(IEnumerable<string> kategorien)
+        {
+            EnsureKategorieStandardkontoSchema();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            foreach (var roh in kategorien.Select(k => (k ?? "").Trim()).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                const string sql = @"
+IF NOT EXISTS (SELECT 1 FROM dbo.KategorieStandardkonto WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@k))))
+BEGIN
+    INSERT INTO dbo.KategorieStandardkonto (Kategorie, KontoId) VALUES (@k, NULL);
+END;";
+                using var cmd = new SqlCommand(sql, c);
+                cmd.Parameters.AddWithValue("@k", roh);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public void SpeichereKategorieStandardkonten(IEnumerable<(int Id, int? KontoId)> zeilen)
+        {
+            EnsureKategorieStandardkontoSchema();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                foreach (var z in zeilen)
+                {
+                    using var cmd = new SqlCommand("UPDATE dbo.KategorieStandardkonto SET KontoId=@k WHERE Id=@id;", c, tx);
+                    cmd.Parameters.AddWithValue("@k", (object?)z.KontoId ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@id", z.Id);
+                    cmd.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        public int? HoleKontoIdFuerKategorie(string? kategorie)
+        {
+            if (string.IsNullOrWhiteSpace(kategorie))
+                return null;
+
+            EnsureKategorieStandardkontoSchema();
+
+            using var c = new SqlConnection(_connectionString);
+            c.Open();
+
+            const string sql = @"
+SELECT KontoId FROM dbo.KategorieStandardkonto
+WHERE UPPER(LTRIM(RTRIM(Kategorie))) = UPPER(LTRIM(RTRIM(@k))) AND KontoId IS NOT NULL;";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@k", kategorie.Trim());
+            var v = cmd.ExecuteScalar();
+            return v == null || v == DBNull.Value ? (int?)null : Convert.ToInt32(v);
+        }
     }
 }

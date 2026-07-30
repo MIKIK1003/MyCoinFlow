@@ -100,6 +100,13 @@
                          Text="{Binding EinstandspreisText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,12"/>
 
+                <ComboBox MinHeight="40"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Einstandswährung (Kaufwährung)"
+                          ItemsSource="{Binding EinstandWaehrungen}"
+                          SelectedItem="{Binding EinstandWaehrungAuswahl, Mode=TwoWay}"
+                          Margin="0,0,0,12"/>
+
                 <DatePicker MinHeight="40"
                             materialDesign:HintAssist.Hint="Einstanddatum"
                             SelectedDate="{Binding Model.EinstandDatum, Mode=TwoWay}"

@@ -44,6 +44,8 @@ namespace MyCoinFlow.Services
             {
                 if (!string.IsNullOrWhiteSpace(p.Symbol))
                 {
+                    await KursluueckenNachholenAsync(p, einstellung.ApiKey, result);
+
                     var kurs = await _kursService.HoleAktuellenKursAsync(
                         p.Symbol,
                         p.Boerse,
@@ -91,14 +93,21 @@ namespace MyCoinFlow.Services
                 result.PositionenAktualisiert++;
             }
 
+            // Handels- und Einstandswährungen berücksichtigen (können pro Position abweichen).
             var fremdwaehrungen = positionen
-                .Select(p => string.IsNullOrWhiteSpace(p.Waehrung) ? "CHF" : p.Waehrung.Trim().ToUpperInvariant())
+                .SelectMany(p => new[]
+                {
+                    string.IsNullOrWhiteSpace(p.Waehrung) ? "CHF" : p.Waehrung.Trim().ToUpperInvariant(),
+                    p.EffektiveEinstandWaehrung
+                })
                 .Where(w => w != "CHF")
                 .Distinct()
                 .ToList();
 
             foreach (var waehrung in fremdwaehrungen)
             {
+                await FxLueckenNachholenAsync(waehrung, positionen, einstellung.ApiKey, result);
+
                 var fx = await _kursService.HoleFxKursAsync(
                     waehrung,
                     "CHF",
@@ -124,9 +133,150 @@ namespace MyCoinFlow.Services
                 $"Kursaktualisierung abgeschlossen: " +
                 $"{result.PositionenAktualisiert} Position(en) aktualisiert oder fortgeschrieben, " +
                 $"{result.PositionenOhneKursbasis} ohne Kursbasis. " +
-                $"FX: {result.FxGespeichert} gespeichert, {result.FxOhneErgebnis} ohne Ergebnis.";
+                $"FX: {result.FxGespeichert} gespeichert, {result.FxOhneErgebnis} ohne Ergebnis. " +
+                $"Nachgeholt: {result.KurseNachgeholt} Kurs(e), {result.FxNachgeholt} FX-Kurs(e).";
 
             return result;
+        }
+
+        // Maximal so weit zurück, wie der EODHD-Free-Plan historische Daten liefert.
+        private static readonly TimeSpan MaxRueckblick = TimeSpan.FromDays(365);
+
+        // Holt fehlende Tagesschlusskurse nach. Der Backfill-Status merkt sich pro Position,
+        // bis zu welchem Datum die Historie bereits vervollständigt wurde. Beim ersten Lauf
+        // wird deshalb der komplette Bereich (ab Einstanddatum, max. 1 Jahr) geholt und
+        // damit auch alle Lücken ZWISCHEN bestehenden Einträgen gefüllt.
+        // Ein API-Aufruf pro Position, unabhängig von der Anzahl fehlender Tage.
+        private async Task KursluueckenNachholenAsync(
+            VermoegenPosition p,
+            string apiKey,
+            VermoegenKursUpdateResult result)
+        {
+            try
+            {
+                var fruehestesVon = DateTime.Today.Add(-MaxRueckblick);
+
+                var abgedecktBis = _db.VermoegenBackfillStatusGet("KURS", p.Id.ToString());
+
+                var von = abgedecktBis.HasValue
+                    ? abgedecktBis.Value.AddDays(1)
+                    : (p.EinstandDatum?.Date ?? fruehestesVon);
+
+                if (von < fruehestesVon)
+                    von = fruehestesVon;
+
+                // Heute ist noch nicht abgeschlossen; den aktuellsten Kurs liefert der Realtime-Abruf.
+                if (von >= DateTime.Today)
+                    return;
+
+                var tage = await _kursService.HoleEodHistorieAsync(
+                    p.Symbol,
+                    p.Boerse,
+                    apiKey,
+                    von,
+                    DateTime.Today);
+
+                if (tage.Count == 0)
+                    return; // Fehler oder keine Daten -> beim nächsten Lauf erneut versuchen.
+
+                var vorhandeneTage = _db.VermoegenKursHistorieGetByPosition(p.Id)
+                    .Select(h => h.KursDatum.Date)
+                    .ToHashSet();
+
+                foreach (var tag in tage.Where(t => !vorhandeneTage.Contains(t.Datum)))
+                {
+                    _db.VermoegenKursHistorieInsertIfMissing(
+                        p.Id,
+                        tag.Datum,
+                        tag.Kurs,
+                        "EODHD-Historie");
+
+                    result.KurseNachgeholt++;
+                }
+
+                _db.VermoegenBackfillStatusSet("KURS", p.Id.ToString(), DateTime.Today);
+            }
+            catch
+            {
+                // Backfill darf die normale Aktualisierung nie blockieren.
+            }
+        }
+
+        // Holt fehlende FX-Tageskurse (Währung -> CHF) nach, damit auch für
+        // nachgeholte Aktienkurse eine CHF-Umrechnung zum jeweiligen Datum vorliegt.
+        // Auch hier merkt sich der Backfill-Status, bis wann bereits vervollständigt wurde.
+        private async Task FxLueckenNachholenAsync(
+            string waehrung,
+            System.Collections.Generic.List<VermoegenPosition> positionen,
+            string apiKey,
+            VermoegenKursUpdateResult result)
+        {
+            try
+            {
+                var fruehestesVon = DateTime.Today.Add(-MaxRueckblick);
+
+                var abgedecktBis = _db.VermoegenBackfillStatusGet("FX", waehrung);
+
+                DateTime von;
+
+                if (abgedecktBis.HasValue)
+                {
+                    von = abgedecktBis.Value.AddDays(1);
+                }
+                else
+                {
+                    // Erster Lauf: ab dem frühesten Kursdatum der Positionen in dieser
+                    // Währung starten, damit die CHF-Spalten rückwirkend füllbar sind.
+                    var fruehesterKurs = positionen
+                        .Where(p =>
+                            string.Equals(p.Waehrung?.Trim(), waehrung, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(p.EffektiveEinstandWaehrung, waehrung, StringComparison.OrdinalIgnoreCase))
+                        .SelectMany(p => _db.VermoegenKursHistorieGetByPosition(p.Id))
+                        .Select(h => (DateTime?)h.KursDatum.Date)
+                        .DefaultIfEmpty(null)
+                        .Min();
+
+                    von = fruehesterKurs ?? fruehestesVon;
+                }
+
+                if (von < fruehestesVon)
+                    von = fruehestesVon;
+
+                if (von >= DateTime.Today)
+                    return;
+
+                var tage = await _kursService.HoleFxHistorieAsync(
+                    waehrung,
+                    "CHF",
+                    apiKey,
+                    von,
+                    DateTime.Today);
+
+                if (tage.Count == 0)
+                    return; // Fehler, keine Daten oder vom Free-Plan nicht unterstützt.
+
+                var vorhandeneTage = _db.VermoegenFxHistorieGetNachChf(waehrung)
+                    .Select(f => f.KursDatum.Date)
+                    .ToHashSet();
+
+                foreach (var tag in tage.Where(t => !vorhandeneTage.Contains(t.Datum)))
+                {
+                    _db.VermoegenFxHistorieInsertIfMissing(
+                        waehrung,
+                        "CHF",
+                        tag.Datum,
+                        tag.Kurs,
+                        "EODHD-Historie");
+
+                    result.FxNachgeholt++;
+                }
+
+                _db.VermoegenBackfillStatusSet("FX", waehrung, DateTime.Today);
+            }
+            catch
+            {
+                // Backfill darf die normale Aktualisierung nie blockieren.
+            }
         }
     }
 
@@ -136,6 +286,8 @@ namespace MyCoinFlow.Services
         public int PositionenOhneKursbasis { get; set; }
         public int FxGespeichert { get; set; }
         public int FxOhneErgebnis { get; set; }
+        public int KurseNachgeholt { get; set; }
+        public int FxNachgeholt { get; set; }
 
         public string Meldung { get; set; } = "";
     }

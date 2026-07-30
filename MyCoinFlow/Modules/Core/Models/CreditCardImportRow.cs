@@ -15,5 +15,8 @@
 
         public int? KontoId { get; set; }
         public string? Konto { get; set; }     // Anzeige
+
+        public int? AdresseId { get; set; }
+        public string? Adresse { get; set; }   // Anzeige
     }
 }

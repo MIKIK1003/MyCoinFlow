@@ -38,6 +38,7 @@ namespace MyCoinFlow.Importing
             int waehrungCol = FindRequired(headerMap, "Währung", "Waehrung");
             int anzahlCol = FindRequired(headerMap, "Anzahl /Nominalbetrag");
             int einstandCol = FindRequired(headerMap, "Einstandspreis");
+            int einstandWaehrungCol = FindOptional(headerMap, "Einstandswährung", "Einstandswaehrung");
             int kursCol = FindRequired(headerMap, "Aktueller Kurs");
 
             var existing = _db.VermoegenPositionenGetAll()
@@ -63,6 +64,7 @@ namespace MyCoinFlow.Importing
 
                 var valor = "";
                 var waehrung = waehrungCol > 0 ? ReadString(row, waehrungCol) : "CHF";
+                var einstandWaehrung = einstandWaehrungCol > 0 ? ReadString(row, einstandWaehrungCol) : "";
 
                 if (!TryReadDecimal(row, anzahlCol, out var anzahl) || anzahl <= 0)
                 {
@@ -103,6 +105,7 @@ namespace MyCoinFlow.Importing
                     Titel = titel.Trim(),
                     Valor = valor.Trim().ToUpperInvariant(),
                     Waehrung = NormalizeWaehrung(waehrung),
+                    EinstandWaehrung = BuildEinstandWaehrung(einstandWaehrung, waehrung),
                     Anlageklasse = GuessAnlageklasse(titel),
                     Anzahl = anzahl,
                     Einstandspreis = einstandspreis,
@@ -200,6 +203,19 @@ namespace MyCoinFlow.Importing
 
             return t.Equals("Total", StringComparison.OrdinalIgnoreCase)
                 || t.Contains("Investitionskonto", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Leer, wenn keine Einstandswährung angegeben ist oder sie der Handelswährung entspricht.
+        private static string BuildEinstandWaehrung(string einstandWaehrung, string handelsWaehrung)
+        {
+            if (string.IsNullOrWhiteSpace(einstandWaehrung))
+                return "";
+
+            var normalisiert = NormalizeWaehrung(einstandWaehrung);
+
+            return normalisiert == NormalizeWaehrung(handelsWaehrung)
+                ? ""
+                : normalisiert;
         }
 
         private static string NormalizeWaehrung(string value)

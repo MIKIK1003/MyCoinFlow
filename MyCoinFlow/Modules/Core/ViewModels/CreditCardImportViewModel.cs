@@ -8,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Win32;
 using MyCoinFlow.Helpers;
+using MyCoinFlow.Import;
 using MyCoinFlow.Models;
 using MyCoinFlow.Services;
 using MyCoinFlow.Views;
@@ -97,12 +98,31 @@ namespace MyCoinFlow.ViewModels
         public ICommand DateiWaehlenCommand { get; }
         public ICommand ZuweisenCommand { get; }
         public ICommand BuchenCommand { get; }
+        public ICommand WebRechercheCommand { get; }
 
         public CreditCardImportViewModel()
         {
             // Basis-Commands
             DateiWaehlenCommand = new RelayCommand(_ => DateiWaehlen());
             ZuweisenCommand = new RelayCommand(p => Zuweisen(p as CreditCardImportRow), p => p is CreditCardImportRow);
+
+            WebRechercheCommand = new RelayCommand(
+                p =>
+                {
+                    if (p is not CreditCardImportRow row) return;
+                    try
+                    {
+                        if (!WebRechercheService.OpenSearch(row.Beschreibung, row.Haendler))
+                            MessageBox.Show("Kein verwertbarer Buchungstext für die Recherche vorhanden.",
+                                "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Recherche konnte nicht geöffnet werden:\n" + ex.Message,
+                            "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                },
+                p => p is CreditCardImportRow);
             BuchenCommand = new RelayCommand(
                                       _ => Buchen(),
                                       _ => Zeilen.Any(z => z.KontoId.HasValue) && AusgleichsKontoId.HasValue);
@@ -177,27 +197,55 @@ namespace MyCoinFlow.ViewModels
             }
         }
 
+        // Gleicher Zuordnungsdialog wie beim CAMT-Bank-Import (inkl. Adress-Erkennung,
+        // Schnellwahl-Konten und Contains-Suche) - dazu wird die Kreditkarten-Zeile
+        // in ein BankImportItem gewrappt, das der Dialog erwartet.
         private void Zuweisen(CreditCardImportRow? row)
         {
             if (row == null) return;
 
-            var kat = row.Kategorie ?? "(ohne Kategorie)";
-            var dlg = new KategorieZuweisenDialog(kat, KontoListe)
+            bool istEinnahme = !IstBelastung(row.DebitKredit);
+
+            var item = new BankImportItem
+            {
+                BookingDate = row.Datum,
+                Amount = row.Betrag,
+                Direction = istEinnahme ? KreditDebit.Credit : KreditDebit.Debit,
+                Currency = "CHF",
+                Text = row.Beschreibung,
+                ServiceRef = row.Kategorie ?? "",
+                CounterpartyName = row.Haendler,
+                VorschlagAdresseId = row.AdresseId,
+                VorschlagNachKontoId = row.KontoId
+            };
+
+            var dlg = new ZuordnungDialog(item)
             {
                 Owner = Application.Current?.MainWindow
             };
 
-            if (dlg.ShowDialog() == true && dlg.AusgewaehlterKontoId.HasValue)
+            if (dlg.ShowDialog() == true && dlg.SelectedKontoId.HasValue)
             {
-                var kontoId = dlg.AusgewaehlterKontoId.Value;
-                var key = _db.BaueMappingSchluessel(row.Beschreibung, row.Haendler, row.Kategorie);
+                _db.UpdateCcStagingZuordnung(row.Id, dlg.SelectedAdresseId, dlg.SelectedKontoId.Value);
 
-                if (dlg.MappingDauerhaftSpeichern)
-                    _db.UpsertKategorieMapping(key, kontoId);
-
-                _db.UpdateCcStagingZuordnung(row.Id, key, kontoId, applyToSameKey: dlg.MappingDauerhaftSpeichern);
+                // Gelernte Adresse/Regel sofort auf übrige offene Zeilen dieses Batches anwenden
+                AutoMatchOffeneZeilenImBatch();
 
                 ReloadStaging();
+            }
+        }
+
+        private void AutoMatchOffeneZeilenImBatch()
+        {
+            var matcher = new AdressErkennungService();
+
+            foreach (var z in Zeilen.Where(z => !z.KontoId.HasValue).ToList())
+            {
+                bool istEinnahme = !IstBelastung(z.DebitKredit);
+                var (adrId, kontoId) = _db.ResolveCcZeile(matcher, z.Haendler, z.Beschreibung, z.Kategorie, Math.Abs(z.Betrag), istEinnahme);
+
+                if (kontoId.HasValue)
+                    _db.UpdateCcStagingZuordnung(z.Id, adrId, kontoId.Value);
             }
         }
 

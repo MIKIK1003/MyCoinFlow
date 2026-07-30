@@ -40,6 +40,7 @@ namespace MyCoinFlow.ViewModels
         public RelayCommand AnlernenCommand { get; }
         public RelayCommand BearbeitenCommand { get; }
         public RelayCommand DeleteImportedRowCommand { get; }
+        public RelayCommand WebRechercheCommand { get; }
 
 
         private string _filePath = "";
@@ -87,6 +88,10 @@ namespace MyCoinFlow.ViewModels
 
             AnlernenCommand = new RelayCommand(p => { if (p is BankImportItem it) Anlernen(it); });
             BearbeitenCommand = new RelayCommand(p => { if (p is BankImportItem it) Anlernen(it); });
+
+            WebRechercheCommand = new RelayCommand(
+                p => { if (p is BankImportItem it) TryOpenWebRecherche(it); },
+                p => p is BankImportItem);
 
             EinzelBuchenCommand = new RelayCommand(
                 p => { if (p is BankImportItem it) BuchenEinzeln(it); },
@@ -223,6 +228,7 @@ namespace MyCoinFlow.ViewModels
             {
                 bool changed = false;
                 it.IstSonderregelTreffer = false;
+                it.IstUnsichereRegel = false;
 
                 // eigenes Geldinstitut aus Account-IBAN
                 if (!it.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(it.AccountIban))
@@ -365,6 +371,21 @@ namespace MyCoinFlow.ViewModels
             }
 
             RefreshItemsView();
+        }
+
+        private static void TryOpenWebRecherche(BankImportItem item)
+        {
+            try
+            {
+                if (!WebRechercheService.OpenSearch(item.Text, item.CounterpartyName))
+                    MessageBox.Show("Kein verwertbarer Buchungstext für die Recherche vorhanden.",
+                        "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Recherche konnte nicht geöffnet werden:\n" + ex.Message,
+                    "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         //____________________________________________
@@ -815,55 +836,6 @@ namespace MyCoinFlow.ViewModels
             return null;
         }
 
-        // ---------------------------------------------
-        // Baut denselben kompakten Regeltext wie BuildAliasCandidate
-        // im ZuordnungDialog.
-        // Dieser Text ist die Basis für AdressBuchungsregeln.
-        // ---------------------------------------------
-        private static string? BuildAdressBuchungsregelCandidate(string? text, string? serviceRef)
-        {
-            var src = !string.IsNullOrWhiteSpace(text) ? text : (serviceRef ?? "");
-            if (string.IsNullOrWhiteSpace(src)) return null;
-
-            // IBANs / lange Nummern entfernen
-            string t = Regex.Replace(src, @"[A-Z]{2}\d{2}[A-Z0-9]{4,}", " ", RegexOptions.IgnoreCase);
-            t = Regex.Replace(t, @"\b\d{5,}\b", " ");
-
-            // Wörter extrahieren (>=3 Zeichen), wie im Dialog
-            var stop = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "RECHNUNG","REFERENZ","ZAHLUNG","GEBUEHR","KARTENZAHLUNG","BELASTUNG",
-        "GUTSCHRIFT","MITTEILUNG","VALUTA","SEPA","SWIFT","UETR","CHF","EUR","USD",
-        "VISA","MASTERCARD","TWINT","POSTFINANCE","UBS","CS","BANK","KONTO","IBAN"
-    };
-
-            var words = Regex.Matches(t.ToUpperInvariant(), @"[A-ZÄÖÜ0-9]{3,}")
-                             .Cast<Match>()
-                             .Select(m => m.Value)
-                             .Where(w => !stop.Contains(w))
-                             .ToList();
-
-            if (words.Count == 0) return null;
-
-            var picks = words.Take(4)
-                             .Select(w => w.Length <= 5 ? w : w.Substring(0, 5))
-                             .ToList();
-
-            var code = string.Join("-", picks);
-
-            if (code.Replace("-", "").Length < 8)
-            {
-                var fallback = words.OrderByDescending(w => w.Length)
-                                    .Take(2)
-                                    .Select(w => w.Length <= 6 ? w : w.Substring(0, 6));
-
-                code = string.Join("-", fallback);
-            }
-
-            return code;
-        }
-
-
         private static string NormalizeIban(string? iban)
             => string.IsNullOrWhiteSpace(iban) ? "" : iban.Replace(" ", "").ToUpperInvariant();
 
@@ -999,10 +971,9 @@ namespace MyCoinFlow.ViewModels
         }
 
         // ---------------------------------------------
-        // Konto über adressbezogene Buchungsregeln auflösen
-        // WICHTIG:
-        // Es wird exakt dieselbe Regeltext-Bildung verwendet
-        // wie beim Anlernen im ZuordnungDialog.
+        // Konto über adressbezogene Buchungsregeln auflösen.
+        // Die eigentliche Logik lebt in DatabaseService.ResolveKontoByAdressBuchungsregel,
+        // damit sie auch vom Kreditkarten-Import genutzt werden kann (gleicher Workflow).
         // ---------------------------------------------
         private int? TryResolveKontoByAdressBuchungsregel(int adresseId, BankImportItem item)
         {
@@ -1011,128 +982,12 @@ namespace MyCoinFlow.ViewModels
 
             bool istEinnahme = item.Direction == KreditDebit.Credit;
 
-            var regeln = _db.LadeAdressBuchungsregeln(adresseId, istEinnahme);
-            if (regeln == null || regeln.Count == 0)
-                return null;
+            var kontoId = _db.ResolveKontoByAdressBuchungsregel(adresseId, istEinnahme, item.Text, item.ServiceRef, item.Amount, out var istKonflikt);
+            if (kontoId.HasValue)
+                item.IstUnsichereRegel = istKonflikt;
 
-            // Exakt dieselbe Verdichtung wie beim Anlernen:
-            // zuerst Alias-Kandidat, sonst voller Text/ServiceRef
-            var regelSuchtext = BuildAdressBuchungsregelCandidate(item.Text, item.ServiceRef);
-            if (string.IsNullOrWhiteSpace(regelSuchtext))
-                regelSuchtext = !string.IsNullOrWhiteSpace(item.Text)
-                    ? item.Text.Trim()
-                    : (string.IsNullOrWhiteSpace(item.ServiceRef) ? null : item.ServiceRef.Trim());
-
-            if (string.IsNullOrWhiteSpace(regelSuchtext))
-                return null;
-
-            var textNorm = NormalizeBookingRuleText(regelSuchtext);
-            var betragAbs = Math.Abs(item.Amount);
-
-            var treffer = regeln
-                .Where(r => !string.IsNullOrWhiteSpace(r.TextPattern))
-                .Where(r => BuchungsregelTextPasst(r.TextPattern, r.PatternModus, textNorm))
-                .Where(r => BuchungsregelBetragPasst(r, betragAbs))
-                .OrderBy(r => r.Prioritaet)
-                .ThenBy(r => r.Id)
-                .ToList();
-
-            if (treffer.Count == 1)
-                return treffer[0].KontoId;
-
-            if (treffer.Count > 1)
-            {
-                var bestePrioritaet = treffer[0].Prioritaet;
-                var top = treffer.Where(x => x.Prioritaet == bestePrioritaet).ToList();
-
-                if (top.Count == 1)
-                    return top[0].KontoId;
-            }
-
-            return null;
+            return kontoId;
         }
 
-
-        private static bool BuchungsregelTextPasst(string patternRaw, string? modusRaw, string textNorm)
-        {
-            var pattern = NormalizeBookingRuleText(patternRaw);
-            if (string.IsNullOrWhiteSpace(pattern) || string.IsNullOrWhiteSpace(textNorm))
-                return false;
-
-            var modus = string.IsNullOrWhiteSpace(modusRaw) ? "Contains" : modusRaw.Trim();
-
-            return modus switch
-            {
-                "Exact" => string.Equals(textNorm, pattern, StringComparison.Ordinal),
-                "StartsWith" => textNorm.StartsWith(pattern, StringComparison.Ordinal),
-                "EndsWith" => textNorm.EndsWith(pattern, StringComparison.Ordinal),
-                "PrefixSeq" => PrefixSeqMatchForBookingRule(pattern, textNorm),
-                _ => textNorm.Contains(pattern, StringComparison.Ordinal)
-            };
-        }
-
-        // ---------------------------------------------
-        // NEU: Prüft, ob der Betrag in den optionalen Bereich der Buchungsregel fällt.
-        // Wenn kein Bereich gesetzt ist, gilt die Regel für jeden Betrag.
-        // ---------------------------------------------
-        private static bool BuchungsregelBetragPasst(AdressBuchungsregel regel, decimal betragAbs)
-        {
-            if (regel == null)
-                return false;
-
-            // Kein Bereich gesetzt -> Betrag immer passend
-            if (!regel.BetragVon.HasValue && !regel.BetragBis.HasValue)
-                return true;
-
-            if (regel.BetragVon.HasValue && betragAbs < regel.BetragVon.Value)
-                return false;
-
-            if (regel.BetragBis.HasValue && betragAbs > regel.BetragBis.Value)
-                return false;
-
-            return true;
-        }
-
-        private static bool PrefixSeqMatchForBookingRule(string patternNorm, string textNorm)
-        {
-            var parts = patternNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) return false;
-
-            var tokens = textNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            int pos = 0;
-
-            foreach (var p in parts)
-            {
-                bool found = false;
-
-                while (pos < tokens.Length)
-                {
-                    if (tokens[pos].StartsWith(p, StringComparison.Ordinal))
-                    {
-                        found = true;
-                        pos++;
-                        break;
-                    }
-                    pos++;
-                }
-
-                if (!found)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static string NormalizeBookingRuleText(string? raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-                return string.Empty;
-
-            var up = raw.ToUpperInvariant();
-            var cleaned = Regex.Replace(up, @"[^A-Z0-9]+", " ");
-            cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
-            return cleaned;
-        }
-        
     }
 }

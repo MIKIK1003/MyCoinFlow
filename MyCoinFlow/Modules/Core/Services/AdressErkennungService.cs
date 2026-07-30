@@ -44,6 +44,19 @@ namespace MyCoinFlow.Services
             _aliases = _db.LadeAdressAliase()
                           .Select(al => (al.AdresseId, NormalizeText(al.Text), string.IsNullOrWhiteSpace(al.Modus) ? "Exact" : al.Modus.Trim()))
                           .ToList();
+
+            // NEU: Adressname selbst als impliziter PrefixSeq-Kandidat.
+            // Ohne das würde z. B. "TWINT Post CH AG" die bereits erfasste
+            // Adresse "Post AG" nie finden, solange dafür noch kein Alias
+            // manuell angelernt wurde - der Name selbst wurde bisher nur
+            // für den exakten Vergleich (Schritt 2 in TryMatch) genutzt.
+            // Mindestlänge als Schutz gegen zu kurze/generische Namen.
+            foreach (var a in adressen)
+            {
+                var nameN = NormalizeText(a.Name);
+                if (nameN.Length >= 4)
+                    _aliases.Add((a.Id, nameN, "PrefixSeq"));
+            }
         }
 
         /// <summary>

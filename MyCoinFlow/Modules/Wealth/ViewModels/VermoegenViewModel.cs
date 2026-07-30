@@ -31,6 +31,27 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<string> AnlageklasseFilterListe { get; } = new();
         public ObservableCollection<VermoegenPositionRow> Positionen { get; } = new();
 
+        public ObservableCollection<string> ZeitraumFilterListe { get; } = new()
+        {
+            "1 Monat",
+            "3 Monate",
+            "6 Monate",
+            "1 Jahr",
+            "Alles"
+        };
+
+        private string _selectedZeitraumFilter = "3 Monate";
+        public string SelectedZeitraumFilter
+        {
+            get => _selectedZeitraumFilter;
+            set
+            {
+                _selectedZeitraumFilter = string.IsNullOrWhiteSpace(value) ? "Alles" : value;
+                OnPropertyChanged();
+                UpdateDepotVerlauf();
+            }
+        }
+
         private ISeries[] _depotVerlaufSeries = Array.Empty<ISeries>();
 
         private ISeries[] _vermoegenAufteilungSeries = Array.Empty<ISeries>();
@@ -316,17 +337,19 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var p in list)
             {
-                var fx = GetFxKursNachChf(p.Waehrung);
-                if (!fx.HasValue)
+                var fxMarkt = GetFxKursNachChf(p.Waehrung);
+                var fxEinstand = GetFxKursNachChf(p.EffektiveEinstandWaehrung);
+
+                if (!fxMarkt.HasValue || !fxEinstand.HasValue)
                 {
                     fehlendeFx++;
                     continue;
                 }
 
-                einstandChf += p.EinstandWert * fx.Value;
+                einstandChf += p.EinstandWert * fxEinstand.Value;
 
                 if (p.Marktwert.HasValue)
-                    depotwertChf += p.Marktwert.Value * fx.Value;
+                    depotwertChf += p.Marktwert.Value * fxMarkt.Value;
             }
 
             var gewinnChf = depotwertChf - einstandChf;
@@ -368,7 +391,10 @@ namespace MyCoinFlow.ViewModels
                 ? SelectedDepotFilter.Id
                 : (int?)null;
 
+            var startDatum = ZeitraumStartdatum(SelectedZeitraumFilter);
+
             var daten = _db.VermoegenDepotVerlaufGet(depotId)
+                .Where(x => !startDatum.HasValue || x.Datum.Date >= startDatum.Value)
                 .OrderBy(x => x.Datum)
                 .ToList();
 
@@ -378,7 +404,8 @@ namespace MyCoinFlow.ViewModels
         {
             Values = daten.Select(x => x.DepotwertChf).ToArray(),
             Name = "Depotwert CHF",
-            GeometrySize = 6,
+            // Bei vielen Datenpunkten keine Einzelpunkte zeichnen, sonst verklumpt die Linie.
+            GeometrySize = daten.Count > 60 ? 0 : 6,
             Fill = null
         }
             };
@@ -476,7 +503,9 @@ namespace MyCoinFlow.ViewModels
                 if (result.PositionenAktualisiert == 0 &&
                     result.PositionenOhneKursbasis == 0 &&
                     result.FxGespeichert == 0 &&
-                    result.FxOhneErgebnis == 0)
+                    result.FxOhneErgebnis == 0 &&
+                    result.KurseNachgeholt == 0 &&
+                    result.FxNachgeholt == 0)
                 {
                     MessageBox.Show(
                         StatusText,
@@ -500,13 +529,20 @@ namespace MyCoinFlow.ViewModels
         private VermoegenPositionRow ToRow(VermoegenPosition p)
         {
             var fx = GetFxKursNachChf(p.Waehrung);
+            var fxEinstand = GetFxKursNachChf(p.EffektiveEinstandWaehrung);
 
             decimal? marktwertChf = p.Marktwert.HasValue && fx.HasValue
                 ? p.Marktwert.Value * fx.Value
                 : null;
 
-            decimal? gewinnChf = p.GewinnVerlust.HasValue && fx.HasValue
-                ? p.GewinnVerlust.Value * fx.Value
+            decimal? einstandChf = fxEinstand.HasValue
+                ? p.EinstandWert * fxEinstand.Value
+                : null;
+
+            // Gewinn immer als Differenz der CHF-Werte, damit auch der Fall
+            // "Einstand in CHF, Handel in USD" korrekt abgebildet ist.
+            decimal? gewinnChf = marktwertChf.HasValue && einstandChf.HasValue
+                ? marktwertChf.Value - einstandChf.Value
                 : null;
 
             return new VermoegenPositionRow
@@ -522,13 +558,13 @@ namespace MyCoinFlow.ViewModels
                 Anzahl = p.Anzahl,
                 AnzahlText = FormatNumber(p.Anzahl),
 
-                EinstandText = FormatCurrency(p.EinstandWert, p.Waehrung),
+                EinstandText = FormatCurrency(p.EinstandWert, p.EffektiveEinstandWaehrung),
 
                 AktuellText = p.Marktwert.HasValue
                     ? FormatCurrency(p.Marktwert.Value, p.Waehrung)
                     : "-",
 
-                GewinnText = BuildGewinnText(p),
+                GewinnText = BuildGewinnText(p, gewinnChf, einstandChf),
 
                 FxKursText = fx.HasValue
                     ? FormatFx(fx.Value)
@@ -548,18 +584,33 @@ namespace MyCoinFlow.ViewModels
             };
         }
 
-        private string BuildGewinnText(VermoegenPosition p)
+        private string BuildGewinnText(VermoegenPosition p, decimal? gewinnChf, decimal? einstandChf)
         {
-            if (!p.GewinnVerlust.HasValue)
-                return "-";
-
-            if (p.EinstandWert > 0)
+            // Standardfall: Einstand und Handel in derselben Währung.
+            if (p.GewinnVerlust.HasValue)
             {
-                var performance = p.GewinnVerlust.Value / p.EinstandWert * 100m;
-                return $"{FormatCurrency(p.GewinnVerlust.Value, p.Waehrung)} ({FormatPercent(performance)})";
+                if (p.EinstandWert > 0)
+                {
+                    var performance = p.GewinnVerlust.Value / p.EinstandWert * 100m;
+                    return $"{FormatCurrency(p.GewinnVerlust.Value, p.Waehrung)} ({FormatPercent(performance)})";
+                }
+
+                return FormatCurrency(p.GewinnVerlust.Value, p.Waehrung);
             }
 
-            return FormatCurrency(p.GewinnVerlust.Value, p.Waehrung);
+            // Abweichende Einstandswährung: Gewinn nur in CHF vergleichbar.
+            if (gewinnChf.HasValue)
+            {
+                if (einstandChf.HasValue && einstandChf.Value > 0)
+                {
+                    var performance = gewinnChf.Value / einstandChf.Value * 100m;
+                    return $"{FormatCurrency(gewinnChf.Value, "CHF")} ({FormatPercent(performance)})";
+                }
+
+                return FormatCurrency(gewinnChf.Value, "CHF");
+            }
+
+            return "-";
         }
 
         private decimal? GetFxKursNachChf(string waehrung)
@@ -817,6 +868,18 @@ namespace MyCoinFlow.ViewModels
                 return false;
 
             return source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static DateTime? ZeitraumStartdatum(string auswahl)
+        {
+            return auswahl switch
+            {
+                "1 Monat" => DateTime.Today.AddMonths(-1),
+                "3 Monate" => DateTime.Today.AddMonths(-3),
+                "6 Monate" => DateTime.Today.AddMonths(-6),
+                "1 Jahr" => DateTime.Today.AddYears(-1),
+                _ => null // "Alles"
+            };
         }
 
         private static string FormatCurrency(decimal value, string waehrung = "CHF")

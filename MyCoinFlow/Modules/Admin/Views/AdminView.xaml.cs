@@ -147,6 +147,7 @@ namespace MyCoinFlow.Views
 
             bool isNum = string.Equals(key, "Nummernkreise", StringComparison.OrdinalIgnoreCase);
             bool isKonten = string.Equals(key, "Kontenplan", StringComparison.OrdinalIgnoreCase);
+            bool isTrans = string.Equals(key, "Transaktionen", StringComparison.OrdinalIgnoreCase);
             bool isKredit = string.Equals(key, "Kreditkarten", StringComparison.OrdinalIgnoreCase);
             bool isMand = string.Equals(key, "Mandanten", StringComparison.OrdinalIgnoreCase);
             bool isUpdate = string.Equals(key, "Update", StringComparison.OrdinalIgnoreCase);
@@ -158,6 +159,7 @@ namespace MyCoinFlow.Views
 
             SetVis("SecNummernkreise", isNum);
             SetVis("SecKontenplan", isKonten);
+            SetVis("SecTransaktionen", isTrans);
             SetVis("SecKreditkarten", isKredit);
             SetVis("SecMandanten", isMand);
             SetVis("SecUpdate", isUpdate);
@@ -168,6 +170,266 @@ namespace MyCoinFlow.Views
 
             if (isKredit) EnsureCreditCardMappingInline();
             if (isPfade) EnsurePathsHost();
+            if (isTrans) LoadTransaktionenSection();
+        }
+
+        // ===== Transaktionen: Schnellwahl-Konten je Benutzer =====
+        public sealed class KontoSchnellwahlRow
+        {
+            public int Id { get; set; }
+            public string Anzeige { get; set; } = "";
+            public bool IstAusgewaehlt { get; set; }
+        }
+
+        private void LoadTransaktionenSection()
+        {
+            try
+            {
+                Transaktionen_StatusText.Text = "";
+
+                var alleKonten = _dbSvc.LadeKontoLookup();
+                var favIds = new HashSet<int>(_dbSvc.LadeKontoSchnellwahl(CurrentUserContext.Username));
+
+                var rows = alleKonten
+                    .Select(k => new KontoSchnellwahlRow { Id = k.Id, Anzeige = k.Anzeige, IstAusgewaehlt = favIds.Contains(k.Id) })
+                    .ToList();
+
+                TransaktionenKontenGrid.ItemsSource = rows;
+            }
+            catch (Exception ex)
+            {
+                Transaktionen_StatusText.Text = "Fehler beim Laden: " + ex.Message;
+            }
+        }
+
+        private void Transaktionen_Save_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Sicherstellen, dass der aktuelle Bearbeitungsstand der Checkbox-Zelle übernommen wird.
+                TransaktionenKontenGrid.CommitEdit(DataGridEditingUnit.Row, true);
+
+                var rows = (TransaktionenKontenGrid.ItemsSource as IEnumerable<KontoSchnellwahlRow>) ?? Enumerable.Empty<KontoSchnellwahlRow>();
+                var ausgewaehlt = rows.Where(r => r.IstAusgewaehlt).Select(r => r.Id).ToList();
+
+                _dbSvc.SpeichereKontoSchnellwahl(CurrentUserContext.Username, ausgewaehlt);
+
+                Transaktionen_StatusText.Text = $"Gespeichert: {ausgewaehlt.Count} Konto(en) in der Schnellwahl.";
+            }
+            catch (Exception ex)
+            {
+                Transaktionen_StatusText.Text = "Fehler beim Speichern: " + ex.Message;
+            }
+        }
+
+        // ===== Transaktionen: Gelernte Zuordnungen (Aliase + Buchungsregeln) verwalten =====
+        private List<DatabaseService.AdressAliasAnzeige> _alleAliase = new();
+        private List<DatabaseService.AdressBuchungsregelAnzeige> _alleRegeln = new();
+
+        private void TransaktionenTab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // WICHTIG: SelectionChanged bubbelt. Ohne diese Prüfung feuert dieser
+            // Handler auch, wenn irgendeine ComboBox/DataGrid *innerhalb* eines
+            // TabItems ihre eigene Auswahl ändert (z. B. KategorieAuswahlBox) -
+            // und LoadKategorieKonten() würde die gerade getroffene Auswahl im
+            // selben Klick sofort wieder zurücksetzen.
+            if (!ReferenceEquals(e.OriginalSource, TransaktionenTab)) return;
+
+            var idx = TransaktionenTab.SelectedIndex;
+
+            var schnellwahlPanel = El<StackPanel>("TransaktionenActionsSchnellwahlPanel");
+            var gelerntPanel = El<StackPanel>("TransaktionenActionsGelerntPanel");
+            var kategorienPanel = El<StackPanel>("TransaktionenActionsKategorienPanel");
+            if (schnellwahlPanel != null) schnellwahlPanel.Visibility = idx == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (gelerntPanel != null) gelerntPanel.Visibility = idx == 1 ? Visibility.Visible : Visibility.Collapsed;
+            if (kategorienPanel != null) kategorienPanel.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+            if (idx == 1) LoadGelernteZuordnungen();
+            if (idx == 2) LoadKategorieKonten();
+        }
+
+        // ===== Transaktionen: Kategorie-Standardkonten (Kreditkarten-Import) =====
+        private List<KontoLookup> _alleKontenFuerKategorie = new();
+
+        private void LoadKategorieKonten()
+        {
+            try
+            {
+                KategorieKonten_StatusText.Text = "";
+                _alleKontenFuerKategorie = _dbSvc.LadeKontoLookup();
+                KategorieKontenGrid.ItemsSource = _dbSvc.LadeKategorieStandardkonten();
+            }
+            catch (Exception ex)
+            {
+                KategorieKonten_StatusText.Text = "Fehler beim Laden: " + ex.Message;
+            }
+        }
+
+        // Pro-Zeile-ComboBox direkt im Grid. Funktioniert jetzt zuverlässig, weil
+        // TransaktionenTab_SelectionChanged bubbelnde SelectionChanged-Events aus
+        // dieser ComboBox nicht mehr fälschlich als Tab-Wechsel behandelt und
+        // dadurch nicht mehr LoadKategorieKonten() (inkl. ItemsSource-Reset)
+        // mitten in der Auswahl erneut auslöst - das war der eigentliche Fehler.
+        private void KategorieKontoCombo_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.ItemsSource == null)
+                cb.ItemsSource = _alleKontenFuerKategorie;
+        }
+
+        // Editierbare ComboBoxen markieren beim Fokuserhalt ihren gesamten Text
+        // blau (Select-All) - in der Tabelle wirkt das wie ein Darstellungsfehler.
+        // Cursor stattdessen ans Textende setzen.
+        private void KategorieKontoCombo_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is not ComboBox cb) return;
+
+            if (cb.Template.FindName("PART_EditableTextBox", cb) is TextBox tb)
+                tb.CaretIndex = tb.Text?.Length ?? 0;
+        }
+
+        private void KategorieKontoCombo_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (sender is not ComboBox cb) return;
+            if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Escape or Key.Tab) return;
+
+            var text = cb.Text ?? "";
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                cb.ItemsSource = _alleKontenFuerKategorie;
+            }
+            else
+            {
+                var gefiltert = _alleKontenFuerKategorie
+                    .Where(k => k.Anzeige.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+                cb.ItemsSource = gefiltert.Count > 0 ? gefiltert : _alleKontenFuerKategorie;
+            }
+
+            cb.IsDropDownOpen = true;
+        }
+
+        private void KategorienAusDatei_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Kreditkarten-Musterdatei wählen",
+                    Filter = "Excel/CSV (*.xlsx;*.xls;*.csv)|*.xlsx;*.xls;*.csv|Alle Dateien|*.*"
+                };
+                if (dlg.ShowDialog() != true) return;
+
+                var rows = _dbSvc.LeseCreditCardExcel(dlg.FileName);
+                var kategorien = rows.Select(r => r.Kategorie).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct().ToList()!;
+
+                _dbSvc.SeedKategorienOhneKonto(kategorien!);
+                LoadKategorieKonten();
+
+                KategorieKonten_StatusText.Text = $"{kategorien.Count} Kategorie(n) aus der Datei geprüft/ergänzt.";
+            }
+            catch (Exception ex)
+            {
+                KategorieKonten_StatusText.Text = "Fehler beim Einlesen: " + ex.Message;
+            }
+        }
+
+        private void KategorieKonten_Save_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rows = (KategorieKontenGrid.ItemsSource as IEnumerable<KategorieStandardkonto>) ?? Enumerable.Empty<KategorieStandardkonto>();
+                var zeilen = rows.Select(r => (r.Id, r.KontoId)).ToList();
+
+                _dbSvc.SpeichereKategorieStandardkonten(zeilen);
+
+                KategorieKonten_StatusText.Text = $"Gespeichert: {zeilen.Count(z => z.KontoId.HasValue)} von {zeilen.Count} Kategorie(n) mit Konto.";
+            }
+            catch (Exception ex)
+            {
+                KategorieKonten_StatusText.Text = "Fehler beim Speichern: " + ex.Message;
+            }
+        }
+
+        private void GelernteZuordnungen_Refresh_Click(object sender, RoutedEventArgs e) => LoadGelernteZuordnungen();
+
+        private void LoadGelernteZuordnungen()
+        {
+            try
+            {
+                GelernteZuordnungen_StatusText.Text = "";
+                _alleAliase = _dbSvc.LadeAdressAliaseMitNamen();
+                _alleRegeln = _dbSvc.LadeAlleAdressBuchungsregelnMitNamen();
+                ApplyAliaseFilter();
+                ApplyRegelnFilter();
+            }
+            catch (Exception ex)
+            {
+                GelernteZuordnungen_StatusText.Text = "Fehler beim Laden: " + ex.Message;
+            }
+        }
+
+        private void ApplyAliaseFilter()
+        {
+            var term = (AliaseFilterBox?.Text ?? "").Trim();
+            IEnumerable<DatabaseService.AdressAliasAnzeige> q = _alleAliase;
+            if (!string.IsNullOrWhiteSpace(term))
+                q = q.Where(a => a.AdresseName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                               || a.Text.Contains(term, StringComparison.OrdinalIgnoreCase));
+            AliaseGrid.ItemsSource = q.ToList();
+        }
+
+        private void ApplyRegelnFilter()
+        {
+            var term = (RegelnFilterBox?.Text ?? "").Trim();
+            IEnumerable<DatabaseService.AdressBuchungsregelAnzeige> q = _alleRegeln;
+            if (!string.IsNullOrWhiteSpace(term))
+                q = q.Where(r => r.AdresseName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                               || r.TextPattern.Contains(term, StringComparison.OrdinalIgnoreCase)
+                               || r.KontoAnzeige.Contains(term, StringComparison.OrdinalIgnoreCase));
+            RegelnGrid.ItemsSource = q.ToList();
+        }
+
+        private void AliaseFilterBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyAliaseFilter();
+        private void RegelnFilterBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyRegelnFilter();
+
+        private void AliasLoeschen_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not int id) return;
+
+            var ok = MessageBox.Show("Diesen Alias wirklich löschen?", "Alias löschen",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (ok != MessageBoxResult.Yes) return;
+
+            try
+            {
+                _dbSvc.LoescheAdressAlias(id);
+                LoadGelernteZuordnungen();
+            }
+            catch (Exception ex)
+            {
+                GelernteZuordnungen_StatusText.Text = "Fehler beim Löschen: " + ex.Message;
+            }
+        }
+
+        private void RegelLoeschen_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not int id) return;
+
+            var ok = MessageBox.Show(
+                "Diese Buchungsregel wirklich löschen? Die zugehörige Lernhistorie für dieses Konto wird ebenfalls entfernt, damit die Regel beim nächsten Anlernen nicht wieder auftaucht.",
+                "Regel löschen", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (ok != MessageBoxResult.Yes) return;
+
+            try
+            {
+                _dbSvc.LoescheAdressBuchungsregel(id);
+                LoadGelernteZuordnungen();
+            }
+            catch (Exception ex)
+            {
+                GelernteZuordnungen_StatusText.Text = "Fehler beim Löschen: " + ex.Message;
+            }
         }
 
         // ===== Nummernkreise-Host =====

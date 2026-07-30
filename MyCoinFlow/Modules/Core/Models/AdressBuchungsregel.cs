@@ -17,5 +17,10 @@
 
         public int Prioritaet { get; set; } = 100;
         public bool IstAktiv { get; set; } = true;
+
+        // NEU: Evidenz, aus der die Regel abgeleitet wurde
+        public int BelegAnzahl { get; set; } = 1;
+        public System.DateTime? LetzteBestaetigung { get; set; }
+        public bool IstKonflikt { get; set; }
     }
 }

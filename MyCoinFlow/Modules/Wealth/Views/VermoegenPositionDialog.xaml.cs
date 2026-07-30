@@ -49,6 +49,19 @@ namespace MyCoinFlow.Views
             "GBP"
         };
 
+        private const string WieHandelswaehrungText = "Wie Handelswährung";
+
+        public ObservableCollection<string> EinstandWaehrungen { get; } = new()
+        {
+            WieHandelswaehrungText,
+            "CHF",
+            "EUR",
+            "USD",
+            "GBP"
+        };
+
+        public string EinstandWaehrungAuswahl { get; set; } = WieHandelswaehrungText;
+
         private VermoegenDepot? _selectedDepot;
         public VermoegenDepot? SelectedDepot
         {
@@ -97,6 +110,7 @@ namespace MyCoinFlow.Views
                     Symbol = model.Symbol,
                     Boerse = string.IsNullOrWhiteSpace(model.Boerse) ? "SIX" : model.Boerse,
                     Waehrung = string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung,
+                    EinstandWaehrung = model.EinstandWaehrung,
                     Anlageklasse = string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse,
                     Anzahl = model.Anzahl,
                     Einstandspreis = model.Einstandspreis,
@@ -108,6 +122,13 @@ namespace MyCoinFlow.Views
                 };
 
             SelectedDepot = Depots.FirstOrDefault(d => d.Id == Model.DepotId) ?? Depots.FirstOrDefault();
+
+            EinstandWaehrungAuswahl = string.IsNullOrWhiteSpace(Model.EinstandWaehrung)
+                ? WieHandelswaehrungText
+                : Model.EinstandWaehrung.Trim().ToUpperInvariant();
+
+            if (!EinstandWaehrungen.Contains(EinstandWaehrungAuswahl))
+                EinstandWaehrungen.Add(EinstandWaehrungAuswahl);
 
             AnzahlText = Model.Anzahl == 0 ? "" : Model.Anzahl.ToString("N8", ChCulture).TrimEnd('0').TrimEnd('.');
             EinstandspreisText = Model.Einstandspreis == 0 ? "" : Model.Einstandspreis.ToString("N6", ChCulture).TrimEnd('0').TrimEnd('.');
@@ -195,6 +216,16 @@ namespace MyCoinFlow.Views
             Model.Waehrung = string.IsNullOrWhiteSpace(Model.Waehrung)
                 ? "CHF"
                 : Model.Waehrung.Trim().ToUpperInvariant();
+
+            // "Wie Handelswährung" oder identische Währung -> leer speichern (= Standardfall).
+            var einstandWaehrung = string.IsNullOrWhiteSpace(EinstandWaehrungAuswahl) ||
+                                   EinstandWaehrungAuswahl == WieHandelswaehrungText
+                ? ""
+                : EinstandWaehrungAuswahl.Trim().ToUpperInvariant();
+
+            Model.EinstandWaehrung = einstandWaehrung == Model.Waehrung
+                ? ""
+                : einstandWaehrung;
 
             Model.Anlageklasse = string.IsNullOrWhiteSpace(Model.Anlageklasse)
                 ? "Aktie"

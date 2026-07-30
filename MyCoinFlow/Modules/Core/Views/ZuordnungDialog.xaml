@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
         Title="Buchung zuordnen"
-        Height="680" Width="820"
+        Height="880" Width="820"
         SizeToContent="Manual"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
@@ -56,10 +56,27 @@
 
                 <!-- Kopf: Info -->
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="{Binding BuchungInfo}" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding BuchungText}" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap"/>
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding BuchungInfo}" FontSize="16" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding BuchungText}" Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                ToolTip="Buchungstext im Web recherchieren"
+                                VerticalAlignment="Top"
+                                Click="WebRecherche_Click">
+                            <materialDesign:PackIcon Kind="Magnify" Width="20" Height="20"/>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}"/>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
                 </Border>
 
                 <!-- Hinweis aktiver Budgetzeitraum -->
@@ -188,7 +205,20 @@
                                            Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 <ComboBox x:Name="KontoBox" Style="{StaticResource BigCombo}"
                                           DisplayMemberPath="Anzeige" SelectedValuePath="Id"
-                                          SelectionChanged="UiChanged"/>
+                                          IsEditable="True"
+                                          IsTextSearchEnabled="False"
+                                          SelectionChanged="UiChanged"
+                                          KeyUp="KontoBox_KeyUp"/>
+                                <TextBlock Text="Tipp: Freitext filtert nach enthaltenem Text (z. B. &quot;Hausha&quot; findet &quot;Essen - Trinken - Haushalt&quot;)."
+                                           Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="SchnellwahlCard" Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock Text="Schnellwahl" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <WrapPanel x:Name="SchnellwahlPanel" Orientation="Horizontal"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

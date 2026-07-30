@@ -129,6 +129,27 @@
                             </StackPanel>
                         </ListBoxItem>
 
+                        <ListBoxItem Tag="Transaktionen">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="StarCogOutline"
+                                                         Style="{StaticResource DefaultIconStyle.Nav}"
+                                                         Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
+                                                         RenderTransformOrigin="0.5,0.5">
+                                    <materialDesign:PackIcon.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+                                            <SkewTransform/>
+                                            <RotateTransform/>
+                                            <TranslateTransform/>
+                                        </TransformGroup>
+                                    </materialDesign:PackIcon.RenderTransform>
+                                </materialDesign:PackIcon>
+                                <TextBlock Text="Transaktionen"
+                                           VerticalAlignment="Center"
+                                           Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                            </StackPanel>
+                        </ListBoxItem>
+
                         <ListBoxItem Tag="Kreditkarten">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CreditCardOutline"
@@ -509,6 +530,373 @@
                             </TabItem>
                         </TabControl>
 
+                    </Border>
+                </Grid>
+
+                <!-- ===================================================== -->
+                <!-- 3b) Transaktionen (Schnellwahl-Konten je Benutzer)      -->
+                <!-- ===================================================== -->
+                <Grid x:Name="SecTransaktionen" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="270"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource SidebarCard}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+
+                                <TextBlock Text="Aktionen"
+                                           Style="{StaticResource SidebarSectionHeader}"/>
+
+                                <!-- Panel 0: Schnellwahl-Konten -->
+                                <StackPanel x:Name="TransaktionenActionsSchnellwahlPanel" Visibility="Visible">
+                                    <TextBlock Text="Schnellwahl-Konten"
+                                               Style="{StaticResource SidebarGroupHeader}"
+                                               Margin="0,0,0,8"/>
+
+                                    <Button Click="Transaktionen_Save_Click"
+                                            Style="{StaticResource IconTextButton}"
+                                            Tag="ContentSave"
+                                            Content="Speichern"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"/>
+
+                                    <TextBlock x:Name="Transaktionen_StatusText"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10"
+                                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                                    <Separator Margin="0,4,0,12"/>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{StaticResource DefaultIconStyle}"
+                                                                 VerticalAlignment="Top"
+                                                                 Margin="0,2,8,0"/>
+                                        <TextBlock Text="Die hier ausgewählten Konten erscheinen im Zuordnungsdialog als Schnellwahl-Buttons. Gilt nur für den angemeldeten Benutzer. Empfehlung: 5-8 Konten."
+                                                   TextWrapping="Wrap"
+                                                   Width="180"
+                                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Panel 1: Gelernte Zuordnungen -->
+                                <StackPanel x:Name="TransaktionenActionsGelerntPanel" Visibility="Collapsed">
+                                    <TextBlock Text="Gelernte Zuordnungen"
+                                               Style="{StaticResource SidebarGroupHeader}"
+                                               Margin="0,0,0,8"/>
+
+                                    <Button Click="GelernteZuordnungen_Refresh_Click"
+                                            Style="{StaticResource IconTextButton}"
+                                            Tag="Refresh"
+                                            Content="Aktualisieren"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"/>
+
+                                    <TextBlock x:Name="GelernteZuordnungen_StatusText"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10"
+                                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                                    <Separator Margin="0,4,0,12"/>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{StaticResource DefaultIconStyle}"
+                                                                 VerticalAlignment="Top"
+                                                                 Margin="0,2,8,0"/>
+                                        <TextBlock Text="Hier lassen sich falsch angelernte Adress-Aliase oder Buchungsregeln finden und löschen, ohne die Datenbank direkt zu bearbeiten."
+                                                   TextWrapping="Wrap"
+                                                   Width="180"
+                                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Panel 2: Kategorie-Konten -->
+                                <StackPanel x:Name="TransaktionenActionsKategorienPanel" Visibility="Collapsed">
+                                    <TextBlock Text="Kategorie-Konten"
+                                               Style="{StaticResource SidebarGroupHeader}"
+                                               Margin="0,0,0,8"/>
+
+                                    <Button Click="KategorienAusDatei_Click"
+                                            Style="{StaticResource IconTextButton}"
+                                            Tag="FileImport"
+                                            Content="Kategorien aus Musterdatei einlesen"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"/>
+
+                                    <Button Click="KategorieKonten_Save_Click"
+                                            Style="{StaticResource IconTextButton}"
+                                            Tag="ContentSave"
+                                            Content="Speichern"
+                                            MinHeight="40"
+                                            Margin="0,0,0,10"/>
+
+                                    <TextBlock x:Name="KategorieKonten_StatusText"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10"
+                                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                                    <Separator Margin="0,4,0,12"/>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{StaticResource DefaultIconStyle}"
+                                                                 VerticalAlignment="Top"
+                                                                 Margin="0,2,8,0"/>
+                                        <TextBlock Text="'Kategorien aus Musterdatei einlesen' liest eine Kreditkarten-Excel-Datei (über die Match-Liste) und ergänzt neue, noch unbekannte Kategorien ohne Konto in der Liste rechts. Konto je Kategorie zuweisen und speichern."
+                                                   TextWrapping="Wrap"
+                                                   Width="180"
+                                                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            CornerRadius="{StaticResource AppCornerRadius.Card}"
+                            Background="{DynamicResource MaterialDesignPaper}"
+                            Padding="12">
+
+                        <TabControl x:Name="TransaktionenTab"
+                                    SelectionChanged="TransaktionenTab_SelectionChanged">
+
+                            <TabItem Header="Schnellwahl-Konten">
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Konten für die Schnellwahl auswählen"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,10"/>
+
+                                    <Border Grid.Row="1"
+                                            Padding="10"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource MaterialDesignCardBackground}">
+                                        <DataGrid x:Name="TransaktionenKontenGrid"
+                                                  AutoGenerateColumns="False"
+                                                  CanUserAddRows="False"
+                                                  HeadersVisibility="Column"
+                                                  SelectionMode="Single"
+                                                  RowHeaderWidth="0"
+                                                  GridLinesVisibility="Horizontal"
+                                                  materialDesign:DataGridAssist.CellPadding="8"
+                                                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                                                  RowHeight="36"
+                                                  Background="White"
+                                                  RowBackground="White"
+                                                  AlternatingRowBackground="{x:Null}">
+                                            <DataGrid.Columns>
+                                                <DataGridCheckBoxColumn Header="Schnellwahl" Binding="{Binding IstAusgewaehlt, UpdateSourceTrigger=PropertyChanged}" Width="90"/>
+                                                <DataGridTextColumn Header="Konto" Binding="{Binding Anzeige}" Width="*" IsReadOnly="True"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </Grid>
+                            </TabItem>
+
+                            <TabItem Header="Gelernte Zuordnungen">
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="260"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Adress-Aliase" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="AliaseFilterBox"
+                                                 Grid.Column="1"
+                                                 materialDesign:HintAssist.Hint="Suchen (Adresse oder Text)…"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                                 TextChanged="AliaseFilterBox_TextChanged"/>
+                                    </Grid>
+
+                                    <Border Grid.Row="1"
+                                            Padding="10"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource MaterialDesignCardBackground}">
+                                        <DataGrid x:Name="AliaseGrid"
+                                                  AutoGenerateColumns="False"
+                                                  CanUserAddRows="False"
+                                                  IsReadOnly="True"
+                                                  HeadersVisibility="Column"
+                                                  SelectionMode="Single"
+                                                  RowHeaderWidth="0"
+                                                  GridLinesVisibility="Horizontal"
+                                                  materialDesign:DataGridAssist.CellPadding="8"
+                                                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                                                  RowHeight="36"
+                                                  Background="White"
+                                                  RowBackground="White"
+                                                  AlternatingRowBackground="{x:Null}">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="2*"/>
+                                                <DataGridTextColumn Header="Text/Muster" Binding="{Binding Text}" Width="3*"/>
+                                                <DataGridTextColumn Header="Modus" Binding="{Binding Modus}" Width="120"/>
+                                                <DataGridTemplateColumn Header="" Width="52" MinWidth="52" MaxWidth="52">
+                                                    <DataGridTemplateColumn.CellStyle>
+                                                        <Style TargetType="DataGridCell">
+                                                            <Setter Property="Focusable" Value="False"/>
+                                                        </Style>
+                                                    </DataGridTemplateColumn.CellStyle>
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button ToolTip="Alias löschen"
+                                                                    Click="AliasLoeschen_Click"
+                                                                    Tag="{Binding Id}">
+                                                                <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18"/>
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource MaterialDesignValidationErrorBrush}"/>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+
+                                    <Grid Grid.Row="2" Margin="0,14,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="260"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Buchungsregeln" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="RegelnFilterBox"
+                                                 Grid.Column="1"
+                                                 materialDesign:HintAssist.Hint="Suchen (Adresse, Text oder Konto)…"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                                 TextChanged="RegelnFilterBox_TextChanged"/>
+                                    </Grid>
+
+                                    <Border Grid.Row="3"
+                                            Padding="10"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource MaterialDesignCardBackground}">
+                                        <DataGrid x:Name="RegelnGrid"
+                                                  AutoGenerateColumns="False"
+                                                  CanUserAddRows="False"
+                                                  IsReadOnly="True"
+                                                  HeadersVisibility="Column"
+                                                  SelectionMode="Single"
+                                                  RowHeaderWidth="0"
+                                                  GridLinesVisibility="Horizontal"
+                                                  materialDesign:DataGridAssist.CellPadding="8"
+                                                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                                                  RowHeight="36"
+                                                  Background="White"
+                                                  RowBackground="White"
+                                                  AlternatingRowBackground="{x:Null}">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" Width="2*"/>
+                                                <DataGridCheckBoxColumn Header="Einnahme" Binding="{Binding IstEinnahme}" Width="80"/>
+                                                <DataGridTextColumn Header="Text/Muster" Binding="{Binding TextPattern}" Width="2*"/>
+                                                <DataGridTextColumn Header="Modus" Binding="{Binding PatternModus}" Width="90"/>
+                                                <DataGridTextColumn Header="Konto" Binding="{Binding KontoAnzeige}" Width="2*"/>
+                                                <DataGridTextColumn Header="Betrag von" Binding="{Binding BetragVon, StringFormat={}{0:N2}}" Width="90"/>
+                                                <DataGridTextColumn Header="Betrag bis" Binding="{Binding BetragBis, StringFormat={}{0:N2}}" Width="90"/>
+                                                <DataGridTextColumn Header="Belege" Binding="{Binding BelegAnzahl}" Width="60"/>
+                                                <DataGridCheckBoxColumn Header="Konflikt" Binding="{Binding IstKonflikt}" Width="80"/>
+                                                <DataGridTemplateColumn Header="" Width="52" MinWidth="52" MaxWidth="52">
+                                                    <DataGridTemplateColumn.CellStyle>
+                                                        <Style TargetType="DataGridCell">
+                                                            <Setter Property="Focusable" Value="False"/>
+                                                        </Style>
+                                                    </DataGridTemplateColumn.CellStyle>
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button ToolTip="Regel löschen"
+                                                                    Click="RegelLoeschen_Click"
+                                                                    Tag="{Binding Id}">
+                                                                <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18"/>
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource MaterialDesignValidationErrorBrush}"/>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </Grid>
+                            </TabItem>
+
+                            <TabItem Header="Kategorie-Konten">
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Standardkonto je Kreditkarten-Kategorie. Greift beim Kreditkarten-Import, wenn keine Adresse/Regel zutrifft - Kategorien sind meist eine feste, überschaubare Liste des Kartenanbieters."
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,10"
+                                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"/>
+
+                                    <Border Grid.Row="1"
+                                            Padding="10"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource MaterialDesignCardBackground}">
+                                        <DataGrid x:Name="KategorieKontenGrid"
+                                                  AutoGenerateColumns="False"
+                                                  CanUserAddRows="False"
+                                                  HeadersVisibility="Column"
+                                                  RowHeaderWidth="0"
+                                                  GridLinesVisibility="Horizontal"
+                                                  materialDesign:DataGridAssist.CellPadding="4"
+                                                  materialDesign:DataGridAssist.ColumnHeaderPadding="8"
+                                                  MinRowHeight="40"
+                                                  Background="White"
+                                                  RowBackground="White"
+                                                  AlternatingRowBackground="{x:Null}">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="2*" IsReadOnly="True"/>
+                                                <DataGridTemplateColumn Header="Standardkonto" Width="3*">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <ComboBox DisplayMemberPath="Anzeige"
+                                                                      SelectedValuePath="Id"
+                                                                      SelectedValue="{Binding KontoId, UpdateSourceTrigger=PropertyChanged}"
+                                                                      IsEditable="True"
+                                                                      IsTextSearchEnabled="False"
+                                                                      Style="{x:Null}"
+                                                                      VerticalContentAlignment="Center"
+                                                                      MinHeight="28"
+                                                                      Padding="6,2"
+                                                                      Loaded="KategorieKontoCombo_Loaded"
+                                                                      KeyUp="KategorieKontoCombo_KeyUp"
+                                                                      GotKeyboardFocus="KategorieKontoCombo_GotKeyboardFocus"
+                                                                      Margin="2"/>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </Grid>
+                            </TabItem>
+
+                        </TabControl>
                     </Border>
                 </Grid>
 

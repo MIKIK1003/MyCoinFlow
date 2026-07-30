@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using MaterialDesignThemes.Wpf;
 using MyCoinFlow.Import;
 using MyCoinFlow.Models;
@@ -17,6 +18,7 @@ namespace MyCoinFlow.Views
     {
         private readonly DatabaseService _db = new();
         private readonly BankImportItem _item;
+        private List<KontoLookup> _alleKonten = new();
 
         // Rückgaben an den Aufrufer
         public int? SelectedAdresseId { get; private set; }
@@ -48,7 +50,8 @@ namespace MyCoinFlow.Views
 
             // 2) DropDowns füllen
             AdrBox.ItemsSource = _db.LadeAdressen().OrderBy(a => a.Name).ToList();   // {Id, Name, ...}
-            KontoBox.ItemsSource = _db.LadeKontoLookup();                               // {Id, Anzeige}
+            _alleKonten = _db.LadeKontoLookup();                                     // {Id, Anzeige}
+            KontoBox.ItemsSource = _alleKonten;
 
             // 3) Geldinstitut-Info
             GiInfoText.Text = !string.IsNullOrWhiteSpace(_item.AccountIban)
@@ -58,13 +61,87 @@ namespace MyCoinFlow.Views
             // 4) Vorbelegung: per Vorschlag/IBAN/Name
             PreselectAdresseUndKonto();
 
-            // 5) Erste Regel-Preview zeigen
+            // 5) Schnellwahl-Buttons des aktuellen Benutzers
+            LadeSchnellwahlButtons();
+
+            // 6) Erste Regel-Preview zeigen
             UpdateRulePreview();
         }
 
         private void UiChanged(object sender, RoutedEventArgs e)
         {
             UpdateRulePreview();
+        }
+
+        // ---------------- Schnellwahl-Konten ----------------
+        private void LadeSchnellwahlButtons()
+        {
+            try
+            {
+                var favIds = _db.LadeKontoSchnellwahl(CurrentUserContext.Username);
+
+                SchnellwahlPanel.Children.Clear();
+
+                foreach (var id in favIds)
+                {
+                    var konto = _alleKonten.FirstOrDefault(k => k.Id == id);
+                    if (konto == null) continue;
+
+                    var btn = new Button
+                    {
+                        Content = konto.Anzeige,
+                        Tag = konto.Id,
+                        Margin = new Thickness(0, 0, 8, 8),
+                        Padding = new Thickness(10, 6, 10, 6)
+                    };
+
+                    if (Application.Current?.TryFindResource("MaterialDesignOutlinedButton") is Style s)
+                        btn.Style = s;
+
+                    btn.Click += SchnellwahlButton_Click;
+                    SchnellwahlPanel.Children.Add(btn);
+                }
+
+                SchnellwahlCard.Visibility = SchnellwahlPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch
+            {
+                SchnellwahlCard.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void SchnellwahlButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not int kontoId) return;
+
+            // Volle Liste sicherstellen, falls gerade gefiltert war,
+            // sonst könnte die Auswahl ins Leere greifen.
+            KontoBox.ItemsSource = _alleKonten;
+            KontoBox.SelectedValue = kontoId;
+        }
+
+        // ---------------- Konto-Suche: enthaltenen Text statt nur Präfix ----------------
+        private void KontoBox_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Escape or Key.Tab)
+                return;
+
+            var text = KontoBox.Text ?? "";
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                KontoBox.ItemsSource = _alleKonten;
+            }
+            else
+            {
+                var gefiltert = _alleKonten
+                    .Where(k => k.Anzeige.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+
+                KontoBox.ItemsSource = gefiltert.Count > 0 ? gefiltert : _alleKonten;
+            }
+
+            KontoBox.IsDropDownOpen = true;
         }
 
         // ------------ Regel-Preview (nur Anzeige) ------------
@@ -137,6 +214,21 @@ namespace MyCoinFlow.Views
         // ------------ Buttons ------------
         private void Abbrechen_Click(object sender, RoutedEventArgs e)
             => DialogResult = false;
+
+        private void WebRecherche_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!WebRechercheService.OpenSearch(_item.Text, _item.CounterpartyName))
+                    MessageBox.Show("Kein verwertbarer Buchungstext für die Recherche vorhanden.",
+                        "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Recherche konnte nicht geöffnet werden:\n" + ex.Message,
+                    "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
         private void Speichern_Click(object sender, RoutedEventArgs e)
         {
@@ -270,16 +362,13 @@ namespace MyCoinFlow.Views
 
                     if (!string.IsNullOrWhiteSpace(regelText))
                     {
-                        var betragAbs = Math.Abs(_item.Amount);
-
-                        _db.SpeichereAdressBuchungsregel(
+                        _db.LernAdressBuchungsregel(
                             adresseId: SelectedAdresseId.Value,
                             istEinnahme: istEinnahme,
                             textPattern: regelText,
                             patternModus: "Contains",
                             kontoId: regelKontoId.Value,
-                            betragVon: betragAbs,
-                            betragBis: betragAbs,
+                            betrag: _item.Amount,
                             prioritaet: 100
                         );
                     }

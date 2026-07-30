@@ -97,9 +97,27 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Text="{Binding TitelText}"
-                       FontSize="22"
-                       FontWeight="SemiBold"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding TitelText}"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+
+                <ComboBox Grid.Column="1"
+                          MinHeight="36"
+                          Width="150"
+                          VerticalAlignment="Top"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          materialDesign:HintAssist.Hint="Zeitraum"
+                          ItemsSource="{Binding ZeitraumFilterListe}"
+                          SelectedItem="{Binding SelectedZeitraumFilter, Mode=TwoWay}"/>
+            </Grid>
 
             <TextBlock Grid.Row="2"
                        Text="{Binding UntertitelText}"
@@ -135,6 +153,8 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Kursdatum" Binding="{Binding KursDatumText}" Width="130"/>
                     <DataGridTextColumn Header="Kurs" Binding="{Binding KursText}" Width="130"/>
+                    <DataGridTextColumn x:Name="FxSpalte" Header="FX → CHF" Binding="{Binding FxKursText}" Width="120"/>
+                    <DataGridTextColumn x:Name="KursChfSpalte" Header="Kurs CHF" Binding="{Binding KursChfText}" Width="120"/>
                     <DataGridTextColumn Header="Quelle" Binding="{Binding Quelle}" Width="120"/>
                     <DataGridTextColumn Header="Erfasst am" Binding="{Binding ErfasstAmText}" Width="180"/>
                 </DataGrid.Columns>

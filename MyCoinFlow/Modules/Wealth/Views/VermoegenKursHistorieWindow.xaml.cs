@@ -22,6 +22,30 @@ namespace MyCoinFlow.Views
 
         public ObservableCollection<KursHistorieRow> Historie { get; } = new();
 
+        public ObservableCollection<string> ZeitraumFilterListe { get; } = new()
+        {
+            "1 Monat",
+            "3 Monate",
+            "6 Monate",
+            "1 Jahr",
+            "Alles"
+        };
+
+        private string _selectedZeitraumFilter = "3 Monate";
+        public string SelectedZeitraumFilter
+        {
+            get => _selectedZeitraumFilter;
+            set
+            {
+                var neu = string.IsNullOrWhiteSpace(value) ? "Alles" : value;
+                if (neu == _selectedZeitraumFilter)
+                    return;
+
+                _selectedZeitraumFilter = neu;
+                Reload();
+            }
+        }
+
         private KursHistorieRow? _selectedHistorie;
         public KursHistorieRow? SelectedHistorie
         {
@@ -83,12 +107,32 @@ namespace MyCoinFlow.Views
         {
             Historie.Clear();
 
+            var startDatum = ZeitraumStartdatum(_selectedZeitraumFilter);
+
             var daten = _db.VermoegenKursHistorieGetByPosition(_position.Id)
+                .Where(h => !startDatum.HasValue || h.KursDatum.Date >= startDatum.Value)
                 .OrderBy(h => h.KursDatum)
                 .ToList();
 
+            // FX-Historie (Handelswährung -> CHF), aufsteigend nach Datum.
+            // Pro Kursdatum wird der letzte bekannte FX-Kurs am oder vor diesem Datum verwendet.
+            var istFremdwaehrung = !string.Equals(
+                string.IsNullOrWhiteSpace(_position.Waehrung) ? "CHF" : _position.Waehrung.Trim().ToUpperInvariant(),
+                "CHF",
+                StringComparison.OrdinalIgnoreCase);
+
+            var fxHistorie = istFremdwaehrung
+                ? _db.VermoegenFxHistorieGetNachChf(_position.Waehrung)
+                : new System.Collections.Generic.List<VermoegenFxHistorie>();
+
             foreach (var h in daten.OrderByDescending(h => h.KursDatum))
             {
+                decimal? fx = istFremdwaehrung
+                    ? fxHistorie.LastOrDefault(f => f.KursDatum.Date <= h.KursDatum.Date)?.Kurs
+                    : 1m;
+
+                decimal? kursChf = fx.HasValue ? h.Kurs * fx.Value : null;
+
                 Historie.Add(new KursHistorieRow
                 {
                     Id = h.Id,
@@ -97,10 +141,20 @@ namespace MyCoinFlow.Views
                     Kurs = h.Kurs,
                     KursDatumText = h.KursDatum.ToString("dd.MM.yyyy"),
                     KursText = h.Kurs.ToString("N2", ChCulture),
+                    FxKursText = istFremdwaehrung
+                        ? (fx.HasValue ? fx.Value.ToString("N6", ChCulture) : "-")
+                        : "",
+                    KursChfText = istFremdwaehrung
+                        ? (kursChf.HasValue ? kursChf.Value.ToString("N2", ChCulture) : "-")
+                        : "",
                     Quelle = h.Quelle,
                     ErfasstAmText = h.ErfasstAm.ToString("dd.MM.yyyy HH:mm")
                 });
             }
+
+            // Für CHF-Positionen sind die Umrechnungsspalten ohne Aussage -> ausblenden.
+            FxSpalte.Visibility = istFremdwaehrung ? Visibility.Visible : Visibility.Collapsed;
+            KursChfSpalte.Visibility = istFremdwaehrung ? Visibility.Visible : Visibility.Collapsed;
 
             KursSeries = new ISeries[]
             {
@@ -108,7 +162,8 @@ namespace MyCoinFlow.Views
                 {
                     Values = daten.Select(h => h.Kurs).ToArray(),
                     Name = "Kurs",
-                    GeometrySize = 8,
+                    // Bei vielen Datenpunkten keine Einzelpunkte zeichnen, sonst verklumpt die Linie.
+                    GeometrySize = daten.Count > 60 ? 0 : 8,
                     Fill = null
                 }
             };
@@ -267,6 +322,18 @@ namespace MyCoinFlow.Views
             return true;
         }
 
+        private static DateTime? ZeitraumStartdatum(string auswahl)
+        {
+            return auswahl switch
+            {
+                "1 Monat" => DateTime.Today.AddMonths(-1),
+                "3 Monate" => DateTime.Today.AddMonths(-3),
+                "6 Monate" => DateTime.Today.AddMonths(-6),
+                "1 Jahr" => DateTime.Today.AddYears(-1),
+                _ => null // "Alles"
+            };
+        }
+
         private static string BuildUntertitel(VermoegenPosition position)
         {
             var parts = new[]
@@ -316,6 +383,8 @@ namespace MyCoinFlow.Views
 
         public string KursDatumText { get; set; } = "";
         public string KursText { get; set; } = "";
+        public string FxKursText { get; set; } = "";
+        public string KursChfText { get; set; } = "";
         public string Quelle { get; set; } = "";
         public string ErfasstAmText { get; set; } = "";
     }

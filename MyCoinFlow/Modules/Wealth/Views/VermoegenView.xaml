@@ -167,16 +167,34 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0">
-                    <TextBlock Text="Vermögen"
-                               FontSize="22"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,4"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="{Binding FilterTitelText}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
-                               Margin="0,0,0,6"/>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Vermögen"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,4"/>
+
+                            <TextBlock Text="{Binding FilterTitelText}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                                       Margin="0,0,0,6"/>
+                        </StackPanel>
+
+                        <ComboBox Grid.Column="1"
+                                  MinHeight="36"
+                                  Width="150"
+                                  VerticalAlignment="Top"
+                                  Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                                  materialDesign:HintAssist.Hint="Zeitraum"
+                                  ItemsSource="{Binding ZeitraumFilterListe}"
+                                  SelectedItem="{Binding SelectedZeitraumFilter, Mode=TwoWay}"/>
+                    </Grid>
 
                     <TextBlock Text="{Binding StatusText}"
                                Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
@@ -296,12 +314,16 @@
 
                     <DataGrid.Columns>
 
-                        <DataGridTemplateColumn Header="" Width="44" IsReadOnly="True">
+                        <DataGridTemplateColumn Header="" Width="72" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Button ToolTip="Kursverlauf anzeigen"
                     Style="{StaticResource MaterialDesignFlatButton}"
                     Padding="0"
+                    MinWidth="0"
+                    Width="36"
+                    Height="32"
+                    HorizontalAlignment="Center"
                     Command="{Binding DataContext.KursHistorieCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                     CommandParameter="{Binding}">
                                         <materialDesign:PackIcon Kind="ChartLine"

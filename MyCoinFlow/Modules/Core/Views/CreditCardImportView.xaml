@@ -175,6 +175,18 @@
                 </Style>
             </DataGrid.RowStyle>
 
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Buchungstext im Web recherchieren"
+                              Command="{Binding PlacementTarget.DataContext.WebRechercheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon>
+                            <materialDesign:PackIcon Kind="Magnify"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+
             <DataGrid.Columns>
                 <!-- pro Zeile löschen (immer sichtbar, fixe Breite) -->
                 <DataGridTemplateColumn Header="" Width="52" MinWidth="52" MaxWidth="52" IsReadOnly="True">
@@ -261,6 +273,9 @@
                 <DataGridTextColumn Header="Beschreibung"    Binding="{Binding Beschreibung}" Width="3*"/>
                 <DataGridTextColumn Header="Händler"         Binding="{Binding Haendler}"      Width="2*"/>
                 <DataGridTextColumn Header="Händlerkategorie" Binding="{Binding Kategorie}"   Width="2*"/>
+
+                <!-- Adresse-Text -->
+                <DataGridTextColumn Header="Adresse" Binding="{Binding Adresse}" Width="2*" IsReadOnly="True"/>
 
                 <!-- Konto-Text -->
                 <DataGridTextColumn Header="Konto" Binding="{Binding Konto}" Width="2*"/>

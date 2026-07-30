@@ -96,6 +96,12 @@ BEGIN
         CONSTRAINT DF_VermoegenPosition_Waehrung DEFAULT ('CHF');
 END;
 
+IF COL_LENGTH('dbo.VermoegenPosition', 'EinstandWaehrung') IS NULL
+BEGIN
+    ALTER TABLE dbo.VermoegenPosition
+    ADD EinstandWaehrung NVARCHAR(10) NULL;
+END;
+
 IF OBJECT_ID('dbo.VermoegenEinstellung', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.VermoegenEinstellung
@@ -124,6 +130,20 @@ BEGIN
 
         CONSTRAINT FK_VermoegenKursHistorie_Position
             FOREIGN KEY (PositionId) REFERENCES dbo.VermoegenPosition(Id)
+    );
+END;
+
+IF OBJECT_ID('dbo.VermoegenBackfillStatus', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VermoegenBackfillStatus
+    (
+        Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_VermoegenBackfillStatus PRIMARY KEY,
+        Art NVARCHAR(10) NOT NULL,        -- 'KURS' (Schluessel = PositionId) oder 'FX' (Schluessel = Waehrung)
+        Schluessel NVARCHAR(50) NOT NULL,
+        AbgedecktBis DATE NOT NULL,
+        ErfasstAm DATETIME2 NOT NULL CONSTRAINT DF_VermoegenBackfillStatus_ErfasstAm DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT UX_VermoegenBackfillStatus_Art_Schluessel UNIQUE (Art, Schluessel)
     );
 END;
 
@@ -301,6 +321,7 @@ SELECT
     ISNULL(p.Symbol, '') AS Symbol,
     ISNULL(p.Boerse, '') AS Boerse,
     ISNULL(p.Waehrung, 'CHF') AS Waehrung,
+    ISNULL(p.EinstandWaehrung, '') AS EinstandWaehrung,
     p.Anlageklasse,
     p.Anzahl,
     p.Einstandspreis,
@@ -329,14 +350,15 @@ ORDER BY d.Name, p.Titel;";
                     Symbol = r.GetString(6),
                     Boerse = r.GetString(7),
                     Waehrung = r.GetString(8),
-                    Anlageklasse = r.GetString(9),
-                    Anzahl = r.GetDecimal(10),
-                    Einstandspreis = r.GetDecimal(11),
-                    EinstandDatum = r.IsDBNull(12) ? null : r.GetDateTime(12),
-                    AktuellerKurs = r.IsDBNull(13) ? null : r.GetDecimal(13),
-                    KursDatum = r.IsDBNull(14) ? null : r.GetDateTime(14),
-                    Notiz = r.IsDBNull(15) ? "" : r.GetString(15),
-                    IstAktiv = r.GetBoolean(16)
+                    EinstandWaehrung = r.GetString(9),
+                    Anlageklasse = r.GetString(10),
+                    Anzahl = r.GetDecimal(11),
+                    Einstandspreis = r.GetDecimal(12),
+                    EinstandDatum = r.IsDBNull(13) ? null : r.GetDateTime(13),
+                    AktuellerKurs = r.IsDBNull(14) ? null : r.GetDecimal(14),
+                    KursDatum = r.IsDBNull(15) ? null : r.GetDateTime(15),
+                    Notiz = r.IsDBNull(16) ? "" : r.GetString(16),
+                    IstAktiv = r.GetBoolean(17)
                 });
             }
 
@@ -456,6 +478,7 @@ INSERT INTO dbo.VermoegenPosition
     Symbol,
     Boerse,
     Waehrung,
+    EinstandWaehrung,
     Anlageklasse,
     Anzahl,
     Einstandspreis,
@@ -475,6 +498,7 @@ VALUES
     @Symbol,
     @Boerse,
     @Waehrung,
+    @EinstandWaehrung,
     @Anlageklasse,
     @Anzahl,
     @Einstandspreis,
@@ -494,6 +518,7 @@ VALUES
             cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@EinstandWaehrung", string.IsNullOrWhiteSpace(model.EinstandWaehrung) ? DBNull.Value : model.EinstandWaehrung.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
@@ -524,6 +549,7 @@ SET
     Symbol = @Symbol,
     Boerse = @Boerse,
     Waehrung = @Waehrung,
+    EinstandWaehrung = @EinstandWaehrung,
     Anlageklasse = @Anlageklasse,
     Anzahl = @Anzahl,
     Einstandspreis = @Einstandspreis,
@@ -544,6 +570,7 @@ WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Symbol", string.IsNullOrWhiteSpace(model.Symbol) ? DBNull.Value : model.Symbol.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Boerse", string.IsNullOrWhiteSpace(model.Boerse) ? DBNull.Value : model.Boerse.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Waehrung", string.IsNullOrWhiteSpace(model.Waehrung) ? "CHF" : model.Waehrung.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@EinstandWaehrung", string.IsNullOrWhiteSpace(model.EinstandWaehrung) ? DBNull.Value : model.EinstandWaehrung.Trim().ToUpperInvariant());
             cmd.Parameters.AddWithValue("@Anlageklasse", string.IsNullOrWhiteSpace(model.Anlageklasse) ? "Aktie" : model.Anlageklasse.Trim());
             cmd.Parameters.AddWithValue("@Anzahl", model.Anzahl);
             cmd.Parameters.AddWithValue("@Einstandspreis", model.Einstandspreis);
@@ -838,6 +865,113 @@ ORDER BY KursDatum DESC;";
                 return null;
 
             return Convert.ToDecimal(result);
+        }
+
+        public DateTime? VermoegenBackfillStatusGet(string art, string schluessel)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT AbgedecktBis
+FROM dbo.VermoegenBackfillStatus
+WHERE Art = @Art AND Schluessel = @Schluessel;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Art", art.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Schluessel", schluessel.Trim().ToUpperInvariant());
+
+            var result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+                return null;
+
+            return Convert.ToDateTime(result);
+        }
+
+        public void VermoegenBackfillStatusSet(string art, string schluessel, DateTime abgedecktBis)
+        {
+            EnsureVermoegenSchema();
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+IF EXISTS (
+    SELECT 1 FROM dbo.VermoegenBackfillStatus
+    WHERE Art = @Art AND Schluessel = @Schluessel
+)
+BEGIN
+    UPDATE dbo.VermoegenBackfillStatus
+    SET AbgedecktBis = @AbgedecktBis
+    WHERE Art = @Art AND Schluessel = @Schluessel;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.VermoegenBackfillStatus (Art, Schluessel, AbgedecktBis)
+    VALUES (@Art, @Schluessel, @AbgedecktBis);
+END;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@Art", art.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@Schluessel", schluessel.Trim().ToUpperInvariant());
+            cmd.Parameters.AddWithValue("@AbgedecktBis", abgedecktBis.Date);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public List<VermoegenFxHistorie> VermoegenFxHistorieGetNachChf(string vonWaehrung)
+        {
+            EnsureVermoegenSchema();
+
+            var list = new List<VermoegenFxHistorie>();
+
+            var von = string.IsNullOrWhiteSpace(vonWaehrung)
+                ? ""
+                : vonWaehrung.Trim().ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(von) || von == "CHF")
+                return list;
+
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+SELECT
+    Id,
+    VonWaehrung,
+    NachWaehrung,
+    KursDatum,
+    Kurs,
+    Quelle,
+    ErfasstAm
+FROM dbo.VermoegenFxHistorie
+WHERE VonWaehrung = @VonWaehrung
+  AND NachWaehrung = 'CHF'
+ORDER BY KursDatum;";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@VonWaehrung", von);
+
+            using var r = cmd.ExecuteReader();
+
+            while (r.Read())
+            {
+                list.Add(new VermoegenFxHistorie
+                {
+                    Id = r.GetInt32(0),
+                    VonWaehrung = r.GetString(1),
+                    NachWaehrung = r.GetString(2),
+                    KursDatum = r.GetDateTime(3),
+                    Kurs = r.GetDecimal(4),
+                    Quelle = r.IsDBNull(5) ? "" : r.GetString(5),
+                    ErfasstAm = r.GetDateTime(6)
+                });
+            }
+
+            return list;
         }
 
         public List<VermoegenDepotVerlaufRow> VermoegenDepotVerlaufGet(int? depotId)
