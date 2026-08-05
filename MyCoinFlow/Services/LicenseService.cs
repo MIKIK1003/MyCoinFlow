@@ -48,7 +48,8 @@ namespace MyCoinFlow.Services
             bool Wealth,
             bool Home,
             string Signature,
-            bool Dms = false);
+            bool Dms = false,
+            bool Abos = false);
 
         private record LicenseFile(string Key, DateTime SavedUtc);
 
@@ -229,7 +230,8 @@ namespace MyCoinFlow.Services
             bool wealth,
             bool home,
             DateTime? expiresUtc,
-            bool dms = false)
+            bool dms = false,
+            bool abos = false)
         {
             var key = GenerateShortKey();
 
@@ -243,7 +245,8 @@ namespace MyCoinFlow.Services
                 Wealth: wealth,
                 Home: home,
                 Signature: "",
-                Dms: dms);
+                Dms: dms,
+                Abos: abos);
 
             var signature = SignModulePayload(unsigned);
 
@@ -329,7 +332,7 @@ namespace MyCoinFlow.Services
 
         private void ApplyModulePayload(ModuleLicensePayload payload)
         {
-            var plusCompat = payload.Property || payload.Wealth || payload.Home || payload.Dms;
+            var plusCompat = payload.Property || payload.Wealth || payload.Home || payload.Dms || payload.Abos;
 
             AppEdition.SetPlus(plusCompat);
 
@@ -338,7 +341,8 @@ namespace MyCoinFlow.Services
                 property: payload.Property,
                 wealth: payload.Wealth,
                 home: payload.Home,
-                dms: payload.Dms);
+                dms: payload.Dms,
+                abos: payload.Abos);
         }
 
         private bool TryValidateModuleLicenseJson(

@@ -284,13 +284,13 @@ namespace MyCoinFlow.ViewModels
 
             foreach (var p in pieItems)
             {
-                var name = p.Label;
+                // Betrag immer in der Legende zeigen, %-Anteil zusätzlich (ShowPercent)
+                var name = $"{p.Label} – {p.Val:N2}";
 
-                // Verbesserung 3: % Anzeige muss sichtbar wirken
                 if (ShowPercent && total > 0)
                 {
                     var pct = p.Val / total;
-                    name = $"{p.Label} ({pct:P0})";
+                    name = $"{p.Label} – {p.Val:N2} ({pct:P0})";
                 }
 
                 PieSeries.Add(new PieSeries<double>

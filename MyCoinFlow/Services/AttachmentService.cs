@@ -53,40 +53,35 @@ namespace MyCoinFlow.Services
             var targetDir = Path.Combine(root, folderRel);
             Directory.CreateDirectory(targetDir);
 
-            // Dateiname TX-{Id}-H{Hash12}{ext}
-            var hash = _db.GetImportHashForTransaktion(transaktionId);
-            string hash12 = !string.IsNullOrWhiteSpace(hash)
-                ? (hash.Length <= 12 ? hash : hash.Substring(hash.Length - 12))
-                : "D" + now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
-
-            string baseNameNoExt = $"TX-{transaktionId}-H{hash12}";
-            string baseName = baseNameNoExt + ext;
-            string targetPath = Path.Combine(targetDir, baseName);
-
-            if (File.Exists(targetPath))
-            {
-                int n = 2;
-                while (true)
-                {
-                    string candidate = Path.Combine(targetDir, $"{baseNameNoExt}-{n}{ext}");
-                    if (!File.Exists(candidate)) { targetPath = candidate; break; }
-                    n++;
-                }
-            }
-
-            // Verschieben
-            File.Move(sourceFilePath, targetPath);
+            // Einheitliches ID-basiertes Namensschema (DOK-000123.pdf), analog AttachFromWatcher/
+            // AttachFreestanding: die endgültige Nummer ist die Attachment-Id, die wir erst nach
+            // dem DB-Insert kennen – daher erst unter Temp-Namen verschieben, dann umbenennen.
+            string tempName = $"DOK-TMP-{Guid.NewGuid():N}{ext}";
+            string tempPath = Path.Combine(targetDir, tempName);
+            File.Move(sourceFilePath, tempPath);
 
             // DB: Attachment anlegen -> Id zurück
             int attachmentId = _db.SaveAttachment(
                 transaktionId: transaktionId,
-                fileName: Path.GetFileName(targetPath),
+                fileName: tempName,
                 originalName: Path.GetFileName(sourceFilePath),
                 folderRel: folderRel.Replace('/', '\\'),
                 sizeBytes: fi.Length,
                 ocrStatus: null, // setzen wir gleich passend
                 dokumentDatum: now
             );
+
+            string finalName = $"DOK-{attachmentId:D6}{ext}";
+            string targetPath = Path.Combine(targetDir, finalName);
+            try
+            {
+                File.Move(tempPath, targetPath);
+                _db.UpdateAttachmentFileName(attachmentId, finalName);
+            }
+            catch (IOException)
+            {
+                targetPath = tempPath;
+            }
 
             RunOcrIndexing(attachmentId, targetPath, ext);
 
@@ -127,28 +122,14 @@ namespace MyCoinFlow.Services
             var targetDir = Path.Combine(root, folderRel);
             Directory.CreateDirectory(targetDir);
 
-            string slug = Path.GetFileNameWithoutExtension(sourceFilePath);
-            if (slug.Length > 40) slug = slug.Substring(0, 40);
-            string baseNameNoExt = $"DOC-{Guid.NewGuid().ToString("N").Substring(0, 8)}-{slug}";
-            string baseName = baseNameNoExt + ext;
-            string targetPath = Path.Combine(targetDir, baseName);
-
-            if (File.Exists(targetPath))
-            {
-                int n = 2;
-                while (true)
-                {
-                    string candidate = Path.Combine(targetDir, $"{baseNameNoExt}-{n}{ext}");
-                    if (!File.Exists(candidate)) { targetPath = candidate; break; }
-                    n++;
-                }
-            }
-
-            File.Move(sourceFilePath, targetPath);
+            // Einheitliches ID-basiertes Namensschema (DOK-000123.pdf), analog AttachFromWatcher.
+            string tempName = $"DOK-TMP-{Guid.NewGuid():N}{ext}";
+            string tempPath = Path.Combine(targetDir, tempName);
+            File.Move(sourceFilePath, tempPath);
 
             int attachmentId = _db.SaveAttachment(
                 transaktionId: null,
-                fileName: Path.GetFileName(targetPath),
+                fileName: tempName,
                 originalName: Path.GetFileName(sourceFilePath),
                 folderRel: folderRel.Replace('/', '\\'),
                 sizeBytes: fi.Length,
@@ -157,18 +138,31 @@ namespace MyCoinFlow.Services
                 kategorie: kategorie,
                 dokumentDatum: now);
 
+            string finalName = $"DOK-{attachmentId:D6}{ext}";
+            string targetPath = Path.Combine(targetDir, finalName);
+            try
+            {
+                File.Move(tempPath, targetPath);
+                _db.UpdateAttachmentFileName(attachmentId, finalName);
+            }
+            catch (IOException)
+            {
+                targetPath = tempPath;
+            }
+
             RunOcrIndexing(attachmentId, targetPath, ext);
 
             return (targetPath, attachmentId);
         }
 
         /// <summary>
-        /// DMS-Arbeitsordner-Überwachung: legt ein Dokument ab, dessen Zielunterordner und
-        /// Dateiname aus dem erkannten Dokumentdatum bzw. Titel (DmsDocumentAnalyzer) stammen,
-        /// statt aus dem Zeitpunkt des Uploads/Originalnamen. Läuft ansonsten wie
-        /// AttachFreestanding (gleiche Ablage-Root, gleiche Whitelist/Grössenprüfung).
+        /// DMS-Arbeitsordner-Überwachung: legt ein Dokument mit einheitlichem, ID-basiertem
+        /// Dateinamen (DOK-000123.pdf – gleiche Länge für alle Dokumente, keine Inhalts-Infos im
+        /// Namen; Adresse/Betrag/Titel sind stattdessen als Grid-Spalten sichtbar) im
+        /// Ablageordner unter Frei\Jahr\Monat des erkannten Dokumentdatums ab.
         /// Text/OcrStatus wurden von DmsWatcherService bereits für die Datums-/Titel-/Betrags-
         /// Erkennung extrahiert und werden hier nur noch gespeichert (kein zweiter OCR-Lauf).
+        /// Der erkannte Titel wandert ins Titel-Feld (Anzeige), nicht in den Dateinamen.
         /// Gibt Zielpfad und neue Attachment-Id zurück.
         /// </summary>
         public (string TargetPath, int AttachmentId) AttachFromWatcher(string sourceFilePath, DateTime dokumentDatum, string titelSlug,
@@ -176,7 +170,6 @@ namespace MyCoinFlow.Services
         {
             if (string.IsNullOrWhiteSpace(sourceFilePath)) throw new ArgumentException("Dateipfad fehlt.", nameof(sourceFilePath));
             if (!File.Exists(sourceFilePath)) throw new FileNotFoundException("Quelldatei nicht gefunden.", sourceFilePath);
-            if (string.IsNullOrWhiteSpace(titelSlug)) titelSlug = "Dokument";
 
             _db.EnsureAttachmentsSchema();
 
@@ -201,36 +194,88 @@ namespace MyCoinFlow.Services
             var targetDir = Path.Combine(root, folderRel);
             Directory.CreateDirectory(targetDir);
 
-            string baseNameNoExt = $"{dokumentDatum:yyyy-MM-dd}_{titelSlug}";
-            string baseName = baseNameNoExt + ext;
-            string targetPath = Path.Combine(targetDir, baseName);
-
-            if (File.Exists(targetPath))
-            {
-                int n = 2;
-                while (true)
-                {
-                    string candidate = Path.Combine(targetDir, $"{baseNameNoExt}-{n}{ext}");
-                    if (!File.Exists(candidate)) { targetPath = candidate; break; }
-                    n++;
-                }
-            }
-
-            File.Move(sourceFilePath, targetPath);
+            // Die endgültige DOK-Nummer ist die Attachment-Id – die kennen wir erst nach dem
+            // DB-Insert. Daher: erst unter temporärem Namen ins Ziel verschieben, dann Datensatz
+            // anlegen, dann auf DOK-{Id} umbenennen und den Dateinamen in der DB nachziehen.
+            string tempName = $"DOK-TMP-{Guid.NewGuid():N}{ext}";
+            string tempPath = Path.Combine(targetDir, tempName);
+            File.Move(sourceFilePath, tempPath);
 
             int attachmentId = _db.SaveAttachment(
                 transaktionId: null,
-                fileName: Path.GetFileName(targetPath),
+                fileName: tempName,
                 originalName: Path.GetFileName(sourceFilePath),
                 folderRel: folderRel.Replace('/', '\\'),
                 sizeBytes: fi.Length,
                 ocrStatus: ocrStatus,
+                titel: string.IsNullOrWhiteSpace(titelSlug) ? null : titelSlug,
                 dokumentDatum: dokumentDatum);
+
+            string finalName = $"DOK-{attachmentId:D6}{ext}";
+            string targetPath = Path.Combine(targetDir, finalName);
+            try
+            {
+                File.Move(tempPath, targetPath);
+                _db.UpdateAttachmentFileName(attachmentId, finalName);
+            }
+            catch (IOException)
+            {
+                targetPath = tempPath; // Umbenennen fehlgeschlagen – Temp-Name bleibt, DB ist konsistent
+            }
 
             if (!string.IsNullOrWhiteSpace(extractedText))
                 _db.UpsertAttachmentText(attachmentId, extractedText, textLang);
 
             return (targetPath, attachmentId);
+        }
+
+        /// <summary>
+        /// Benennt bestehende Attachments (inkl. der noch aus der Zeit vor dem einheitlichen
+        /// Schema stammenden TX-{Id}-H{Hash}-Dateien) auf DOK-{Id:D6}{ext} um – Datei auf der
+        /// Platte UND FileName in der DB. Bereits korrekt benannte Einträge werden übersprungen
+        /// (idempotent, kann gefahrlos mehrfach laufen).
+        /// </summary>
+        public (int Renamed, int AlreadyOk, int Missing) MigrateAllToUniformNaming()
+        {
+            var (root, _) = _db.GetAttachmentSettings();
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                var doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                root = Path.Combine(doc, "MyCoinFlow", "Attachments");
+            }
+
+            int renamed = 0, alreadyOk = 0, missing = 0;
+
+            foreach (var (id, fileName, folderRel) in _db.LoadAllAttachmentFilePaths())
+            {
+                var ext = Path.GetExtension(fileName);
+                var targetName = $"DOK-{id:D6}{ext}";
+
+                if (string.Equals(fileName, targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    alreadyOk++;
+                    continue;
+                }
+
+                var dir = Path.Combine(root, folderRel);
+                var oldPath = Path.Combine(dir, fileName);
+                var newPath = Path.Combine(dir, targetName);
+
+                if (!File.Exists(oldPath) || File.Exists(newPath))
+                {
+                    // Datei fehlt bereits auf der Platte, oder das Zielnamen existiert schon
+                    // (sollte wegen eindeutiger Id nicht vorkommen) – zur Sicherheit überspringen,
+                    // statt DB und Dateisystem auseinanderlaufen zu lassen.
+                    missing++;
+                    continue;
+                }
+
+                File.Move(oldPath, newPath);
+                _db.UpdateAttachmentFileName(id, targetName);
+                renamed++;
+            }
+
+            return (renamed, alreadyOk, missing);
         }
 
         /// <summary>
@@ -337,75 +382,18 @@ namespace MyCoinFlow.Services
 
         /// <summary>
         /// Verknüpft ein Dokument mit einer Transaktion (automatisches Matching oder manuelles
-        /// Zuweisen) und benennt es passend um: {TransaktionsDatum}_Rechnung_{Adresse}. Ein
-        /// gefundenes Dokument ist im DMS-Kontext immer eine Rechnung, daher wird die Kategorie
-        /// gleich auf "Rechnungen" gesetzt. Datei bleibt im selben Ordner, nur der Dateiname
-        /// ändert sich. Schlägt das Umbenennen fehl (Datei fehlt/gesperrt), bleibt der
-        /// bestehende Dateiname erhalten – die Verknüpfung wird trotzdem gesetzt.
+        /// Zuweisen). Ein gefundenes Dokument ist im DMS-Kontext immer eine Rechnung, daher wird
+        /// die Kategorie gleich auf "Rechnungen" gesetzt. Der Dateiname bleibt unverändert
+        /// (einheitliches DOK-{Id}-Schema) – Adresse/Betrag der Transaktion sind über die
+        /// Grid-Spalten sichtbar, nicht über den Dateinamen.
         /// </summary>
         public void LinkToTransaktion(int attachmentId, int transaktionId)
         {
             var info = _db.GetAttachmentById(attachmentId);
-            var transaktion = _db.HoleTransaktion(transaktionId);
-
-            if (info != null && transaktion != null)
-            {
-                var (root, _) = _db.GetAttachmentSettings();
-                if (string.IsNullOrWhiteSpace(root))
-                {
-                    var doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                    root = Path.Combine(doc, "MyCoinFlow", "Attachments");
-                }
-
-                var currentDir = Path.Combine(root, info.Value.FolderRel);
-                var currentPath = Path.Combine(currentDir, info.Value.FileName);
-                var ext = Path.GetExtension(info.Value.FileName);
-
-                if (File.Exists(currentPath))
-                {
-                    var gegenpartei = SanitizeKeepingSpaces(
-                        transaktion.AdresseName ?? transaktion.BankName ?? "Unbekannt");
-                    var baseNameNoExt = $"{transaktion.Datum:yyyy-MM-dd}_Rechnung_{gegenpartei}";
-                    var targetPath = Path.Combine(currentDir, baseNameNoExt + ext);
-
-                    if (!string.Equals(targetPath, currentPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        int n = 2;
-                        while (File.Exists(targetPath))
-                        {
-                            targetPath = Path.Combine(currentDir, $"{baseNameNoExt}-{n}{ext}");
-                            n++;
-                        }
-
-                        try
-                        {
-                            File.Move(currentPath, targetPath);
-                            _db.UpdateAttachmentFileNameAndKategorie(attachmentId, Path.GetFileName(targetPath), "Rechnungen");
-                        }
-                        catch (IOException) { /* Datei gesperrt – Verknüpfung trotzdem setzen */ }
-                        catch (UnauthorizedAccessException) { /* Berechtigungen – Verknüpfung trotzdem setzen */ }
-                    }
-                    else
-                    {
-                        _db.UpdateAttachmentFileNameAndKategorie(attachmentId, info.Value.FileName, "Rechnungen");
-                    }
-                }
-            }
+            if (info != null)
+                _db.UpdateAttachmentFileNameAndKategorie(attachmentId, info.Value.FileName, "Rechnungen");
 
             _db.LinkAttachmentToTransaktion(attachmentId, transaktionId);
-        }
-
-        private static string SanitizeKeepingSpaces(string raw)
-        {
-            var sb = new StringBuilder(raw.Trim());
-            foreach (var c in Path.GetInvalidFileNameChars())
-                sb.Replace(c, '-');
-
-            var result = sb.ToString().Trim();
-            if (result.Length == 0) result = "Unbekannt";
-            if (result.Length > DmsDocumentAnalyzer.TitleMaxLength)
-                result = result.Substring(0, DmsDocumentAnalyzer.TitleMaxLength).TrimEnd();
-            return result;
         }
 
         /// <summary>

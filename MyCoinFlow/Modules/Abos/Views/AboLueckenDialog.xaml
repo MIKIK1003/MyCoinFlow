@@ -1,0 +1,114 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.AboLueckenDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Lücken in der Zahlungsreihe füllen"
+                 Width="1020"
+                 Height="600"
+                 WindowStartupLocation="CenterOwner">
+
+    <base:BaseWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisLuecke"/>
+    </base:BaseWindow.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   x:Name="InfoText"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                   Text="Für die markierten Termine fehlt eine Zahlung. Die Vorschläge sind nach Übereinstimmung sortiert (Adresse, Buchungstext, Konto, Datum). Nur sichere Treffer sind vorselektiert – Transaktionen, die bereits einer anderen Adresse gehören, nie."/>
+
+        <DataGrid Grid.Row="2"
+                  x:Name="LueckenGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+
+                <DataGridCheckBoxColumn Header="Zuordnen"
+                                        Binding="{Binding Uebernehmen, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="90"/>
+
+                <DataGridTextColumn Header="Fehlt am (erwartet)"
+                                    Binding="{Binding ErwartetAm, StringFormat=dd.MM.yyyy}"
+                                    IsReadOnly="True" Width="140"/>
+
+                <DataGridTextColumn Header="Datum"
+                                    Binding="{Binding Datum, StringFormat=dd.MM.yyyy}"
+                                    IsReadOnly="True" Width="110"/>
+
+                <DataGridTextColumn Header="Betrag"
+                                    Binding="{Binding Betrag, StringFormat={}{0:N2}}"
+                                    IsReadOnly="True" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTemplateColumn Header="" Width="40">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <materialDesign:PackIcon Kind="CheckDecagram"
+                                                     Width="18" Height="18"
+                                                     Foreground="{StaticResource AppBrandBrush}"
+                                                     ToolTip="Adresse stimmt mit dem Abo überein"
+                                                     HorizontalAlignment="Center"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="{Binding AdressePasst, Converter={StaticResource BoolToVisLuecke}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="Übereinstimmung"
+                                    Binding="{Binding MatchInfo}"
+                                    IsReadOnly="True" Width="200">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="ToolTip" Value="{Binding MatchInfo}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AdresseKonflikt}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesignValidationErrorBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Adresse"
+                                    Binding="{Binding AdresseName}"
+                                    IsReadOnly="True" Width="*"/>
+
+                <DataGridTextColumn Header="Geldinstitut"
+                                    Binding="{Binding BankName}"
+                                    IsReadOnly="True" Width="150"/>
+
+                <DataGridTextColumn Header="Notiz"
+                                    Binding="{Binding Notiz}"
+                                    IsReadOnly="True" Width="2*"/>
+
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Check" Content="Zuordnen"
+                    MinWidth="130" Margin="0,0,10,0"
+                    IsDefault="True"
+                    Click="Zuordnen_Click"/>
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    MinWidth="110"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

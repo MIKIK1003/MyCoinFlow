@@ -52,8 +52,36 @@ namespace MyCoinFlow.Services
         // ---------------- Bindbare Statuswerte (Fortschrittsanzeige) ----------------
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        private void Raise(string name) =>
-            Application.Current?.Dispatcher.Invoke(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name)));
+
+        private void Raise(string name)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+
+            // Beim App-Beenden ist der Dispatcher bereits im Shutdown – ein Invoke
+            // würde dann eine TaskCanceledException werfen (und im Debugger anhalten,
+            // statt die Debug-Sitzung mit der App zu beenden). Status-Updates sind
+            // zu diesem Zeitpunkt ohnehin bedeutungslos.
+            if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+                return;
+
+            // Auch die ABONNENTEN des Events können beim Herunterfahren in den Dispatcher
+            // laufen (z.B. Bindings im Hauptfenster) – deren TaskCanceled-/OperationCanceled-
+            // Exceptions dürfen den Verarbeitungs-Thread nicht hochkommen lassen.
+            void Feuern()
+            {
+                try { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name)); }
+                catch (OperationCanceledException) { /* Shutdown-Rennen – still */ }
+            }
+
+            try
+            {
+                if (dispatcher.CheckAccess())
+                    Feuern();
+                else
+                    dispatcher.BeginInvoke(new Action(Feuern));
+            }
+            catch (OperationCanceledException) { /* Shutdown-Rennen – still */ }
+        }
 
         /// <summary>Ausgelöst, sobald ein Dokument fertig verarbeitet (abgelegt, ggf. verknüpft) wurde.</summary>
         public event EventHandler? DocumentProcessed;
@@ -235,17 +263,21 @@ namespace MyCoinFlow.Services
             CurrentPhase = "Lese gespeicherten Text…";
             var text = _db.GetAttachmentText(attachmentId);
 
-            var docDatum = DmsDocumentAnalyzer.ExtractDocumentDate(text, info.Value.ImportedAtUtc.Date);
+            var retryFallback = info.Value.ImportedAtUtc.Date;
+            var docDatum = DmsDocumentAnalyzer.ExtractDocumentDate(text, retryFallback);
             var (matchedAdresseId, _) = FindKnownAdresse(text);
-            var betragsKandidaten = DmsDocumentAnalyzer.ExtractAmountCandidates(text);
+            var betragsKandidaten = DmsDocumentAnalyzer.ExtractAmountCandidatesScored(text);
 
             // Ältere Dokumente (angelegt, bevor DokumentDatum eingeführt wurde) oder solche ohne
             // Treffer beim ersten Lauf haben evtl. noch kein DokumentDatum – hier nachtragen,
             // damit das Fälligkeits-Tracking ("Fällig am") auch für sie greift.
             _db.UpdateAttachmentDokumentDatum(attachmentId, docDatum);
+            _db.UpdateAttachmentErkannterBetrag(attachmentId,
+                betragsKandidaten.Count > 0 ? betragsKandidaten[0].Amount : (decimal?)null);
 
             CurrentPhase = "Suche passende Transaktion…";
-            TryMatchTransaktion(attachmentId, docDatum, betragsKandidaten, matchedAdresseId);
+            TryMatchTransaktion(attachmentId, docDatum, betragsKandidaten, matchedAdresseId,
+                datumAusDokument: docDatum != retryFallback);
         }
 
         // ---------------- Queue ----------------
@@ -341,11 +373,14 @@ namespace MyCoinFlow.Services
                 // Schleife läuft also im Normalbetrieb nie bis ans Ende durch. IsBusy muss
                 // deshalb pro Element zurückgesetzt werden, sonst bleibt der Spinner nach der
                 // letzten Datei für immer aktiv, obwohl nichts mehr passiert.
+                try { _db.LogDmsProcessing(item.DisplayName, CurrentPhase); } catch { /* Historie ist best-effort */ }
+
                 IsBusy = false;
                 CurrentFileName = "";
                 CurrentPhase = "";
 
-                DocumentProcessed?.Invoke(this, EventArgs.Empty);
+                try { DocumentProcessed?.Invoke(this, EventArgs.Empty); }
+                catch (OperationCanceledException) { /* App-Beenden während Verarbeitung – still */ }
             }
         }
 
@@ -375,13 +410,18 @@ namespace MyCoinFlow.Services
             var (matchedAdresseId, matchedAdresseName) = FindKnownAdresse(text);
             var titelSlug = DmsDocumentAnalyzer.ExtractTitle(text, matchedAdresseName,
                 fallbackFromFileName: Path.GetFileNameWithoutExtension(path));
-            var betragsKandidaten = DmsDocumentAnalyzer.ExtractAmountCandidates(text);
+            var betragsKandidaten = DmsDocumentAnalyzer.ExtractAmountCandidatesScored(text);
 
             CurrentPhase = "Ablegen im Dokumentenarchiv…";
             var (_, attachmentId) = _attachSvc.AttachFromWatcher(path, docDatum, titelSlug, text, textSource, ocrStatus);
 
+            // Erkannten Rechnungsbetrag (bester Kandidat) fürs DMS-Grid festhalten
+            _db.UpdateAttachmentErkannterBetrag(attachmentId,
+                betragsKandidaten.Count > 0 ? betragsKandidaten[0].Amount : (decimal?)null);
+
             CurrentPhase = "Suche passende Transaktion…";
-            TryMatchTransaktion(attachmentId, docDatum, betragsKandidaten, matchedAdresseId);
+            TryMatchTransaktion(attachmentId, docDatum, betragsKandidaten, matchedAdresseId,
+                datumAusDokument: docDatum != fallbackDate);
         }
 
         /// <summary>
@@ -464,7 +504,7 @@ namespace MyCoinFlow.Services
                 : (imgText, "img", "OCR");
         }
 
-        private void TryMatchTransaktion(int attachmentId, DateTime docDatum, List<decimal> betragsKandidaten, int? matchedAdresseId)
+        private void TryMatchTransaktion(int attachmentId, DateTime docDatum, List<(decimal Amount, int Score)> betragsKandidaten, int? matchedAdresseId, bool datumAusDokument)
         {
             if (betragsKandidaten.Count == 0)
             {
@@ -472,14 +512,29 @@ namespace MyCoinFlow.Services
                 return;
             }
 
+            // Wurde das Rechnungsdatum aus dem Dokument gelesen, kann die Zahlung nicht
+            // davor liegen (eine Rechnung vom 03.08. ist nicht am 30.07. bezahlt) –
+            // Fenster nach hinten also 0 Tage. Nur wenn das Datum bloss ein Fallback
+            // ist (Dateidatum), bleibt Spielraum: der Scan kann nach der Zahlung liegen.
+            var tageVorher = datumAusDokument ? 0 : 10;
+
             // Die Gewichtung der Betragskandidaten (Nähe zu "Total" etc.) ist eine Heuristik und
             // kann danebenliegen (z. B. bei Mehrspalten-Layouts). Daher mehrere Kandidaten der
             // Reihe nach probieren, statt blind nur dem bestbewerteten zu vertrauen.
             var kandidaten = new List<Transaktion>();
-            foreach (var betrag in betragsKandidaten.Take(5))
+            bool niedrigeZuversicht = false;
+            foreach (var (betrag, score) in betragsKandidaten.Take(5))
             {
-                kandidaten = _db.FindCandidateTransaktionenForMatch(betrag, docDatum, tageVorher: 10, tageNachher: 60);
-                if (kandidaten.Count > 0) break;
+                kandidaten = _db.FindCandidateTransaktionenForMatch(betrag, docDatum, tageVorher: tageVorher, tageNachher: 60);
+                if (kandidaten.Count > 0)
+                {
+                    // Nicht still verknüpfen, wenn der Treffer NICHT auf dem bestbewerteten
+                    // Betrag (dem mutmasslichen Total) beruht: Ein Positionsbetrag kann
+                    // zufällig auf eine fremde Transaktion passen (beobachteter Fall:
+                    // 81.80 aus der Positionszeile statt Total 84.60).
+                    niedrigeZuversicht = score <= 0 || betrag != betragsKandidaten[0].Amount;
+                    break;
+                }
             }
 
             if (kandidaten.Count > 1 && matchedAdresseId.HasValue)
@@ -489,40 +544,61 @@ namespace MyCoinFlow.Services
                     kandidaten = engere;
             }
 
-            switch (kandidaten.Count)
+            if (kandidaten.Count == 0)
             {
-                case 0:
-                    CurrentPhase = "Kein automatischer Treffer – im DMS unter „Frei“ verfügbar.";
-                    break;
+                CurrentPhase = "Kein automatischer Treffer – im DMS unter „Frei“ verfügbar.";
+                return;
+            }
 
-                case 1:
-                    _attachSvc.LinkToTransaktion(attachmentId, kandidaten[0].Id);
-                    CurrentPhase = $"Automatisch zugeordnet: Transaktion #{kandidaten[0].Id}";
-                    break;
+            if (kandidaten.Count == 1 && !niedrigeZuversicht)
+            {
+                _attachSvc.LinkToTransaktion(attachmentId, kandidaten[0].Id);
+                CurrentPhase = $"Automatisch zugeordnet: Transaktion #{kandidaten[0].Id}";
+                return;
+            }
 
-                default:
-                    CurrentPhase = "Mehrere passende Transaktionen – Auswahl erforderlich…";
-                    var gewaehlt = AskUserToPickTransaktion(kandidaten);
-                    if (gewaehlt.HasValue)
-                    {
-                        _attachSvc.LinkToTransaktion(attachmentId, gewaehlt.Value);
-                        CurrentPhase = $"Zugeordnet: Transaktion #{gewaehlt.Value}";
-                    }
-                    else
-                    {
-                        CurrentPhase = "Zuordnung zurückgestellt – im DMS unter „Frei“ verfügbar.";
-                    }
-                    break;
+            // Entweder mehrdeutig, oder der einzige Treffer beruht auf einem Betrag ohne
+            // erkennbaren Bezug zu "Total"/"Betrag" im Text (reine Fliesstext-Zahl) – dann nicht
+            // still verknüpfen, sondern durch den User bestätigen lassen. Vermeidet z. B. eine
+            // zufällig passende, aber falsche Transaktion (bereits beobachteter Fall: CHF 90 aus
+            // einer Positionszeile statt des echten Totals CHF 421.15).
+            CurrentPhase = kandidaten.Count > 1
+                ? "Mehrere passende Transaktionen – Auswahl erforderlich…"
+                : "Unsicherer Treffer – Bestätigung erforderlich…";
+
+            var gewaehlt = AskUserToPickTransaktion(kandidaten);
+            if (gewaehlt.HasValue)
+            {
+                _attachSvc.LinkToTransaktion(attachmentId, gewaehlt.Value);
+                CurrentPhase = $"Zugeordnet: Transaktion #{gewaehlt.Value}";
+            }
+            else
+            {
+                CurrentPhase = "Zuordnung zurückgestellt – im DMS unter „Frei“ verfügbar.";
             }
         }
 
         private int? AskUserToPickTransaktion(List<Transaktion> kandidaten)
         {
-            return Application.Current?.Dispatcher.Invoke(() =>
+            var dispatcher = Application.Current?.Dispatcher;
+
+            // App fährt gerade herunter: kein Dialog mehr möglich –
+            // Dokument bleibt unverknüpft und ist im DMS unter „Frei" verfügbar.
+            if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+                return null;
+
+            try
             {
-                var dlg = new DmsAssignTransactionDialog(kandidaten) { Owner = Application.Current?.MainWindow };
-                return dlg.ShowDialog() == true ? dlg.AusgewaehlteTransaktionId : null;
-            });
+                return dispatcher.Invoke(() =>
+                {
+                    var dlg = new DmsAssignTransactionDialog(kandidaten) { Owner = Application.Current?.MainWindow };
+                    return dlg.ShowDialog() == true ? dlg.AusgewaehlteTransaktionId : null;
+                });
+            }
+            catch (TaskCanceledException)
+            {
+                return null; // Shutdown während des Wartens auf den Dialog
+            }
         }
 
         private static void LogError(string context, Exception ex)

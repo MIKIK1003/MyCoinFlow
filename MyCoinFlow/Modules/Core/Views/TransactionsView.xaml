@@ -124,8 +124,14 @@
                                 Command="{Binding BearbeitenCommand}"/>
                         <Button Style="{StaticResource IconTextButton.Danger}"
                                 Tag="invoiceremove" Content="Löschen"
-                                MinHeight="40" Margin="0,0,0,16"
+                                MinHeight="40" Margin="0,0,0,8"
                                 Command="{Binding LoeschenCommand}"/>
+
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="ContentDuplicate" Content="Duplikate…"
+                                ToolTip="Sucht Transaktionen mit gleichem Datum und Betrag und erlaubt das gezielte Löschen der Doppelten"
+                                MinHeight="40" Margin="0,0,0,16"
+                                Command="{Binding DuplikateCommand}"/>
 
                         <TextBlock Text="Import" Margin="0,20,0,8"
                                    Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
@@ -158,6 +164,18 @@
                         <Setter Property="ToolTip" Value="{Binding SearchHitInfo}"/>
                     </Style>
                 </DataGrid.RowStyle>
+
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Buchungstext im Web recherchieren"
+                                  Command="{Binding PlacementTarget.DataContext.WebRechercheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="Magnify"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
 
                 <DataGrid.Columns>
 

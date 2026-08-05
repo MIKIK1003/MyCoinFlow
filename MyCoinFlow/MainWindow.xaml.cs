@@ -51,9 +51,22 @@ namespace MyCoinFlow
             try
             {
                 if (ExitButton != null)
-                    ExitButton.Click += (_, __) => Application.Current?.Shutdown();
+                    ExitButton.Click += (_, __) =>
+                    {
+                        // Watcher VOR dem Shutdown stoppen: Dann laufen seine letzten
+                        // Status-Updates noch auf einem lebenden Dispatcher, statt beim
+                        // Herunterfahren TaskCanceledExceptions auszulösen.
+                        try { DmsWatcherService.Instance.Stop(); } catch { }
+                        Application.Current?.Shutdown();
+                    };
             }
             catch { }
+
+            // Gleiches Vorgehen beim Schliessen über das X (oder Alt+F4)
+            Closing += (_, __) =>
+            {
+                try { DmsWatcherService.Instance.Stop(); } catch { }
+            };
 
             // ✅ ESC im MainWindow hart unterdrücken (überschreibt BaseWindow!)
             this.AddHandler(
@@ -105,6 +118,11 @@ namespace MyCoinFlow
                     NavDmsButton,
                     AppModules.IsDmsEnabled,
                     "DMS");
+
+                ApplyButtonState(
+                    NavAbosButton,
+                    AppModules.IsAbosEnabled,
+                    "Abos");
             }
             catch
             {
@@ -152,6 +170,13 @@ namespace MyCoinFlow
             {
                 if (NavDmsLockIcon != null)
                     NavDmsLockIcon.Visibility =
+                        isEnabled ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (moduleName == "Abos")
+            {
+                if (NavAbosLockIcon != null)
+                    NavAbosLockIcon.Visibility =
                         isEnabled ? Visibility.Collapsed : Visibility.Visible;
             }
         }

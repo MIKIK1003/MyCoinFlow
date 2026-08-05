@@ -17,6 +17,7 @@ namespace MyCoinFlow.Services
         public static bool IsWealthEnabled { get; private set; } = false;
         public static bool IsHomeEnabled { get; private set; } = false;
         public static bool IsDmsEnabled { get; private set; } = false;
+        public static bool IsAbosEnabled { get; private set; } = false;
 
         private static string ConfigFolder =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MyCoinFlow");
@@ -49,6 +50,7 @@ namespace MyCoinFlow.Services
                     wealth: cfg.Wealth,
                     home: cfg.Home,
                     dms: cfg.Dms,
+                    abos: cfg.Abos,
                     persist: false);
             }
             catch
@@ -63,6 +65,7 @@ namespace MyCoinFlow.Services
             bool wealth,
             bool home,
             bool dms = false,
+            bool abos = false,
             bool persist = true)
         {
             // Finanzen ist das Grundmodul und bleibt immer aktiv.
@@ -72,6 +75,7 @@ namespace MyCoinFlow.Services
             IsWealthEnabled = wealth;
             IsHomeEnabled = home;
             IsDmsEnabled = dms;
+            IsAbosEnabled = abos;
 
             if (persist)
                 Save();
@@ -85,6 +89,7 @@ namespace MyCoinFlow.Services
                 wealth: false,
                 home: false,
                 dms: false,
+                abos: false,
                 persist: true);
         }
 
@@ -95,7 +100,8 @@ namespace MyCoinFlow.Services
                 $"Immobilien: {(IsPropertyEnabled ? "aktiv" : "nicht aktiv")}\n" +
                 $"Wealth: {(IsWealthEnabled ? "aktiv" : "nicht aktiv")}\n" +
                 $"Haushalt: {(IsHomeEnabled ? "aktiv" : "nicht aktiv")}\n" +
-                $"DMS: {(IsDmsEnabled ? "aktiv" : "nicht aktiv")}";
+                $"DMS: {(IsDmsEnabled ? "aktiv" : "nicht aktiv")}\n" +
+                $"Abo-Verwaltung: {(IsAbosEnabled ? "aktiv" : "nicht aktiv")}";
         }
 
         private static void ApplyLegacyEditionFallback()
@@ -119,6 +125,7 @@ namespace MyCoinFlow.Services
                 IsWealthEnabled = false;
                 IsHomeEnabled = false;
                 IsDmsEnabled = false;
+                IsAbosEnabled = false;
             }
         }
 
@@ -134,7 +141,8 @@ namespace MyCoinFlow.Services
                     Property = IsPropertyEnabled,
                     Wealth = IsWealthEnabled,
                     Home = IsHomeEnabled,
-                    Dms = IsDmsEnabled
+                    Dms = IsDmsEnabled,
+                    Abos = IsAbosEnabled
                 };
 
                 var json = JsonSerializer.Serialize(
@@ -156,6 +164,7 @@ namespace MyCoinFlow.Services
             public bool Wealth { get; set; }
             public bool Home { get; set; }
             public bool Dms { get; set; }
+            public bool Abos { get; set; }
         }
     }
 }

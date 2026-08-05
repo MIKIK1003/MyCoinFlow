@@ -30,11 +30,14 @@ namespace MyCoinFlow.Services
 
                 if (_trial.IsTrialActive())
                 {
+                    // Testversion: ALLE Module freigeschaltet (inkl. DMS und Abo-Verwaltung)
                     AppModules.SetModules(
                         finance: true,
                         property: true,
                         wealth: true,
-                        home: true);
+                        home: true,
+                        dms: true,
+                        abos: true);
 
                     message = $"Testversion aktiv. Verbleibende Tage: {_trial.GetRemainingDays()}";
                     return AppActivationStatus.Trial;
@@ -74,11 +77,14 @@ namespace MyCoinFlow.Services
                     return false;
                 }
 
+                // Testversion: ALLE Module freigeschaltet (inkl. DMS und Abo-Verwaltung)
                 AppModules.SetModules(
                     finance: true,
                     property: true,
                     wealth: true,
-                    home: true);
+                    home: true,
+                    dms: true,
+                    abos: true);
 
                 message = $"Testversion aktiviert. Verbleibende Tage: {_trial.GetRemainingDays()}";
                 return true;

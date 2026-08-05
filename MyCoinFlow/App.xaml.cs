@@ -48,7 +48,10 @@ namespace MyCoinFlow
 
             RegisterGlobalExceptionHandlers();
 
-            try { MyCoinFlow.Services.DmsWatcherService.Instance.Start(); } catch { /* Arbeitsordner evtl. nicht konfiguriert */ }
+            // DMS-Watcher wird bewusst NICHT hier gestartet, sondern erst nach
+            // erfolgreichem Login (LoginWindow.Login_Click): Vorher steht der
+            // Mandant (DB) nicht fest, und der Matching-Dialog würde vor dem
+            // Login-Fenster aufpoppen.
 
             base.OnStartup(e);
         }

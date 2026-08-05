@@ -26,7 +26,18 @@ namespace MyCoinFlow.ViewModels
         public DmsDocument? AusgewaehltesDokument
         {
             get => _ausgewaehltesDokument;
-            set { _ausgewaehltesDokument = value; OnPropertyChanged(); }
+            set
+            {
+                _ausgewaehltesDokument = value;
+                OnPropertyChanged();
+
+                // Anklicken einer Zeile = Dokument gesehen -> Neu-Icon entfernen
+                if (value != null && value.IstNeu)
+                {
+                    try { _db.MarkDocumentSeen(value.Id); } catch { /* Anzeige-Komfort, nie blockieren */ }
+                    value.IstNeu = false;
+                }
+            }
         }
 
         private string _searchText = "";
@@ -69,6 +80,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand TransaktionZuweisenCommand { get; }
         public ICommand SucheErneutCommand { get; }
         public ICommand AlleErneutSuchenCommand { get; }
+        public ICommand VerlaufAnzeigenCommand { get; }
 
         public DmsViewModel()
         {
@@ -83,6 +95,7 @@ namespace MyCoinFlow.ViewModels
             TransaktionZuweisenCommand = new RelayCommand(p => TransaktionZuweisen(p as DmsDocument ?? AusgewaehltesDokument));
             SucheErneutCommand = new RelayCommand(p => SucheErneut(p as DmsDocument ?? AusgewaehltesDokument));
             AlleErneutSuchenCommand = new RelayCommand(_ => DmsWatcherService.Instance.RequeueAllUnmatched());
+            VerlaufAnzeigenCommand = new RelayCommand(_ => DmsHistoryWindow.ShowOrActivate(Application.Current?.MainWindow));
 
             DmsWatcherService.Instance.PropertyChanged += Watcher_PropertyChanged;
             DmsWatcherService.Instance.DocumentProcessed += Watcher_DocumentProcessed;

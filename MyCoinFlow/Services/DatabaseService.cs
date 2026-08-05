@@ -194,6 +194,22 @@ BEGIN
     ALTER TABLE dbo.Attachment ADD GarantieAblaufDatum DATE NULL;
 END;
 
+-- NEU: aus dem Dokument erkannter Rechnungsbetrag (bester Betragskandidat der
+-- Texterkennung). Anzeige im DMS-Grid, solange keine Transaktion verknuepft ist.
+IF COL_LENGTH('dbo.Attachment', 'ErkannterBetrag') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD ErkannterBetrag DECIMAL(19,2) NULL;
+END;
+
+-- NEU: Gesehen-Markierung fuer die Neu-Anzeige im DMS-Grid.
+-- NULL = frisch importiert, noch nicht angeklickt. Beim Anlegen der Spalte werden
+-- Bestandsdokumente als gesehen markiert, damit nicht das ganze Archiv aufleuchtet.
+IF COL_LENGTH('dbo.Attachment', 'GesehenAm') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD GesehenAm DATETIME2 NULL;
+    EXEC('UPDATE dbo.Attachment SET GesehenAm = SYSUTCDATETIME()');
+END;
+
 IF EXISTS (
     SELECT 1 FROM sys.columns c
     JOIN sys.tables t ON t.object_id = c.object_id
@@ -226,6 +242,75 @@ END;
                 dmsDataCmd.CommandText = dmsDataSql;
                 dmsDataCmd.ExecuteNonQuery();
             }
+
+            // NEU: Verarbeitungs-Historie für den DMS-Watcher (Task 24).
+            var dmsLogSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'DmsProcessingLog' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.DmsProcessingLog
+    (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        OccurredAtUtc DATETIME2 NOT NULL,
+        FileName NVARCHAR(260) NULL,
+        Ergebnis NVARCHAR(500) NULL
+    );
+END;
+";
+            using (var dmsLogCmd = conn.CreateCommand())
+            {
+                dmsLogCmd.CommandText = dmsLogSql;
+                dmsLogCmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Schreibt einen Eintrag in die DMS-Verarbeitungs-Historie (Task 24).
+        /// </summary>
+        public void LogDmsProcessing(string? fileName, string? ergebnis)
+        {
+            using var conn = CreateConnection();
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO dbo.DmsProcessingLog (OccurredAtUtc, FileName, Ergebnis)
+VALUES (@occurred, @fileName, @ergebnis);";
+            cmd.Parameters.AddWithValue("@occurred", DateTime.UtcNow);
+            cmd.Parameters.AddWithValue("@fileName", (object?)fileName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ergebnis", (object?)ergebnis ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Lädt die DMS-Verarbeitungs-Historie, neueste zuerst (Task 24).
+        /// </summary>
+        public List<DmsProcessingLogEntry> LoadDmsProcessingLog(int maxRows = 500)
+        {
+            var result = new List<DmsProcessingLogEntry>();
+
+            using var conn = CreateConnection();
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+SELECT TOP (@max) Id, OccurredAtUtc, FileName, Ergebnis
+FROM dbo.DmsProcessingLog
+ORDER BY OccurredAtUtc DESC;";
+            cmd.Parameters.AddWithValue("@max", maxRows);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new DmsProcessingLogEntry
+                {
+                    Id = reader.GetInt32(0),
+                    OccurredAtUtc = reader.GetDateTime(1),
+                    FileName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    Ergebnis = reader.IsDBNull(3) ? null : reader.GetString(3)
+                });
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -583,14 +668,19 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
             var sql = @"
 SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
        a.FileName, a.OriginalName, a.FolderRel, a.SizeBytes, a.ImportedAtUtc, a.OcrStatus,
-       a.DokumentDatum, a.IstGarantieschein, a.GarantieAblaufDatum
+       a.DokumentDatum, a.IstGarantieschein, a.GarantieAblaufDatum,
+       tr.Betrag AS TransBetrag, adr.Name AS TransAdresseName,
+       a.GesehenAm, a.ErkannterBetrag
 FROM dbo.Attachment a
-LEFT JOIN dbo.AttachmentText t ON t.AttachmentId = a.Id
+LEFT JOIN dbo.AttachmentText txt ON txt.AttachmentId = a.Id
+LEFT JOIN dbo.Transaktion tr ON a.EntityType = 'Transaktion' AND tr.Id = a.EntityId
+LEFT JOIN dbo.Adresse adr ON adr.Id = tr.AdresseId
 WHERE (@q IS NULL OR
        a.FileName LIKE '%' + @q + '%' OR
        a.Titel LIKE '%' + @q + '%' OR
        a.Kategorie LIKE '%' + @q + '%' OR
-       t.[Text] LIKE '%' + @q + '%')
+       adr.Name LIKE '%' + @q + '%' OR
+       txt.[Text] LIKE '%' + @q + '%')
   AND (@kat IS NULL OR a.Kategorie = @kat)
 ORDER BY a.ImportedAtUtc DESC;";
 
@@ -621,10 +711,43 @@ ORDER BY a.ImportedAtUtc DESC;";
                     OcrStatus = r.IsDBNull(11) ? null : r.GetString(11),
                     DokumentDatum = r.IsDBNull(12) ? (DateTime?)null : r.GetDateTime(12),
                     IstGarantieschein = r.GetBoolean(13),
-                    GarantieAblaufDatum = r.IsDBNull(14) ? (DateTime?)null : r.GetDateTime(14)
+                    GarantieAblaufDatum = r.IsDBNull(14) ? (DateTime?)null : r.GetDateTime(14),
+                    TransBetrag = r.IsDBNull(15) ? (decimal?)null : r.GetDecimal(15),
+                    TransAdresseName = r.IsDBNull(16) ? null : r.GetString(16),
+                    IstNeu = r.IsDBNull(17),
+                    ErkannterBetrag = r.IsDBNull(18) ? (decimal?)null : r.GetDecimal(18)
                 });
             }
             return list;
+        }
+
+        /// <summary>
+        /// DMS: speichert den aus dem Dokumenttext erkannten Rechnungsbetrag
+        /// (bester Betragskandidat; Anzeige im Grid für freie Dokumente).
+        /// </summary>
+        public void UpdateAttachmentErkannterBetrag(int attachmentId, decimal? betrag)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET ErkannterBetrag = @betrag WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@betrag", (object?)betrag ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: markiert ein Dokument als gesehen (Neu-Icon im Grid verschwindet).
+        /// </summary>
+        public void MarkDocumentSeen(int attachmentId)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET GesehenAm = SYSUTCDATETIME()
+                                 WHERE Id = @id AND GesehenAm IS NULL";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
@@ -808,6 +931,42 @@ WHERE Id = @id";
             cmd.Parameters.AddWithValue("@fn", fileName);
             cmd.Parameters.AddWithValue("@kat", (object?)kategorie ?? DBNull.Value);
             cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: aktualisiert nur den Dateinamen (z. B. Umbenennen auf das einheitliche
+        /// DOK-{Id}-Schema direkt nach dem Anlegen). Kategorie/Titel bleiben unverändert.
+        /// </summary>
+        public void UpdateAttachmentFileName(int attachmentId, string fileName)
+        {
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET FileName = @fn WHERE Id = @id";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@fn", fileName);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: liefert Id/Dateiname/Ordner aller Attachments – Grundlage für die
+        /// Migration bestehender Dokumente auf das einheitliche DOK-{Id}-Namensschema.
+        /// </summary>
+        public List<(int Id, string FileName, string FolderRel)> LoadAllAttachmentFilePaths()
+        {
+            var result = new List<(int, string, string)>();
+
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT Id, FileName, FolderRel FROM dbo.Attachment;";
+            using var cmd = new SqlCommand(sql, c);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+            }
+
+            return result;
         }
 
         /// <summary>

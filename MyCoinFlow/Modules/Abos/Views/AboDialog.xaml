@@ -1,0 +1,142 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.AboDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Abo"
+                 Width="560"
+                 Height="790"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <TextBox x:Name="NameBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Name des Abos *"
+                         MinHeight="48" Margin="0,0,0,14"/>
+
+                <ComboBox x:Name="AdresseBox"
+                          materialDesign:HintAssist.Hint="Adresse / Anbieter (für automatische Zuordnung)"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Id"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          MinHeight="48" Margin="0,0,0,14"/>
+
+                <ComboBox x:Name="PeriodeBox"
+                          materialDesign:HintAssist.Hint="Rhythmus *"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          DisplayMemberPath="Anzeige"
+                          SelectedValuePath="Code"
+                          MinHeight="48" Margin="0,0,0,14"/>
+
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="BetragBox" Grid.Column="0"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Erwarteter Betrag"
+                             MinHeight="48"/>
+
+                    <TextBox x:Name="ToleranzBox" Grid.Column="2"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Toleranz in % (Standard 10)"
+                             MinHeight="48"/>
+                </Grid>
+
+                <ComboBox x:Name="StatusBox"
+                          materialDesign:HintAssist.Hint="Status"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          DisplayMemberPath="Anzeige"
+                          SelectedValuePath="Code"
+                          MinHeight="48" Margin="0,0,0,14"/>
+
+                <!-- Kündigungsplanung: gewünschtes Ende + Frist => spätester Kündigungstermin -->
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <DatePicker x:Name="KuendigenZumPicker" Grid.Column="0"
+                                materialDesign:HintAssist.Hint="Abo nicht mehr ab (geplantes Ende)"
+                                Style="{StaticResource MaterialDesignOutlinedDatePicker}"
+                                SelectedDateChanged="KuendigungsDatum_Changed"
+                                MinHeight="48"/>
+
+                    <TextBox x:Name="FristBox" Grid.Column="2"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             materialDesign:HintAssist.Hint="Kündigungsfrist (Tage)"
+                             TextChanged="KuendigungsFrist_Changed"
+                             MinHeight="48"/>
+                </Grid>
+
+                <TextBlock x:Name="KuendigungsHinweisText"
+                           Margin="4,0,0,14"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                <DatePicker x:Name="GekuendigtAmPicker"
+                            materialDesign:HintAssist.Hint="Gekündigt am (Kündigung effektiv eingereicht)"
+                            Style="{StaticResource MaterialDesignOutlinedDatePicker}"
+                            MinHeight="48" Margin="0,0,0,14"/>
+
+                <TextBox x:Name="VorwarnBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Vorwarnung vor nächster Zahlung (Tage, Standard 7)"
+                         MinHeight="48" Margin="0,0,0,14"/>
+
+                <ComboBox x:Name="KontoBox"
+                          materialDesign:HintAssist.Hint="Erwartetes Buchungskonto"
+                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                          DisplayMemberPath="Anzeige"
+                          SelectedValuePath="Id"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          MinHeight="48" Margin="0,0,0,14"/>
+
+                <TextBox x:Name="WebseiteBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Webseite (z.B. www.anbieter.ch)"
+                         MinHeight="48" Margin="0,0,0,14"/>
+
+                <TextBox x:Name="NotizBox"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="Notiz (z.B. Kundennummer, Kündigungsweg)"
+                         MinHeight="80"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Check" Content="Speichern"
+                    MinWidth="130" Margin="0,0,10,0"
+                    IsDefault="True"
+                    Click="Speichern_Click"/>
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    MinWidth="110"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

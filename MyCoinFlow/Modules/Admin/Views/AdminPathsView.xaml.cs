@@ -12,6 +12,7 @@ namespace MyCoinFlow.Views
     public partial class AdminPathsView : UserControl
     {
         private readonly DatabaseService _db = new();
+        private readonly AttachmentService _attachSvc = new();
 
         private const string KeyRoot = "AttachmentRoot";
         private const string KeyMax = "AttachmentMaxMB";
@@ -134,6 +135,44 @@ namespace MyCoinFlow.Views
             catch (Exception ex)
             {
                 Status("Fehler: " + ex.Message);
+            }
+        }
+
+        public void MigrateFileNames_Click(object? sender, RoutedEventArgs e)
+        {
+            var ask = MessageBox.Show(
+                Application.Current?.MainWindow,
+                "Alle bestehenden Dokumente werden auf das einheitliche Namensschema DOK-{Id} umgestellt " +
+                "(Datei auf der Platte UND Dateiname in der Datenbank). Bereits korrekt benannte Dokumente " +
+                "werden übersprungen. Fortfahren?",
+                "Dateinamen vereinheitlichen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (ask != MessageBoxResult.Yes) return;
+
+            try
+            {
+                var btn = sender as Button;
+                if (btn != null) btn.IsEnabled = false;
+                Status("Vereinheitliche Dateinamen…");
+
+                var (renamed, alreadyOk, missing) = _attachSvc.MigrateAllToUniformNaming();
+
+                Status($"Dateinamen vereinheitlicht: {renamed} umbenannt, {alreadyOk} bereits korrekt, {missing} übersprungen (Datei fehlt).");
+                MessageBox.Show(
+                    Application.Current?.MainWindow,
+                    $"Umbenannt: {renamed}\nBereits korrekt: {alreadyOk}\nÜbersprungen (Datei nicht gefunden): {missing}",
+                    "Dateinamen vereinheitlichen",
+                    MessageBoxButton.OK,
+                    missing > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Status("Vereinheitlichen fehlgeschlagen: " + ex.Message);
+            }
+            finally
+            {
+                if (sender is Button b) b.IsEnabled = true;
             }
         }
 

@@ -54,6 +54,12 @@ namespace MyCoinFlow.Views
             if (e.Key == Key.Enter) Suchen_Click(sender, e);
         }
 
+        private void AuchVerknuepfte_Changed(object sender, RoutedEventArgs e)
+        {
+            // Umschalten wirkt direkt auf die aktuelle Suche
+            if (IsLoaded) Suchen_Click(sender, e);
+        }
+
         private void Suchen_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -61,9 +67,20 @@ namespace MyCoinFlow.Views
                 decimal? betrag = decimal.TryParse(BetragBox.Text?.Trim(), NumberStyles.Number,
                     CultureInfo.CurrentCulture, out var b) ? b : null;
 
+                // Bereits mit einem Dokument verknüpfte Transaktionen standardmässig ausblenden
+                // (ein Rechnungsdokument gehört zu genau einer Zahlung). Ausnahme per Checkbox:
+                // Sammelbuchungen, denen mehrere Rechnungen zugeordnet werden müssen.
+                var auchVerknuepfte = AuchVerknuepfteCheck.IsChecked == true;
+
                 var result = _db.SearchTransaktionenForZuordnung(
-                    SuchTextBox.Text, betrag, VonPicker.SelectedDate, BisPicker.SelectedDate);
+                    SuchTextBox.Text, betrag, VonPicker.SelectedDate, BisPicker.SelectedDate,
+                    nurOhneDokument: !auchVerknuepfte);
                 Fill(result);
+
+                if (result.Count == 0)
+                    HinweisText.Text = auchVerknuepfte
+                        ? "Keine Treffer."
+                        : "Keine Treffer. Hinweis: Transaktionen mit bereits verknüpftem Dokument werden ausgeblendet (Checkbox unten einschalten, um sie zu sehen).";
             }
             catch (Exception ex)
             {

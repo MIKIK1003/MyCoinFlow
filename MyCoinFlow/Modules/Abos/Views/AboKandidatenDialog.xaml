@@ -1,0 +1,104 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.AboKandidatenDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Gefundene Abo-Kandidaten"
+                 Width="980"
+                 Height="600"
+                 WindowStartupLocation="CenterOwner">
+
+    <base:BaseWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisKandidat"/>
+    </base:BaseWindow.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                   Text="Diese wiederkehrenden Zahlungen wurden in den Transaktionen erkannt. Abwählen, was kein Abo ist – erst mit «Übernehmen» wird gespeichert."/>
+
+        <DataGrid Grid.Row="2"
+                  x:Name="KandidatenGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+
+                <DataGridCheckBoxColumn Header="Übernehmen"
+                                        Binding="{Binding Uebernehmen, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="100"/>
+
+                <DataGridTextColumn Header="Anbieter / Adresse"
+                                    Binding="{Binding AdresseName}"
+                                    IsReadOnly="True" Width="*"/>
+
+                <DataGridTextColumn Header="Rhythmus"
+                                    Binding="{Binding Periodizitaet}"
+                                    IsReadOnly="True" Width="110"/>
+
+                <DataGridTextColumn Header="Betrag (Median)"
+                                    Binding="{Binding MedianBetrag, StringFormat={}{0:N2}}"
+                                    IsReadOnly="True" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Zahlungen"
+                                    Binding="{Binding AnzahlZahlungen}"
+                                    IsReadOnly="True" Width="90">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Erste"
+                                    Binding="{Binding ErsteZahlung, StringFormat=dd.MM.yyyy}"
+                                    IsReadOnly="True" Width="100"/>
+
+                <DataGridTextColumn Header="Letzte"
+                                    Binding="{Binding LetzteZahlung, StringFormat=dd.MM.yyyy}"
+                                    IsReadOnly="True" Width="100"/>
+
+                <DataGridTemplateColumn Header="" Width="40">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <materialDesign:PackIcon Kind="AlertOutline"
+                                                     Width="18" Height="18"
+                                                     Foreground="{StaticResource AppBrandBrush}"
+                                                     ToolTip="Zahlungen auf verschiedenen Konten verbucht"
+                                                     HorizontalAlignment="Center"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="{Binding MehrereKonten, Converter={StaticResource BoolToVisKandidat}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Check" Content="Übernehmen"
+                    MinWidth="140" Margin="0,0,10,0"
+                    IsDefault="True"
+                    Click="Uebernehmen_Click"/>
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    MinWidth="110"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

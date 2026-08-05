@@ -1862,7 +1862,10 @@ LEFT JOIN dbo.Adresse a      ON a.Id = t.AdresseId
 LEFT JOIN dbo.Geldinstitut g ON g.Id = t.GeldinstitutId
 WHERE ABS(t.Betrag) = ABS(@betrag)
   AND t.Datum BETWEEN @von AND @bis
-  AND NOT EXISTS (SELECT 1 FROM dbo.Attachment att WHERE att.TransaktionId = t.Id)
+  AND NOT EXISTS (
+       SELECT 1 FROM dbo.Attachment att
+       WHERE att.TransaktionId = t.Id
+          OR (att.EntityType = 'Transaktion' AND att.EntityId = t.Id))
 ORDER BY t.Datum DESC;";
 
             using var cmd = new SqlCommand(sql, c);
@@ -1896,8 +1899,10 @@ ORDER BY t.Datum DESC;";
         /// DMS: einfache Suche für das manuelle Zuweisen eines Dokuments zu einer Transaktion
         /// (Betrag/Datumsbereich/Freitext optional, alle kombinierbar). Für den
         /// DmsAssignTransactionDialog-Suchmodus.
+        /// nurOhneDokument = true blendet Transaktionen aus, die bereits ein Dokument
+        /// haben (eine Rechnung gehört zu genau einer Zahlung).
         /// </summary>
-        public List<Transaktion> SearchTransaktionenForZuordnung(string? text, decimal? betrag, DateTime? von, DateTime? bis, int maxResults = 50)
+        public List<Transaktion> SearchTransaktionenForZuordnung(string? text, decimal? betrag, DateTime? von, DateTime? bis, int maxResults = 50, bool nurOhneDokument = false)
         {
             var list = new List<Transaktion>();
             using var c = CreateConnection();
@@ -1919,10 +1924,15 @@ WHERE (@betrag IS NULL OR ABS(t.Betrag) = ABS(@betrag))
        t.Notiz LIKE '%' + @q + '%' OR
        a.Name LIKE '%' + @q + '%' OR
        g.Name LIKE '%' + @q + '%')
+  AND (@nurOhneDok = 0 OR NOT EXISTS (
+       SELECT 1 FROM dbo.Attachment att
+       WHERE att.TransaktionId = t.Id
+          OR (att.EntityType = 'Transaktion' AND att.EntityId = t.Id)))
 ORDER BY t.Datum DESC;";
 
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.AddWithValue("@max", maxResults);
+            cmd.Parameters.AddWithValue("@nurOhneDok", nurOhneDokument ? 1 : 0);
             cmd.Parameters.AddWithValue("@betrag", (object?)betrag ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@von", (object?)von ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@bis", (object?)bis ?? DBNull.Value);
@@ -2107,10 +2117,56 @@ ORDER BY Id DESC;";
                 throw new InvalidOperationException(string.Join(Environment.NewLine, lines));
             }
 
+            // Abo-Zuordnung automatisch mitlöschen: Sie ist reine Verwaltungsinfo des
+            // Abo-Moduls und ohne die Transaktion wertlos (typischer Fall: Duplikat
+            // wurde erst über die Abo-Erkennung entdeckt und soll nun weg).
+            const string sqlAbo = @"
+IF OBJECT_ID('dbo.AboTransaktion', 'U') IS NOT NULL
+    DELETE FROM dbo.AboTransaktion WHERE TransaktionId = @id;";
+            using (var cmdAbo = new SqlCommand(sqlAbo, c))
+            {
+                cmdAbo.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
+                cmdAbo.ExecuteNonQuery();
+            }
+
             const string sql = "DELETE FROM Transaktion WHERE Id=@id";
             using var cmd = new SqlCommand(sql, c);
             cmd.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = id });
-            cmd.ExecuteNonQuery();
+
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (SqlException ex) when (ex.Number == 547)
+            {
+                // FK-Konflikt in eine verständliche Meldung übersetzen statt
+                // den rohen Constraint-Fehler anzuzeigen.
+                throw new InvalidOperationException(UebersetzeLoeschKonflikt(ex), ex);
+            }
+        }
+
+        // Übersetzt einen Fremdschlüssel-Konflikt beim Löschen einer Transaktion
+        // in eine Meldung, die dem Benutzer sagt, WO die Transaktion noch verwendet wird.
+        private static string UebersetzeLoeschKonflikt(SqlException ex)
+        {
+            var m = ex.Message ?? "";
+
+            string quelle;
+            if (m.Contains("AboTransaktion", StringComparison.OrdinalIgnoreCase))
+                quelle = "Die Transaktion ist einem Abo zugeordnet.\n" +
+                         "Im Modul Abos beim betroffenen Abo die Zuordnung entfernen (Ketten-Symbol in der Zahlungsliste).";
+            else if (m.Contains("Stwe", StringComparison.OrdinalIgnoreCase))
+                quelle = "Die Transaktion wird in einem STWE-Set verwendet.\n" +
+                         "Im STWE-Modul die Verknüpfung lösen.";
+            else if (m.Contains("Attachment", StringComparison.OrdinalIgnoreCase))
+                quelle = "An der Transaktion hängen noch Anhänge (PDF/Bilder).\n" +
+                         "Zuerst die Anhänge entfernen (Drei-Punkte-Symbol in der Zeile).";
+            else
+                quelle = "Die Transaktion ist noch mit anderen Daten verknüpft " +
+                         "(z.B. STWE-Set, Abo oder Anhänge). Zuerst die Verknüpfung lösen.\n\n" +
+                         "Technische Details: " + m;
+
+            return "Diese Transaktion kann nicht gelöscht werden.\n\n" + quelle;
         }
 
         // --- Defaults für Konto-Vorschläge (Adresse.DefaultKontoId) -----------------
@@ -3590,7 +3646,15 @@ WHERE Id = @Id";
             // KK-Detailbuchung? Dann auf Kosten-/Budgetkonten immer als Ausgabe zeigen.
             if (string.Equals(t.ImportQuelle, "KreditkartenExcel", StringComparison.OrdinalIgnoreCase))
             {
-                if (!IstEinnahmenKonto(kontoId)) return true;  // Budget-/Kostenkonten: Ausgabe
+                // Sicht des VON-Kontos (typisch: KK-Durchlaufkonto): Die Detailbuchung
+                // verlässt das Konto Richtung Budgetkonto => Entlastung (Einnahmen-Spalte).
+                // Nur so geht das Durchlaufkonto nach vollständiger Verteilung auf Null auf:
+                // Gesamtbelastung (Bank -> Durchlauf) steht in "Ausgaben", die Teilbeträge
+                // (Durchlauf -> Budget) in "Einnahmen". Deckt auch Refunds ab: Auf dem
+                // Budgetkonto (dann VON-Seite) erscheint die Rückvergütung als Einnahme.
+                if (t.VonKontoId == kontoId && t.NachKontoId != null) return false;
+
+                if (!IstEinnahmenKonto(kontoId)) return true;  // NACH-Seite Budget-/Kostenkonten: Ausgabe
                                                                // Einnahmenkonten: normale Logik
             }
 

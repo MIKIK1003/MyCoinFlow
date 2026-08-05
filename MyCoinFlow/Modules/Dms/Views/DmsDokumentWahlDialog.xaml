@@ -1,0 +1,90 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.DmsDokumentWahlDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Dokument aus DMS anhängen"
+                 Width="1000"
+                 Height="620"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Suchleiste -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SuchTextBox" Grid.Column="0"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Suchen (Dateiname, Titel, Kategorie, Inhalt)"
+                     MinHeight="48"
+                     KeyDown="SuchTextBox_KeyDown"/>
+
+            <Button Grid.Column="2"
+                    Style="{StaticResource IconTextButton}"
+                    Tag="Magnify" Content="Suchen"
+                    MinHeight="48" MinWidth="120"
+                    Click="Suchen_Click"/>
+        </Grid>
+
+        <!-- Freie Dokumente -->
+        <DataGrid Grid.Row="2"
+                  x:Name="DokumenteGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  MouseDoubleClick="DokumenteGrid_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
+                <DataGridTextColumn Header="Titel" Binding="{Binding TitelAnzeige}" Width="*"/>
+                <DataGridTextColumn Header="Betrag (erkannt)" Binding="{Binding BetragAnzeige}" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="130"/>
+                <DataGridTextColumn Header="Dokumentdatum" Binding="{Binding DokumentDatum, StringFormat=dd.MM.yyyy}" Width="130"/>
+                <DataGridTextColumn Header="Importiert" Binding="{Binding ImportedAtUtc, StringFormat=dd.MM.yyyy}" Width="110"/>
+                <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="90"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="4">
+            <TextBlock x:Name="StatusText"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                       Text="Angezeigt werden nur freie Dokumente (ohne Transaktions-Verknüpfung)."/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                        Content="Datei aus Explorer…"
+                        ToolTip="Stattdessen eine Datei vom Rechner wählen (wie bisher)"
+                        MinWidth="160" Margin="0,0,10,0"
+                        Click="Explorer_Click"/>
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="Paperclip" Content="Anhängen"
+                        MinWidth="140" Margin="0,0,10,0"
+                        IsDefault="True"
+                        Click="Anhaengen_Click"/>
+                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                        Content="Abbrechen"
+                        MinWidth="110"
+                        IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</base:BaseWindow>

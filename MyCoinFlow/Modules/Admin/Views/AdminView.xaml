@@ -367,7 +367,17 @@
                                             Tag="ContentSave"
                                             Content="Speichern"
                                             MinHeight="40"
+                                            Margin="0,0,0,10"
                                             Click="Paths_Save_Click"/>
+
+                                    <Separator Margin="0,4,0,10"/>
+
+                                    <Button Style="{StaticResource IconTextButton}"
+                                            Tag="FileReplace"
+                                            Content="Dateinamen vereinheitlichen"
+                                            ToolTip="Bestehende Dokumente (Datei + DB) einmalig auf das einheitliche DOK-{Id}-Namensschema umstellen"
+                                            MinHeight="40"
+                                            Click="Paths_MigrateFileNames_Click"/>
                                 </StackPanel>
 
                                 <!-- Panel 1: OCR -->

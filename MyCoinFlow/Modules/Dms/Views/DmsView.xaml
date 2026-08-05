@@ -37,8 +37,15 @@
                 <Button Style="{StaticResource IconTextButton}"
                         Tag="Upload"
                         Content="Dokument hochladen"
-                        MinHeight="40"
+                        MinHeight="40" Margin="0,0,0,8"
                         Command="{Binding HochladenCommand}"/>
+
+                <Button Style="{StaticResource IconTextButton}"
+                        Tag="History"
+                        Content="Verlauf"
+                        ToolTip="Zeigt eine Historie aller automatisch verarbeiteten Dokumente – das Fenster kann offen bleiben, während in der App weitergearbeitet wird"
+                        MinHeight="40"
+                        Command="{Binding VerlaufAnzeigenCommand}"/>
 
                 <Separator Margin="0,14,0,12"/>
 
@@ -208,8 +215,26 @@
                 </DataGrid.RowStyle>
 
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Titel / Datei" Binding="{Binding TitelAnzeige}" Width="*"/>
+
+                    <!-- Neu-Icon: frisch importierte, noch nicht angeklickte Dokumente -->
+                    <DataGridTemplateColumn Header="" Width="40" CanUserResize="False">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <materialDesign:PackIcon Kind="NewBox"
+                                                         Width="22" Height="22"
+                                                         Foreground="{StaticResource AppBrandBrush}"
+                                                         ToolTip="Neu importiert – Zeile anklicken, um die Markierung zu entfernen"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         Visibility="{Binding IstNeu, Converter={StaticResource BoolToVisConverter}}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
                     <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="140"/>
+                    <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseAnzeige}" Width="140"/>
+                    <DataGridTextColumn Header="Betrag" Binding="{Binding BetragAnzeige}" Width="90"/>
                     <DataGridTextColumn Header="Verknüpft mit" Binding="{Binding VerknuepftMitAnzeige}" Width="140"/>
                     <DataGridTextColumn Header="Fällig am" Binding="{Binding FaelligAnzeige}" Width="90"
                                         ToolTipService.ToolTip="30 Tage ab erkanntem Dokumentdatum – rot, falls noch keine Transaktion zugeordnet und überfällig"/>

@@ -126,22 +126,8 @@ namespace MyCoinFlow.Views
             if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Escape or Key.Tab)
                 return;
 
-            var text = KontoBox.Text ?? "";
-
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                KontoBox.ItemsSource = _alleKonten;
-            }
-            else
-            {
-                var gefiltert = _alleKonten
-                    .Where(k => k.Anzeige.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
-
-                KontoBox.ItemsSource = gefiltert.Count > 0 ? gefiltert : _alleKonten;
-            }
-
-            KontoBox.IsDropDownOpen = true;
+            MyCoinFlow.Helpers.ComboBoxFilterHelper.FiltereMitTextErhalt(
+                KontoBox, _alleKonten, k => k.Anzeige);
         }
 
         // ------------ Regel-Preview (nur Anzeige) ------------

@@ -172,6 +172,13 @@ namespace MyCoinFlow.Views
                 var main = new MyCoinFlow.MainWindow();
                 main.Show();
                 Close();
+
+                // DMS-Watcher erst NACH erfolgreichem Login starten:
+                // 1. Der Mandant (DB) steht erst jetzt fest.
+                // 2. Der Mehrdeutigkeits-Dialog des Matchings darf nicht vor dem
+                //    Login-Fenster aufpoppen.
+                try { MyCoinFlow.Services.DmsWatcherService.Instance.Start(); }
+                catch { /* Arbeitsordner evtl. nicht konfiguriert */ }
             }
             catch (Exception ex)
             {

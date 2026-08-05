@@ -76,6 +76,8 @@ namespace MyCoinFlow.ViewModels
         public ICommand OpenAttachmentCommand { get; }
         public ICommand ManageAttachmentsCommand { get; }
         public ICommand OpenBankImportCommand { get; }
+        public ICommand WebRechercheCommand { get; }
+        public ICommand DuplikateCommand { get; }
 
         private string? _searchText;
 
@@ -154,6 +156,8 @@ namespace MyCoinFlow.ViewModels
             ManageAttachmentsCommand = new RelayCommand(p => ManageAttachmentsFromRow(p), _ => true);
 
             OpenBankImportCommand = new RelayCommand(_ => OpenBankImport());
+            WebRechercheCommand = new RelayCommand(p => WebRecherche(p));
+            DuplikateCommand = new RelayCommand(_ => DuplikateSuchen());
 
             ApplySearchCommand = new RelayCommand(_ => LadeListe(), _ => true);
 
@@ -428,6 +432,48 @@ namespace MyCoinFlow.ViewModels
         }
 
 
+        private void WebRecherche(object? p)
+        {
+            var row = p as TransaktionRowExt ?? AusgewaehlteTransaktion;
+            if (row == null) return;
+
+            try
+            {
+                if (!WebRechercheService.OpenSearch(row.Notiz, row.AdresseName))
+                    MessageBox.Show("Kein verwertbarer Buchungstext für die Recherche vorhanden.",
+                        "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Recherche konnte nicht geöffnet werden:\n" + ex.Message,
+                    "Web-Recherche", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void DuplikateSuchen()
+        {
+            try
+            {
+                var dlg = new DuplikateDialog
+                {
+                    Owner = Application.Current?.Windows
+                                .OfType<Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                            ?? Application.Current?.MainWindow
+                };
+
+                dlg.ShowDialog();
+
+                if (dlg.HatGeloescht)
+                    LadeListe();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Dialogfehler (Duplikate): {ex.Message}", "Transaktionen",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void OpenBankImport()
         {
             try
@@ -472,29 +518,66 @@ namespace MyCoinFlow.ViewModels
 
             try
             {
-                var dlg = new OpenFileDialog
+                // Mit DMS-Lizenz: zuerst die freien DMS-Dokumente anbieten
+                // (mit Ausweich-Button auf die klassische Explorer-Auswahl).
+                // Ohne DMS-Lizenz: direkt Explorer wie bisher.
+                if (AppModules.IsDmsEnabled)
                 {
-                    Filter = "Dokumente und Bilder|*.pdf;*.jpg;*.jpeg;*.png|PDF|*.pdf|Bilder|*.jpg;*.jpeg;*.png|Alle Dateien|*.*",
-                    Title = "Datei anhängen",
-                    Multiselect = false,
-                    CheckFileExists = true
-                };
-                var ok = dlg.ShowDialog();
-                if (ok != true) return;
+                    var dmsDlg = new DmsDokumentWahlDialog
+                    {
+                        Owner = Application.Current?.Windows
+                                    .OfType<Window>()
+                                    .FirstOrDefault(w => w.IsActive)
+                                ?? Application.Current?.MainWindow
+                    };
 
-                var service = new AttachmentService();
-                service.AttachAndSave(id, dlg.FileName);
+                    if (dmsDlg.ShowDialog() != true) return;
 
-                var keepId = id;
-                LadeListe();
-                foreach (var row in Transaktionen)
-                    if (row.Id == keepId) { AusgewaehlteTransaktion = row; break; }
+                    if (!dmsDlg.ExplorerGewaehlt && dmsDlg.AusgewaehltesDokumentId > 0)
+                    {
+                        var service = new AttachmentService();
+                        service.LinkToTransaktion(dmsDlg.AusgewaehltesDokumentId, id);
+
+                        try { _db.MarkDocumentSeen(dmsDlg.AusgewaehltesDokumentId); } catch { }
+
+                        RefreshUndReselect(id);
+                        return;
+                    }
+                    // ExplorerGewaehlt: unten normal weiter
+                }
+
+                AttachPdfViaExplorer(id);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Anhängen fehlgeschlagen: " + ex.Message, "Datei anhängen",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void AttachPdfViaExplorer(int id)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Dokumente und Bilder|*.pdf;*.jpg;*.jpeg;*.png|PDF|*.pdf|Bilder|*.jpg;*.jpeg;*.png|Alle Dateien|*.*",
+                Title = "Datei anhängen",
+                Multiselect = false,
+                CheckFileExists = true
+            };
+            var ok = dlg.ShowDialog();
+            if (ok != true) return;
+
+            var service = new AttachmentService();
+            service.AttachAndSave(id, dlg.FileName);
+
+            RefreshUndReselect(id);
+        }
+
+        private void RefreshUndReselect(int transaktionId)
+        {
+            LadeListe();
+            foreach (var row in Transaktionen)
+                if (row.Id == transaktionId) { AusgewaehlteTransaktion = row; break; }
         }
 
         private void OpenAttachmentFromRow(object? p)

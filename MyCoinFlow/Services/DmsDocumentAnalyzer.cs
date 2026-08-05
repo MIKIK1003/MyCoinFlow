@@ -46,14 +46,25 @@ namespace MyCoinFlow.Services
         private static readonly Regex GermanTextDatePattern = new(
             @"\b(\d{1,2})\.\s*([A-Za-zÀ-ÿ]+)\.?\s+(\d{4})\b", RegexOptions.Compiled);
 
+        // Tausendertrennzeichen kommen je nach Rechnungssoftware unterschiedlich vor: Schweizer
+        // Apostroph (6'400.00), aber auch Komma (6,400.00, international) oder Punkt
+        // (6.400,00, deutsches Format). Alle drei müssen als Gruppierung erkannt werden, sonst
+        // wird die Zahl an der falschen Stelle zerschnitten (siehe TryParseAmount).
         private static readonly Regex AmountPattern = new(
-            @"(?:CHF|Fr\.?|EUR|€)?\s*(\d{1,3}(?:['’]\d{3})*(?:[.,]\d{2})?)\s*(?:CHF|Fr\.?|EUR|€)?",
+            @"(?:CHF|Fr\.?|EUR|€)?\s*(\d{1,3}(?:[.,'’]\d{3})*(?:[.,]\d{2})?)\s*(?:CHF|Fr\.?|EUR|€)?",
             RegexOptions.Compiled);
 
         private static readonly string[] AmountKeywords =
         {
-            "total", "rechnungsbetrag", "zu zahlen", "zu bezahlen", "gesamtbetrag", "endbetrag", "betrag"
+            "total", "rechnungsbetrag", "zu zahlen", "zu bezahlen", "gesamtbetrag", "endbetrag", "betrag",
+            "gesamt", "saldo"
         };
+
+        // Nur Treffer, die überhaupt wie ein formatierter Geldbetrag aussehen (Dezimal- oder
+        // Tausendertrennzeichen), dürfen von der Nähe zu einem AmountKeyword profitieren. Sonst
+        // werden blosse Positions-/Zeilennummern (1, 2, 3...) fälschlich aufgewertet, wenn eine
+        // Tabellenkopfzeile ("... Betrag") im Text direkt vor jeder Position wiederholt wird.
+        private static readonly char[] AmountSeparators = { '.', ',', '\'', '’' };
 
         private static readonly char[] InvalidFileNameChars = System.IO.Path.GetInvalidFileNameChars();
 
@@ -180,10 +191,21 @@ namespace MyCoinFlow.Services
         /// sollte bei der Transaktionssuche mehrere Kandidaten der Reihe nach probieren, falls
         /// die Gewichtung im Einzelfall daneben liegt.
         /// </summary>
-        public static List<decimal> ExtractAmountCandidates(string? text)
+        public static List<decimal> ExtractAmountCandidates(string? text) =>
+            ExtractAmountCandidatesScored(text).Select(r => r.Amount).ToList();
+
+        /// <summary>
+        /// Wie <see cref="ExtractAmountCandidates"/>, liefert zusätzlich den Score je Kandidat
+        /// (0 = keine Nähe zu einem Schlüsselwort erkannt, reine Fliesstext-Zahl; 10 = in der Nähe
+        /// von "Total"/"Betrag"/... gefunden). Der Aufrufer kann damit einen Treffer über einen
+        /// Score-0-Kandidaten bewusst vorsichtiger behandeln (z. B. Bestätigung statt stillem
+        /// Auto-Link), weil ein zufälliger Fliesstext-Betrag auch zufällig zu einer unabhängigen
+        /// Transaktion passen kann.
+        /// </summary>
+        public static List<(decimal Amount, int Score)> ExtractAmountCandidatesScored(string? text)
         {
             var result = new List<(decimal Amount, int Score)>();
-            if (string.IsNullOrWhiteSpace(text)) return new List<decimal>();
+            if (string.IsNullOrWhiteSpace(text)) return result;
 
             var lowerText = text.ToLowerInvariant();
 
@@ -194,12 +216,15 @@ namespace MyCoinFlow.Services
                 if (amount <= 0 || amount > 1_000_000m) continue;
 
                 int score = 0;
-                int contextStart = Math.Max(0, m.Index - 25);
-                int contextLen = Math.Min(50, lowerText.Length - contextStart);
-                string context = lowerText.Substring(contextStart, contextLen);
-                foreach (var kw in AmountKeywords)
+                if (raw.IndexOfAny(AmountSeparators) >= 0)
                 {
-                    if (context.Contains(kw)) { score += 10; break; }
+                    int contextStart = Math.Max(0, m.Index - 25);
+                    int contextLen = Math.Min(50, lowerText.Length - contextStart);
+                    string context = lowerText.Substring(contextStart, contextLen);
+                    foreach (var kw in AmountKeywords)
+                    {
+                        if (context.Contains(kw)) { score += 10; break; }
+                    }
                 }
 
                 result.Add((amount, score));
@@ -210,7 +235,6 @@ namespace MyCoinFlow.Services
                 .Select(g => (Amount: g.Key, Score: g.Max(x => x.Score)))
                 .OrderByDescending(r => r.Score)
                 .ThenByDescending(r => r.Amount)
-                .Select(r => r.Amount)
                 .ToList();
         }
 
@@ -219,13 +243,33 @@ namespace MyCoinFlow.Services
             amount = 0m;
             if (string.IsNullOrWhiteSpace(raw)) return false;
 
+            // Apostroph ist im Schweizer Format immer Tausendertrennzeichen, nie Dezimalzeichen.
             var cleaned = raw.Replace("'", "").Replace("’", "");
 
-            // Deutsches Format (Komma als Dezimaltrennzeichen) nur, wenn kein Punkt vorkommt.
-            if (cleaned.Contains(',') && !cleaned.Contains('.'))
-                cleaned = cleaned.Replace(',', '.');
-            else
-                cleaned = cleaned.Replace(",", "");
+            bool hasDot = cleaned.Contains('.');
+            bool hasComma = cleaned.Contains(',');
+
+            if (hasDot && hasComma)
+            {
+                // Gemischtes Format: das SPÄTER stehende Zeichen ist der Dezimaltrenner
+                // (z.B. "6.400,00" -> Komma dezimal; "6,400.00" -> Punkt dezimal), alle
+                // vorherigen Vorkommen des jeweils anderen Zeichens sind Tausendergruppen.
+                cleaned = cleaned.LastIndexOf(',') > cleaned.LastIndexOf('.')
+                    ? cleaned.Replace(".", "").Replace(',', '.')
+                    : cleaned.Replace(",", "");
+            }
+            else if (hasComma)
+            {
+                // Nur Komma: meist Dezimalkomma (13,50). Stehen aber genau 3 Ziffern danach,
+                // ist es eher eine Tausendergruppe ohne Nachkommastellen (6,400 = sechstausend).
+                int digitsAfter = cleaned.Length - cleaned.LastIndexOf(',') - 1;
+                cleaned = digitsAfter == 3 ? cleaned.Replace(",", "") : cleaned.Replace(',', '.');
+            }
+            else if (hasDot)
+            {
+                int digitsAfter = cleaned.Length - cleaned.LastIndexOf('.') - 1;
+                if (digitsAfter == 3) cleaned = cleaned.Replace(".", "");
+            }
 
             return decimal.TryParse(cleaned, NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
         }

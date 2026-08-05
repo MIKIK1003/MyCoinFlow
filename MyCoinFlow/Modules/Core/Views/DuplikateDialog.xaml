@@ -1,0 +1,124 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.DuplikateDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Doppelte Transaktionen"
+                 Width="1200"
+                 Height="700"
+                 WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                   Text="Gefunden werden Transaktionen mit gleichem Datum und gleichem Betrag. Achtung: Solche Paare können auch legitim sein (z.B. zwei Abos beim gleichen Anbieter am selben Tag) – vor dem Löschen Notiz/Referenz vergleichen. Gelöscht wird nur, was in der ersten Spalte markiert ist."/>
+
+        <!-- Optionen -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal">
+            <CheckBox x:Name="NurIdentischeNotizCheck"
+                      Content="Nur Gruppen mit identischer Notiz (präziser)"
+                      Checked="Filter_Changed" Unchecked="Filter_Changed"
+                      VerticalAlignment="Center" Margin="0,0,24,0"/>
+
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Jüngere ID je Gruppe vormerken"
+                    ToolTip="Markiert in jeder Gruppe alle Einträge ausser dem mit der kleinsten Transaktions-Nr. (Original bleibt stehen)"
+                    MinHeight="36" Margin="0,0,12,0"
+                    Click="NeuereVormerken_Click"/>
+
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Auswahl aufheben"
+                    MinHeight="36"
+                    Click="AuswahlAufheben_Click"/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="4"
+                  x:Name="DupGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False">
+
+            <!-- Gruppen abwechselnd einfärben, damit die Paare optisch zusammenbleiben -->
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding GruppeGerade}" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Löschen"
+                                        Binding="{Binding Loeschen, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="80"/>
+
+                <DataGridTextColumn Header="Gruppe" Binding="{Binding GruppeNr}" IsReadOnly="True" Width="70">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" IsReadOnly="True" Width="100"/>
+
+                <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:N2}}" IsReadOnly="True" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Transaktions-#" Binding="{Binding Id}" IsReadOnly="True" Width="110"/>
+                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseName}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" IsReadOnly="True" Width="140"/>
+
+                <DataGridTextColumn Header="Anhänge" Binding="{Binding AnhangAnzahl}" IsReadOnly="True" Width="80">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" IsReadOnly="True" Width="2*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="ToolTip" Value="{Binding Notiz}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="6">
+            <TextBlock x:Name="StatusText"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource IconTextButton.Danger}"
+                        Tag="Delete" Content="Markierte löschen"
+                        MinWidth="170" Margin="0,0,10,0"
+                        Click="MarkierteLoeschen_Click"/>
+                <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                        Content="Schliessen"
+                        MinWidth="110"
+                        IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</base:BaseWindow>

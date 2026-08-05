@@ -292,21 +292,8 @@ namespace MyCoinFlow.Views
             if (sender is not ComboBox cb) return;
             if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Escape or Key.Tab) return;
 
-            var text = cb.Text ?? "";
-
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                cb.ItemsSource = _alleKontenFuerKategorie;
-            }
-            else
-            {
-                var gefiltert = _alleKontenFuerKategorie
-                    .Where(k => k.Anzeige.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
-                cb.ItemsSource = gefiltert.Count > 0 ? gefiltert : _alleKontenFuerKategorie;
-            }
-
-            cb.IsDropDownOpen = true;
+            MyCoinFlow.Helpers.ComboBoxFilterHelper.FiltereMitTextErhalt(
+                cb, _alleKontenFuerKategorie, k => k.Anzeige);
         }
 
         private void KategorienAusDatei_Click(object sender, RoutedEventArgs e)
@@ -1273,7 +1260,8 @@ ORDER BY name;";
                         $"{(AppModules.IsPropertyEnabled ? "✓" : "–")} Immobilien: {(AppModules.IsPropertyEnabled ? "aktiv" : "nicht aktiv")}\n" +
                         $"{(AppModules.IsWealthEnabled ? "✓" : "–")} Wealth: {(AppModules.IsWealthEnabled ? "aktiv" : "nicht aktiv")}\n" +
                         $"{(AppModules.IsHomeEnabled ? "✓" : "–")} Haushalt: {(AppModules.IsHomeEnabled ? "aktiv" : "nicht aktiv")}\n" +
-                        $"{(AppModules.IsDmsEnabled ? "✓" : "–")} DMS: {(AppModules.IsDmsEnabled ? "aktiv" : "nicht aktiv")}";
+                        $"{(AppModules.IsDmsEnabled ? "✓" : "–")} DMS: {(AppModules.IsDmsEnabled ? "aktiv" : "nicht aktiv")}\n" +
+                        $"{(AppModules.IsAbosEnabled ? "✓" : "–")} Abo-Verwaltung: {(AppModules.IsAbosEnabled ? "aktiv" : "nicht aktiv")}";
                 }
             }
             catch
@@ -1488,6 +1476,7 @@ ORDER BY name;";
         private void Paths_Save_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Save_Click(sender, e);
         private void Paths_CreateWorkFolder_Click(object sender, RoutedEventArgs e) => GetPathsView()?.CreateWorkFolder_Click(sender, e);
         private void Paths_OpenWorkFolderExplorer_Click(object sender, RoutedEventArgs e) => GetPathsView()?.OpenWorkFolderInExplorer_Click(sender, e);
+        private void Paths_MigrateFileNames_Click(object sender, RoutedEventArgs e) => GetPathsView()?.MigrateFileNames_Click(sender, e);
         private void Paths_BrowseTesseract_Click(object sender, RoutedEventArgs e) => GetPathsView()?.BrowseTesseract_Click(sender, e);
         private void Paths_SaveOcr_Click(object sender, RoutedEventArgs e) => GetPathsView()?.SaveOcr_Click(sender, e);
         private void Paths_Reindex_Click(object sender, RoutedEventArgs e) => GetPathsView()?.Reindex_Click(sender, e);

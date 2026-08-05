@@ -1,9 +1,29 @@
 using System;
+using System.ComponentModel;
+using System.Globalization;
 
 namespace MyCoinFlow.Models
 {
-    public class DmsDocument
+    public class DmsDocument : INotifyPropertyChanged
     {
+        // Nur IstNeu meldet Änderungen (das Neu-Icon soll beim Anklicken sofort
+        // verschwinden, ohne die ganze Liste neu zu laden).
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private bool _istNeu;
+
+        /// <summary>Frisch importiert und noch nie angeklickt (GesehenAm in der DB ist NULL).</summary>
+        public bool IstNeu
+        {
+            get => _istNeu;
+            set
+            {
+                if (_istNeu == value) return;
+                _istNeu = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IstNeu)));
+            }
+        }
+
         public int Id { get; set; }
         public int? TransaktionId { get; set; }
         public string? EntityType { get; set; }
@@ -26,7 +46,24 @@ namespace MyCoinFlow.Models
         public bool IstGarantieschein { get; set; }
         public DateTime? GarantieAblaufDatum { get; set; }
 
+        // NEU: Adresse/Betrag der verknüpften Transaktion (nur befüllt, wenn EntityType=Transaktion).
+        public decimal? TransBetrag { get; set; }
+        public string? TransAdresseName { get; set; }
+
+        // NEU: aus dem Dokumenttext erkannter Rechnungsbetrag (bester Betragskandidat).
+        public decimal? ErkannterBetrag { get; set; }
+
         public string TitelAnzeige => !string.IsNullOrWhiteSpace(Titel) ? Titel : FileName;
+
+        public string AdresseAnzeige => TransAdresseName ?? "";
+
+        // Verknüpft: Betrag der Transaktion (verbindlich). Frei: erkannter Betrag
+        // aus der Texterkennung, als solcher gekennzeichnet.
+        public string BetragAnzeige => TransBetrag.HasValue
+            ? TransBetrag.Value.ToString("N2", CultureInfo.CurrentCulture)
+            : ErkannterBetrag.HasValue
+                ? ErkannterBetrag.Value.ToString("N2", CultureInfo.CurrentCulture) + " ?"
+                : "";
 
         public string VerknuepftMitAnzeige => EntityType switch
         {

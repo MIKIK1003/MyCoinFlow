@@ -25,6 +25,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand ShowTransaktionSetsCommand { get; }
         public ICommand ShowHaushaltCommand { get; }
         public ICommand ShowDmsCommand { get; }
+        public ICommand ShowAbosCommand { get; }
 
         public MainViewModel()
         {
@@ -42,6 +43,7 @@ namespace MyCoinFlow.ViewModels
             ShowTransaktionSetsCommand = new RelayCommand(_ => CurrentViewModel = new TransaktionSetsViewModel());
             ShowHaushaltCommand = new RelayCommand(_ => CurrentViewModel = new HaushaltViewModel());
             ShowDmsCommand = new RelayCommand(_ => CurrentViewModel = new DmsViewModel());
+            ShowAbosCommand = new RelayCommand(_ => CurrentViewModel = new AbosViewModel());
         }
     }
 }

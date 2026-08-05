@@ -13,7 +13,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
@@ -64,6 +64,13 @@
                     Content="Suchen"
                     Click="Suchen_Click"/>
         </Grid>
+
+        <CheckBox x:Name="AuchVerknuepfteCheck"
+                  Grid.Row="2"
+                  Margin="0,4,0,8"
+                  Content="Auch bereits verknüpfte Transaktionen anzeigen (z.B. Sammelbuchung mit mehreren Rechnungen)"
+                  Checked="AuchVerknuepfte_Changed"
+                  Unchecked="AuchVerknuepfte_Changed"/>
 
         <DataGrid x:Name="GridKandidaten"
                   Grid.Row="3"

@@ -54,6 +54,10 @@
                 <views:DmsView />
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type vm:AbosViewModel}">
+                <views:AbosView />
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type vm:AdminViewModel}">
                 <views:AdminView />
             </DataTemplate>

@@ -1,0 +1,69 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.AboKontoWahlDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Zielkonto wählen"
+                 Width="640"
+                 Height="440"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   x:Name="InfoText"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
+                   Text="Die Zahlungen dieses Abos sind auf mehreren Konten verbucht. Bitte das richtige Konto wählen – alle abweichenden Zahlungen werden darauf umgebucht und es wird als erwartetes Konto gespeichert."/>
+
+        <DataGrid Grid.Row="2"
+                  x:Name="KontenGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  MouseDoubleClick="KontenGrid_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Konto" Binding="{Binding Anzeige}" Width="*"/>
+                <DataGridTextColumn Header="Zahlungen" Binding="{Binding Anzahl}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Letzte Zahlung"
+                                    Binding="{Binding LetzteZahlung, StringFormat=dd.MM.yyyy}"
+                                    Width="130"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="4"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource MaterialDesignBodySecondaryBrush}"
+                   Text="Soll ein ganz anderes Konto verwendet werden, dieses zuerst unter «Bearbeiten» als erwartetes Konto setzen und die Bereinigung erneut starten."/>
+
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource IconTextButton}"
+                    Tag="Check" Content="Umbuchen"
+                    MinWidth="140" Margin="0,0,10,0"
+                    IsDefault="True"
+                    Click="Uebernehmen_Click"/>
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="Abbrechen"
+                    MinWidth="110"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

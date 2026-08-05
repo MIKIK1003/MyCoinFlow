@@ -1,0 +1,288 @@
+<UserControl x:Class="MyCoinFlow.Views.AbosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ============ SIDEBAR LINKS: Filter & Aktionen ============ -->
+        <Border Grid.Column="0" Padding="12"
+                Background="{DynamicResource MaterialDesignPaper}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <TextBlock Text="Abo-Verwaltung"
+                               FontSize="18" Margin="0,0,0,12"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                    <!-- Übersicht -->
+                    <Border Background="{DynamicResource MaterialDesignSelection}"
+                            CornerRadius="8" Padding="10" Margin="0,0,0,16">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Aktive Abos: " FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding AnzahlAktiv}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="Kosten/Jahr: " FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding JahreskostenTotal, StringFormat={}{0:N2}}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Filter -->
+                    <TextBlock Text="Status" Margin="0,0,0,4"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+                    <ComboBox MinHeight="36" Margin="0,0,0,16"
+                              ItemsSource="{Binding StatusFilterListe}"
+                              SelectedItem="{Binding StatusFilter}"/>
+
+                    <!-- Erkennung -->
+                    <TextBlock Text="Erkennung" Margin="0,0,0,8"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Radar" Content="Abos suchen"
+                            ToolTip="Durchsucht alle Transaktionen nach wiederkehrenden Zahlungen und schlägt neue Abos vor"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding KandidatenSuchenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Autorenew" Content="Neue Zahlungen"
+                            ToolTip="Ordnet neu importierte Transaktionen den bestehenden Abos zu"
+                            MinHeight="40" Margin="0,0,0,16"
+                            Command="{Binding NeueZahlungenCommand}"/>
+
+                    <!-- Abo-Aktionen -->
+                    <TextBlock Text="Abo" Margin="0,0,0,8"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Plus" Content="Neues Abo"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding NeuesAboCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Pencil" Content="Bearbeiten"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding BearbeitenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="CancelBold" Content="Gekündigt"
+                            ToolTip="Markiert das gewählte Abo als gekündigt (per heute)"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding GekuendigtCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="PlaylistPlus" Content="Zahlung zuordnen"
+                            ToolTip="Transaktion suchen und diesem Abo manuell zuordnen (z.B. jährliche Versicherungsrechnung)"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding TransaktionZuordnenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="CalendarSearch" Content="Lücken füllen"
+                            ToolTip="Erkennt fehlende Termine in der Zahlungsreihe und schlägt passende, noch nicht zugeordnete Transaktionen vor"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding LueckenFuellenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="BankTransfer" Content="Konten bereinigen"
+                            ToolTip="Bucht alle Zahlungen dieses Abos, die auf einem abweichenden Konto verbucht sind, auf das erwartete Konto um (erwartetes Konto unter 'Bearbeiten' setzen)"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding KontenBereinigenCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton.Danger}"
+                            Tag="Delete" Content="Löschen"
+                            MinHeight="40" Margin="0,0,0,16"
+                            Command="{Binding LoeschenCommand}"/>
+
+                    <!-- Recherche -->
+                    <TextBlock Text="Recherche" Margin="0,0,0,8"
+                               Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Web" Content="Homepage"
+                            ToolTip="Öffnet die Webseite des Anbieters (z.B. um Konto- oder Kündigungsdaten zu finden)"
+                            MinHeight="40" Margin="0,0,0,8"
+                            Command="{Binding HomepageCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Magnify" Content="Web-Recherche"
+                            ToolTip="Recherchiert den Anbieter / Buchungstext im Web"
+                            MinHeight="40" Margin="0,0,0,16"
+                            Command="{Binding RechercheCommand}"/>
+
+                    <Button Style="{StaticResource IconTextButton}"
+                            Tag="Refresh" Content="Aktualisieren"
+                            MinHeight="40"
+                            Command="{Binding AktualisierenCommand}"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ============ RECHTS: Abos + Zahlungen ============ -->
+        <Grid Grid.Column="1" Margin="12,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="2*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Abo-Liste -->
+            <DataGrid Grid.Row="0"
+                      ItemsSource="{Binding Abos}"
+                      SelectedItem="{Binding AusgewaehltesAbo}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True">
+
+                <DataGrid.Columns>
+
+                    <!-- Ampel -->
+                    <DataGridTemplateColumn Header="" Width="46">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Ellipse Width="16" Height="16"
+                                         Fill="{Binding AmpelBrush}"
+                                         ToolTip="{Binding AmpelText}"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Hinweis (z.B. verschiedene Konten) -->
+                    <DataGridTemplateColumn Header="" Width="40">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <materialDesign:PackIcon Kind="AlertOutline"
+                                                         Width="18" Height="18"
+                                                         Foreground="{StaticResource AppBrandBrush}"
+                                                         ToolTip="{Binding HinweisText}"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         Visibility="{Binding HatHinweis, Converter={StaticResource BoolToVis}}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Abo" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding StatusAnzeige}" Width="100"/>
+                    <DataGridTextColumn Header="Rhythmus" Binding="{Binding PeriodizitaetAnzeige}" Width="110"/>
+
+                    <DataGridTextColumn Header="Letzter Betrag"
+                                        Binding="{Binding LetzterBetrag, StringFormat={}{0:N2}}"
+                                        Width="110">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Letzte Zahlung"
+                                        Binding="{Binding LetzteZahlung, StringFormat=dd.MM.yyyy}"
+                                        Width="120"/>
+
+                    <DataGridTextColumn Header="Nächste (erwartet)"
+                                        Binding="{Binding NaechsteZahlung, StringFormat=dd.MM.yyyy}"
+                                        Width="130"/>
+
+                    <DataGridTextColumn Header="Kündigen bis"
+                                        Binding="{Binding KuendigenBis, StringFormat=dd.MM.yyyy}"
+                                        Width="110"/>
+
+                    <DataGridTextColumn Header="Zahlungen"
+                                        Binding="{Binding AnzahlZahlungen}"
+                                        Width="90">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Kosten/Jahr"
+                                        Binding="{Binding Jahreskosten, StringFormat={}{0:N2}}"
+                                        Width="110">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Konto" Binding="{Binding KontoAnzeige}" Width="*"/>
+
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <GridSplitter Grid.Row="1" Height="6"
+                          HorizontalAlignment="Stretch"
+                          Background="Transparent"/>
+
+            <!-- Zahlungen des gewählten Abos -->
+            <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="Zahlungen des gewählten Abos"
+                           FontWeight="SemiBold"
+                           Margin="0,4,0,6"
+                           Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Zahlungen}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True">
+                    <DataGrid.Columns>
+
+                        <!-- Zuordnung entfernen -->
+                        <DataGridTemplateColumn Header="" Width="46">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button ToolTip="Zuordnung zu diesem Abo entfernen"
+                                            Command="{Binding DataContext.ZahlungEntfernenCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource MaterialDesignFlatButton}"
+                                            Padding="0">
+                                        <materialDesign:PackIcon Kind="LinkOff"
+                                                                 Style="{StaticResource DefaultIconStyle}"
+                                                                 Width="20" Height="20"/>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Datum" Binding="{Binding Datum, StringFormat=dd.MM.yyyy}" Width="110"/>
+                        <DataGridTextColumn Header="Betrag" Binding="{Binding Betrag, StringFormat={}{0:N2}}" Width="110">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Konto" Binding="{Binding KontoAnzeige}" Width="*"/>
+                        <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" Width="150"/>
+                        <DataGridTextColumn Header="Zuordnung" Binding="{Binding ZuordnungAnzeige}" Width="110"/>
+                        <DataGridTextColumn Header="Notiz" Binding="{Binding Notiz}" Width="2*"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
