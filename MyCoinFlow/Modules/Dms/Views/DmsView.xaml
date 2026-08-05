@@ -196,10 +196,50 @@
                     </Style>
                 </DataGrid.ColumnHeaderStyle>
 
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Zur verknüpften Transaktion springen"
+                                  Command="{Binding PlacementTarget.DataContext.ZurTransaktionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="SwapHorizontal"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <Separator/>
+
+                        <MenuItem Header="Dokument öffnen"
+                                  Command="{Binding PlacementTarget.DataContext.OeffnenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="FileFindOutline"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <MenuItem Header="Bearbeiten"
+                                  Command="{Binding PlacementTarget.DataContext.BearbeitenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="Pencil"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <MenuItem Header="Transaktion zuweisen"
+                                  Command="{Binding PlacementTarget.DataContext.TransaktionZuweisenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon>
+                                <materialDesign:PackIcon Kind="LinkVariant"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+
                 <!-- Überfällige Rechnungen (rot) bzw. ablaufende/abgelaufene Garantien (gelb/orange)
                      farblich hervorheben, damit sie im Grid sofort auffallen. -->
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow">
+                        <EventSetter Event="PreviewMouseRightButtonDown"
+                                     Handler="DataGridRow_PreviewMouseRightButtonDown"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IstGarantieBaldAblaufend}" Value="True">
                                 <Setter Property="Background" Value="#FFFFF9E0"/>
@@ -231,7 +271,14 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
+                    <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="140"/>
+                    <DataGridTextColumn Header="Beschreibung" Binding="{Binding Beschreibung}" Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="ToolTip" Value="{Binding Beschreibung}"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                     <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="140"/>
                     <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseAnzeige}" Width="140"/>
                     <DataGridTextColumn Header="Betrag" Binding="{Binding BetragAnzeige}" Width="90"/>

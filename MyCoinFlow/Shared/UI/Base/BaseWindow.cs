@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 using MyCoinFlow.Services;
 
@@ -18,6 +19,38 @@ namespace MyCoinFlow.UI.Base
 
             // Tastatur-Handling
             PreviewKeyDown += BaseWindow_PreviewKeyDown;
+
+            RepariereMainWindowFallsNoetig();
+        }
+
+        /// <summary>
+        /// Sicherheitsnetz: Solange Application.MainWindow leer ist, macht WPF das nächste
+        /// erzeugte Fenster automatisch zum MainWindow. Für einen Dialog, der gleich danach
+        /// "Owner = Application.Current.MainWindow" setzt, hiesse das: Owner = er selbst –
+        /// WPF quittiert das mit einer ArgumentException. Hier wird MainWindow deshalb auf
+        /// ein bereits sichtbares Fenster zurückgebogen, bevor der Owner gesetzt wird.
+        /// </summary>
+        private void RepariereMainWindowFallsNoetig()
+        {
+            try
+            {
+                var app = Application.Current;
+                if (app == null || !ReferenceEquals(app.MainWindow, this))
+                    return;
+
+                var echtesFenster = app.Windows
+                    .OfType<Window>()
+                    .FirstOrDefault(w => !ReferenceEquals(w, this) && w.IsVisible);
+
+                // Kein anderes sichtbares Fenster: Dann ist dieses Fenster tatsächlich
+                // das Hauptfenster – nichts korrigieren.
+                if (echtesFenster != null)
+                    app.MainWindow = echtesFenster;
+            }
+            catch
+            {
+                // Fensteraufbau darf daran nie scheitern.
+            }
         }
 
         private void BaseWindow_Loaded(object sender, RoutedEventArgs e)

@@ -79,6 +79,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand LoeschenCommand { get; }
         public ICommand TransaktionZuweisenCommand { get; }
         public ICommand SucheErneutCommand { get; }
+        public ICommand ZurTransaktionCommand { get; }
         public ICommand AlleErneutSuchenCommand { get; }
         public ICommand VerlaufAnzeigenCommand { get; }
 
@@ -94,6 +95,7 @@ namespace MyCoinFlow.ViewModels
             LoeschenCommand = new RelayCommand(p => Loeschen(p as DmsDocument ?? AusgewaehltesDokument));
             TransaktionZuweisenCommand = new RelayCommand(p => TransaktionZuweisen(p as DmsDocument ?? AusgewaehltesDokument));
             SucheErneutCommand = new RelayCommand(p => SucheErneut(p as DmsDocument ?? AusgewaehltesDokument));
+            ZurTransaktionCommand = new RelayCommand(p => ZurTransaktion(p as DmsDocument ?? AusgewaehltesDokument));
             AlleErneutSuchenCommand = new RelayCommand(_ => DmsWatcherService.Instance.RequeueAllUnmatched());
             VerlaufAnzeigenCommand = new RelayCommand(_ => DmsHistoryWindow.ShowOrActivate(Application.Current?.MainWindow));
 
@@ -178,9 +180,18 @@ namespace MyCoinFlow.ViewModels
 
             try
             {
-                var (_, attachmentId) = _attachSvc.AttachFreestanding(dlg.AusgewaehlteDateiPfad!, dlg.Titel, dlg.Kategorie);
-                if (dlg.IstGarantieschein)
-                    _db.UpdateAttachmentGarantie(attachmentId, true, dlg.GarantieAblaufDatum);
+                var (_, attachmentId) = _attachSvc.AttachFreestanding(dlg.AusgewaehlteDateiPfad!, null, dlg.Kategorie);
+
+                _db.UpdateAttachmentDetails(
+                    attachmentId,
+                    dlg.Kategorie,
+                    dlg.Beschreibung,
+                    dlg.DokumentDatum,
+                    dlg.Betrag,
+                    dlg.IstGarantieschein,
+                    dlg.GarantieAblaufDatum,
+                    dlg.AdresseId);
+
                 LadeKategorien();
                 Laden();
             }
@@ -200,8 +211,17 @@ namespace MyCoinFlow.ViewModels
 
             try
             {
-                _db.UpdateAttachmentMeta(doc.Id, dlg.Titel, dlg.Kategorie);
-                _db.UpdateAttachmentGarantie(doc.Id, dlg.IstGarantieschein, dlg.GarantieAblaufDatum);
+                _db.UpdateAttachmentDetails(
+                    doc.Id,
+                    dlg.Kategorie,
+                    dlg.Beschreibung,
+                    dlg.DokumentDatum,
+                    // Bei verknüpften Dokumenten bleibt der Betrag der Buchung führend
+                    doc.EntityType != null ? doc.ErkannterBetrag : dlg.Betrag,
+                    dlg.IstGarantieschein,
+                    dlg.GarantieAblaufDatum,
+                    dlg.AdresseId);
+
                 LadeKategorien();
                 Laden();
             }
@@ -265,6 +285,29 @@ namespace MyCoinFlow.ViewModels
                 MessageBox.Show(Application.Current?.MainWindow, "Zuweisen fehlgeschlagen: " + ex.Message,
                     "DMS", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// Wechselt in die Transaktionsansicht und markiert dort die verknüpfte Buchung.
+        /// </summary>
+        private void ZurTransaktion(DmsDocument? doc)
+        {
+            if (doc == null) return;
+
+            var transaktionId = doc.EntityType == "Transaktion"
+                ? (doc.EntityId ?? doc.TransaktionId)
+                : doc.TransaktionId;
+
+            if (transaktionId is not > 0)
+            {
+                MessageBox.Show(Application.Current?.MainWindow,
+                    "Dieses Dokument ist keiner Transaktion zugeordnet.\n\n" +
+                    "Über «Transaktion zuweisen» kann die Verknüpfung erstellt werden.",
+                    "Zur Transaktion springen", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            AppNavigation.ZeigeTransaktion(transaktionId.Value);
         }
 
         private void SucheErneut(DmsDocument? doc)

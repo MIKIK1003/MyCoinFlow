@@ -44,6 +44,10 @@ namespace MyCoinFlow.ViewModels
             ShowHaushaltCommand = new RelayCommand(_ => CurrentViewModel = new HaushaltViewModel());
             ShowDmsCommand = new RelayCommand(_ => CurrentViewModel = new DmsViewModel());
             ShowAbosCommand = new RelayCommand(_ => CurrentViewModel = new AbosViewModel());
+
+            // Sprung aus anderen Modulen (z.B. DMS) direkt auf eine Buchung
+            MyCoinFlow.Services.AppNavigation.TransaktionAnzeigen +=
+                id => CurrentViewModel = new TransactionsViewModel(id);
         }
     }
 }

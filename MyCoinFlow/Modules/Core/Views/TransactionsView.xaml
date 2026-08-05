@@ -32,7 +32,7 @@
 
                     <TextBox MinHeight="40"
                              Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                             materialDesign:HintAssist.Hint="Suchen (Text, Datei, Notiz, OCR)"
+                             materialDesign:HintAssist.Hint="Suchen (Text, Nr., Betrag, Konto, OCR)"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding ApplySearchCommand}"/>
@@ -152,11 +152,13 @@
 
         <!-- ============ RECHTS: Liste ============ -->
         <Grid Grid.Column="1">
-            <DataGrid ItemsSource="{Binding Transaktionen}"
+            <DataGrid x:Name="TransaktionenGrid"
+                      ItemsSource="{Binding Transaktionen}"
                       SelectedItem="{Binding AusgewaehlteTransaktion}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
-                      IsReadOnly="True">
+                      IsReadOnly="True"
+                      SelectionChanged="TransaktionenGrid_SelectionChanged">
 
                 <!-- Treffer-Hinweis als Tooltip pro Zeile -->
                 <DataGrid.RowStyle>

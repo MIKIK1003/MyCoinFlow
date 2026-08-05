@@ -48,7 +48,8 @@
                   MouseDoubleClick="DokumenteGrid_MouseDoubleClick">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="*"/>
-                <DataGridTextColumn Header="Titel" Binding="{Binding TitelAnzeige}" Width="*"/>
+                <DataGridTextColumn Header="Beschreibung" Binding="{Binding Beschreibung}" Width="*"/>
+                <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseAnzeige}" Width="150"/>
                 <DataGridTextColumn Header="Betrag (erkannt)" Binding="{Binding BetragAnzeige}" Width="120">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

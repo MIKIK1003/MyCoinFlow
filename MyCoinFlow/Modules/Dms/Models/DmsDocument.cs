@@ -32,6 +32,9 @@ namespace MyCoinFlow.Models
         public string? Titel { get; set; }
         public string? Kategorie { get; set; }
 
+        /// <summary>Frei erfassbarer Beschreibungstext (im Bearbeiten-Dialog gepflegt).</summary>
+        public string? Beschreibung { get; set; }
+
         public string FileName { get; set; } = "";
         public string? OriginalName { get; set; }
         public string FolderRel { get; set; } = "";
@@ -50,12 +53,19 @@ namespace MyCoinFlow.Models
         public decimal? TransBetrag { get; set; }
         public string? TransAdresseName { get; set; }
 
+        // NEU: am Dokument selbst hinterlegte Adresse (für Dokumente ohne Zahlung,
+        // z.B. Bankdokumente oder Verträge).
+        public int? AdresseId { get; set; }
+        public string? EigeneAdresseName { get; set; }
+
         // NEU: aus dem Dokumenttext erkannter Rechnungsbetrag (bester Betragskandidat).
         public decimal? ErkannterBetrag { get; set; }
 
         public string TitelAnzeige => !string.IsNullOrWhiteSpace(Titel) ? Titel : FileName;
 
-        public string AdresseAnzeige => TransAdresseName ?? "";
+        // Eigene Zuordnung hat Vorrang (was der Benutzer erfasst, wird auch angezeigt);
+        // sonst die Adresse der verknüpften Transaktion.
+        public string AdresseAnzeige => EigeneAdresseName ?? TransAdresseName ?? "";
 
         // Verknüpft: Betrag der Transaktion (verbindlich). Frei: erkannter Betrag
         // aus der Texterkennung, als solcher gekennzeichnet.

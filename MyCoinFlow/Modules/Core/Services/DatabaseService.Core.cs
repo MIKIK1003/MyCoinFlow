@@ -4165,12 +4165,31 @@ ORDER BY t.Datum DESC, t.Id DESC;";
                 .Where(t => t.Length > 0)
                 .ToArray();
 
+            // Ganzzahlen werden gegen Kontonummer, Transaktions-Nr. und Betrag geprüft;
+            // Dezimalzahlen (z.B. 84.60 oder 1'234.50) gezielt gegen den Betrag.
             var numTokens = new List<int>();
+            var betragTokens = new List<decimal>();
             var txtTokens = new List<string>();
+
             foreach (var tok in rawTokens)
             {
-                if (int.TryParse(tok, out var n)) numTokens.Add(n);
-                else txtTokens.Add(tok);
+                var clean = tok.Replace("'", "");
+
+                if (int.TryParse(clean, out var n))
+                {
+                    numTokens.Add(n);
+                }
+                else if (decimal.TryParse(clean, System.Globalization.NumberStyles.Number,
+                             System.Globalization.CultureInfo.CurrentCulture, out var d)
+                      || decimal.TryParse(clean, System.Globalization.NumberStyles.Number,
+                             System.Globalization.CultureInfo.InvariantCulture, out d))
+                {
+                    betragTokens.Add(d);
+                }
+                else
+                {
+                    txtTokens.Add(tok);
+                }
             }
 
             using var c = CreateConnection();
@@ -4215,9 +4234,17 @@ WHERE 1=1
             {
                 sb.Append(@"
   AND (
-       kv.Kontonummer = @n" + j + @" 
+       kv.Kontonummer = @n" + j + @"
     OR kn.Kontonummer = @n" + j + @"
+    OR t.Id           = @n" + j + @"
+    OR ABS(t.Betrag)  = @n" + j + @"
   )");
+            }
+
+            for (int k = 0; k < betragTokens.Count; k++)
+            {
+                sb.Append(@"
+  AND ABS(t.Betrag) = @d" + k);
             }
 
             sb.AppendLine("\nORDER BY t.Datum DESC;");
@@ -4231,6 +4258,8 @@ WHERE 1=1
                 cmd.Parameters.AddWithValue("@q" + i, "%" + txtTokens[i] + "%");
             for (int j = 0; j < numTokens.Count; j++)
                 cmd.Parameters.AddWithValue("@n" + j, numTokens[j]);
+            for (int k = 0; k < betragTokens.Count; k++)
+                cmd.Parameters.AddWithValue("@d" + k, betragTokens[k]);
 
             var list = new List<Transaktion>();
             using var r = cmd.ExecuteReader();

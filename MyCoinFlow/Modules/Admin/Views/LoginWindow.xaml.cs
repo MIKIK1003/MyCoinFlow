@@ -170,6 +170,15 @@ namespace MyCoinFlow.Views
                 CurrentUserContext.SignIn(username, isAdmin);
 
                 var main = new MyCoinFlow.MainWindow();
+
+                // WICHTIG: Application.MainWindow zeigt bis hier auf das Login-Fenster.
+                // Wird dieses geschlossen, bleibt die Eigenschaft leer – WPF setzt sie dann
+                // automatisch auf das nächste erzeugte Fenster, also auf irgendeinen Dialog.
+                // Dessen "Owner = Application.Current.MainWindow" zeigte dadurch auf sich
+                // selbst ("Die Owner-Eigenschaft kann nicht auf sich selbst festgelegt werden").
+                if (Application.Current != null)
+                    Application.Current.MainWindow = main;
+
                 main.Show();
                 Close();
 

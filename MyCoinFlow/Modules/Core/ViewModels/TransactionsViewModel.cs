@@ -145,7 +145,11 @@ namespace MyCoinFlow.ViewModels
         public ICommand ApplySearchCommand { get; }
         public ICommand ClearSearchCommand { get; }
 
-        public TransactionsViewModel()
+        /// <param name="fokusTransaktionId">
+        /// Optional: Beim Öffnen gezielt diese Buchung anzeigen und markieren
+        /// (Sprung aus einem anderen Modul, z.B. aus dem DMS).
+        /// </param>
+        public TransactionsViewModel(int? fokusTransaktionId = null)
         {
             NeuBuchungCommand = new RelayCommand(_ => NeueBuchung());
             BearbeitenCommand = new RelayCommand(_ => Bearbeiten(), _ => AusgewaehlteTransaktion != null);
@@ -176,10 +180,27 @@ namespace MyCoinFlow.ViewModels
               || FilterBis.HasValue
               || !string.IsNullOrWhiteSpace(FilterAdresse));
 
-            // ✅ Default: aktiver Budgetzeitraum
-            PrefillDateRangeFromActiveBudget();
+            if (fokusTransaktionId.HasValue)
+            {
+                // Gezielter Sprung: Datumsfilter bewusst offen lassen, damit die Buchung
+                // auch ausserhalb des aktiven Budgetzeitraums gefunden wird. Die Nummer
+                // steht im Suchfeld, damit nachvollziehbar ist, warum die Liste gefiltert ist.
+                FilterVon = null;
+                FilterBis = null;
+                SearchText = fokusTransaktionId.Value.ToString();
 
-            LadeListe();
+                LadeListe();
+
+                AusgewaehlteTransaktion = Transaktionen
+                    .FirstOrDefault(r => r.Id == fokusTransaktionId.Value);
+            }
+            else
+            {
+                // ✅ Default: aktiver Budgetzeitraum
+                PrefillDateRangeFromActiveBudget();
+
+                LadeListe();
+            }
         }
 
         private void PrefillDateRangeFromActiveBudget()
@@ -381,13 +402,28 @@ namespace MyCoinFlow.ViewModels
                     bool adrHit = !string.IsNullOrWhiteSpace(t.AdresseName) && tokens.Any(tok => t.AdresseName!.IndexOf(tok, StringComparison.CurrentCultureIgnoreCase) >= 0);
                     bool bankHit = !string.IsNullOrWhiteSpace(t.BankName) && tokens.Any(tok => t.BankName!.IndexOf(tok, StringComparison.CurrentCultureIgnoreCase) >= 0);
 
+                    // Zahlen-Treffer: Transaktions-Nr. bzw. Betrag
+                    bool idHit = tokens.Any(tok => tok == t.Id.ToString());
+
+                    bool betragHit = tokens.Any(tok =>
+                    {
+                        var clean = tok.Replace("'", "");
+                        return (decimal.TryParse(clean, System.Globalization.NumberStyles.Number,
+                                    System.Globalization.CultureInfo.CurrentCulture, out var d)
+                             || decimal.TryParse(clean, System.Globalization.NumberStyles.Number,
+                                    System.Globalization.CultureInfo.InvariantCulture, out d))
+                            && Math.Abs(t.Betrag) == d;
+                    });
+
                     var (total, fileHits, textHits) = _db.GetAttachmentHitCountsForTokens(t.Id, tokens);
-                    var parts = new List<string>(5);
+                    var parts = new List<string>(7);
                     if (fileHits > 0) parts.Add($"Datei({fileHits})");
                     if (textHits > 0) parts.Add($"OCR({textHits})");
                     if (noteHit) parts.Add("Notiz");
                     if (adrHit) parts.Add("Adresse");
                     if (bankHit) parts.Add("Bank");
+                    if (idHit) parts.Add("Nr.");
+                    if (betragHit) parts.Add("Betrag");
                     if (parts.Count > 0) hitInfo = "Treffer in: " + string.Join(", ", parts);
                 }
 

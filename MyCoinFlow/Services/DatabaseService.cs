@@ -194,6 +194,21 @@ BEGIN
     ALTER TABLE dbo.Attachment ADD GarantieAblaufDatum DATE NULL;
 END;
 
+-- NEU: eigene Adresse am Dokument (z.B. Bankdokument/Vertrag ohne zugehoerige Zahlung).
+-- Bewusst ohne Fremdschluessel, damit das Loeschen einer Adresse nicht blockiert wird;
+-- die Anzeige laeuft ueber LEFT JOIN und bleibt bei geloeschter Adresse einfach leer.
+IF COL_LENGTH('dbo.Attachment', 'AdresseId') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD AdresseId INT NULL;
+END;
+
+-- NEU: frei erfassbarer Beschreibungstext (ersetzt den frueheren Titel in der Bearbeitung,
+-- da die Dateinamen einheitlich vergeben werden und nicht mehr sprechend sind).
+IF COL_LENGTH('dbo.Attachment', 'Beschreibung') IS NULL
+BEGIN
+    ALTER TABLE dbo.Attachment ADD Beschreibung NVARCHAR(1000) NULL;
+END;
+
 -- NEU: aus dem Dokument erkannter Rechnungsbetrag (bester Betragskandidat der
 -- Texterkennung). Anzeige im DMS-Grid, solange keine Transaktion verknuepft ist.
 IF COL_LENGTH('dbo.Attachment', 'ErkannterBetrag') IS NULL
@@ -670,16 +685,20 @@ SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
        a.FileName, a.OriginalName, a.FolderRel, a.SizeBytes, a.ImportedAtUtc, a.OcrStatus,
        a.DokumentDatum, a.IstGarantieschein, a.GarantieAblaufDatum,
        tr.Betrag AS TransBetrag, adr.Name AS TransAdresseName,
-       a.GesehenAm, a.ErkannterBetrag
+       a.GesehenAm, a.ErkannterBetrag, a.Beschreibung,
+       a.AdresseId, dadr.Name AS EigeneAdresseName
 FROM dbo.Attachment a
 LEFT JOIN dbo.AttachmentText txt ON txt.AttachmentId = a.Id
 LEFT JOIN dbo.Transaktion tr ON a.EntityType = 'Transaktion' AND tr.Id = a.EntityId
 LEFT JOIN dbo.Adresse adr ON adr.Id = tr.AdresseId
+LEFT JOIN dbo.Adresse dadr ON dadr.Id = a.AdresseId
 WHERE (@q IS NULL OR
        a.FileName LIKE '%' + @q + '%' OR
        a.Titel LIKE '%' + @q + '%' OR
+       a.Beschreibung LIKE '%' + @q + '%' OR
        a.Kategorie LIKE '%' + @q + '%' OR
        adr.Name LIKE '%' + @q + '%' OR
+       dadr.Name LIKE '%' + @q + '%' OR
        txt.[Text] LIKE '%' + @q + '%')
   AND (@kat IS NULL OR a.Kategorie = @kat)
 ORDER BY a.ImportedAtUtc DESC;";
@@ -715,10 +734,91 @@ ORDER BY a.ImportedAtUtc DESC;";
                     TransBetrag = r.IsDBNull(15) ? (decimal?)null : r.GetDecimal(15),
                     TransAdresseName = r.IsDBNull(16) ? null : r.GetString(16),
                     IstNeu = r.IsDBNull(17),
-                    ErkannterBetrag = r.IsDBNull(18) ? (decimal?)null : r.GetDecimal(18)
+                    ErkannterBetrag = r.IsDBNull(18) ? (decimal?)null : r.GetDecimal(18),
+                    Beschreibung = r.IsDBNull(19) ? null : r.GetString(19),
+                    AdresseId = r.IsDBNull(20) ? (int?)null : r.GetInt32(20),
+                    EigeneAdresseName = r.IsDBNull(21) ? null : r.GetString(21)
                 });
             }
             return list;
+        }
+
+        /// <summary>
+        /// DMS: Anzahl Dokumente, die eine bestimmte Kategorie verwenden
+        /// (für die Rückfrage vor dem Löschen der Kategorie).
+        /// </summary>
+        public int ZaehleDokumenteMitKategorie(string kategorie)
+        {
+            if (string.IsNullOrWhiteSpace(kategorie)) return 0;
+
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"SELECT COUNT(1) FROM dbo.Attachment WHERE Kategorie = @kat";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@kat", kategorie.Trim());
+
+            var v = cmd.ExecuteScalar();
+            return v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
+        }
+
+        /// <summary>
+        /// DMS: entfernt eine Kategorie, indem sie bei allen Dokumenten geleert wird.
+        /// Die Dokumente selbst bleiben unverändert erhalten. Da die Kategorienliste aus
+        /// den verwendeten Werten gebildet wird, verschwindet der Eintrag damit aus der Auswahl.
+        /// </summary>
+        public int LoescheKategorie(string kategorie)
+        {
+            if (string.IsNullOrWhiteSpace(kategorie)) return 0;
+
+            using var c = CreateConnection();
+            c.Open();
+            const string sql = @"UPDATE dbo.Attachment SET Kategorie = NULL WHERE Kategorie = @kat";
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@kat", kategorie.Trim());
+
+            return cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// DMS: speichert alle im Bearbeiten-Dialog erfassbaren Felder eines Dokuments
+        /// in einem Rutsch (Kategorie, Beschreibung, Dokumentdatum, Betrag, Garantie).
+        /// Dateiname, Größe, Status und Transaktions-Verknüpfung bleiben unberührt.
+        /// </summary>
+        public void UpdateAttachmentDetails(
+            int attachmentId,
+            string? kategorie,
+            string? beschreibung,
+            DateTime? dokumentDatum,
+            decimal? betrag,
+            bool istGarantieschein,
+            DateTime? garantieAblaufDatum,
+            int? adresseId = null)
+        {
+            using var c = CreateConnection();
+            c.Open();
+
+            const string sql = @"
+UPDATE dbo.Attachment SET
+    Kategorie = @kat,
+    Beschreibung = @besch,
+    DokumentDatum = @dok,
+    ErkannterBetrag = @betrag,
+    IstGarantieschein = @garantie,
+    GarantieAblaufDatum = @ablauf,
+    AdresseId = @adr
+WHERE Id = @id";
+
+            using var cmd = new SqlCommand(sql, c);
+            cmd.Parameters.AddWithValue("@id", attachmentId);
+            cmd.Parameters.AddWithValue("@adr", (object?)adresseId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@kat", string.IsNullOrWhiteSpace(kategorie) ? DBNull.Value : (object)kategorie.Trim());
+            cmd.Parameters.AddWithValue("@besch", string.IsNullOrWhiteSpace(beschreibung) ? DBNull.Value : (object)beschreibung.Trim());
+            cmd.Parameters.AddWithValue("@dok", dokumentDatum.HasValue ? (object)dokumentDatum.Value.Date : DBNull.Value);
+            cmd.Parameters.AddWithValue("@betrag", (object?)betrag ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@garantie", istGarantieschein);
+            cmd.Parameters.AddWithValue("@ablauf", istGarantieschein && garantieAblaufDatum.HasValue ? (object)garantieAblaufDatum.Value.Date : DBNull.Value);
+
+            cmd.ExecuteNonQuery();
         }
 
         /// <summary>
