@@ -52,6 +52,9 @@ namespace MyCoinFlow.Views
 
         private string BestimmeTypName(Transaktion t)
         {
+            if (t.AdresseId.HasValue && !t.GeldinstitutId.HasValue &&
+                !t.VonKontoId.HasValue && t.NachKontoId.HasValue) return "Adresse → Konto";
+
             if (string.Equals((t.Notiz ?? "").Trim(), "Budgetierte Einnahme", StringComparison.OrdinalIgnoreCase))
                 return "Budgetierte Einnahme";
 
@@ -120,7 +123,18 @@ namespace MyCoinFlow.Views
                     !_prefNachKontoId.HasValue &&
                     _prefAdresseId.HasValue;
 
-                if (isBudgetLeg)
+                bool isAdresseZuKonto =
+                    _prefAdresseId.HasValue &&
+                    !_prefGeldinstitutId.HasValue &&
+                    !_prefVonKontoId.HasValue &&
+                    _prefNachKontoId.HasValue;
+
+                if (isAdresseZuKonto)
+                {
+                    TypeAdresseToKonto.IsChecked = true;
+                    BudgetEinnahmeBox.IsChecked = false;
+                }
+                else if (isBudgetLeg)
                 {
                     TypeAdresseToBank.IsChecked = true;
                     BudgetEinnahmeBox.IsChecked = true;
@@ -156,6 +170,7 @@ namespace MyCoinFlow.Views
                     {
                         case "Konto → Konto": TypeKontoToKonto.IsChecked = true; break;
                         case "Konto → Bank": TypeKontoToBank.IsChecked = true; break;
+                        case "Adresse → Konto": TypeAdresseToKonto.IsChecked = true; break;
                         case "Adresse → Bank": TypeAdresseToBank.IsChecked = true; break;
                         default: TypeBankToKonto.IsChecked = true; break;
                     }
@@ -169,6 +184,7 @@ namespace MyCoinFlow.Views
                 TypeBankToKonto.IsEnabled = !lockThisType;
                 TypeKontoToKonto.IsEnabled = !lockThisType;
                 TypeKontoToBank.IsEnabled = !lockThisType;
+                TypeAdresseToKonto.IsEnabled = !lockThisType;
                 TypeAdresseToBank.IsEnabled = !lockThisType;
                 BudgetEinnahmeBox.IsEnabled = !lockThisType;
 
@@ -215,6 +231,11 @@ namespace MyCoinFlow.Views
                 SafeSetEnabled(BankBox, true);
                 return;
             }
+            if (TypeAdresseToKonto.IsChecked == true)
+            {
+                SafeSetEnabled(NachKontoBox, true);
+                return;
+            }
             if (TypeAdresseToBank.IsChecked == true)
             {
                 SafeSetEnabled(BankBox, true);
@@ -258,6 +279,7 @@ namespace MyCoinFlow.Views
                 string typ;
                 if (TypeKontoToKonto.IsChecked == true) typ = "Konto → Konto";
                 else if (TypeKontoToBank.IsChecked == true) typ = "Konto → Bank";
+                else if (TypeAdresseToKonto.IsChecked == true) typ = "Adresse → Konto";
                 else if (TypeAdresseToBank.IsChecked == true) typ = "Adresse → Bank";
                 else typ = "Bank → Konto";
 
@@ -297,6 +319,16 @@ namespace MyCoinFlow.Views
                                 return;
                             }
                             _db.AktualisiereTransaktion(_editId.Value, datum, vonKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
+                            break;
+
+                        case "Adresse → Konto":
+                            if (!adresseId.HasValue || !nachKontoId.HasValue)
+                            {
+                                MessageBox.Show("Bitte Adresse und Nach-Konto wählen.", "Hinweis",
+                                    MessageBoxButton.OK, MessageBoxImage.Information);
+                                return;
+                            }
+                            _db.AktualisiereTransaktion(_editId.Value, datum, null, nachKontoId, betrag, notiz, adresseId, null, budgetDatum);
                             break;
 
                         case "Adresse → Bank":
@@ -372,6 +404,16 @@ namespace MyCoinFlow.Views
                             return;
                         }
                         _db.SpeichereTransaktion(datum, vonKontoId, null, betrag, notiz, adresseId, bankId, budgetDatum); // NEU
+                        break;
+
+                    case "Adresse → Konto":
+                        if (!adresseId.HasValue || !nachKontoId.HasValue)
+                        {
+                            MessageBox.Show("Bitte Adresse und Nach-Konto wählen.", "Hinweis",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                        _db.SpeichereTransaktion(datum, null, nachKontoId, betrag, notiz, adresseId, null, budgetDatum);
                         break;
 
                     case "Adresse → Bank":

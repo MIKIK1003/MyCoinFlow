@@ -5,7 +5,7 @@
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
                  Title="Dokument"
                  Width="560"
-                 Height="720"
+                 Height="820"
                  WindowStartupLocation="CenterOwner"
                  ResizeMode="NoResize">
 
@@ -23,8 +23,10 @@
                    FontSize="22"
                    FontWeight="SemiBold"/>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-        <StackPanel>
+        <ScrollViewer Grid.Row="2"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,14,0">
 
             <StackPanel x:Name="DateiPanel" Margin="0,8,0,14">
                 <TextBlock Text="Datei" Margin="0,0,0,6"
@@ -52,6 +54,19 @@
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
                      materialDesign:HintAssist.Hint="Dateiname (automatisch vergeben)"
                      Margin="0,0,0,14"/>
+
+            <TextBox x:Name="TitelBox"
+                     MaxLength="200"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Titel"
+                     Margin="0,0,0,14"/>
+
+            <ComboBox x:Name="BelegartBox"
+                      MinHeight="44"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Belegart"
+                      Margin="0,0,0,14"/>
 
             <ComboBox x:Name="KategorieBox"
                       IsEditable="True"
@@ -83,7 +98,7 @@
             </ComboBox>
 
             <ComboBox x:Name="AdresseBox"
-                      IsEditable="True"
+                      IsEditable="False"
                       IsTextSearchEnabled="True"
                       DisplayMemberPath="Name"
                       SelectedValuePath="Id"
@@ -94,12 +109,20 @@
                       Margin="0,0,0,14"/>
 
             <TextBox x:Name="BeschreibungBox"
+                     MaxLength="1000"
                      MinHeight="90"
                      TextWrapping="Wrap"
                      AcceptsReturn="True"
                      VerticalScrollBarVisibility="Auto"
                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
                      materialDesign:HintAssist.Hint="Beschreibung (worum geht es in diesem Dokument?)"
+                     Margin="0,0,0,14"/>
+
+            <TextBox x:Name="SchlagwoerterBox"
+                     MaxLength="1000"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Schlagwörter (mit Komma trennen)"
                      Margin="0,0,0,14"/>
 
             <Grid Margin="0,0,0,14">
@@ -139,6 +162,51 @@
                 <DatePicker x:Name="GarantieAblaufPicker"
                             MinHeight="40"/>
             </StackPanel>
+
+            <Separator Margin="0,18,0,14"/>
+            <TextBlock Text="WORKFLOW"
+                       Style="{StaticResource SidebarGroupHeader}"
+                       Margin="0,0,0,10"/>
+
+            <ComboBox x:Name="BearbeitungsstatusBox"
+                      MinHeight="44"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Bearbeitungsstatus"
+                      Margin="0,0,0,14"/>
+
+            <TextBox x:Name="VerantwortlichBox"
+                     MaxLength="128"
+                     MinHeight="40"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Verantwortlich"
+                     Margin="0,0,0,14"/>
+
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <CheckBox x:Name="FaelligAktivBox" Content="Frist setzen"
+                              Checked="Fristen_CheckedChanged" Unchecked="Fristen_CheckedChanged"/>
+                    <DatePicker x:Name="FaelligPicker" MinHeight="40" Visibility="Collapsed"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <CheckBox x:Name="AufbewahrungAktivBox" Content="Aufbewahrung bis"
+                              Checked="Fristen_CheckedChanged" Unchecked="Fristen_CheckedChanged"/>
+                    <DatePicker x:Name="AufbewahrungPicker" MinHeight="40" Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBox x:Name="NotizBox"
+                     MinHeight="90"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Interne Notiz"
+                     Margin="0,0,0,14"/>
 
         </StackPanel>
         </ScrollViewer>

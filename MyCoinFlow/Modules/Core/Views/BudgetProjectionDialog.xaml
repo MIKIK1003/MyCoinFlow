@@ -1,0 +1,93 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.BudgetProjectionDialog"
+        xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Budget an Hochrechnung anpassen"
+        Width="1280" Height="760"
+        MinWidth="1050" MinHeight="620"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Budgetvorschau" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding ZeitraumInfo}" Foreground="Gray" Margin="0,3,0,0"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="#FFF7E1" BorderBrush="#E7B75F"
+                BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,14,0,12">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap">
+                    Das Feld „Neues Budget“ ist mit der Hochrechnung vorbelegt und kann pro Konto manuell überschrieben werden.
+                    Manuell veränderte Zeilen werden automatisch markiert.
+                    Die Speicherung erfolgt gesammelt und vollständig transaktional.
+                </TextBlock>
+                <TextBlock Text="{Binding Datenqualitaet}" TextWrapping="Wrap"
+                           FontWeight="SemiBold" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <DataGrid x:Name="BudgetGrid" Grid.Row="2" ItemsSource="{Binding Zeilen}"
+                  AutoGenerateColumns="False" CanUserAddRows="False"
+                  SelectionMode="Extended" FrozenColumnCount="3">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="✓"
+                                        Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="42"/>
+                <DataGridTextColumn Header="Konto" Binding="{Binding Kontonummer}" Width="75" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Bezeichnung}" Width="*" MinWidth="240" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Richtung" Binding="{Binding Richtung}" Width="95" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Bisheriges Budget" Binding="{Binding AlterWert, StringFormat={}{0:N2}}" Width="140" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Hochrechnung" Binding="{Binding Hochrechnung, StringFormat={}{0:N0}}" Width="130" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Neues Budget" Width="135">
+                    <DataGridTextColumn.Binding>
+                        <Binding Path="NeuerWert" Mode="TwoWay" UpdateSourceTrigger="PropertyChanged"
+                                 StringFormat="N2" ValidatesOnExceptions="True"/>
+                    </DataGridTextColumn.Binding>
+                    <DataGridTextColumn.CellStyle>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Background" Value="#FFF7E1"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+                    </DataGridTextColumn.CellStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Quelle" Binding="{Binding QuelleText}" Width="105" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Veränderung" Binding="{Binding Differenz, StringFormat={}{0:N2}}" Width="130" IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,12,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button Content="Alle Änderungen" Command="{Binding AlleCommand}" Margin="0,0,8,0"/>
+                <Button Content="Keine" Command="{Binding KeineCommand}" Margin="0,0,8,0"/>
+                <Button Content="Alle auf Hochrechnung"
+                        Command="{Binding HochrechnungEinsetzenCommand}"/>
+            </StackPanel>
+            <TextBlock Grid.Column="2" VerticalAlignment="Center" FontWeight="SemiBold">
+                <Run Text="{Binding Ausgewaehlt, Mode=OneWay}"/><Run Text=" Konten · Alt "/>
+                <Run Text="{Binding SummeAlt, Mode=OneWay, StringFormat={}{0:N2}}"/><Run Text=" · Neu "/>
+                <Run Text="{Binding SummeNeu, Mode=OneWay, StringFormat={}{0:N2}}"/><Run Text=" · Δ "/>
+                <Run Text="{Binding Differenz, Mode=OneWay, StringFormat={}{0:N2}}"/>
+            </TextBlock>
+        </Grid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Abbrechen" IsCancel="True" MinWidth="110" Margin="0,0,8,0"/>
+            <Button Content="Markierte Budgetwerte übernehmen"
+                    IsDefault="True" MinWidth="250"
+                    IsEnabled="{Binding HatAuswahl}"
+                    Click="Apply_Click"/>
+        </StackPanel>
+    </Grid>
+</base:BaseWindow>

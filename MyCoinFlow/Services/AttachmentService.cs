@@ -2,7 +2,9 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
+using MyCoinFlow.Models;
 
 namespace MyCoinFlow.Services
 {
@@ -84,6 +86,7 @@ namespace MyCoinFlow.Services
             }
 
             RunOcrIndexing(attachmentId, targetPath, ext);
+            InitializeWorkspaceFile(attachmentId, targetPath);
 
             return targetPath;
         }
@@ -151,6 +154,7 @@ namespace MyCoinFlow.Services
             }
 
             RunOcrIndexing(attachmentId, targetPath, ext);
+            InitializeWorkspaceFile(attachmentId, targetPath);
 
             return (targetPath, attachmentId);
         }
@@ -226,6 +230,8 @@ namespace MyCoinFlow.Services
             if (!string.IsNullOrWhiteSpace(extractedText))
                 _db.UpsertAttachmentText(attachmentId, extractedText, textLang);
 
+            InitializeWorkspaceFile(attachmentId, targetPath);
+
             return (targetPath, attachmentId);
         }
 
@@ -297,6 +303,7 @@ namespace MyCoinFlow.Services
             if (File.Exists(full))
             {
                 Process.Start(new ProcessStartInfo(full) { UseShellExecute = true });
+                _db.LogDmsActivity(attachmentId, "Geoeffnet", "Dokument geöffnet");
             }
             else
             {
@@ -394,41 +401,179 @@ namespace MyCoinFlow.Services
                 _db.UpdateAttachmentFileNameAndKategorie(attachmentId, info.Value.FileName, "Rechnungen");
 
             _db.LinkAttachmentToTransaktion(attachmentId, transaktionId);
+            _db.LogDmsActivity(attachmentId, "Verknuepft", $"Mit Transaktion #{transaktionId} verknüpft");
+        }
+
+        public void UnlinkFromTransaktion(int attachmentId)
+        {
+            _db.UnlinkAttachment(attachmentId);
+            _db.LogDmsActivity(attachmentId, "VerknuepfungGeloest", "Verknüpfung zur Transaktion gelöst");
         }
 
         /// <summary>
-        /// Löscht den Anhang (Datei + DB-Zeile). Ignoriert fehlende Datei.
+        /// Entfernt das Dokument aus dem aktiven DMS. Dateien werden in den wiederherstellbaren
+        /// Archivbereich verschoben; eine aktive Aufbewahrungsfrist sperrt die Aktion.
         /// </summary>
         public void DeleteAttachment(int attachmentId)
         {
             if (attachmentId <= 0) return;
 
-            var info = _db.GetAttachmentById(attachmentId);
-            if (info == null) { _db.DeleteAttachment(attachmentId); return; }
+            var info = _db.GetDmsFileInfo(attachmentId);
+            if (info == null) return;
+            if (info.RetainUntil is { } retainUntil && retainUntil.Date > DateTime.Today)
+                throw new InvalidOperationException($"Das Dokument ist bis {retainUntil:dd.MM.yyyy} aufbewahrungsgesperrt.");
 
-            var (root, _) = _db.GetAttachmentSettings();
-            if (string.IsNullOrWhiteSpace(root))
-            {
-                var doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                root = Path.Combine(doc, "MyCoinFlow", "Attachments");
-            }
+            var root = GetStorageRoot();
+            var sourcePath = SafePath(root, Path.Combine(info.FolderRel, info.FileName));
+            var archiveFolder = SafePath(root, Path.Combine("Archiv", info.FolderRel));
+            Directory.CreateDirectory(archiveFolder);
+            var archivePath = UniquePath(archiveFolder, info.FileName);
 
-            var full = Path.Combine(root, info.Value.FolderRel, info.Value.FileName);
-
+            string? versionsSource = null;
+            string? versionsArchive = null;
+            if (File.Exists(sourcePath)) File.Move(sourcePath, archivePath);
             try
             {
-                if (File.Exists(full)) File.Delete(full);
+                versionsSource = SafePath(root, Path.Combine("_Versionen", attachmentId.ToString()));
+                if (Directory.Exists(versionsSource))
+                {
+                    var versionsArchiveRoot = SafePath(root, Path.Combine("Archiv", "_Versionen"));
+                    Directory.CreateDirectory(versionsArchiveRoot);
+                    versionsArchive = UniqueDirectory(versionsArchiveRoot, attachmentId.ToString());
+                    Directory.Move(versionsSource, versionsArchive);
+                }
+
+                _db.LogDmsActivity(attachmentId, "Geloescht", "Dokument aus dem aktiven DMS entfernt");
+                _db.DeleteDmsVersions(attachmentId);
+                _db.DeleteAttachment(attachmentId);
             }
-            catch (IOException)
+            catch
             {
-                // Falls gesperrt – trotzdem DB-Eintrag löschen, damit UI konsistent bleibt.
+                if (versionsArchive != null && versionsSource != null && Directory.Exists(versionsArchive) && !Directory.Exists(versionsSource))
+                    Directory.Move(versionsArchive, versionsSource);
+                if (File.Exists(archivePath) && !File.Exists(sourcePath))
+                    File.Move(archivePath, sourcePath);
+                throw;
             }
-            catch (UnauthorizedAccessException)
+        }
+
+        public void ReplaceWithNewVersion(int attachmentId, string sourceFilePath, string? comment)
+        {
+            if (!File.Exists(sourceFilePath)) throw new FileNotFoundException("Die neue Dokumentversion wurde nicht gefunden.", sourceFilePath);
+            var info = _db.GetDmsFileInfo(attachmentId) ?? throw new InvalidOperationException("Das Dokument wurde nicht gefunden.");
+            var extension = Path.GetExtension(sourceFilePath).ToLowerInvariant();
+            if (!new[] { ".pdf", ".jpg", ".jpeg", ".png" }.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Nur PDF/JPG/PNG sind erlaubt.");
+
+            var (_, maxMb) = _db.GetAttachmentSettings();
+            var newFile = new FileInfo(sourceFilePath);
+            if (newFile.Length > (long)Math.Max(1, maxMb) * 1024L * 1024L)
+                throw new InvalidOperationException($"Datei ist größer als das Limit von {maxMb} MB.");
+
+            var root = GetStorageRoot();
+            var currentPath = SafePath(root, Path.Combine(info.FolderRel, info.FileName));
+            if (!File.Exists(currentPath)) throw new FileNotFoundException("Die aktuelle Dokumentdatei wurde nicht gefunden.", currentPath);
+
+            var versionFolderRel = Path.Combine("_Versionen", attachmentId.ToString(), $"v{info.CurrentVersion:D3}");
+            var versionFolder = SafePath(root, versionFolderRel);
+            Directory.CreateDirectory(versionFolder);
+            var archivedPath = UniquePath(versionFolder, info.FileName);
+            var newFileName = $"DOK-{attachmentId:D6}{extension}";
+            var newPath = SafePath(root, Path.Combine(info.FolderRel, newFileName));
+            if (!string.Equals(currentPath, newPath, StringComparison.OrdinalIgnoreCase) && File.Exists(newPath))
+                newPath = UniquePath(Path.GetDirectoryName(newPath)!, newFileName);
+
+            File.Move(currentPath, archivedPath);
+            try
             {
-                // Berechtigungen – DB-Eintrag trotzdem löschen
+                File.Copy(sourceFilePath, newPath, overwrite: false);
+                var hash = ComputeHash(newPath);
+                _db.CommitDmsVersion(info, Path.GetFileName(archivedPath), versionFolderRel,
+                    Path.GetFileName(newPath), Path.GetFileName(sourceFilePath), newFile.Length, hash, comment);
+            }
+            catch
+            {
+                if (File.Exists(newPath)) File.Delete(newPath);
+                if (File.Exists(archivedPath) && !File.Exists(currentPath)) File.Move(archivedPath, currentPath);
+                throw;
+            }
+        }
+
+        public void OpenVersion(DmsVersionEntry version)
+        {
+            if (version.IsCurrent)
+            {
+                OpenAttachment(version.AttachmentId);
+                return;
             }
 
-            _db.DeleteAttachment(attachmentId);
+            var fullPath = SafePath(GetStorageRoot(), Path.Combine(version.FolderRel, version.FileName));
+            if (!File.Exists(fullPath)) throw new FileNotFoundException("Die archivierte Version wurde nicht gefunden.", fullPath);
+            Process.Start(new ProcessStartInfo(fullPath) { UseShellExecute = true });
+        }
+
+        public void InitializeExistingDocumentHashes()
+        {
+            var root = GetStorageRoot();
+            foreach (var info in _db.LoadDmsFilesWithoutHash())
+            {
+                try
+                {
+                    var path = SafePath(root, Path.Combine(info.FolderRel, info.FileName));
+                    InitializeWorkspaceFile(info.Id, path);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+
+        private void InitializeWorkspaceFile(int attachmentId, string path)
+        {
+            if (!File.Exists(path)) return;
+            var file = new FileInfo(path);
+            _db.InitializeDmsFile(attachmentId, file.Length, ComputeHash(path));
+        }
+
+        private string GetStorageRoot()
+        {
+            var (root, _) = _db.GetAttachmentSettings();
+            if (!string.IsNullOrWhiteSpace(root)) return Path.GetFullPath(root);
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MyCoinFlow", "Attachments");
+        }
+
+        private static string SafePath(string root, string relativePath)
+        {
+            var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var fullPath = Path.GetFullPath(Path.Combine(normalizedRoot, relativePath));
+            if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Der Dokumentpfad liegt außerhalb des konfigurierten DMS-Ordners.");
+            return fullPath;
+        }
+
+        private static string ComputeHash(string path)
+        {
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(SHA256.HashData(stream));
+        }
+
+        private static string UniquePath(string folder, string fileName)
+        {
+            var candidate = Path.Combine(folder, fileName);
+            if (!File.Exists(candidate)) return candidate;
+            var stem = Path.GetFileNameWithoutExtension(fileName);
+            var extension = Path.GetExtension(fileName);
+            for (var index = 2; ; index++)
+            {
+                candidate = Path.Combine(folder, $"{stem}-{index}{extension}");
+                if (!File.Exists(candidate)) return candidate;
+            }
+        }
+
+        private static string UniqueDirectory(string folder, string name)
+        {
+            var candidate = Path.Combine(folder, name);
+            if (!Directory.Exists(candidate)) return candidate;
+            return Path.Combine(folder, $"{name}-{DateTime.UtcNow:yyyyMMddHHmmssfff}");
         }
 
 

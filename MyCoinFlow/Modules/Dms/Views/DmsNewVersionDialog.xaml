@@ -1,0 +1,35 @@
+<base:BaseWindow x:Class="MyCoinFlow.Views.DmsNewVersionDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                 xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
+                 Title="Neue Dokumentversion"
+                 Width="560" Height="330"
+                 WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Neue Version einspielen" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBlock Text="Die bisherige Fassung bleibt unveränderbar in der Dokumentakte erhalten."
+                       TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,18"/>
+            <DockPanel LastChildFill="True" Margin="0,0,0,16">
+                <Button DockPanel.Dock="Right" Content="Datei wählen" Tag="FileOutline"
+                        Style="{StaticResource IconTextButton}" Margin="8,0,0,0" Click="SelectFile_Click"/>
+                <TextBox x:Name="FilePathBox" IsReadOnly="True" MinHeight="40"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         materialDesign:HintAssist.Hint="PDF/JPG/PNG"/>
+            </DockPanel>
+            <TextBox x:Name="CommentBox" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="Versionsnotiz (optional)"/>
+        </StackPanel>
+        <DockPanel Grid.Row="2" LastChildFill="False">
+            <Button Content="Abbrechen" Width="120" Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="Einspielen" Width="120" Style="{StaticResource MaterialDesignRaisedButton}" Click="Save_Click"/>
+        </DockPanel>
+    </Grid>
+</base:BaseWindow>

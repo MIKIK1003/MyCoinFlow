@@ -76,6 +76,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand OpenAttachmentCommand { get; }
         public ICommand ManageAttachmentsCommand { get; }
         public ICommand OpenBankImportCommand { get; }
+        public ICommand OpenReportCommand { get; }
         public ICommand WebRechercheCommand { get; }
         public ICommand DuplikateCommand { get; }
 
@@ -160,6 +161,7 @@ namespace MyCoinFlow.ViewModels
             ManageAttachmentsCommand = new RelayCommand(p => ManageAttachmentsFromRow(p), _ => true);
 
             OpenBankImportCommand = new RelayCommand(_ => OpenBankImport());
+            OpenReportCommand = new RelayCommand(_ => OpenReport());
             WebRechercheCommand = new RelayCommand(p => WebRecherche(p));
             DuplikateCommand = new RelayCommand(_ => DuplikateSuchen());
 
@@ -379,7 +381,9 @@ namespace MyCoinFlow.ViewModels
             {
                 string von = t.VonKontoId.HasValue
                     ? (kontoMap.TryGetValue(t.VonKontoId.Value, out var vk) ? vk : $"Konto #{t.VonKontoId}")
-                    : (t.BankName ?? "Bank");
+                    : (!t.GeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(t.AdresseName)
+                        ? t.AdresseName
+                        : (t.BankName ?? "Bank"));
 
                 string nach = t.NachKontoId.HasValue
                     ? (kontoMap.TryGetValue(t.NachKontoId.Value, out var nk) ? nk : $"Konto #{t.NachKontoId}")
@@ -537,6 +541,44 @@ namespace MyCoinFlow.ViewModels
             {
                 MessageBox.Show($"Fensterfehler (Bankimport): {ex.Message}", "Transaktionen",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenReport()
+        {
+            try
+            {
+                var window = new TransactionReportWindow();
+
+                Window? owner = null;
+                try
+                {
+                    owner = Application.Current?.Windows
+                                .OfType<Window>()
+                                .FirstOrDefault(w => w.IsActive)
+                         ?? Application.Current?.MainWindow;
+                }
+                catch { }
+
+                if (owner != null && owner.IsVisible && !ReferenceEquals(owner, window))
+                {
+                    window.Owner = owner;
+                    window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
+                else
+                {
+                    window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                }
+
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Fensterfehler (Transaktionsbericht): {ex.Message}",
+                    "Transaktionen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 

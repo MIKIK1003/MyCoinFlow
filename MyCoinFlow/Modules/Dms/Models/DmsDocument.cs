@@ -4,6 +4,27 @@ using System.Globalization;
 
 namespace MyCoinFlow.Models
 {
+    public enum DmsBelegart
+    {
+        Rechnung,
+        Gutschrift,
+        Kontoauszug,
+        Kassenbeleg,
+        Vertrag,
+        Versicherung,
+        Korrespondenz,
+        Garantieschein,
+        Sonstiges
+    }
+
+    public enum DmsBearbeitungsstatus
+    {
+        Neu,
+        InPruefung,
+        Freigegeben,
+        Erledigt
+    }
+
     public class DmsDocument : INotifyPropertyChanged
     {
         // Nur IstNeu meldet Änderungen (das Neu-Icon soll beim Anklicken sofort
@@ -31,6 +52,18 @@ namespace MyCoinFlow.Models
 
         public string? Titel { get; set; }
         public string? Kategorie { get; set; }
+        public DmsBelegart? Belegart { get; set; }
+        public string? Schlagwoerter { get; set; }
+        public string? Notiz { get; set; }
+        public DmsBearbeitungsstatus Bearbeitungsstatus { get; set; } = DmsBearbeitungsstatus.Neu;
+        public string? Verantwortlich { get; set; }
+        public DateTime? ExplizitFaelligAm { get; set; }
+        public DateTime? AufbewahrenBis { get; set; }
+        public bool IstFavorit { get; set; }
+        public int AktuelleVersion { get; set; } = 1;
+        public string? InhaltHash { get; set; }
+        public DateTime? LetzteAenderungAmUtc { get; set; }
+        public bool IstMoeglichesDuplikat { get; set; }
 
         /// <summary>Frei erfassbarer Beschreibungstext (im Bearbeiten-Dialog gepflegt).</summary>
         public string? Beschreibung { get; set; }
@@ -62,6 +95,16 @@ namespace MyCoinFlow.Models
         public decimal? ErkannterBetrag { get; set; }
 
         public string TitelAnzeige => !string.IsNullOrWhiteSpace(Titel) ? Titel : FileName;
+        public string KategorieAnzeige => string.IsNullOrWhiteSpace(Kategorie) ? "Ohne Kategorie" : Kategorie;
+        public string BelegartAnzeige => Belegart?.ToString() ?? "Ohne Belegart";
+        public string BearbeitungsstatusAnzeige => Bearbeitungsstatus == DmsBearbeitungsstatus.InPruefung
+            ? "In Prüfung"
+            : Bearbeitungsstatus.ToString();
+        public string VerantwortlichAnzeige => string.IsNullOrWhiteSpace(Verantwortlich) ? "Nicht zugewiesen" : Verantwortlich;
+        public string SchlagwoerterAnzeige => string.IsNullOrWhiteSpace(Schlagwoerter) ? "Keine Schlagwörter" : Schlagwoerter;
+        public string FavoritSymbol => IstFavorit ? "★" : "☆";
+        public string VersionAnzeige => $"v{AktuelleVersion}";
+        public string DuplikatAnzeige => IstMoeglichesDuplikat ? "Möglicher Doppelbeleg" : "";
 
         // Eigene Zuordnung hat Vorrang (was der Benutzer erfasst, wird auch angezeigt);
         // sonst die Adresse der verknüpften Transaktion.
@@ -92,11 +135,14 @@ namespace MyCoinFlow.Models
         // Nur relevant, solange das Dokument noch keiner Transaktion zugeordnet ist – sobald
         // verknüpft, gilt die Rechnung als erledigt (siehe VerknuepftMitAnzeige).
 
-        public DateTime? FaelligkeitsDatum => (EntityType == null && DokumentDatum.HasValue)
-            ? DokumentDatum.Value.AddDays(30)
-            : null;
+        public DateTime? FaelligkeitsDatum => ExplizitFaelligAm
+            ?? ((EntityType == null && DokumentDatum.HasValue)
+                ? DokumentDatum.Value.AddDays(30)
+                : null);
 
-        public bool IstUeberfaellig => FaelligkeitsDatum.HasValue && FaelligkeitsDatum.Value < DateTime.Today;
+        public bool IstUeberfaellig => FaelligkeitsDatum.HasValue
+            && FaelligkeitsDatum.Value < DateTime.Today
+            && Bearbeitungsstatus != DmsBearbeitungsstatus.Erledigt;
 
         public string FaelligAnzeige => FaelligkeitsDatum.HasValue
             ? FaelligkeitsDatum.Value.ToString("dd.MM.yyyy")
@@ -115,5 +161,18 @@ namespace MyCoinFlow.Models
             : GarantieAblaufDatum.HasValue
                 ? (IstGarantieAbgelaufen ? $"abgelaufen ({GarantieAblaufDatum.Value:dd.MM.yyyy})" : GarantieAblaufDatum.Value.ToString("dd.MM.yyyy"))
                 : "Garantie (ohne Datum)";
+
+        public string AufbewahrungAnzeige => AufbewahrenBis.HasValue
+            ? $"Aufbewahren bis {AufbewahrenBis.Value:dd.MM.yyyy}"
+            : "Keine Aufbewahrungsfrist";
+
+        public string OcrAnzeige => OcrStatus switch
+        {
+            "Text" => "Volltext erfasst",
+            "OCR" => "OCR erfasst",
+            "Image" => "Bilddokument",
+            "Error" => "Texterkennung fehlgeschlagen",
+            _ => "Texterkennung ausstehend"
+        };
     }
 }

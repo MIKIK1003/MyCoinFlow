@@ -276,6 +276,8 @@ END;
                 dmsLogCmd.CommandText = dmsLogSql;
                 dmsLogCmd.ExecuteNonQuery();
             }
+
+            EnsureDmsWorkspaceSchema();
         }
 
         /// <summary>
@@ -686,7 +688,15 @@ SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
        a.DokumentDatum, a.IstGarantieschein, a.GarantieAblaufDatum,
        tr.Betrag AS TransBetrag, adr.Name AS TransAdresseName,
        a.GesehenAm, a.ErkannterBetrag, a.Beschreibung,
-       a.AdresseId, dadr.Name AS EigeneAdresseName
+       a.AdresseId, dadr.Name AS EigeneAdresseName,
+       a.Belegart, a.Schlagwoerter, a.Notiz, a.Bearbeitungsstatus, a.Verantwortlich,
+       a.FaelligAm, a.AufbewahrenBis, a.IstFavorit, a.AktuelleVersion, a.InhaltHash,
+       a.LetzteAenderungAmUtc,
+       CAST(CASE WHEN a.InhaltHash IS NOT NULL AND EXISTS
+       (
+           SELECT 1 FROM dbo.Attachment duplicate
+           WHERE duplicate.InhaltHash = a.InhaltHash AND duplicate.Id <> a.Id
+       ) THEN 1 ELSE 0 END AS BIT) AS IstMoeglichesDuplikat
 FROM dbo.Attachment a
 LEFT JOIN dbo.AttachmentText txt ON txt.AttachmentId = a.Id
 LEFT JOIN dbo.Transaktion tr ON a.EntityType = 'Transaktion' AND tr.Id = a.EntityId
@@ -697,6 +707,10 @@ WHERE (@q IS NULL OR
        a.Titel LIKE '%' + @q + '%' OR
        a.Beschreibung LIKE '%' + @q + '%' OR
        a.Kategorie LIKE '%' + @q + '%' OR
+       a.Belegart LIKE '%' + @q + '%' OR
+       a.Schlagwoerter LIKE '%' + @q + '%' OR
+       a.Notiz LIKE '%' + @q + '%' OR
+       a.Verantwortlich LIKE '%' + @q + '%' OR
        adr.Name LIKE '%' + @q + '%' OR
        dadr.Name LIKE '%' + @q + '%' OR
        txt.[Text] LIKE '%' + @q + '%')
@@ -713,6 +727,13 @@ ORDER BY a.ImportedAtUtc DESC;";
                 var transaktionId = r.IsDBNull(1) ? (int?)null : r.GetInt32(1);
                 var entityType = r.IsDBNull(2) ? null : r.GetString(2);
                 var entityId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
+
+                var belegart = r.IsDBNull(22) || !Enum.TryParse<DmsBelegart>(r.GetString(22), out var parsedBelegart)
+                    ? (DmsBelegart?)null
+                    : parsedBelegart;
+                var bearbeitungsstatus = r.IsDBNull(25) || !Enum.TryParse<DmsBearbeitungsstatus>(r.GetString(25), out var parsedStatus)
+                    ? DmsBearbeitungsstatus.Neu
+                    : parsedStatus;
 
                 list.Add(new DmsDocument
                 {
@@ -737,7 +758,19 @@ ORDER BY a.ImportedAtUtc DESC;";
                     ErkannterBetrag = r.IsDBNull(18) ? (decimal?)null : r.GetDecimal(18),
                     Beschreibung = r.IsDBNull(19) ? null : r.GetString(19),
                     AdresseId = r.IsDBNull(20) ? (int?)null : r.GetInt32(20),
-                    EigeneAdresseName = r.IsDBNull(21) ? null : r.GetString(21)
+                    EigeneAdresseName = r.IsDBNull(21) ? null : r.GetString(21),
+                    Belegart = belegart,
+                    Schlagwoerter = r.IsDBNull(23) ? null : r.GetString(23),
+                    Notiz = r.IsDBNull(24) ? null : r.GetString(24),
+                    Bearbeitungsstatus = bearbeitungsstatus,
+                    Verantwortlich = r.IsDBNull(26) ? null : r.GetString(26),
+                    ExplizitFaelligAm = r.IsDBNull(27) ? null : r.GetDateTime(27),
+                    AufbewahrenBis = r.IsDBNull(28) ? null : r.GetDateTime(28),
+                    IstFavorit = r.GetBoolean(29),
+                    AktuelleVersion = r.GetInt32(30),
+                    InhaltHash = r.IsDBNull(31) ? null : r.GetString(31),
+                    LetzteAenderungAmUtc = r.GetDateTime(32),
+                    IstMoeglichesDuplikat = r.GetBoolean(33)
                 });
             }
             return list;

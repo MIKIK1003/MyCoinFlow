@@ -18,6 +18,14 @@ namespace MyCoinFlow.Views
         private readonly DatabaseService _db = new();
 
         public string? Kategorie { get; private set; }
+        public string? Titel { get; private set; }
+        public DmsBelegart? Belegart { get; private set; }
+        public string? Schlagwoerter { get; private set; }
+        public string? Notiz { get; private set; }
+        public DmsBearbeitungsstatus Bearbeitungsstatus { get; private set; } = DmsBearbeitungsstatus.Neu;
+        public string? Verantwortlich { get; private set; }
+        public DateTime? FaelligAm { get; private set; }
+        public DateTime? AufbewahrenBis { get; private set; }
         public string? Beschreibung { get; private set; }
         public int? AdresseId { get; private set; }
         public DateTime? DokumentDatum { get; private set; }
@@ -38,6 +46,9 @@ namespace MyCoinFlow.Views
             DateinameBox.Visibility = _istNeu ? Visibility.Collapsed : Visibility.Visible;
 
             KategorieBox.ItemsSource = _db.GetDistinctKategorien();
+            BelegartBox.ItemsSource = Enum.GetValues<DmsBelegart>();
+            BearbeitungsstatusBox.ItemsSource = Enum.GetValues<DmsBearbeitungsstatus>();
+            BearbeitungsstatusBox.SelectedItem = DmsBearbeitungsstatus.Neu;
 
             // Auch das Standard-Kontextmenü der Eingabezeile um "Kategorie löschen" erweitern
             KategorieBox.Loaded += KategorieBox_Loaded;
@@ -52,7 +63,17 @@ namespace MyCoinFlow.Views
             if (bestehend != null)
             {
                 DateinameBox.Text = bestehend.FileName;
+                TitelBox.Text = bestehend.Titel ?? "";
                 KategorieBox.Text = bestehend.Kategorie ?? "";
+                BelegartBox.SelectedItem = bestehend.Belegart;
+                SchlagwoerterBox.Text = bestehend.Schlagwoerter ?? "";
+                NotizBox.Text = bestehend.Notiz ?? "";
+                BearbeitungsstatusBox.SelectedItem = bestehend.Bearbeitungsstatus;
+                VerantwortlichBox.Text = bestehend.Verantwortlich ?? "";
+                FaelligAktivBox.IsChecked = bestehend.ExplizitFaelligAm.HasValue;
+                FaelligPicker.SelectedDate = bestehend.ExplizitFaelligAm ?? DateTime.Today.AddDays(7);
+                AufbewahrungAktivBox.IsChecked = bestehend.AufbewahrenBis.HasValue;
+                AufbewahrungPicker.SelectedDate = bestehend.AufbewahrenBis ?? DateTime.Today.AddYears(10);
                 AdresseBox.SelectedValue = bestehend.AdresseId ?? 0;
                 BeschreibungBox.Text = bestehend.Beschreibung ?? "";
                 DokumentDatumPicker.SelectedDate = bestehend.DokumentDatum;
@@ -88,11 +109,14 @@ namespace MyCoinFlow.Views
             else
             {
                 DokumentDatumPicker.SelectedDate = DateTime.Today;
+                FaelligPicker.SelectedDate = DateTime.Today.AddDays(30);
+                AufbewahrungPicker.SelectedDate = DateTime.Today.AddYears(10);
                 VerknuepfungText.Text =
                     "Nach dem Hochladen kann das Dokument über «Transaktion zuweisen» mit einer Buchung verknüpft werden.";
             }
 
             GarantiePanel.Visibility = GarantieCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            Fristen_CheckedChanged(this, new RoutedEventArgs());
         }
 
         // ---------------- Kategorien verwalten ----------------
@@ -188,6 +212,13 @@ namespace MyCoinFlow.Views
             GarantiePanel.Visibility = GarantieCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        private void Fristen_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            if (FaelligPicker == null || AufbewahrungPicker == null) return;
+            FaelligPicker.Visibility = FaelligAktivBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            AufbewahrungPicker.Visibility = AufbewahrungAktivBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void DateiWaehlen_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
@@ -214,7 +245,27 @@ namespace MyCoinFlow.Views
                 return;
             }
 
+            if (!ValidateTextLength(KategorieBox.Text, 100, "Kategorie", KategorieBox)
+                || !ValidateDate(DokumentDatumPicker, "Dokumentdatum", required: false)
+                || (GarantieCheckBox.IsChecked == true
+                    && !ValidateDate(GarantieAblaufPicker, "Garantie-Ablaufdatum", required: false))
+                || !ValidateDate(FaelligPicker, "Fälligkeit", FaelligAktivBox.IsChecked == true)
+                || !ValidateDate(AufbewahrungPicker, "Aufbewahrungsfrist", AufbewahrungAktivBox.IsChecked == true))
+            {
+                return;
+            }
+
             Kategorie = string.IsNullOrWhiteSpace(KategorieBox.Text) ? null : KategorieBox.Text.Trim();
+            Titel = string.IsNullOrWhiteSpace(TitelBox.Text) ? null : TitelBox.Text.Trim();
+            Belegart = BelegartBox.SelectedItem is DmsBelegart belegart ? belegart : null;
+            Schlagwoerter = string.IsNullOrWhiteSpace(SchlagwoerterBox.Text) ? null : SchlagwoerterBox.Text.Trim();
+            Notiz = string.IsNullOrWhiteSpace(NotizBox.Text) ? null : NotizBox.Text.Trim();
+            Bearbeitungsstatus = BearbeitungsstatusBox.SelectedItem is DmsBearbeitungsstatus status
+                ? status
+                : DmsBearbeitungsstatus.Neu;
+            Verantwortlich = string.IsNullOrWhiteSpace(VerantwortlichBox.Text) ? null : VerantwortlichBox.Text.Trim();
+            FaelligAm = FaelligAktivBox.IsChecked == true ? FaelligPicker.SelectedDate : null;
+            AufbewahrenBis = AufbewahrungAktivBox.IsChecked == true ? AufbewahrungPicker.SelectedDate : null;
             Beschreibung = string.IsNullOrWhiteSpace(BeschreibungBox.Text) ? null : BeschreibungBox.Text.Trim();
             DokumentDatum = DokumentDatumPicker.SelectedDate;
 
@@ -243,6 +294,29 @@ namespace MyCoinFlow.Views
             GarantieAblaufDatum = IstGarantieschein ? GarantieAblaufPicker.SelectedDate : null;
 
             DialogResult = true;
+        }
+
+        private bool ValidateTextLength(string? value, int maxLength, string fieldName, Control control)
+        {
+            if ((value ?? "").Trim().Length <= maxLength) return true;
+            MessageBox.Show(this, $"{fieldName} darf höchstens {maxLength} Zeichen enthalten.",
+                "Eingabe zu lang", MessageBoxButton.OK, MessageBoxImage.Information);
+            control.Focus();
+            return false;
+        }
+
+        private bool ValidateDate(DatePicker picker, string fieldName, bool required)
+        {
+            var hasText = !string.IsNullOrWhiteSpace(picker.Text);
+            if (picker.SelectedDate.HasValue) return true;
+            if (!hasText && !required) return true;
+
+            var message = hasText
+                ? $"Der Wert in „{fieldName}“ ist kein gültiges Datum."
+                : $"Bitte für „{fieldName}“ ein Datum auswählen.";
+            MessageBox.Show(this, message, "Datum prüfen", MessageBoxButton.OK, MessageBoxImage.Information);
+            picker.Focus();
+            return false;
         }
 
         private void Abbrechen_Click(object sender, RoutedEventArgs e)

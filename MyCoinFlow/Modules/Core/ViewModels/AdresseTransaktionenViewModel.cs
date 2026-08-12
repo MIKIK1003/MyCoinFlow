@@ -200,7 +200,12 @@ namespace MyCoinFlow.ViewModels
 
                 decimal einnahmen = 0m, ausgaben = 0m;
 
-                if (t.NachKontoId.HasValue)
+                if (t.AdresseId.HasValue && !t.GeldinstitutId.HasValue &&
+                    !t.VonKontoId.HasValue && t.NachKontoId.HasValue)
+                {
+                    einnahmen = t.Betrag;
+                }
+                else if (t.NachKontoId.HasValue)
                 {
                     if (_incomeAccounts.Contains(t.NachKontoId.Value))
                         einnahmen = t.Betrag;

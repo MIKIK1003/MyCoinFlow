@@ -2,295 +2,224 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
-
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+        <Style x:Key="MetricCard" TargetType="Border">
+            <Setter Property="Padding" Value="9"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignCardBackground}"/>
+            <Setter Property="BorderBrush" Value="#18000000"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
     </UserControl.Resources>
 
-    <!-- Sidebar | Divider | Suchleiste + Tabelle -->
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250"/>
             <ColumnDefinition Width="16"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*" MinWidth="430"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="320"/>
         </Grid.ColumnDefinitions>
 
-        <!-- ================== SIDEBAR ================== -->
-        <Border Grid.Column="0" Padding="12"
-                Background="{DynamicResource MaterialDesignPaper}">
-            <StackPanel>
-                <TextBlock Text="DMS"
-                           Style="{StaticResource SidebarSectionHeader}"/>
+        <!-- MyCoinFlow-Funktionsspalte: alle Aktionen und Sichten bleiben links. -->
+        <Border Grid.Column="0" Padding="12" Background="{DynamicResource MaterialDesignPaper}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="DMS" Style="{StaticResource SidebarSectionHeader}"/>
 
-                <!-- Gruppe: Erfassen -->
-                <TextBlock Text="Erfassen"
-                           Style="{StaticResource SidebarGroupHeader}"
-                           Margin="0,0,0,8"/>
+                    <TextBlock Text="ÜBERSICHT" Style="{StaticResource SidebarGroupHeader}" Margin="0,0,0,8"/>
+                    <UniformGrid Columns="2" Margin="0,0,0,12">
+                        <Border Style="{StaticResource MetricCard}" Margin="0,0,4,4">
+                            <StackPanel><TextBlock Text="{Binding AnzahlDokumente}" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Dokumente" FontSize="11" Opacity="0.65"/></StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource MetricCard}" Margin="4,0,0,4">
+                            <StackPanel><TextBlock Text="{Binding AnzahlNeu}" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Neu" FontSize="11" Opacity="0.65"/></StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource MetricCard}" Margin="0,4,4,0">
+                            <StackPanel><TextBlock Text="{Binding AnzahlUeberfaellig}" FontSize="21" FontWeight="SemiBold" Foreground="#FFC62828"/><TextBlock Text="Überfällig" FontSize="11" Opacity="0.65"/></StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource MetricCard}" Margin="4,4,0,0">
+                            <StackPanel><TextBlock Text="{Binding AnzahlFavoriten}" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Favoriten" FontSize="11" Opacity="0.65"/></StackPanel>
+                        </Border>
+                    </UniformGrid>
 
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="Scanner"
-                        Content="Scannen"
-                        ToolTip="Papierdokument über den angeschlossenen Scanner einlesen und in den Arbeitsordner legen"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding ScannenCommand}"/>
+                    <TextBlock Text="ERFASSEN" Style="{StaticResource SidebarGroupHeader}" Margin="0,0,0,8"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Scanner" Content="Scannen" MinHeight="40" Margin="0,0,0,8" Command="{Binding ScannenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Upload" Content="Dokument hochladen" MinHeight="40" Margin="0,0,0,8" Command="{Binding HochladenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="History" Content="Verarbeitungsverlauf" MinHeight="40" Command="{Binding VerlaufAnzeigenCommand}"/>
 
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="Upload"
-                        Content="Dokument hochladen"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding HochladenCommand}"/>
+                    <Separator Margin="0,14,0,12"/>
+                    <TextBlock Text="DOKUMENT" Style="{StaticResource SidebarGroupHeader}" Margin="0,0,0,8"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="FileEye" Content="Öffnen" MinHeight="40" Margin="0,0,0,8" Command="{Binding OeffnenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Pencil" Content="Organisieren" MinHeight="40" Margin="0,0,0,8" Command="{Binding BearbeitenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="StarOutline" Content="Favorit umschalten" MinHeight="40" Margin="0,0,0,8" Command="{Binding FavoritUmschaltenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="FileReplaceOutline" Content="Neue Version" MinHeight="40" Margin="0,0,0,8" Command="{Binding NeueVersionCommand}"/>
+                    <Button Style="{StaticResource IconTextButton.Danger}" Tag="ArchiveArrowDownOutline" Content="Entfernen" MinHeight="40" Command="{Binding LoeschenCommand}"/>
 
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="History"
-                        Content="Verlauf"
-                        ToolTip="Zeigt eine Historie aller automatisch verarbeiteten Dokumente – das Fenster kann offen bleiben, während in der App weitergearbeitet wird"
-                        MinHeight="40"
-                        Command="{Binding VerlaufAnzeigenCommand}"/>
+                    <Separator Margin="0,14,0,12"/>
+                    <TextBlock Text="TRANSAKTIONS-ZUORDNUNG" Style="{StaticResource SidebarGroupHeader}" Margin="0,0,0,8"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="LinkVariant" Content="Transaktion zuweisen" MinHeight="40" Margin="0,0,0,8" Command="{Binding TransaktionZuweisenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="LinkVariantOff" Content="Verknüpfung lösen" MinHeight="40" Margin="0,0,0,8" Command="{Binding VerknuepfungLoesenCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Refresh" Content="Suche erneut" MinHeight="40" Margin="0,0,0,8" Command="{Binding SucheErneutCommand}"/>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Magnify" Content="Alle automatisch suchen" MinHeight="40" Command="{Binding AlleErneutSuchenCommand}"/>
 
-                <Separator Margin="0,14,0,12"/>
-
-                <!-- Gruppe: Dokument -->
-                <TextBlock Text="Dokument"
-                           Style="{StaticResource SidebarGroupHeader}"
-                           Margin="0,0,0,8"/>
-
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="FileEye"
-                        Content="Öffnen"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding OeffnenCommand}"/>
-
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="Pencil"
-                        Content="Bearbeiten"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding BearbeitenCommand}"/>
-
-                <Button Style="{StaticResource IconTextButton.Danger}"
-                        Tag="Delete"
-                        Content="Löschen"
-                        MinHeight="40"
-                        Command="{Binding LoeschenCommand}"/>
-
-                <Separator Margin="0,14,0,12"/>
-
-                <!-- Gruppe: Transaktions-Zuordnung -->
-                <TextBlock Text="Transaktions-Zuordnung"
-                           Style="{StaticResource SidebarGroupHeader}"
-                           Margin="0,0,0,8"/>
-
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="LinkVariant"
-                        Content="Transaktion zuweisen"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding TransaktionZuweisenCommand}"/>
-
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="Refresh"
-                        Content="Suche erneut"
-                        ToolTip="Automatisches Matching für das ausgewählte Dokument erneut versuchen (z. B. wenn die Buchung erst jetzt erfasst wurde)"
-                        MinHeight="40" Margin="0,0,0,8"
-                        Command="{Binding SucheErneutCommand}"/>
-
-                <Button Style="{StaticResource IconTextButton}"
-                        Tag="Magnify"
-                        Content="Alle automatisch suchen"
-                        ToolTip="Automatisches Matching für alle noch nicht zugeordneten Dokumente erneut versuchen"
-                        MinHeight="40"
-                        Command="{Binding AlleErneutSuchenCommand}"/>
-
-                <Separator Margin="0,14,0,12"/>
-
-                <TextBlock Text="Kategorie"
-                           Style="{StaticResource SidebarGroupHeader}"
-                           Margin="0,0,0,8"/>
-                <ComboBox ItemsSource="{Binding Kategorien}"
-                          SelectedItem="{Binding KategorieFilter}"
-                          Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                          MinHeight="40"/>
-            </StackPanel>
+                    <Separator Margin="0,14,0,12"/>
+                    <TextBlock Text="SUCHE UND SICHT" Style="{StaticResource SidebarGroupHeader}" Margin="0,0,0,8"/>
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}" materialDesign:HintAssist.Hint="Volltextsuche" Margin="0,0,0,8">
+                        <TextBox.InputBindings><KeyBinding Key="Return" Command="{Binding SuchenCommand}"/></TextBox.InputBindings>
+                    </TextBox>
+                    <Button Style="{StaticResource IconTextButton}" Tag="Magnify" Content="Suchen" MinHeight="40" Margin="0,0,0,10" Command="{Binding SuchenCommand}"/>
+                    <ComboBox ItemsSource="{Binding Gruppierungen}" SelectedItem="{Binding Gruppierung}" MinHeight="40"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}" materialDesign:HintAssist.Hint="Gruppieren nach" Margin="0,0,0,10"/>
+                    <ComboBox ItemsSource="{Binding Kategorien}" SelectedItem="{Binding KategorieFilter}" MinHeight="40"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}" materialDesign:HintAssist.Hint="Kategorie" Margin="0,0,0,10"/>
+                    <ComboBox ItemsSource="{Binding BearbeitungsstatusOptionen}" SelectedItem="{Binding BearbeitungsstatusFilter}" MinHeight="40"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}" materialDesign:HintAssist.Hint="Bearbeitungsstatus" Margin="0,0,0,8"/>
+                    <CheckBox Content="Nur Favoriten" IsChecked="{Binding NurFavoriten}" Margin="2,2,0,5"/>
+                    <CheckBox Content="Nur überfällige" IsChecked="{Binding NurUeberfaellige}" Margin="2,0,0,4"/>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
 
-        <!-- ================== INHALT ================== -->
+        <!-- Aufklappbarer, metadatenbasierter Dokumentbestand -->
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="12"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-
-            <DockPanel Grid.Row="0" LastChildFill="True">
-                <Button DockPanel.Dock="Right"
-                        Style="{StaticResource IconTextButton}"
-                        Tag="Magnify"
-                        Content="Suchen"
-                        Margin="8,0,0,0"
-                        Command="{Binding SuchenCommand}"/>
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                         materialDesign:HintAssist.Hint="Volltextsuche (Dateiname, Titel, Kategorie, Inhalt)"
-                         MinHeight="40">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Return" Command="{Binding SuchenCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
+            <DockPanel Margin="0,0,0,10">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding AnzahlTreffer, StringFormat={}{0} Treffer}" VerticalAlignment="Bottom" Opacity="0.65"/>
+                <StackPanel>
+                    <TextBlock Text="Dokumentenbestand" FontSize="22" FontWeight="SemiBold"/>
+                    <TextBlock Text="Metadatenbasierte Gruppen – unabhängig vom Ablageordner" FontSize="12" Opacity="0.65"/>
+                </StackPanel>
             </DockPanel>
 
-            <!-- Arbeitsordner-Verarbeitung: nur sichtbar, während der Watcher gerade aktiv ist -->
-            <Border Grid.Row="2"
-                    Padding="10"
-                    CornerRadius="8"
-                    Margin="0,0,0,12"
+            <Border Grid.Row="1" Padding="10" CornerRadius="8" Margin="0,0,0,10"
                     Background="{DynamicResource MaterialDesignCardBackground}"
-                    Visibility="{Binding WatcherIsBusy, Converter={StaticResource BoolToVisConverter}}">
-                <DockPanel LastChildFill="True">
-                    <materialDesign:PackIcon DockPanel.Dock="Left"
-                                             Kind="Sync"
-                                             Width="20" Height="20"
-                                             VerticalAlignment="Center"
-                                             Margin="0,0,10,0"
-                                             RenderTransformOrigin="0.5,0.5">
-                        <materialDesign:PackIcon.RenderTransform>
-                            <RotateTransform/>
-                        </materialDesign:PackIcon.RenderTransform>
-                        <materialDesign:PackIcon.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="(materialDesign:PackIcon.RenderTransform).(RotateTransform.Angle)"
-                                                         From="0" To="360" Duration="0:0:1.2" RepeatBehavior="Forever"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </materialDesign:PackIcon.Triggers>
-                    </materialDesign:PackIcon>
-                    <TextBlock VerticalAlignment="Center">
-                        <Run Text="Verarbeite:"/>
-                        <Run Text="{Binding WatcherCurrentFile, Mode=OneWay}" FontWeight="SemiBold"/>
-                        <Run Text=" – "/>
-                        <Run Text="{Binding WatcherPhase, Mode=OneWay}"/>
-                        <Run Text=" · noch "/>
-                        <Run Text="{Binding WatcherQueueCount, Mode=OneWay}"/>
-                        <Run Text=" in Warteschlange"/>
-                    </TextBlock>
+                    Visibility="{Binding WatcherIsBusy, Mode=OneWay, Converter={StaticResource BoolToVisConverter}}">
+                <DockPanel>
+                    <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" Margin="0,0,9,0" VerticalAlignment="Center"/>
+                    <TextBlock VerticalAlignment="Center"><Run Text="Verarbeite: "/><Run Text="{Binding WatcherCurrentFile, Mode=OneWay}" FontWeight="SemiBold"/><Run Text=" · "/><Run Text="{Binding WatcherPhase, Mode=OneWay}"/></TextBlock>
                 </DockPanel>
             </Border>
 
-            <DataGrid Grid.Row="3"
-                      ItemsSource="{Binding Dokumente}"
-                      SelectedItem="{Binding AusgewaehltesDokument}"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      IsReadOnly="True"
-                      materialDesign:DataGridAssist.CellPadding="8"
-                      materialDesign:DataGridAssist.ColumnHeaderPadding="8"
-                      RowHeaderWidth="0"
-                      Background="White"
-                      RowBackground="White"
-                      AlternatingRowBackground="{x:Null}">
-
-                <DataGrid.ColumnHeaderStyle>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
-                    </Style>
-                </DataGrid.ColumnHeaderStyle>
-
-                <DataGrid.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Zur verknüpften Transaktion springen"
-                                  Command="{Binding PlacementTarget.DataContext.ZurTransaktionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                            <MenuItem.Icon>
-                                <materialDesign:PackIcon Kind="SwapHorizontal"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-
-                        <Separator/>
-
-                        <MenuItem Header="Dokument öffnen"
-                                  Command="{Binding PlacementTarget.DataContext.OeffnenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                            <MenuItem.Icon>
-                                <materialDesign:PackIcon Kind="FileFindOutline"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-
-                        <MenuItem Header="Bearbeiten"
-                                  Command="{Binding PlacementTarget.DataContext.BearbeitenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                            <MenuItem.Icon>
-                                <materialDesign:PackIcon Kind="Pencil"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-
-                        <MenuItem Header="Transaktion zuweisen"
-                                  Command="{Binding PlacementTarget.DataContext.TransaktionZuweisenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                            <MenuItem.Icon>
-                                <materialDesign:PackIcon Kind="LinkVariant"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-                    </ContextMenu>
-                </DataGrid.ContextMenu>
-
-                <!-- Überfällige Rechnungen (rot) bzw. ablaufende/abgelaufene Garantien (gelb/orange)
-                     farblich hervorheben, damit sie im Grid sofort auffallen. -->
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <EventSetter Event="PreviewMouseRightButtonDown"
-                                     Handler="DataGridRow_PreviewMouseRightButtonDown"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IstGarantieBaldAblaufend}" Value="True">
-                                <Setter Property="Background" Value="#FFFFF9E0"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IstGarantieAbgelaufen}" Value="True">
-                                <Setter Property="Background" Value="#FFFFF0D9"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IstUeberfaellig}" Value="True">
-                                <Setter Property="Background" Value="#FFFDECEA"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.RowStyle>
-
-                <DataGrid.Columns>
-
-                    <!-- Neu-Icon: frisch importierte, noch nicht angeklickte Dokumente -->
-                    <DataGridTemplateColumn Header="" Width="40" CanUserResize="False">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <materialDesign:PackIcon Kind="NewBox"
-                                                         Width="22" Height="22"
-                                                         Foreground="{StaticResource AppBrandBrush}"
-                                                         ToolTip="Neu importiert – Zeile anklicken, um die Markierung zu entfernen"
-                                                         HorizontalAlignment="Center"
-                                                         VerticalAlignment="Center"
-                                                         Visibility="{Binding IstNeu, Converter={StaticResource BoolToVisConverter}}"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn Header="Datei" Binding="{Binding FileName}" Width="140"/>
-                    <DataGridTextColumn Header="Beschreibung" Binding="{Binding Beschreibung}" Width="*">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="ToolTip" Value="{Binding Beschreibung}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    <DataGridTextColumn Header="Kategorie" Binding="{Binding Kategorie}" Width="140"/>
-                    <DataGridTextColumn Header="Adresse" Binding="{Binding AdresseAnzeige}" Width="140"/>
-                    <DataGridTextColumn Header="Betrag" Binding="{Binding BetragAnzeige}" Width="90"/>
-                    <DataGridTextColumn Header="Verknüpft mit" Binding="{Binding VerknuepftMitAnzeige}" Width="140"/>
-                    <DataGridTextColumn Header="Fällig am" Binding="{Binding FaelligAnzeige}" Width="90"
-                                        ToolTipService.ToolTip="30 Tage ab erkanntem Dokumentdatum – rot, falls noch keine Transaktion zugeordnet und überfällig"/>
-                    <DataGridTextColumn Header="Garantie bis" Binding="{Binding GarantieAnzeige}" Width="130"/>
-                    <DataGridTextColumn Header="Größe" Binding="{Binding SizeDisplay}" Width="90"/>
-                    <DataGridTextColumn Header="Datum" Binding="{Binding ImportedAtUtc, StringFormat=dd.MM.yyyy}" Width="100"/>
-                    <DataGridTextColumn Header="Status" Binding="{Binding OcrStatus}" Width="90"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <ListBox Grid.Row="2" ItemsSource="{Binding Gruppen}" Background="Transparent" BorderThickness="0"
+                     HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,8"/></Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Expander IsExpanded="False" Background="{DynamicResource MaterialDesignPaper}" BorderBrush="#20000000" BorderThickness="1">
+                            <Expander.Header>
+                                <Grid Margin="8,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="12" Opacity="0.65" Margin="12,0,0,0"/>
+                                </Grid>
+                            </Expander.Header>
+                            <ListBox ItemsSource="{Binding Documents}" SelectionChanged="DocumentList_SelectionChanged"
+                                     Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch">
+                                <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/></Style></ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="9" BorderBrush="#16000000" BorderThickness="0,1,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/><ColumnDefinition Width="105"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding FavoritSymbol}" FontSize="20" Foreground="{StaticResource AppBrandBrush}" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding TitelAnzeige}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding TitelAnzeige}"/>
+                                                    <TextBlock Text="{Binding SchlagwoerterAnzeige}" FontSize="11" Opacity="0.58" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding DuplikatAnzeige}" FontSize="11" Foreground="#FFC62828"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{Binding DokumentDatum, StringFormat=dd.MM.yyyy}"/>
+                                                    <TextBlock Text="{Binding VersionAnzeige}" FontSize="11" Opacity="0.58"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="3">
+                                                    <TextBlock Text="{Binding BearbeitungsstatusAnzeige}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding VerantwortlichAnzeige}" FontSize="11" Opacity="0.58" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Expander>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Grid>
+
+        <!-- Dokumentakte mit Metadaten, Versionen und Aktivitätsprotokoll -->
+        <Border Grid.Column="4" Padding="14" Background="{DynamicResource MaterialDesignPaper}">
+            <Grid>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="240">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HatAuswahl}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <materialDesign:PackIcon Kind="FileSearchOutline" Width="42" Height="42" HorizontalAlignment="Center" Opacity="0.45" Margin="0,0,0,10"/>
+                    <TextBlock Text="Dokument auswählen" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Metadaten, Versionen und Aktivitäten erscheinen hier." TextAlignment="Center" TextWrapping="Wrap" Opacity="0.6" Margin="0,5,0,0"/>
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HatAuswahl, Converter={StaticResource BoolToVisConverter}}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,12">
+                            <Button DockPanel.Dock="Right" Content="{Binding AusgewaehltesDokument.FavoritSymbol}" FontSize="20" Padding="8,2"
+                                    Command="{Binding FavoritUmschaltenCommand}" ToolTip="Favorit umschalten"/>
+                            <StackPanel>
+                                <TextBlock Text="DOKUMENTAKTE" Style="{StaticResource SidebarGroupHeader}"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.TitelAnzeige}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <Border Padding="10" CornerRadius="7" Background="{DynamicResource MaterialDesignCardBackground}" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.FileName}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                <TextBlock FontSize="12" Opacity="0.68"><Run Text="{Binding AusgewaehltesDokument.BelegartAnzeige, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding AusgewaehltesDokument.KategorieAnzeige, Mode=OneWay}"/></TextBlock>
+                                <TextBlock FontSize="12" Opacity="0.68"><Run Text="{Binding AusgewaehltesDokument.BearbeitungsstatusAnzeige, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding AusgewaehltesDokument.VerantwortlichAnzeige, Mode=OneWay}"/></TextBlock>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.FaelligAnzeige, StringFormat=Fällig: {0}}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.AufbewahrungAnzeige}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.VerknuepftMitAnzeige, StringFormat=Verknüpft mit: {0}}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.AdresseAnzeige, StringFormat=Adresse: {0}}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.BetragAnzeige, StringFormat=Betrag: {0}}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.GarantieAnzeige, StringFormat=Garantie: {0}}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.OcrAnzeige}" FontSize="12"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.SchlagwoerterAnzeige}" FontSize="12" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.Beschreibung}" FontSize="12" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding AusgewaehltesDokument.Notiz}" FontSize="12" FontStyle="Italic" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Expander Header="Versionen" IsExpanded="True" Margin="0,0,0,8">
+                            <ListBox ItemsSource="{Binding Versionen}" BorderThickness="0" MaxHeight="210" Background="Transparent" HorizontalContentAlignment="Stretch">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,4">
+                                            <Button DockPanel.Dock="Right" Content="Öffnen" Padding="8,3"
+                                                    Command="{Binding DataContext.VersionOeffnenCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}"/>
+                                            <StackPanel><TextBlock Text="{Binding VersionText}" FontWeight="SemiBold"/><TextBlock Text="{Binding CreatedText}" FontSize="11" Opacity="0.6"/><TextBlock Text="{Binding CommentDisplay}" FontSize="11" TextWrapping="Wrap"/></StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Expander>
+
+                        <Expander Header="Aktivitätsprotokoll">
+                            <ListBox ItemsSource="{Binding Aktivitaeten}" BorderThickness="0" MaxHeight="230" Background="Transparent">
+                                <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="0,4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap"/><TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.58"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

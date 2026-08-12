@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows.Input;
+using MyCoinFlow.Models;
 using MyCoinFlow.ViewModels;
 
 namespace MyCoinFlow.Views
@@ -22,6 +23,13 @@ namespace MyCoinFlow.Views
                 row.IsSelected = true;
                 row.Focus();
             }
+        }
+
+        private void DocumentList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is not ListBox list || list.SelectedItem is not DmsDocument document) return;
+            if (DataContext is DmsViewModel viewModel)
+                viewModel.AusgewaehltesDokument = document;
         }
     }
 }

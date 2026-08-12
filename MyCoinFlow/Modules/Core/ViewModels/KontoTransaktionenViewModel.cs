@@ -195,7 +195,13 @@ namespace MyCoinFlow.ViewModels
                 {
                     ein = t.Betrag;
                 }
-                // (2) BANK -> KONTO: Von = NULL, Nach = Konto
+                // (2) ADRESSE -> KONTO: direkter Zugang ohne Geldinstitut
+                else if (t.AdresseId.HasValue && !t.GeldinstitutId.HasValue &&
+                         t.VonKontoId == null && t.NachKontoId == _kontoId)
+                {
+                    ein = t.Betrag;
+                }
+                // (3) BANK -> KONTO: Von = NULL, Nach = Konto
                 else if (t.VonKontoId == null && t.NachKontoId == _kontoId)
                 {
                     // NEU: Bank → Konto ist:
@@ -206,7 +212,7 @@ namespace MyCoinFlow.ViewModels
                     else
                         aus = t.Betrag;  // unverändert für Ausgabenkonten
                 }
-                // (3) Rest inkl. Konto->Konto (KK-Detailverteilung Durchlauf -> Budget)
+                // (4) Rest inkl. Konto->Konto (KK-Detailverteilung Durchlauf -> Budget)
                 else
                 {
                     bool istAusgabe = _db.IstAusgabeFuerKonto(_kontoId, t); // enthält KK-Sonderfall

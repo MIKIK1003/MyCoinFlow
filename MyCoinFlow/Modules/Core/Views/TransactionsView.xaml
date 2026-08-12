@@ -142,8 +142,17 @@
                                 Command="{Binding OpenBankImportCommand}"/>
                         <Button Style="{StaticResource IconTextButton}"
                                 Tag="creditcard" Content="Kreditkarten"
-                                MinHeight="40"
+                                MinHeight="40" Margin="0,0,0,16"
                                 Click="OpenCreditCardImport_Click"/>
+
+                        <TextBlock Text="Berichte" Margin="0,20,0,8"
+                                   Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"/>
+
+                        <Button Style="{StaticResource IconTextButton}"
+                                Tag="ChartBoxOutline" Content="Transaktionsbericht…"
+                                ToolTip="Ausgewählte Konten nach Budget, Ist und Jahreshochrechnung auswerten"
+                                MinHeight="40"
+                                Command="{Binding OpenReportCommand}"/>
                     </StackPanel>
 
                 </StackPanel>
