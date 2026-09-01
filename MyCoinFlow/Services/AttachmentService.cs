@@ -14,6 +14,7 @@ namespace MyCoinFlow.Services
     /// </summary>
     public class AttachmentService
     {
+        private const string TransactionMetadataActivityType = "MetadatenAusTransaktionV2";
         private readonly DatabaseService _db = new();
 
         /// <summary>
@@ -87,6 +88,7 @@ namespace MyCoinFlow.Services
 
             RunOcrIndexing(attachmentId, targetPath, ext);
             InitializeWorkspaceFile(attachmentId, targetPath);
+            LinkToTransaktion(attachmentId, transaktionId);
 
             return targetPath;
         }
@@ -389,20 +391,238 @@ namespace MyCoinFlow.Services
 
         /// <summary>
         /// Verknüpft ein Dokument mit einer Transaktion (automatisches Matching oder manuelles
-        /// Zuweisen). Ein gefundenes Dokument ist im DMS-Kontext immer eine Rechnung, daher wird
-        /// die Kategorie gleich auf "Rechnungen" gesetzt. Der Dateiname bleibt unverändert
-        /// (einheitliches DOK-{Id}-Schema) – Adresse/Betrag der Transaktion sind über die
-        /// Grid-Spalten sichtbar, nicht über den Dateinamen.
+        /// Zuweisen) und leitet daraus dieselben DMS-Metadaten ab. Der Dateiname bleibt
+        /// unverändert (einheitliches DOK-{Id}-Schema).
         /// </summary>
-        public void LinkToTransaktion(int attachmentId, int transaktionId)
+        public void LinkToTransaktion(int attachmentId, int transaktionId, bool requireUnlinked = false)
         {
-            var info = _db.GetAttachmentById(attachmentId);
-            if (info != null)
-                _db.UpdateAttachmentFileNameAndKategorie(attachmentId, info.Value.FileName, "Rechnungen");
+            _db.EnsureAttachmentsSchema();
+            var document = _db.LoadAllDocuments(null, null).FirstOrDefault(value => value.Id == attachmentId)
+                ?? throw new InvalidOperationException("Das DMS-Dokument wurde nicht gefunden.");
+            var transaction = _db.HoleTransaktion(transaktionId)
+                ?? throw new InvalidOperationException("Die ausgewählte Transaktion wurde nicht gefunden.");
+            var documentType = DetermineDmsDocumentType(transaction);
+            var changes = BuildTransactionMetadata(document, transaction, documentType);
+            var relation = documentType == DmsBelegart.Gutschrift ? "Gutschrift" : "Zahlung";
 
-            _db.LinkAttachmentToTransaktion(attachmentId, transaktionId);
-            _db.LogDmsActivity(attachmentId, "Verknuepft", $"Mit Transaktion #{transaktionId} verknüpft");
+            _db.LinkAttachmentToTransaktionAndUpdateMetadata(
+                attachmentId,
+                transaktionId,
+                changes,
+                requireUnlinked,
+                $"Mit Transaktion #{transaktionId} verknüpft ({relation})");
         }
+
+        /// <summary>
+        /// Ergänzt einmalig bereits früher verknüpfte Dokumente, bei denen die damalige
+        /// Verknüpfung noch keine Transaktions-Metadaten übernommen hat.
+        /// </summary>
+        public (int Updated, int Failed) RefreshLinkedTransactionMetadata()
+        {
+            _db.EnsureAttachmentsSchema();
+            var updated = 0;
+            var failed = 0;
+            var documents = _db.LoadAllDocuments(null, null)
+                .Where(value => value.EntityType == "Transaktion" && (value.EntityId ?? value.TransaktionId) > 0)
+                .ToList();
+
+            foreach (var document in documents)
+            {
+                try
+                {
+                    if (_db.HasDmsActivity(document.Id, TransactionMetadataActivityType))
+                        continue;
+                    var transactionId = document.EntityId ?? document.TransaktionId;
+                    var transaction = transactionId.HasValue ? _db.HoleTransaktion(transactionId.Value) : null;
+                    if (transaction is null)
+                    {
+                        failed++;
+                        continue;
+                    }
+
+                    var documentType = DetermineDmsDocumentType(transaction);
+                    var changes = BuildTransactionMetadata(document, transaction, documentType);
+                    _db.UpdateDmsDocument(document.Id, changes);
+                    _db.LogDmsActivity(document.Id, TransactionMetadataActivityType,
+                        "Bestehende Verknüpfung: Dokumentdaten aus der Transaktion ergänzt");
+                    updated++;
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+
+            return (updated, failed);
+        }
+
+        private DmsDocumentChanges BuildTransactionMetadata(
+            DmsDocument document,
+            Transaktion transaction,
+            DmsBelegart documentType)
+        {
+            var transactionParty = NormalizeWhitespace(transaction.AdresseName);
+            var party = FirstNonEmpty(
+                transactionParty,
+                document.EigeneAdresseName,
+                transaction.BankName);
+            // Sobald die Buchung eine erkannte Gegenpartei besitzt, ist diese für den
+            // DMS-Titel verbindlicher als der OCR-Titel. OCR findet auf Rechnungen häufig
+            // zuerst den Rechnungsempfänger (z. B. den eigenen Namen) statt des Absenders.
+            var title = !string.IsNullOrWhiteSpace(transactionParty) || IsGenericDocumentTitle(document)
+                ? BuildTransactionTitle(documentType, party, transaction.Notiz, transaction.Datum)
+                : document.Titel;
+            var description = MergeTransactionDescription(
+                document.Beschreibung,
+                BuildTransactionDescription(documentType, transaction, party));
+            var keywords = AddKeyword(document.Schlagwoerter, documentType.ToString());
+
+            return new DmsDocumentChanges(
+                title,
+                documentType == DmsBelegart.Gutschrift ? "Gutschriften" : "Rechnungen",
+                documentType,
+                description,
+                keywords,
+                string.IsNullOrWhiteSpace(document.Notiz) ? NormalizeWhitespace(transaction.Notiz) : document.Notiz,
+                document.Bearbeitungsstatus,
+                document.Verantwortlich,
+                document.DokumentDatum ?? transaction.Datum.Date,
+                document.ErkannterBetrag ?? Math.Abs(transaction.Betrag),
+                transaction.AdresseId ?? document.AdresseId,
+                document.IstGarantieschein,
+                document.GarantieAblaufDatum,
+                document.ExplizitFaelligAm,
+                document.AufbewahrenBis);
+        }
+
+        private DmsBelegart DetermineDmsDocumentType(Transaktion transaction)
+        {
+            var fromDirection = GetAccountDirection(transaction.VonKontoId);
+            var toDirection = GetAccountDirection(transaction.NachKontoId);
+            if (string.Equals(fromDirection, "Einnahme", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(toDirection, "Einnahme", StringComparison.OrdinalIgnoreCase))
+                return DmsBelegart.Gutschrift;
+
+            // Die importierten Belastungen laufen Bank/Durchlauf -> Kostenkonto.
+            if (string.Equals(toDirection, "Ausgabe", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(fromDirection, "Ausgabe", StringComparison.OrdinalIgnoreCase))
+                return DmsBelegart.Rechnung;
+
+            // Rückzahlungen/Gutschriften laufen in Gegenrichtung: Kostenkonto ->
+            // Bank/Kreditkarten-/Durchlaufseite.
+            if (string.Equals(fromDirection, "Ausgabe", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(toDirection, "Ausgabe", StringComparison.OrdinalIgnoreCase))
+                return DmsBelegart.Gutschrift;
+
+            if (transaction.VonKontoId.HasValue && !transaction.NachKontoId.HasValue)
+                return DmsBelegart.Gutschrift;
+            if (!transaction.VonKontoId.HasValue && transaction.NachKontoId.HasValue)
+                return DmsBelegart.Rechnung;
+
+            // Nur bei strukturell nicht eindeutigen Alt-/Manuellbuchungen dient der
+            // Buchungstext als zusätzliche Evidenz. So kann z. B. das Wort "Gutschrift"
+            // in einer normalen Rechnungsnotiz keine klare Belastung umklassifizieren.
+            var note = NormalizeWhitespace(transaction.Notiz)?.ToUpperInvariant() ?? string.Empty;
+            string[] creditTerms =
+            {
+                "GUTSCHRIFT", "RÜCKERSTATT", "RUECKERSTATT", "RÜCKVERGÜT", "RUECKVERGUET",
+                "REFUND", "STORNO", "CREDIT NOTE"
+            };
+            if (creditTerms.Any(term => note.Contains(term, StringComparison.Ordinal)))
+                return DmsBelegart.Gutschrift;
+
+            return DmsBelegart.Rechnung;
+        }
+
+        private string? GetAccountDirection(int? accountId)
+        {
+            if (!accountId.HasValue) return null;
+            var accountNumber = _db.HoleKontonummerByKontoId(accountId.Value);
+            return accountNumber.HasValue ? _db.FindeRegelFuerKontonummer(accountNumber.Value)?.Richtung : null;
+        }
+
+        private static string BuildTransactionTitle(
+            DmsBelegart documentType,
+            string? party,
+            string? note,
+            DateTime transactionDate)
+        {
+            var subject = FirstNonEmpty(party, NormalizeWhitespace(note));
+            if (!string.IsNullOrWhiteSpace(subject) && subject.Length > 130)
+                subject = subject[..130].TrimEnd();
+            var title = string.IsNullOrWhiteSpace(subject)
+                ? $"{documentType} vom {transactionDate:dd.MM.yyyy}"
+                : $"{documentType} – {subject}";
+            return title.Length <= 200 ? title : title[..200].TrimEnd();
+        }
+
+        private static string BuildTransactionDescription(
+            DmsBelegart documentType,
+            Transaktion transaction,
+            string? party)
+        {
+            var movement = documentType == DmsBelegart.Gutschrift ? "Gutschrift von" : "Zahlung an";
+            var counterpart = string.IsNullOrWhiteSpace(party) ? "unbekannte Gegenpartei" : party;
+            var amount = Math.Abs(transaction.Betrag).ToString("N2", CultureInfo.GetCultureInfo("de-CH"));
+            var builder = new StringBuilder($"Transaktionsbezug: {movement} {counterpart} am {transaction.Datum:dd.MM.yyyy} über CHF {amount}.");
+            var note = NormalizeWhitespace(transaction.Notiz);
+            if (!string.IsNullOrWhiteSpace(note))
+                builder.Append(" Buchungstext: ").Append(note).Append('.');
+            if (!string.IsNullOrWhiteSpace(transaction.BankName)
+                && !string.Equals(transaction.BankName, party, StringComparison.CurrentCultureIgnoreCase))
+                builder.Append(" Geldinstitut: ").Append(transaction.BankName.Trim()).Append('.');
+            return builder.Length <= 1000 ? builder.ToString() : builder.ToString(0, 1000).TrimEnd();
+        }
+
+        private static string MergeTransactionDescription(string? current, string automaticDescription)
+        {
+            const string marker = "Transaktionsbezug:";
+            var existing = current?.Trim() ?? string.Empty;
+            var markerIndex = existing.IndexOf(marker, StringComparison.CurrentCultureIgnoreCase);
+            if (markerIndex >= 0)
+                existing = existing[..markerIndex].TrimEnd();
+            var merged = string.IsNullOrWhiteSpace(existing)
+                ? automaticDescription
+                : existing + Environment.NewLine + automaticDescription;
+            return merged.Length <= 1000 ? merged : merged[..1000].TrimEnd();
+        }
+
+        private static string? AddKeyword(string? current, string keyword)
+        {
+            var values = (current ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            if (!values.Contains(keyword, StringComparer.CurrentCultureIgnoreCase))
+                values.Add(keyword);
+            var result = string.Join(", ", values);
+            return result.Length <= 1000 ? result : result[..1000].TrimEnd(' ', ',');
+        }
+
+        private static bool IsGenericDocumentTitle(DmsDocument document)
+        {
+            if (string.IsNullOrWhiteSpace(document.Titel)) return true;
+            var titleStem = Path.GetFileNameWithoutExtension(document.Titel).Trim();
+            var fileStem = Path.GetFileNameWithoutExtension(document.FileName);
+            var originalStem = Path.GetFileNameWithoutExtension(document.OriginalName ?? string.Empty);
+            if (string.Equals(titleStem, fileStem, StringComparison.CurrentCultureIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(originalStem)
+                    && string.Equals(titleStem, originalStem, StringComparison.CurrentCultureIgnoreCase)))
+                return true;
+
+            var upper = titleStem.ToUpperInvariant();
+            string[] scannerPrefixes = { "WLMAGE_", "WLMAGE-", "IMG_", "IMG-", "IMAGE_", "SCAN_", "SCAN-", "DOK-", "DOK_", "DOCUMENT_", "DOKUMENT_" };
+            return scannerPrefixes.Any(prefix => upper.StartsWith(prefix, StringComparison.Ordinal)
+                && upper[prefix.Length..].Any(char.IsDigit));
+        }
+
+        private static string? NormalizeWhitespace(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            return string.Join(" ", value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        private static string? FirstNonEmpty(params string?[] values)
+            => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
         public void UnlinkFromTransaktion(int attachmentId)
         {
@@ -512,6 +732,95 @@ namespace MyCoinFlow.Services
             Process.Start(new ProcessStartInfo(fullPath) { UseShellExecute = true });
         }
 
+        /// <summary>
+        /// Kopiert die aktuelle Fassung aller markierten Steuerunterlagen in einen gemeinsamen
+        /// Zielordner. Bereits vorhandene Dateien werden über ihren SHA-256-Inhalt erkannt;
+        /// gleichnamige, aber unterschiedliche Dokumente erhalten eine laufende Nummer.
+        /// </summary>
+        public async Task<DmsTaxExportResult> ExportTaxDocumentsAsync(
+            IReadOnlyCollection<DmsDocument> documents,
+            string targetFolder,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(targetFolder))
+                throw new ArgumentException("Der Zielordner fehlt.", nameof(targetFolder));
+
+            var taxDocuments = documents.Where(document => document.IstSteuerunterlage).ToList();
+            var fullTargetFolder = Path.GetFullPath(targetFolder);
+            Directory.CreateDirectory(fullTargetFolder);
+
+            var existingHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var existingFile in Directory.EnumerateFiles(fullTargetFolder, "*", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    existingHashes.Add(await ComputeHashAsync(existingFile, cancellationToken));
+                }
+                catch (IOException exception)
+                {
+                    throw new IOException($"Die vorhandene Datei „{Path.GetFileName(existingFile)}“ konnte für die Dublettenprüfung nicht gelesen werden.", exception);
+                }
+                catch (UnauthorizedAccessException exception)
+                {
+                    throw new UnauthorizedAccessException($"Auf die vorhandene Datei „{Path.GetFileName(existingFile)}“ kann für die Dublettenprüfung nicht zugegriffen werden.", exception);
+                }
+            }
+
+            var storageRoot = GetStorageRoot();
+            var copied = 0;
+            var duplicates = 0;
+            var missing = 0;
+            var renamed = 0;
+
+            foreach (var document in taxDocuments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sourcePath = SafePath(storageRoot, Path.Combine(document.FolderRel, document.FileName));
+                if (!File.Exists(sourcePath))
+                {
+                    missing++;
+                    continue;
+                }
+
+                var sourceHash = string.IsNullOrWhiteSpace(document.InhaltHash)
+                    ? await ComputeHashAsync(sourcePath, cancellationToken)
+                    : document.InhaltHash;
+                if (existingHashes.Contains(sourceHash))
+                {
+                    duplicates++;
+                    continue;
+                }
+
+                var desiredFileName = BuildTaxExportFileName(document);
+                var destinationPath = UniquePath(fullTargetFolder, desiredFileName);
+                if (!string.Equals(Path.GetFileName(destinationPath), desiredFileName, StringComparison.OrdinalIgnoreCase))
+                    renamed++;
+
+                try
+                {
+                    await using var source = new FileStream(
+                        sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                        81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    await using var destination = new FileStream(
+                        destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                        81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    await source.CopyToAsync(destination, cancellationToken);
+                }
+                catch
+                {
+                    if (File.Exists(destinationPath))
+                        File.Delete(destinationPath);
+                    throw;
+                }
+
+                existingHashes.Add(sourceHash);
+                copied++;
+            }
+
+            return new DmsTaxExportResult(taxDocuments.Count, copied, duplicates, missing, renamed);
+        }
+
         public void InitializeExistingDocumentHashes()
         {
             var root = GetStorageRoot();
@@ -554,6 +863,43 @@ namespace MyCoinFlow.Services
         {
             using var stream = File.OpenRead(path);
             return Convert.ToHexString(SHA256.HashData(stream));
+        }
+
+        private static async Task<string> ComputeHashAsync(string path, CancellationToken cancellationToken)
+        {
+            await using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
+        }
+
+        private static string BuildTaxExportFileName(DmsDocument document)
+        {
+            var extension = Path.GetExtension(document.FileName);
+            var title = document.TitelAnzeige.Trim();
+            if (!string.IsNullOrWhiteSpace(extension) && title.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                title = title[..^extension.Length];
+
+            var invalidCharacters = Path.GetInvalidFileNameChars().ToHashSet();
+            var sanitized = new string(title
+                .Select(character => invalidCharacters.Contains(character) || char.IsControl(character) ? '_' : character)
+                .ToArray())
+                .Trim()
+                .TrimEnd('.', ' ');
+            if (string.IsNullOrWhiteSpace(sanitized))
+                sanitized = $"Dokument-{document.Id:D6}";
+            if (sanitized.Length > 180)
+                sanitized = sanitized[..180].TrimEnd('.', ' ');
+
+            var reservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "CON", "PRN", "AUX", "NUL",
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+            };
+            if (reservedNames.Contains(sanitized))
+                sanitized = "_" + sanitized;
+            return sanitized + extension.ToLowerInvariant();
         }
 
         private static string UniquePath(string folder, string fileName)

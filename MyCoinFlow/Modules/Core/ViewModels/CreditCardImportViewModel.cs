@@ -226,13 +226,24 @@ namespace MyCoinFlow.ViewModels
 
             if (dlg.ShowDialog() == true && dlg.SelectedKontoId.HasValue)
             {
-                _db.UpdateCcStagingZuordnung(row.Id, dlg.SelectedAdresseId, dlg.SelectedKontoId.Value);
-
-                // Gelernte Adresse/Regel sofort auf übrige offene Zeilen dieses Batches anwenden
-                AutoMatchOffeneZeilenImBatch();
-
-                ReloadStaging();
+                UebernehmeZuordnung(row, dlg.SelectedAdresseId, dlg.SelectedKontoId.Value);
             }
+        }
+
+        /// <summary>
+        /// Führt nach einer bestätigten Zuordnungsmaske exakt denselben Ablauf aus,
+        /// unabhängig davon, ob die Maske aus WPF oder WinUI stammt.
+        /// </summary>
+        public void UebernehmeZuordnung(CreditCardImportRow row, int? adresseId, int kontoId)
+        {
+            if (row == null) throw new ArgumentNullException(nameof(row));
+
+            _db.UpdateCcStagingZuordnung(row.Id, adresseId, kontoId);
+
+            // Gelernte Adresse/Regel sofort auf übrige offene Zeilen dieses Batches anwenden
+            AutoMatchOffeneZeilenImBatch();
+
+            ReloadStaging();
         }
 
         private void AutoMatchOffeneZeilenImBatch()

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="MyCoinFlow.WinUI.Views.BudgetPeriodEditorDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Budgetzeitraum"
+    PrimaryButtonText="Speichern"
+    CloseButtonText="Abbrechen"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick">
+
+    <Grid MinWidth="520">
+        <StackPanel Spacing="12">
+            <TextBlock x:Name="HeadingText" Style="{StaticResource SectionTitleStyle}" />
+            <InfoBar x:Name="EditorError" IsOpen="False" IsClosable="True" Severity="Error" />
+            <TextBox x:Name="NameBox" Header="Bezeichnung*" />
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <DatePicker x:Name="StartPicker" Header="Startdatum*" MinWidth="240" HorizontalAlignment="Stretch" />
+                <DatePicker x:Name="EndPicker" Grid.Column="1" Header="Enddatum*" MinWidth="240" HorizontalAlignment="Stretch" />
+            </Grid>
+            <CheckBox x:Name="ActiveCheckBox" Content="Aktiv" />
+        </StackPanel>
+    </Grid>
+</ContentDialog>

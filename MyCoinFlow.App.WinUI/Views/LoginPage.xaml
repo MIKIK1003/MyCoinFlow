@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="MyCoinFlow.WinUI.Views.LoginPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="36">
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="1120" MaxHeight="760" ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.9*" />
+                <ColumnDefinition Width="1.1*" />
+            </Grid.ColumnDefinitions>
+
+            <Border CornerRadius="24" Padding="34" MinWidth="390">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#DBD4F4" Offset="0" />
+                        <GradientStop Color="#BFE9E3" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid>
+                    <FontIcon Glyph="&#xEAFD;" FontSize="250" Opacity="0.06"
+                              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-28,-22" />
+                    <StackPanel VerticalAlignment="Center" Spacing="14">
+                        <Border Width="68" Height="68" CornerRadius="20" Background="{StaticResource MyCoinFlowAccentBrush}"
+                                HorizontalAlignment="Left">
+                            <FontIcon Glyph="&#xE8C7;" FontSize="34" Foreground="White" />
+                        </Border>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="MyCoinFlow" FontSize="36" FontWeight="Bold" />
+                            <TextBlock Text="Finanzen klar. Entscheidungen leichter."
+                                       FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Spacing="13" Margin="0,16,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE73E;" FontSize="17" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                <TextBlock Text="Mandant sicher auswählen" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE73E;" FontSize="17" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                <TextBlock Text="Lokal, schnell und übersichtlich" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE73E;" FontSize="17" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                <TextBlock Text="Module und Rechte integriert" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="MyCoinFlow 3 · WinUI Preview" VerticalAlignment="Bottom"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" CornerRadius="24" Padding="38" MinWidth="510">
+                <ScrollViewer Style="{StaticResource FormScrollViewerStyle}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Willkommen zurück" FontSize="30" FontWeight="SemiBold" />
+                            <TextBlock Text="Wähle den Mandanten und melde dich an. Deine freigeschalteten Module erscheinen anschließend automatisch."
+                                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <InfoBar x:Name="StatusInfoBar" IsOpen="False" IsClosable="False" />
+
+                        <Border x:Name="ActivationPanel" Visibility="Collapsed"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="12" Padding="16">
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE72E;" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                    <TextBlock Text="Aktivierung erforderlich" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock x:Name="ActivationMessageText" TextWrapping="Wrap" />
+                                <Button x:Name="StartTrialButton" Content="30-Tage-Testversion starten"
+                                        HorizontalAlignment="Left" Click="OnStartTrialClick" />
+                                <TextBlock Text="Eine Lizenzdatei kann bis zur Migration der Einstellungen weiterhin in MyCoinFlow 2 importiert werden."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
+
+                        <ComboBox x:Name="DatabaseBox" Header="Datenbank (Mandant)" PlaceholderText="Mandant wird geladen …"
+                                  HorizontalAlignment="Stretch" SelectionChanged="OnDatabaseSelectionChanged" />
+
+                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="12" Padding="18">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="20" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                    <TextBlock Text="Anmeldung" FontSize="20" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBox x:Name="UsernameBox" Header="Benutzername" PlaceholderText="Benutzername"
+                                         KeyDown="OnLoginFieldKeyDown" />
+                                <PasswordBox x:Name="PasswordBox" Header="Passwort" PlaceholderText="Passwort"
+                                             PasswordRevealMode="Peek" KeyDown="OnLoginFieldKeyDown" />
+                                <Button x:Name="LoginButton" Content="Anmelden" Style="{StaticResource AccentButtonStyle}"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Click="OnLoginClick" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="DatabaseStatusText" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ProgressRing x:Name="BusyRing" Grid.Column="1" Width="22" Height="22" IsActive="False" />
+                        </Grid>
+
+                        <Expander x:Name="FirstUserExpander" Header="Ersten Benutzer anlegen" IsEnabled="False">
+                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" Padding="16" CornerRadius="0,0,12,12">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Der erste Benutzer dieses Mandanten erhält Administratorrechte."
+                                               TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBox x:Name="NewUsernameBox" Header="Benutzername" />
+                                    <PasswordBox x:Name="NewPasswordBox" Header="Passwort" PasswordRevealMode="Peek" />
+                                    <PasswordBox x:Name="RepeatPasswordBox" Header="Passwort wiederholen" PasswordRevealMode="Peek" />
+                                    <Button Content="Administrator anlegen" Click="OnCreateFirstUserClick" />
+                                </StackPanel>
+                            </Border>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

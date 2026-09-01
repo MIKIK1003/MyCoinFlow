@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="MyCoinFlow.WinUI.Views.AccountStructureSettingsControl" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid RowSpacing="14"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Kontenplan – Struktur" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Konten-Arten, Gruppen und Untergruppen" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel><CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right"><AppBarButton Label="Import (Excel)" Click="OnImportClick"><AppBarButton.Icon><FontIcon Glyph="&#xE8B5;"/></AppBarButton.Icon></AppBarButton><AppBarButton Label="Export (Excel)" Click="OnExportClick"><AppBarButton.Icon><FontIcon Glyph="&#xE8B5;"/></AppBarButton.Icon></AppBarButton><AppBarSeparator/><AppBarButton Label="Neu" Click="OnNewClick"><AppBarButton.Icon><FontIcon Glyph="&#xE710;"/></AppBarButton.Icon></AppBarButton><AppBarButton Label="Speichern" Click="OnSaveClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74E;"/></AppBarButton.Icon></AppBarButton><AppBarButton Label="Löschen" Foreground="{StaticResource MyCoinFlowDangerBrush}" Click="OnDeleteClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;"/></AppBarButton.Icon></AppBarButton></CommandBar></Grid>
+  <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="14,10"><TextBox x:Name="NameBox" Header="Bezeichnung"/></Border>
+  <TabView x:Name="StructureTabs" Grid.Row="2" IsAddTabButtonVisible="False" SelectionChanged="OnTabChanged">
+   <TabViewItem Header="Konten-Art" Tag="Art"><ListView x:Name="ArtsList" DisplayMemberPath="Bezeichnung" SelectionChanged="OnSelectionChanged"/></TabViewItem>
+   <TabViewItem Header="Konten-Gruppe" Tag="Group"><ListView x:Name="GroupsList" DisplayMemberPath="Bezeichnung" SelectionChanged="OnSelectionChanged"/></TabViewItem>
+   <TabViewItem Header="Konten-Untergruppe" Tag="Subgroup"><ListView x:Name="SubgroupsList" DisplayMemberPath="Bezeichnung" SelectionChanged="OnSelectionChanged"/></TabViewItem>
+  </TabView>
+  <InfoBar x:Name="StatusBar" Grid.Row="3" IsOpen="False" IsClosable="True"/>
+ </Grid>
+</UserControl>

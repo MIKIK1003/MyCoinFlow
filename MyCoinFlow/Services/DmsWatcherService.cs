@@ -14,6 +14,19 @@ using MyCoinFlow.Views;
 namespace MyCoinFlow.Services
 {
     /// <summary>
+    /// Beide Seiten einer vom Benutzer zu bestätigenden DMS-Zuordnung. Die Oberfläche muss
+    /// sowohl das Dokument als auch die möglichen Transaktionen eindeutig zeigen können.
+    /// </summary>
+    public sealed record DmsTransactionSelectionRequest(
+        int AttachmentId,
+        string DocumentTitle,
+        string FileName,
+        DateTime? DocumentDate,
+        decimal? RecognizedAmount,
+        string? Address,
+        IReadOnlyList<Transaktion> Candidates);
+
+    /// <summary>
     /// Überwacht den in den Einstellungen konfigurierten DMS-Arbeitsordner und verarbeitet neu
     /// eintreffende Dateien sequenziell: OCR/Textlayer -> Datums-/Titel-Erkennung -> Ablage im
     /// Ablageordner (AttachmentService.AttachFromWatcher) -> Transaktions-Matching
@@ -49,6 +62,13 @@ namespace MyCoinFlow.Services
 
         private DmsWatcherService() { }
 
+        /// <summary>
+        /// UI-neutraler Auswahl-Hook für Oberflächen ohne WPF-Dispatcher (insbesondere WinUI 3).
+        /// Die WPF-Anwendung verwendet weiterhin ihren bestehenden modalen Dialog. Eine andere
+        /// Oberfläche kann hier denselben fachlichen Auswahlablauf bereitstellen.
+        /// </summary>
+        public Func<DmsTransactionSelectionRequest, Task<int?>>? TransactionPickerAsync { get; set; }
+
         // ---------------- Bindbare Statuswerte (Fortschrittsanzeige) ----------------
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -57,11 +77,21 @@ namespace MyCoinFlow.Services
         {
             var dispatcher = Application.Current?.Dispatcher;
 
+            // In WinUI existiert keine WPF-Application. Die WinUI-Abonnenten übernehmen das
+            // Marshalling über ihre DispatcherQueue selbst; das Event darf deshalb nicht wie
+            // bisher still verloren gehen.
+            if (dispatcher == null)
+            {
+                try { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name)); }
+                catch (OperationCanceledException) { /* Oberfläche wird gerade beendet */ }
+                return;
+            }
+
             // Beim App-Beenden ist der Dispatcher bereits im Shutdown – ein Invoke
             // würde dann eine TaskCanceledException werfen (und im Debugger anhalten,
             // statt die Debug-Sitzung mit der App zu beenden). Status-Updates sind
             // zu diesem Zeitpunkt ohnehin bedeutungslos.
-            if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+            if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                 return;
 
             // Auch die ABONNENTEN des Events können beim Herunterfahren in den Dispatcher
@@ -522,12 +552,14 @@ namespace MyCoinFlow.Services
             // kann danebenliegen (z. B. bei Mehrspalten-Layouts). Daher mehrere Kandidaten der
             // Reihe nach probieren, statt blind nur dem bestbewerteten zu vertrauen.
             var kandidaten = new List<Transaktion>();
+            decimal? passenderBetrag = null;
             bool niedrigeZuversicht = false;
             foreach (var (betrag, score) in betragsKandidaten.Take(5))
             {
                 kandidaten = _db.FindCandidateTransaktionenForMatch(betrag, docDatum, tageVorher: tageVorher, tageNachher: 60);
                 if (kandidaten.Count > 0)
                 {
+                    passenderBetrag = betrag;
                     // Nicht still verknüpfen, wenn der Treffer NICHT auf dem bestbewerteten
                     // Betrag (dem mutmasslichen Total) beruht: Ein Positionsbetrag kann
                     // zufällig auf eine fremde Transaktion passen (beobachteter Fall:
@@ -566,7 +598,13 @@ namespace MyCoinFlow.Services
                 ? "Mehrere passende Transaktionen – Auswahl erforderlich…"
                 : "Unsicherer Treffer – Bestätigung erforderlich…";
 
-            var gewaehlt = AskUserToPickTransaktion(kandidaten);
+            var request = BuildSelectionRequest(
+                attachmentId,
+                docDatum,
+                passenderBetrag ?? betragsKandidaten[0].Amount,
+                matchedAdresseId,
+                kandidaten);
+            var gewaehlt = AskUserToPickTransaktion(request);
             if (gewaehlt.HasValue)
             {
                 _attachSvc.LinkToTransaktion(attachmentId, gewaehlt.Value);
@@ -578,20 +616,63 @@ namespace MyCoinFlow.Services
             }
         }
 
-        private int? AskUserToPickTransaktion(List<Transaktion> kandidaten)
+        private DmsTransactionSelectionRequest BuildSelectionRequest(
+            int attachmentId,
+            DateTime documentDate,
+            decimal? recognizedAmount,
+            int? matchedAddressId,
+            IReadOnlyList<Transaktion> candidates)
+        {
+            DmsDocument? document = null;
+            string? address = null;
+            try
+            {
+                document = _db.LoadAllDocuments(null, null).FirstOrDefault(value => value.Id == attachmentId);
+                address = document?.AdresseAnzeige;
+                if (string.IsNullOrWhiteSpace(address) && matchedAddressId.HasValue)
+                    address = _db.LadeAdressen().FirstOrDefault(value => value.Id == matchedAddressId.Value)?.Name;
+            }
+            catch
+            {
+                // Der Auswahl-Dialog muss auch dann funktionieren, wenn optionale Anzeigedaten
+                // gerade nicht nachgeladen werden konnten.
+            }
+
+            return new DmsTransactionSelectionRequest(
+                attachmentId,
+                document?.TitelAnzeige ?? $"Dokument #{attachmentId}",
+                document?.FileName ?? $"Dokument #{attachmentId}",
+                document?.DokumentDatum ?? documentDate,
+                recognizedAmount ?? document?.ErkannterBetrag,
+                string.IsNullOrWhiteSpace(address) ? null : address,
+                candidates);
+        }
+
+        private int? AskUserToPickTransaktion(DmsTransactionSelectionRequest request)
         {
             var dispatcher = Application.Current?.Dispatcher;
 
+            // WinUI 3: Der Singleton wird aus dem WPF-Projekt mitverwendet, hat dort aber
+            // bewusst keine WPF-Application. Der registrierte Hook zeigt den äquivalenten
+            // WinUI-Auswahldialog und blockiert nur diesen sequenziellen Watcher-Worker.
+            if (dispatcher == null)
+            {
+                var picker = TransactionPickerAsync;
+                if (picker == null) return null;
+                try { return picker(request).GetAwaiter().GetResult(); }
+                catch (OperationCanceledException) { return null; }
+            }
+
             // App fährt gerade herunter: kein Dialog mehr möglich –
             // Dokument bleibt unverknüpft und ist im DMS unter „Frei" verfügbar.
-            if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+            if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                 return null;
 
             try
             {
                 return dispatcher.Invoke(() =>
                 {
-                    var dlg = new DmsAssignTransactionDialog(kandidaten) { Owner = Application.Current?.MainWindow };
+                    var dlg = new DmsAssignTransactionDialog(request.Candidates.ToList()) { Owner = Application.Current?.MainWindow };
                     return dlg.ShowDialog() == true ? dlg.AusgewaehlteTransaktionId : null;
                 });
             }

@@ -405,134 +405,7 @@ namespace MyCoinFlow.ViewModels
 
                 if (dlg.ShowDialog() == true)
                 {
-                    bool changed = false;
-
-                    if (dlg.SelectedAdresseId.HasValue && item.VorschlagAdresseId != dlg.SelectedAdresseId.Value)
-                    {
-                        item.VorschlagAdresseId = dlg.SelectedAdresseId.Value;
-                        changed = true;
-                    }
-
-                    if (dlg.SelectedKontoId.HasValue)
-                    {
-                        if (item.Direction == KreditDebit.Credit)
-                        {
-                            if (item.VorschlagAdresseId.HasValue)
-                            {
-                                var adr = _db.LadeAdresseById(item.VorschlagAdresseId.Value);
-
-                                if (IstUmbuchungsAdresse(adr?.Name))
-                                {
-                                    // CRDT (Eingang): Durchlaufkonto als VON
-                                    item.VorschlagVonKontoId = dlg.SelectedKontoId.Value;
-                                    item.VorschlagNachKontoId = null;
-                                    changed = true;
-                                }
-                                else if (adr.IstBudgetiert)
-                                {
-                                    // Echte Einnahmen
-                                    if (item.VorschlagNachKontoId != dlg.SelectedKontoId.Value)
-                                    {
-                                        item.VorschlagNachKontoId = dlg.SelectedKontoId.Value;
-                                        changed = true;
-                                    }
-                                    item.VorschlagVonKontoId = null;
-                                }
-                                else
-                                {
-                                    // Refund
-                                    if (item.VorschlagVonKontoId != dlg.SelectedKontoId.Value)
-                                    {
-                                        item.VorschlagVonKontoId = dlg.SelectedKontoId.Value;
-                                        changed = true;
-                                    }
-                                    item.VorschlagNachKontoId = null;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // DBIT (Ausgang)
-                            if (item.VorschlagAdresseId.HasValue)
-                            {
-                                var adr = _db.LadeAdresseById(item.VorschlagAdresseId.Value);
-                                if (IstUmbuchungsAdresse(adr?.Name))
-                                {
-                                    // DBIT: Durchlaufkonto als NACH
-                                    if (item.VorschlagNachKontoId != dlg.SelectedKontoId.Value)
-                                    {
-                                        item.VorschlagNachKontoId = dlg.SelectedKontoId.Value;
-                                        changed = true;
-                                    }
-                                    item.VorschlagVonKontoId = null;
-                                }
-                                else
-                                {
-                                    // normale Ausgabe
-                                    if (item.VorschlagNachKontoId != dlg.SelectedKontoId.Value)
-                                    {
-                                        item.VorschlagNachKontoId = dlg.SelectedKontoId.Value;
-                                        changed = true;
-                                    }
-                                    item.VorschlagVonKontoId = null;
-                                }
-                            }
-                        }
-                    }
-
-                    if (!item.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(item.AccountIban))
-                    {
-                        var gi = TryFindGeldinstitutId(item.AccountIban);
-                        if (gi.HasValue)
-                        {
-                            item.VorschlagGeldinstitutId = gi.Value;
-                            changed = true;
-                        }
-                    }
-
-                    if (item.VorschlagAdresseId.HasValue)
-                        _matcher.AddAliasFromTextIfNew(item.VorschlagAdresseId.Value, item.Text);
-
-                    if (changed)
-                    {
-                        PersistSuggestionsIfStaged(item);
-                        item.NotifyLabelPropertiesChanged();
-                    }
-
-                    // -------------------------------------------------
-                    // NEU:
-                    // Nach dem Anlernen nicht mit altem In-Memory-Zustand
-                    // weiterarbeiten. Sonderregeln / Standardkonten / Aliase
-                    // sollen sofort aus der DB neu wirksam werden.
-                    // -------------------------------------------------
-                    _matcher.Reload();
-
-                    // Wenn die Zeilen aus dem Staging stammen, laden wir den
-                    // ganzen Stapel hart neu aus der DB. Das ist die robusteste
-                    // Variante und verhindert "hängende" Vorschläge.
-                    if (Items.Any(x => x.StagingId.HasValue))
-                    {
-                        LoadPendingFromDb();
-                        return;
-                    }
-
-                    // Fallback für Datei-Import ohne vorheriges Staging:
-                    // Vorschläge aktiv zurücksetzen und komplett neu berechnen.
-                    foreach (var it2 in Items)
-                    {
-                        it2.VorschlagAdresseId = null;
-                        it2.VorschlagNachKontoId = null;
-                        it2.VorschlagVonKontoId = null;
-                        it2.VorschlagGeldinstitutId = null;
-                    }
-
-                    AutoMatchAdressen();
-
-                    BankImportLabelCache.Refresh();
-                    foreach (var it2 in Items)
-                        it2.NotifyLabelPropertiesChanged();
-
-                    RefreshItemsView();
+                    UebernehmeZuordnung(item, dlg.SelectedAdresseId, dlg.SelectedKontoId);
                 }
             }
             catch (Exception ex)
@@ -540,6 +413,111 @@ namespace MyCoinFlow.ViewModels
                 MessageBox.Show("Anlernen fehlgeschlagen:\n" + ex.Message,
                     "Anlernen", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// Führt nach einer bestätigten Zuordnungsmaske exakt denselben Ablauf aus,
+        /// unabhängig davon, ob die Maske aus WPF oder WinUI stammt.
+        /// </summary>
+        public void UebernehmeZuordnung(BankImportItem item, int? adresseId, int? kontoId)
+        {
+            if (item == null) throw new ArgumentNullException(nameof(item));
+
+            bool changed = false;
+
+            if (adresseId.HasValue && item.VorschlagAdresseId != adresseId.Value)
+            {
+                item.VorschlagAdresseId = adresseId.Value;
+                changed = true;
+            }
+
+            if (kontoId.HasValue)
+            {
+                if (item.Direction == KreditDebit.Credit)
+                {
+                    if (item.VorschlagAdresseId.HasValue)
+                    {
+                        var adr = _db.LadeAdresseById(item.VorschlagAdresseId.Value);
+
+                        if (IstUmbuchungsAdresse(adr?.Name))
+                        {
+                            item.VorschlagVonKontoId = kontoId.Value;
+                            item.VorschlagNachKontoId = null;
+                            changed = true;
+                        }
+                        else if (adr.IstBudgetiert)
+                        {
+                            if (item.VorschlagNachKontoId != kontoId.Value)
+                            {
+                                item.VorschlagNachKontoId = kontoId.Value;
+                                changed = true;
+                            }
+                            item.VorschlagVonKontoId = null;
+                        }
+                        else
+                        {
+                            if (item.VorschlagVonKontoId != kontoId.Value)
+                            {
+                                item.VorschlagVonKontoId = kontoId.Value;
+                                changed = true;
+                            }
+                            item.VorschlagNachKontoId = null;
+                        }
+                    }
+                }
+                else if (item.VorschlagAdresseId.HasValue)
+                {
+                    if (item.VorschlagNachKontoId != kontoId.Value)
+                    {
+                        item.VorschlagNachKontoId = kontoId.Value;
+                        changed = true;
+                    }
+                    item.VorschlagVonKontoId = null;
+                }
+            }
+
+            if (!item.VorschlagGeldinstitutId.HasValue && !string.IsNullOrWhiteSpace(item.AccountIban))
+            {
+                var gi = TryFindGeldinstitutId(item.AccountIban);
+                if (gi.HasValue)
+                {
+                    item.VorschlagGeldinstitutId = gi.Value;
+                    changed = true;
+                }
+            }
+
+            if (item.VorschlagAdresseId.HasValue)
+                _matcher.AddAliasFromTextIfNew(item.VorschlagAdresseId.Value, item.Text);
+
+            if (changed)
+            {
+                PersistSuggestionsIfStaged(item);
+                item.NotifyLabelPropertiesChanged();
+            }
+
+            _matcher.Reload();
+
+            if (Items.Any(x => x.StagingId.HasValue))
+            {
+                LoadPendingFromDb();
+                return;
+            }
+
+            foreach (var itemToRefresh in Items)
+            {
+                itemToRefresh.VorschlagAdresseId = null;
+                itemToRefresh.VorschlagNachKontoId = null;
+                itemToRefresh.VorschlagVonKontoId = null;
+                itemToRefresh.VorschlagGeldinstitutId = null;
+            }
+
+            AutoMatchAdressen();
+
+            BankImportLabelCache.Refresh();
+            foreach (var itemToRefresh in Items)
+                itemToRefresh.NotifyLabelPropertiesChanged();
+
+            RefreshItemsView();
         }
 
 

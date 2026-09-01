@@ -27,6 +27,8 @@ IF COL_LENGTH('dbo.Attachment', 'AufbewahrenBis') IS NULL
     ALTER TABLE dbo.Attachment ADD AufbewahrenBis DATE NULL;
 IF COL_LENGTH('dbo.Attachment', 'IstFavorit') IS NULL
     ALTER TABLE dbo.Attachment ADD IstFavorit BIT NOT NULL CONSTRAINT DF_Attachment_IstFavorit DEFAULT 0;
+IF COL_LENGTH('dbo.Attachment', 'IstSteuerunterlage') IS NULL
+    ALTER TABLE dbo.Attachment ADD IstSteuerunterlage BIT NOT NULL CONSTRAINT DF_Attachment_IstSteuerunterlage DEFAULT 0;
 IF COL_LENGTH('dbo.Attachment', 'AktuelleVersion') IS NULL
     ALTER TABLE dbo.Attachment ADD AktuelleVersion INT NOT NULL CONSTRAINT DF_Attachment_AktuelleVersion DEFAULT 1;
 IF COL_LENGTH('dbo.Attachment', 'InhaltHash') IS NULL
@@ -74,7 +76,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttachmentVersion_Atta
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_DmsAktivitaet_AttachmentId_ZeitpunktUtc' AND object_id = OBJECT_ID('dbo.DmsAktivitaet'))
     CREATE INDEX IX_DmsAktivitaet_AttachmentId_ZeitpunktUtc ON dbo.DmsAktivitaet(AttachmentId, ZeitpunktUtc DESC);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Attachment_InhaltHash' AND object_id = OBJECT_ID('dbo.Attachment'))
-    CREATE INDEX IX_Attachment_InhaltHash ON dbo.Attachment(InhaltHash) WHERE InhaltHash IS NOT NULL;";
+    CREATE INDEX IX_Attachment_InhaltHash ON dbo.Attachment(InhaltHash) WHERE InhaltHash IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Attachment_IstSteuerunterlage' AND object_id = OBJECT_ID('dbo.Attachment'))
+    CREATE INDEX IX_Attachment_IstSteuerunterlage ON dbo.Attachment(IstSteuerunterlage) WHERE IstSteuerunterlage = 1;";
 
             using (var command = new SqlCommand(tablesSql, connection))
                 command.ExecuteNonQuery();
@@ -103,21 +107,23 @@ WHERE NOT EXISTS
         /// Speichert sämtliche Werte aus „Dokument organisieren“ atomar. Damit können die
         /// klassischen MyCoinFlow-Felder und die erweiterten DMS-Metadaten nie auseinanderlaufen.
         /// </summary>
-        public void UpdateDmsDocument(int attachmentId, DmsDocumentChanges changes)
+        public void UpdateDmsDocument(int attachmentId, DmsDocumentChanges changes, bool? isTaxDocument = null)
         {
             using var connection = CreateConnection();
             connection.Open();
             using var transaction = connection.BeginTransaction();
 
             string? oldStatus;
+            bool oldIsTaxDocument;
             string snapshot;
-            using (var read = new SqlCommand("SELECT Bearbeitungsstatus, COALESCE(NULLIF(Titel, ''), FileName) FROM dbo.Attachment WHERE Id=@id", connection, transaction))
+            using (var read = new SqlCommand("SELECT Bearbeitungsstatus, COALESCE(NULLIF(Titel, ''), FileName), IstSteuerunterlage FROM dbo.Attachment WHERE Id=@id", connection, transaction))
             {
                 read.Parameters.AddWithValue("@id", attachmentId);
                 using var reader = read.ExecuteReader();
                 if (!reader.Read()) throw new InvalidOperationException("Das Dokument wurde nicht gefunden.");
                 oldStatus = reader.IsDBNull(0) ? null : reader.GetString(0);
                 snapshot = reader.GetString(1);
+                oldIsTaxDocument = reader.GetBoolean(2);
             }
 
             const string sql = @"
@@ -137,6 +143,7 @@ UPDATE dbo.Attachment SET
     GarantieAblaufDatum=@warrantyExpiresAt,
     FaelligAm=@dueAt,
     AufbewahrenBis=@retainUntil,
+    IstSteuerunterlage=COALESCE(@isTaxDocument, IstSteuerunterlage),
     LetzteAenderungAmUtc=SYSUTCDATETIME()
 WHERE Id=@id;";
             using (var command = new SqlCommand(sql, connection, transaction))
@@ -158,6 +165,10 @@ WHERE Id=@id;";
                     changes.IsWarrantyCertificate ? DateValue(changes.WarrantyExpiresAt) : DBNull.Value);
                 command.Parameters.AddWithValue("@dueAt", DateValue(changes.DueAt));
                 command.Parameters.AddWithValue("@retainUntil", DateValue(changes.RetainUntil));
+                command.Parameters.Add(new SqlParameter("@isTaxDocument", System.Data.SqlDbType.Bit)
+                {
+                    Value = isTaxDocument.HasValue ? isTaxDocument.Value : DBNull.Value
+                });
                 if (command.ExecuteNonQuery() != 1)
                     throw new InvalidOperationException("Das Dokument wurde beim Speichern nicht gefunden.");
             }
@@ -166,8 +177,86 @@ WHERE Id=@id;";
             if (!string.Equals(oldStatus, changes.WorkflowStatus.ToString(), StringComparison.Ordinal))
                 InsertActivity(connection, transaction, attachmentId, snapshot, "StatusGeaendert",
                     $"Status: {oldStatus ?? "Neu"} → {changes.WorkflowStatus}");
+            if (isTaxDocument.HasValue && oldIsTaxDocument != isTaxDocument.Value)
+                InsertActivity(connection, transaction, attachmentId, snapshot, "SteuerkennzeichnungGeaendert",
+                    isTaxDocument.Value ? "Als Steuerunterlage markiert" : "Steuerkennzeichnung entfernt");
 
             transaction.Commit();
+        }
+
+        /// <summary>
+        /// Verknüpft ein DMS-Dokument atomar mit einer Transaktion und übernimmt gleichzeitig
+        /// die daraus abgeleiteten Metadaten. Dadurch verhalten sich manuelle Zuweisung,
+        /// automatisches Matching und die Verknüpfung von der Transaktionsseite identisch.
+        /// </summary>
+        public void LinkAttachmentToTransaktionAndUpdateMetadata(
+            int attachmentId,
+            int transaktionId,
+            DmsDocumentChanges changes,
+            bool requireUnlinked,
+            string linkDescription)
+        {
+            using var connection = CreateConnection();
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+            var snapshot = LoadSnapshot(connection, transaction, attachmentId);
+
+            const string sql = @"
+UPDATE dbo.Attachment SET
+    TransaktionId=@transactionId,
+    EntityType=N'Transaktion',
+    EntityId=@transactionId,
+    Titel=@title,
+    Kategorie=@category,
+    Belegart=@documentType,
+    Beschreibung=@description,
+    Schlagwoerter=@keywords,
+    Notiz=@note,
+    DokumentDatum=@documentDate,
+    ErkannterBetrag=@recognizedAmount,
+    AdresseId=@addressId,
+    LetzteAenderungAmUtc=SYSUTCDATETIME()
+WHERE Id=@id
+  AND (@requireUnlinked=0 OR (TransaktionId IS NULL AND EntityType IS NULL));";
+            using (var command = new SqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@id", attachmentId);
+                command.Parameters.AddWithValue("@transactionId", transaktionId);
+                command.Parameters.AddWithValue("@requireUnlinked", requireUnlinked ? 1 : 0);
+                command.Parameters.AddWithValue("@title", DbValue(changes.Title));
+                command.Parameters.AddWithValue("@category", DbValue(changes.Category));
+                command.Parameters.AddWithValue("@documentType", changes.DocumentType.HasValue ? changes.DocumentType.Value.ToString() : DBNull.Value);
+                command.Parameters.AddWithValue("@description", DbValue(changes.Description));
+                command.Parameters.AddWithValue("@keywords", DbValue(NormalizeKeywords(changes.Keywords)));
+                command.Parameters.AddWithValue("@note", DbValue(changes.Note));
+                command.Parameters.AddWithValue("@documentDate", DateValue(changes.DocumentDate));
+                command.Parameters.AddWithValue("@recognizedAmount", (object?)changes.RecognizedAmount ?? DBNull.Value);
+                command.Parameters.AddWithValue("@addressId", (object?)changes.AddressId ?? DBNull.Value);
+                if (command.ExecuteNonQuery() != 1)
+                    throw new InvalidOperationException(requireUnlinked
+                        ? "Das Dokument ist nicht mehr frei oder wurde zwischenzeitlich anderweitig verknüpft."
+                        : "Das Dokument wurde beim Verknüpfen nicht gefunden.");
+            }
+
+            InsertActivity(connection, transaction, attachmentId, snapshot, "Verknuepft", linkDescription);
+            InsertActivity(connection, transaction, attachmentId, snapshot, "MetadatenAusTransaktionV2",
+                "Dokumentdaten aus der verknüpften Transaktion ergänzt");
+            transaction.Commit();
+        }
+
+        public bool HasDmsActivity(int attachmentId, string activityType)
+        {
+            using var connection = CreateConnection();
+            connection.Open();
+            using var command = new SqlCommand(@"
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1 FROM dbo.DmsAktivitaet
+    WHERE AttachmentId=@id AND Art=@activityType
+) THEN 1 ELSE 0 END", connection);
+            command.Parameters.AddWithValue("@id", attachmentId);
+            command.Parameters.AddWithValue("@activityType", activityType);
+            return Convert.ToInt32(command.ExecuteScalar()) == 1;
         }
 
         public void SetDmsFavorite(int attachmentId, bool isFavorite)

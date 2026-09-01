@@ -20,6 +20,8 @@ namespace MyCoinFlow.ViewModels
         public int Id => Abo.Id;
         public string Name => Abo.Name;
         public string? AdresseName => Abo.AdresseName;
+        public string KategorieAnzeige => AboKategorien.Anzeige(Abo.Kategorie);
+        public string RichtungAnzeige => Zahlungsrichtungen.Anzeige(Abo.Richtung);
         public string PeriodizitaetAnzeige => AboPerioden.Anzeige(Abo.Periodizitaet);
 
         public string StatusAnzeige => Abo.Status switch
@@ -37,6 +39,8 @@ namespace MyCoinFlow.ViewModels
         public DateTime? NaechsteZahlung { get; set; }
         public DateTime? KuendigenBis => Abo.SpaetesterKuendigungsTermin;
         public int AnzahlZahlungen { get; set; }
+        public int AnzahlEinmaligeZahlungen { get; set; }
+        public decimal HistorischesTotal { get; set; }
         public decimal? Jahreskosten { get; set; }
         public string? KontoAnzeige { get; set; }
         public string? HinweisText { get; set; }
@@ -54,7 +58,9 @@ namespace MyCoinFlow.ViewModels
         public string? BankName { get; set; }
         public string? Notiz { get; set; }
         public bool ManuellZugeordnet { get; set; }
+        public bool IstEinmalig { get; set; }
         public string ZuordnungAnzeige => ManuellZugeordnet ? "manuell" : "automatisch";
+        public string ZahlungsartAnzeige => IstEinmalig ? "Einmalig" : "Wiederkehrend";
     }
 
     public class AbosViewModel : BaseViewModel
@@ -123,6 +129,7 @@ namespace MyCoinFlow.ViewModels
         public ICommand KontenBereinigenCommand { get; }
         public ICommand LueckenFuellenCommand { get; }
         public ICommand ZahlungEntfernenCommand { get; }
+        public ICommand ZahlungEinmaligCommand { get; }
         public ICommand AktualisierenCommand { get; }
 
         public AbosViewModel()
@@ -139,6 +146,7 @@ namespace MyCoinFlow.ViewModels
             KontenBereinigenCommand = new RelayCommand(_ => KontenBereinigen(), _ => AusgewaehltesAbo != null);
             LueckenFuellenCommand = new RelayCommand(_ => LueckenFuellen(), _ => AusgewaehltesAbo != null);
             ZahlungEntfernenCommand = new RelayCommand(p => ZahlungEntfernen(p));
+            ZahlungEinmaligCommand = new RelayCommand(p => ZahlungEinmaligUmschalten(p));
             AktualisierenCommand = new RelayCommand(_ => LadeDaten());
 
             try
@@ -172,6 +180,9 @@ namespace MyCoinFlow.ViewModels
                     .GroupBy(z => z.AboId)
                     .ToDictionary(g => g.Key, g => g.ToList());
 
+                foreach (var abo in _alleAbos.Where(a => a.Richtung == Zahlungsrichtungen.Unklar))
+                    abo.Richtung = RichtungAusZahlungen(abo.Id);
+
                 FuelleListe();
             }
             catch (Exception ex)
@@ -203,9 +214,10 @@ namespace MyCoinFlow.ViewModels
                     Abos.Add(row);
             }
 
-            AnzahlAktiv = _alleAbos.Count(a => a.Status == AboStatus.Aktiv);
+            AnzahlAktiv = _alleAbos.Count(a =>
+                a.Status == AboStatus.Aktiv && AboKategorien.IstDigitalesAbo(a.Kategorie));
             JahreskostenTotal = _alleAbos
-                .Where(a => a.Status == AboStatus.Aktiv)
+                .Where(a => a.Status == AboStatus.Aktiv && AboKategorien.IstDigitalesAbo(a.Kategorie))
                 .Sum(a => JahreskostenVon(a));
 
             AusgewaehltesAbo = Abos.FirstOrDefault(r => r.Id == vorherId) ?? Abos.FirstOrDefault();
@@ -213,7 +225,9 @@ namespace MyCoinFlow.ViewModels
 
         private decimal JahreskostenVon(Abo abo)
         {
-            var zahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z) ? z : new List<AboZahlung>();
+            var zahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z)
+                ? z.Where(value => !value.IstEinmalig).OrderByDescending(value => value.Datum).ToList()
+                : new List<AboZahlung>();
 
             var betrag = abo.ErwarteterBetrag
                          ?? (zahlungen.Count > 0 ? Math.Abs(zahlungen[0].Betrag) : 0m);
@@ -222,19 +236,42 @@ namespace MyCoinFlow.ViewModels
             return Math.Round(Math.Abs(betrag) * proJahr, 2);
         }
 
+        private string RichtungAusZahlungen(int aboId)
+        {
+            if (!_zahlungenProAbo.TryGetValue(aboId, out var zahlungen) || zahlungen.Count == 0)
+                return Zahlungsrichtungen.Unklar;
+
+            var richtungen = zahlungen.Select(zahlung =>
+            {
+                if (zahlung.NachKontoId.HasValue)
+                    return _db.IstEinnahmenKonto(zahlung.NachKontoId.Value)
+                        ? Zahlungsrichtungen.Einnahme
+                        : Zahlungsrichtungen.Ausgabe;
+                if (zahlung.VonKontoId.HasValue || !string.IsNullOrWhiteSpace(zahlung.BankName))
+                    return Zahlungsrichtungen.Einnahme;
+                return Zahlungsrichtungen.Unklar;
+            }).Where(value => value != Zahlungsrichtungen.Unklar).ToList();
+
+            return richtungen.Count == 0
+                ? Zahlungsrichtungen.Unklar
+                : richtungen.GroupBy(value => value).OrderByDescending(group => group.Count()).First().Key;
+        }
+
         private AboRow BaueRow(Abo abo)
         {
-            var zahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z)
+            var alleZahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z)
                 ? z.OrderByDescending(x => x.Datum).ToList()
                 : new List<AboZahlung>();
+            var zahlungen = alleZahlungen.Where(value => !value.IstEinmalig).ToList();
 
-            var letzte = zahlungen.FirstOrDefault();
+            var letzte = alleZahlungen.FirstOrDefault();
+            var letzteRegelzahlung = zahlungen.FirstOrDefault();
             var periodeTage = AboPerioden.Tage(abo.Periodizitaet);
             var heute = DateTime.Today;
 
             DateTime? naechste = null;
-            if (abo.Status == AboStatus.Aktiv && letzte != null)
-                naechste = letzte.Datum.Date.AddDays(periodeTage);
+            if (abo.Status == AboStatus.Aktiv && letzteRegelzahlung != null)
+                naechste = letzteRegelzahlung.Datum.Date.AddDays(periodeTage);
 
             var row = new AboRow
             {
@@ -242,7 +279,9 @@ namespace MyCoinFlow.ViewModels
                 LetzteZahlung = letzte?.Datum,
                 LetzterBetrag = letzte != null ? Math.Abs(letzte.Betrag) : (decimal?)null,
                 NaechsteZahlung = naechste,
-                AnzahlZahlungen = zahlungen.Count,
+                AnzahlZahlungen = alleZahlungen.Count,
+                AnzahlEinmaligeZahlungen = alleZahlungen.Count(value => value.IstEinmalig),
+                HistorischesTotal = alleZahlungen.Sum(value => Math.Abs(value.Betrag)),
                 Jahreskosten = JahreskostenVon(abo)
             };
 
@@ -265,20 +304,20 @@ namespace MyCoinFlow.ViewModels
                 hinweise.Add($"Zahlungen auf {kontoIds.Count} verschiedenen Konten verbucht");
 
             if (abo.ErwartetesKontoId.HasValue
-                && letzte?.BuchungsKontoId != null
-                && letzte.BuchungsKontoId != abo.ErwartetesKontoId)
+                && letzteRegelzahlung?.BuchungsKontoId != null
+                && letzteRegelzahlung.BuchungsKontoId != abo.ErwartetesKontoId)
                 hinweise.Add("Letzte Zahlung nicht auf dem erwarteten Konto");
 
             bool betragWeichtAb = false;
-            if (abo.ErwarteterBetrag.HasValue && abo.ErwarteterBetrag.Value != 0m && letzte != null)
+            if (abo.ErwarteterBetrag.HasValue && abo.ErwarteterBetrag.Value != 0m && letzteRegelzahlung != null)
             {
                 var toleranz = Math.Max(0m, abo.BetragToleranzProzent) / 100m;
                 betragWeichtAb =
-                    Math.Abs(Math.Abs(letzte.Betrag) - Math.Abs(abo.ErwarteterBetrag.Value))
+                    Math.Abs(Math.Abs(letzteRegelzahlung.Betrag) - Math.Abs(abo.ErwarteterBetrag.Value))
                     > Math.Abs(abo.ErwarteterBetrag.Value) * toleranz;
 
                 if (betragWeichtAb)
-                    hinweise.Add($"Letzter Betrag {Math.Abs(letzte.Betrag):N2} weicht vom erwarteten Betrag {Math.Abs(abo.ErwarteterBetrag.Value):N2} ab");
+                    hinweise.Add($"Letzter wiederkehrender Betrag {Math.Abs(letzteRegelzahlung.Betrag):N2} weicht vom erwarteten Betrag {Math.Abs(abo.ErwarteterBetrag.Value):N2} ab");
             }
 
             // Kündigungsplanung: gewünschtes Ende gesetzt => Termin überwachen
@@ -337,10 +376,12 @@ namespace MyCoinFlow.ViewModels
                 row.AmpelBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07)); // Gelb
                 row.AmpelText = $"Jetzt kündigen: bis {abo.SpaetesterKuendigungsTermin:dd.MM.yyyy} für Ende per {abo.KuendigenZum:dd.MM.yyyy}";
             }
-            else if (letzte == null)
+            else if (letzteRegelzahlung == null)
             {
                 row.AmpelBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07)); // Gelb
-                row.AmpelText = "Noch keine Zahlungen zugeordnet";
+                row.AmpelText = alleZahlungen.Count > 0
+                    ? "Noch keine wiederkehrende Zahlung zugeordnet"
+                    : "Noch keine Zahlungen zugeordnet";
             }
             else if (naechste.HasValue && heute > naechste.Value.AddDays(periodeTage * 0.25))
             {
@@ -393,7 +434,8 @@ namespace MyCoinFlow.ViewModels
                     KontoAnzeige = konto,
                     BankName = z.BankName,
                     Notiz = z.Notiz,
-                    ManuellZugeordnet = z.ManuellZugeordnet
+                    ManuellZugeordnet = z.ManuellZugeordnet,
+                    IstEinmalig = z.IstEinmalig
                 });
             }
         }
@@ -411,20 +453,27 @@ namespace MyCoinFlow.ViewModels
                     .Select(a => a.AdresseId!.Value)
                     .ToHashSet();
 
-                var kandidaten = AboErkennungService.FindeKandidaten(alle, zugeordnet, adressenMitAbo);
+                var kandidaten = AboErkennungService.FindeKandidaten(
+                    alle,
+                    zugeordnet,
+                    adressenMitAbo,
+                    _db.AboKandidatAusschluesseLaden(),
+                    _db.IstEinnahmenKonto);
 
                 if (kandidaten.Count == 0)
                 {
                     MessageBox.Show(
-                        "Keine neuen Abo-Kandidaten gefunden.\n\n" +
-                        "Tipp: Die Erkennung braucht mindestens 2–3 regelmässige Zahlungen " +
-                        "an dieselbe Adresse mit ähnlichem Betrag.",
-                        "Abo-Kandidaten", MessageBoxButton.OK, MessageBoxImage.Information);
+                        "Keine neuen Zahlungsserien gefunden.\n\n" +
+                        "Die Erkennung berücksichtigt regelmässige Einnahmen und Ausgaben sowie " +
+                        "typische Vertrags-, Streaming-, App-, Cloud- und Softwarehinweise.",
+                        "Zahlungsserien", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dlg = new AboKandidatenDialog(kandidaten) { Owner = AktivesFenster() };
                 if (dlg.ShowDialog() != true) return;
+
+                _db.AboKandidatenIgnorieren(kandidaten.Where(k => !k.Uebernehmen));
 
                 int uebernommen = 0;
                 foreach (var k in kandidaten.Where(k => k.Uebernehmen))
@@ -441,6 +490,8 @@ namespace MyCoinFlow.ViewModels
                             : k.AdresseName,
                         AdresseId = k.AdresseId,
                         Periodizitaet = k.Periodizitaet,
+                        Richtung = k.Richtung,
+                        Kategorie = k.Kategorie,
                         ErwarteterBetrag = k.MedianBetrag,
                         ErwartetesKontoId = k.HaeufigstesKontoId,
                         Status = AboStatus.Aktiv
@@ -456,13 +507,13 @@ namespace MyCoinFlow.ViewModels
 
                 LadeDaten();
 
-                MessageBox.Show($"{uebernommen} Abo(s) übernommen.",
-                    "Abo-Kandidaten", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"{uebernommen} Zahlungsserie(n) übernommen. Abgewählte Vorschläge werden nicht erneut angezeigt.",
+                    "Zahlungsserien", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Kandidaten-Suche fehlgeschlagen:\n" + ex.Message,
-                    "Abo-Kandidaten", MessageBoxButton.OK, MessageBoxImage.Error);
+                    "Zahlungsserien", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -474,7 +525,9 @@ namespace MyCoinFlow.ViewModels
                 var zugeordnet = _db.AboZugeordneteTransaktionIds();
 
                 var abosNachAdresse = _alleAbos
-                    .Where(a => a.Status != AboStatus.Beendet && a.AdresseId.HasValue)
+                    .Where(a => a.Status != AboStatus.Beendet
+                                && AboKategorien.IstDigitalesAbo(a.Kategorie)
+                                && a.AdresseId.HasValue)
                     .GroupBy(a => a.AdresseId!.Value)
                     .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -705,7 +758,7 @@ namespace MyCoinFlow.ViewModels
             var abo = AusgewaehltesAbo.Abo;
 
             var zahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z)
-                ? z
+                ? z.Where(value => !value.IstEinmalig).ToList()
                 : new List<AboZahlung>();
 
             var ohneKonto = zahlungen.Count(x => !x.BuchungsKontoId.HasValue);
@@ -814,13 +867,13 @@ namespace MyCoinFlow.ViewModels
             var abo = AusgewaehltesAbo.Abo;
 
             var zahlungen = _zahlungenProAbo.TryGetValue(abo.Id, out var z)
-                ? z
+                ? z.Where(value => !value.IstEinmalig).ToList()
                 : new List<AboZahlung>();
 
             if (zahlungen.Count < 2)
             {
                 MessageBox.Show(
-                    "Für die Lücken-Suche braucht das Abo mindestens 2 zugeordnete Zahlungen.",
+                    "Für die Lücken-Suche braucht das Abo mindestens 2 wiederkehrende Zahlungen.",
                     "Lücken füllen", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -910,6 +963,24 @@ namespace MyCoinFlow.ViewModels
             {
                 MessageBox.Show("Entfernen fehlgeschlagen:\n" + ex.Message,
                     "Zahlung entfernen", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ZahlungEinmaligUmschalten(object? param)
+        {
+            if (AusgewaehltesAbo == null || param is not AboZahlungRow row) return;
+            try
+            {
+                _db.AboTransaktionEinmaligSetzen(
+                    AusgewaehltesAbo.Id,
+                    row.TransaktionId,
+                    !row.IstEinmalig);
+                LadeDaten();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Zahlungsart konnte nicht geändert werden:\n" + ex.Message,
+                    "Einmalige Zahlung", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

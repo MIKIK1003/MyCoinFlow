@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog x:Class="MyCoinFlow.WinUI.Views.StweReportPrintOptionsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="STWE Bericht – Druckoptionen" PrimaryButtonText="Weiter" CloseButtonText="Abbrechen" DefaultButton="Primary">
+    <StackPanel Width="480" Spacing="12"><CheckBox x:Name="CoverBox" Content="Mit Deckblatt" IsChecked="True"/><CheckBox x:Name="OwnerPageBox" Content="Neue Seite pro Eigentümer" IsChecked="True"/><CheckBox x:Name="OriginalsBox" Content="Ausgabe Original-Transaktionen (mit Totalbetrag)" IsChecked="True"/><TextBlock Margin="0,10,0,0" Text="PDF wird über die Druckerauswahl erstellt (z. B. Microsoft Print to PDF)." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+</ContentDialog>

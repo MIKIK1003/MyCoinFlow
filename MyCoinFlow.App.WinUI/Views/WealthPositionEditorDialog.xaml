@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog x:Class="MyCoinFlow.WinUI.Views.WealthPositionEditorDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Vermögensposition" PrimaryButtonText="Speichern" CloseButtonText="Abbrechen" DefaultButton="Primary" PrimaryButtonClick="OnPrimaryButtonClick"><ScrollViewer MaxHeight="690" Style="{StaticResource FormScrollViewerStyle}"><Grid Width="720" ColumnSpacing="14" RowSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <ComboBox x:Name="DepotBox" Header="Depot" DisplayMemberPath="Name"/><TextBox x:Name="TitleBox" Grid.Column="1" Header="Titel"/>
+    <TextBox x:Name="IsinBox" Grid.Row="1" Header="ISIN"/><TextBox x:Name="ValorBox" Grid.Row="1" Grid.Column="1" Header="Valor"/>
+    <TextBox x:Name="SymbolBox" Grid.Row="2" Header="Symbol"/><ComboBox x:Name="ExchangeBox" Grid.Row="2" Grid.Column="1" Header="Börse"/>
+    <ComboBox x:Name="AssetClassBox" Grid.Row="3" Header="Anlageklasse"/><ComboBox x:Name="CurrencyBox" Grid.Row="3" Grid.Column="1" Header="Handelswährung"/>
+    <ComboBox x:Name="CostCurrencyBox" Grid.Row="4" Header="Einstandswährung"/><TextBox x:Name="QuantityBox" Grid.Row="4" Grid.Column="1" Header="Anzahl / Nominalbetrag" TextAlignment="Right"/>
+    <TextBox x:Name="CostPriceBox" Grid.Row="5" Header="Einstandspreis" TextAlignment="Right"/><CalendarDatePicker x:Name="CostDatePicker" Grid.Row="5" Grid.Column="1" Header="Einstandsdatum"/>
+    <TextBox x:Name="CurrentPriceBox" Grid.Row="6" Header="Aktueller Kurs" TextAlignment="Right"/><CalendarDatePicker x:Name="PriceDatePicker" Grid.Row="6" Grid.Column="1" Header="Kursdatum"/>
+    <TextBox x:Name="NoteBox" Grid.Row="7" Grid.ColumnSpan="2" Header="Notiz" AcceptsReturn="True" MinHeight="70"/>
+    <InfoBar x:Name="ErrorBar" Grid.Row="8" Grid.ColumnSpan="2" IsOpen="False" IsClosable="True" Severity="Warning"/>
+</Grid></ScrollViewer></ContentDialog>

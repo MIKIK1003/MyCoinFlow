@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="MyCoinFlow.WinUI.Views.AddressEditorDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Adresse"
+    PrimaryButtonText="Speichern"
+    CloseButtonText="Abbrechen"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick">
+
+    <Grid MinWidth="640">
+        <ScrollViewer MaxHeight="680" Style="{StaticResource FormScrollViewerStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock x:Name="DialogHeading" Style="{StaticResource SectionTitleStyle}" />
+                <TextBlock Text="Adressdaten und die bestehende Zuordnung für budgetierte Einnahmen erfassen."
+                           TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <InfoBar x:Name="EditorError" IsOpen="False" IsClosable="True" Severity="Error" />
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="NameBox" Header="Name*" />
+                    <TextBox x:Name="TypeBox" Grid.Column="1" Header="Typ" />
+                </Grid>
+
+                <TextBox x:Name="StreetBox" Header="Straße" />
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="160" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="PostalCodeBox" Header="PLZ" />
+                    <TextBox x:Name="CityBox" Grid.Column="1" Header="Ort" />
+                    <TextBox x:Name="CountryBox" Grid.Column="2" Header="Land" />
+                </Grid>
+
+                <TextBox x:Name="IbanBox" Header="IBAN" />
+                <TextBox x:Name="NoteBox" Header="Notiz" Height="96"
+                         AcceptsReturn="True" TextWrapping="Wrap" />
+
+                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4" />
+
+                <CheckBox x:Name="BudgetedCheckBox"
+                          Content="Reine Standard-Einnahmen Adresse → Bank mit Standard-Einnahmenkonto"
+                          Checked="OnBudgetedChanged" Unchecked="OnBudgetedChanged" />
+                <ComboBox x:Name="StandardIncomeAccountBox"
+                          Header="Standard-Einnahmenkonto (optional)"
+                          DisplayMemberPath="Anzeige" SelectedValuePath="Id"
+                          HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</ContentDialog>

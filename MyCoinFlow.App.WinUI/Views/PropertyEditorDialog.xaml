@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="MyCoinFlow.WinUI.Views.PropertyEditorDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Liegenschaft"
+    PrimaryButtonText="Speichern"
+    CloseButtonText="Abbrechen"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick">
+    <Grid MinWidth="560">
+        <StackPanel Spacing="12">
+            <TextBlock x:Name="HeadingText" Style="{StaticResource SectionTitleStyle}" />
+            <InfoBar x:Name="EditorError" IsOpen="False" Severity="Error" />
+            <TextBox x:Name="NameBox" Header="Name*" />
+            <TextBox x:Name="StreetBox" Header="Straße" />
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBox x:Name="PostalCodeBox" Header="PLZ" />
+                <TextBox x:Name="CityBox" Grid.Column="1" Header="Ort" />
+            </Grid>
+            <TextBox x:Name="NoteBox" Header="Notiz" Height="90" AcceptsReturn="True" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</ContentDialog>

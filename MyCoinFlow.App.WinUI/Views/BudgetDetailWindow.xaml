@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.BudgetDetailWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Budget erfassen">
+
+    <Grid x:Name="RootGrid" Padding="24,18,24,20" RowSpacing="14"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock x:Name="TitleText" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Budgetwerte werden beim Verlassen eines Feldes und beim Schließen gespeichert"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <CommandBar Grid.Column="1" DefaultLabelPosition="Right" Background="Transparent"
+                        IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Schließen" Click="OnCloseClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8BB;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+        </Grid>
+
+        <TextBlock Grid.Row="1" x:Name="ResultText"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Padding="14,10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="1.7*" />
+                        <ColumnDefinition Width="145" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="NR." FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="ART" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="GRUPPE" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="3" Text="UNTERGRUPPE" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="4" Text="DETAIL" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="5" Text="BUDGET" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                </Grid>
+                <ListView x:Name="AccountsList" Grid.Row="1" SelectionMode="None">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="8,4" />
+                            <Setter Property="IsTabStop" Value="False" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnSpacing="10" MinHeight="40">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1.7*" />
+                                    <ColumnDefinition Width="145" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding AccountNumber}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding Art}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{Binding Group}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="{Binding Subgroup}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="4" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBox Grid.Column="5" Text="{Binding BudgetText, Mode=TwoWay}"
+                                         HorizontalContentAlignment="Right" LostFocus="OnBudgetLostFocus" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Border>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="3" IsOpen="False" IsClosable="True" />
+    </Grid>
+</window:PersistentWindow>

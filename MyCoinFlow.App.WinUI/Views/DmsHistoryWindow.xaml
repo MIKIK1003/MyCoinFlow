@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow x:Class="MyCoinFlow.WinUI.Views.DmsHistoryWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:window="using:MyCoinFlow.WinUI"
+ Title="DMS – Verarbeitungsverlauf">
+ <Grid x:Name="RootGrid" Padding="24,18,24,20" RowSpacing="14" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Verarbeitungsverlauf" Style="{StaticResource PageTitleStyle}"/><TextBlock Text="Protokoll der automatischen Dokumentverarbeitung" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel><CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right"><AppBarButton Label="Aktualisieren" Click="OnRefreshClick"><AppBarButton.Icon><FontIcon Glyph="&#xE72C;"/></AppBarButton.Icon></AppBarButton><AppBarButton Label="Schließen" Click="OnCloseClick"><AppBarButton.Icon><FontIcon Glyph="&#xE8BB;"/></AppBarButton.Icon></AppBarButton></CommandBar></Grid>
+  <ListView x:Name="HistoryList" Grid.Row="1"><ListView.Header><Grid Padding="10,8" ColumnSpacing="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions><TextBlock Text="Zeitpunkt" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Datei" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Ergebnis" FontWeight="SemiBold"/></Grid></ListView.Header><ListView.ItemTemplate><DataTemplate><Grid Padding="10,8" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions><TextBlock Text="{Binding CreatedAtUtc}"/><TextBlock Grid.Column="1" Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="2" Text="{Binding Ergebnis}" TextWrapping="Wrap"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+ </Grid>
+</window:PersistentWindow>

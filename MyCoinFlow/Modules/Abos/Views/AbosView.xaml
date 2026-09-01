@@ -275,6 +275,17 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Zahlungsart" Width="125">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="Einmalig"
+                                              IsChecked="{Binding IstEinmalig, Mode=OneWay}"
+                                              Command="{Binding DataContext.ZahlungEinmaligCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                              CommandParameter="{Binding}"
+                                              ToolTip="Zählt zum historischen Total, aber nicht zum erwarteten Jahreswert"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Konto" Binding="{Binding KontoAnzeige}" Width="*"/>
                         <DataGridTextColumn Header="Geldinstitut" Binding="{Binding BankName}" Width="150"/>
                         <DataGridTextColumn Header="Zuordnung" Binding="{Binding ZuordnungAnzeige}" Width="110"/>

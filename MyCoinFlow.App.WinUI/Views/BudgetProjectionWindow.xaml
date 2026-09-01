@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.BudgetProjectionWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Budget an Hochrechnung anpassen">
+
+    <Grid x:Name="RootGrid" Padding="20" RowSpacing="12" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Budget an Hochrechnung anpassen" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock x:Name="PeriodInfoText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+
+        <InfoBar x:Name="QualityBar" Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Warning" />
+
+        <Border Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Padding="9,7" ColumnSpacing="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="38" />
+                        <ColumnDefinition Width="70" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="130" />
+                        <ColumnDefinition Width="110" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Text="KONTO" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="BEZEICHNUNG" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="3" Text="RICHTUNG" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="4" Text="BUDGET ALT" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="5" Text="HOCHRECHNUNG" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="6" Text="BUDGET NEU" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="7" Text="DIFFERENZ" FontSize="10" FontWeight="SemiBold" />
+                </Grid>
+                <ListView x:Name="RowsList" Grid.Row="1" SelectionMode="None">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="9,5" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="38" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="110" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="OnRowChanged" />
+                                <TextBlock Grid.Column="1" Text="{Binding Kontonummer}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{Binding Bezeichnung}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="{Binding Richtung}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="4" Text="{Binding AlterWert}" TextAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="5" Text="{Binding Hochrechnung}" TextAlignment="Right" VerticalAlignment="Center" />
+                                <TextBox Grid.Column="6" Text="{Binding NeuerWert, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         HorizontalContentAlignment="Right" LostFocus="OnNewValueLostFocus" />
+                                <TextBlock Grid.Column="7" Text="{Binding Differenz}" TextAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Alle" Click="OnAllClick" />
+                <Button Content="Keine" Click="OnNoneClick" />
+                <Button Content="Hochrechnung einsetzen" Click="OnUseProjectionClick" />
+                <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Content="Abbrechen" Click="OnCancelClick" />
+                <Button Content="Markierte übernehmen" Style="{StaticResource AccentButtonStyle}" Click="OnApplyClick" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</window:PersistentWindow>

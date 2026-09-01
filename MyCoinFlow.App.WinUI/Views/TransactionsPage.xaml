@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="MyCoinFlow.WinUI.Views.TransactionsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Enabled">
+
+    <Grid Padding="28,22,28,24" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Transaktionen" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Zahlungsströme prüfen, erfassen und nachvollziehen"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <CommandBar Grid.Column="1" DefaultLabelPosition="Right" Background="Transparent" VerticalAlignment="Center" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Aktualisieren" Click="OnRefreshClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+                    <AppBarButton.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="R" Modifiers="Control" />
+                    </AppBarButton.KeyboardAccelerators>
+                </AppBarButton>
+                <AppBarButton Label="Neue Buchung" Click="OnNewClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
+                    <AppBarButton.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="N" Modifiers="Control" />
+                    </AppBarButton.KeyboardAccelerators>
+                </AppBarButton>
+                <AppBarSeparator />
+                <AppBarButton Label="Dubletten" Icon="Copy" Click="OnDuplicatesClick" />
+                <AppBarButton Label="Bank einlesen" Icon="Download" Click="OnBankImportClick" />
+                <AppBarButton Label="Kreditkarte einlesen" Icon="Download" Click="OnCreditCardImportClick" />
+                <AppBarButton Label="Bericht" Icon="ReportHacked" Click="OnReportClick" />
+            </CommandBar>
+        </Grid>
+
+        <InfoBar x:Name="PreviewInfoBar" Grid.Row="1" IsOpen="True" IsClosable="True"
+                 Severity="Informational" Title="MyCoinFlow 3 Musterversion"
+                 Message="Diese Seite arbeitet bereits mit der aktiven MyCoinFlow-Datenbank. Die übrigen Module bleiben bis zu ihrer Migration in Version 2." />
+
+        <Grid Grid.Row="2" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="ERGEBNIS" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding ResultCountText}" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="EINNAHMEN" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding IncomeAmountText}" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+                <ToolTipService.ToolTip>Nummernkreis „Einnahmen (Budgetiert)“; neutrale Konten sind ausgeschlossen.</ToolTipService.ToolTip>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="AUSGABEN" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding ExpenseAmountText}" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+                <ToolTipService.ToolTip>Nummernkreis „Ausgaben (Budgetiert)“; neutrale Konten sind ausgeschlossen.</ToolTipService.ToolTip>
+            </Border>
+            <Border Grid.Column="3" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="MIT BELEGEN" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding AttachmentCountText}" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="4" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="ZEITRAUM" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding PeriodText}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Expander Grid.Row="3" Header="Suchen und filtern" IsExpanded="True">
+            <Border Style="{StaticResource CardBorderStyle}" CornerRadius="0,0,12,12">
+                <Grid ColumnSpacing="10" RowSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.3*" />
+                        <ColumnDefinition Width="1.3*" />
+                        <ColumnDefinition Width="1.4*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBox x:Name="SearchBox" Header="Volltext, Nummer, Konto oder Betrag"
+                             Grid.ColumnSpan="2"
+                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="z. B. Versicherung 1200 oder 84.60"
+                             KeyDown="OnFilterKeyDown" />
+                    <TextBox Grid.Column="2" Header="Adresse"
+                             Text="{Binding AddressText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Adressname" KeyDown="OnFilterKeyDown" />
+                    <DatePicker Grid.Row="1" Grid.Column="0" Header="Von" SelectedDate="{Binding From, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <DatePicker Grid.Row="1" Grid.Column="1" Header="Bis" SelectedDate="{Binding To, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Der Zeitraum folgt standardmäßig dem aktiven Budgetjahr."
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,0,0,7" />
+                    <StackPanel Grid.Column="3" Grid.RowSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                        <Button Content="Anwenden" Style="{StaticResource AccentButtonStyle}" Click="OnApplyFilterClick" />
+                        <Button Content="Zurücksetzen" Click="OnResetFilterClick" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Expander>
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Padding="16,11" Background="{ThemeResource SubtleFillColorSecondaryBrush}" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="116" />
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="1.25*" />
+                        <ColumnDefinition Width="1.25*" />
+                        <ColumnDefinition Width="112" />
+                        <ColumnDefinition Width="1.1*" />
+                        <ColumnDefinition Width="1.4*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="DOKUMENTE" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="DATUM" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="NR." FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="3" Text="VON" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="4" Text="NACH" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="5" Text="BETRAG" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="6" Text="KONTEXT" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="7" Text="NOTIZ" FontSize="11" FontWeight="SemiBold" />
+                </Grid>
+
+                <ListView x:Name="TransactionGroupsList" Grid.Row="1"
+                          ItemsSource="{Binding TransactionGroups}"
+                          SelectionMode="None"
+                          HorizontalContentAlignment="Stretch">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0,3" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                      HorizontalAlignment="Stretch"
+                                      HorizontalContentAlignment="Stretch">
+                                <Expander.Header>
+                                    <Grid Padding="4,3" RowSpacing="5">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Grid Grid.Row="1" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    CornerRadius="7" Padding="7,1">
+                                                <TextBlock Text="{Binding Direction}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </Grid>
+                                </Expander.Header>
+                                <ListView ItemsSource="{Binding Entries}"
+                                          SelectionMode="Single"
+                                          SelectionChanged="OnTransactionSelectionChanged"
+                                          DoubleTapped="OnListDoubleTapped"
+                                          Loaded="OnTransactionListLoaded"
+                                          HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Stretch">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Padding" Value="0" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="16,11" ColumnSpacing="12" MinHeight="54">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="116" />
+                                                    <ColumnDefinition Width="82" />
+                                                    <ColumnDefinition Width="92" />
+                                                    <ColumnDefinition Width="1.25*" />
+                                                    <ColumnDefinition Width="1.25*" />
+                                                    <ColumnDefinition Width="112" />
+                                                    <ColumnDefinition Width="1.1*" />
+                                                    <ColumnDefinition Width="1.4*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                    <Button Width="34" Height="34" Padding="0" Click="OnAttachDocumentRowClick" ToolTipService.ToolTip="Dokument verknüpfen">
+                                                        <FontIcon Glyph="&#xE710;" FontSize="15"/>
+                                                    </Button>
+                                                    <Button Width="34" Height="34" Padding="0" Click="OnOpenDocumentRowClick" IsEnabled="{Binding HasAttachments}" ToolTipService.ToolTip="Dokument öffnen">
+                                                        <Grid>
+                                                            <FontIcon Glyph="&#xE8E5;" FontSize="15"/>
+                                                            <Border Background="{StaticResource MyCoinFlowAccentBrush}" CornerRadius="8"
+                                                                    Opacity="{Binding AttachmentOpacity}" MinWidth="16" Height="16"
+                                                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14,-8,-8,0">
+                                                                <TextBlock Text="{Binding AttachmentAnzeige}" Foreground="White" FontSize="9"
+                                                                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="3,0"/>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Button>
+                                                    <Button Width="34" Height="34" Padding="0" Click="OnManageDocumentsRowClick" IsEnabled="{Binding HasAttachments}" ToolTipService.ToolTip="Dokumente verwalten">
+                                                        <FontIcon Glyph="&#xE712;" FontSize="16"/>
+                                                    </Button>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding DatumAnzeige}" />
+                                                    <TextBlock Text="{Binding BudgetDatumAnzeige}" FontSize="10" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding NummerAnzeige}" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding VonAnzeige}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="4" Text="{Binding NachAnzeige}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="5" Text="{Binding BetragAnzeige}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="6" Text="{Binding KontextAnzeige}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="7" Text="{Binding Notiz}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </Expander>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <ProgressRing IsActive="{Binding IsBusy}" Width="42" Height="42"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Content="Web-Recherche" IsEnabled="{Binding HasSelection}" Click="OnWebResearchClick" />
+                <Button Content="Bearbeiten" IsEnabled="{Binding HasSelection}" Click="OnEditClick">
+                    <Button.KeyboardAccelerators><KeyboardAccelerator Key="E" Modifiers="Control" /></Button.KeyboardAccelerators>
+                </Button>
+                <Button Content="Löschen" IsEnabled="{Binding HasSelection}" Click="OnDeleteClick" />
+            </StackPanel>
+        </Grid>
+
+        <InfoBar x:Name="ErrorInfoBar" Grid.RowSpan="6" VerticalAlignment="Top" Margin="80,12"
+                 IsOpen="{Binding HasError}" IsClosable="True" Severity="Error"
+                 Title="Aktion nicht möglich" Message="{Binding ErrorMessage}"
+                 Closed="OnErrorClosed" />
+    </Grid>
+</Page>

@@ -6,7 +6,7 @@ using System.Linq;
 namespace MyCoinFlow.Services
 {
     /// <summary>
-    /// Erkennt wiederkehrende Zahlungen (Abo-Kandidaten) aus bestehenden Transaktionen.
+    /// Erkennt wiederkehrende Zahlungsserien aus bestehenden Transaktionen.
     ///
     /// Vorgehen:
     /// 1. Transaktionen pro Adresse gruppieren (Adresserkennung ist bereits gelaufen).
@@ -14,6 +14,8 @@ namespace MyCoinFlow.Services
     ///    damit z.B. Einzelkäufe beim gleichen Händler das Abo nicht verwässern.
     /// 3. Abstände zwischen den Zahlungen prüfen: passt der Median-Abstand zu einer
     ///    bekannten Periodizität (monatlich/quartalsweise/halbjährlich/jährlich)?
+    /// 4. Richtung und Themenart bestimmen. Eindeutige Streaming-/Lizenzhinweise
+    ///    dürfen vorsichtig bereits vor einem vollständig bestätigten Rhythmus erscheinen.
     ///
     /// Der Service arbeitet rein in-memory und schreibt nichts in die DB —
     /// Kandidaten werden erst nach Bestätigung durch den Benutzer gespeichert.
@@ -21,6 +23,57 @@ namespace MyCoinFlow.Services
     public static class AboErkennungService
     {
         private const decimal BetragClusterToleranz = 0.15m; // ±15 % um den Cluster-Median
+
+        private enum AboHinweisStaerke
+        {
+            KeinHinweis,
+            Moeglich,
+            Stark
+        }
+
+        // Bekannte Themenmerkmale dienen der Sortierung, nicht als Voraussetzung:
+        // Ein stabiler Rhythmus ist selbst eine relevante Zahlungsserie.
+        private static readonly string[] StreamingMerkmale =
+        {
+            "NETFLIX", "SPOTIFY", "DISNEY+", "DISNEY PLUS", "YOUTUBE PREMIUM",
+            "APPLE MUSIC", "AMAZON PRIME", "PRIME VIDEO", "DEEZER", "AUDIBLE",
+            "TIDAL", "TWITCH", "PATREON", "MUBI", "DAZN", "SKY SHOW", "SKYSHOW", "PARAMOUNT+", "PARAMOUNT PLUS", "PLAYSTATION PLUS",
+            "XBOX GAME PASS", "NINTENDO SWITCH ONLINE", "HBO", "CRUNCHYROLL", "SOUNDCLOUD GO"
+        };
+
+        private static readonly string[] SoftwareLizenzMerkmale =
+        {
+            "APPLE.COM/BILL", "APPLE COM BILL", "APP STORE", "APPSTORE", "GOOGLE PLAY",
+            "GOOGLE ONE", "MICROSOFT 365", "MICROSOFT365", "OFFICE 365", "OFFICE365",
+            "ADOBE", "OPENAI", "CHATGPT", "DROPBOX", "ICLOUD", "ONEDRIVE",
+            "CANVA", "NOTION", "EVERNOTE", "GITHUB", "JETBRAINS", "1PASSWORD",
+            "LASTPASS", "NORDVPN", "SURFSHARK", "MCAFEE", "NORTON", "ANTIVIRUS"
+        };
+
+        // Gattungsbegriffe sind nur zusammen mit einem bestätigten Zahlungsrhythmus
+        // ausreichend. Ein blosses Wort wie "Abo" genügt bewusst nicht.
+        private static readonly string[] StreamingGattungen =
+        {
+            "STREAMING", "MUSIK STREAM", "VIDEO STREAM", "PODCAST PREMIUM"
+        };
+
+        private static readonly string[] SoftwareLizenzGattungen =
+        {
+            "SOFTWARE", "SAAS", "CLOUD SPEICHER", "CLOUD STORAGE", "SOFTWARELIZENZ",
+            "MONATSLIZENZ", "JAHRESLIZENZ", "APP LIZENZ", "APP SUBSCRIPTION"
+        };
+
+        private static readonly (string Kategorie, string[] Merkmale)[] KategorieMerkmale =
+        {
+            (AboKategorien.Wohnen, new[] { "MIETE", "MIETZINS", "PACHT", "NEBENKOSTEN" }),
+            (AboKategorien.Versicherung, new[] { "VERSICHERUNG", "POLICE", "KRANKENKASSE" }),
+            (AboKategorien.Telekommunikation, new[] { "MOBILFUNK", "TELEKOM", "INTERNET" }),
+            (AboKategorien.Mitgliedschaft, new[] { "FITNESS", "GYM", "MITGLIEDSCHAFT", "VEREIN" }),
+            (AboKategorien.Finanzierung, new[] { "LEASING", "DARLEHEN", "HYPOTHEK", "KREDIT" }),
+            (AboKategorien.SteuernGebuehren, new[] { "STEUERRECHNUNG", "STEUERRATE", "GEMEINDESTEUER", "KANTONSSTEUER" }),
+            (AboKategorien.VorsorgeSparen, new[] { "SPARPLAN", "VORSORGE", "SAEULE 3", "SÄULE 3", "PENSIONSKASSE" }),
+            (AboKategorien.Vertrag, new[] { "VERTRAG", "ABONNEMENT" })
+        };
 
         // Periodendefinition: (Code, minTage, maxTage, Mindestanzahl Zahlungen)
         private static readonly (string Code, int Min, int Max, int MinAnzahl)[] Perioden =
@@ -40,7 +93,9 @@ namespace MyCoinFlow.Services
         public static List<AboKandidat> FindeKandidaten(
             List<Transaktion> alleMitAdresse,
             HashSet<int> bereitsZugeordneteTransaktionIds,
-            HashSet<int> adressenMitBestehendemAbo)
+            HashSet<int> adressenMitBestehendemAbo,
+            IReadOnlyCollection<AboKandidatAusschluss>? ignorierteKandidaten = null,
+            Func<int, bool>? istEinnahmenKonto = null)
         {
             var kandidaten = new List<AboKandidat>();
 
@@ -53,8 +108,22 @@ namespace MyCoinFlow.Services
             {
                 foreach (var cluster in ClusterNachBetrag(gruppe.ToList()))
                 {
-                    foreach (var kandidat in PruefeClusterMitSplit(cluster))
+                    var hinweis = BewerteAboHinweis(cluster);
+                    var richtung = RichtungErmitteln(cluster, istEinnahmenKonto);
+
+                    var periodischeKandidaten = PruefeClusterMitSplit(cluster).ToList();
+                    foreach (var kandidat in periodischeKandidaten)
                     {
+                        kandidat.AdresseHatAbo = adressenMitBestehendemAbo.Contains(kandidat.AdresseId);
+                        kandidat.Kategorie = hinweis.Kategorie;
+                        kandidat.Richtung = richtung;
+                        kandidat.Erkennungsgrund = $"{hinweis.Grund}; Zahlungsrhythmus bestätigt ({Zahlungsrichtungen.Anzeige(richtung)})";
+                        kandidaten.Add(kandidat);
+                    }
+
+                    if (periodischeKandidaten.Count == 0 && hinweis.Staerke == AboHinweisStaerke.Stark)
+                    {
+                        var kandidat = BaueSemantischenKandidaten(cluster, hinweis.Grund, hinweis.Kategorie, richtung);
                         kandidat.AdresseHatAbo = adressenMitBestehendemAbo.Contains(kandidat.AdresseId);
                         kandidaten.Add(kandidat);
                     }
@@ -62,9 +131,160 @@ namespace MyCoinFlow.Services
             }
 
             return kandidaten
-                .OrderByDescending(k => k.AnzahlZahlungen)
+                .Where(k => !IstIgnoriert(k, ignorierteKandidaten))
+                .OrderBy(k => k.Richtung == Zahlungsrichtungen.Einnahme ? 0 : 1)
+                .ThenBy(k => k.Kategorie)
+                .ThenBy(k => k.RhythmusNurVermutet)
+                .ThenByDescending(k => k.AnzahlZahlungen)
                 .ThenBy(k => k.AdresseName)
                 .ToList();
+        }
+
+        private static (AboHinweisStaerke Staerke, string Grund, string Kategorie) BewerteAboHinweis(List<Transaktion> cluster)
+        {
+            var text = string.Join(" ", cluster.Select(t => $"{t.AdresseName} {t.Notiz}"))
+                .ToUpperInvariant();
+
+            var streaming = StreamingMerkmale.FirstOrDefault(text.Contains);
+            if (streaming != null)
+                return (AboHinweisStaerke.Stark, $"typischer Streaminganbieter ({streaming})", AboKategorien.Streaming);
+
+            var software = SoftwareLizenzMerkmale.FirstOrDefault(text.Contains);
+            if (software != null)
+                return (AboHinweisStaerke.Stark, $"typischer App-/Softwareanbieter ({software})", AboKategorien.SoftwareLizenz);
+
+            var streamingGattung = StreamingGattungen.FirstOrDefault(text.Contains);
+            if (streamingGattung != null)
+                return (AboHinweisStaerke.Moeglich, $"Streaming-Hinweis ({streamingGattung})", AboKategorien.Streaming);
+
+            var softwareGattung = SoftwareLizenzGattungen.FirstOrDefault(text.Contains);
+            if (softwareGattung != null)
+                return (AboHinweisStaerke.Moeglich, $"Software-/Lizenzhinweis ({softwareGattung})", AboKategorien.SoftwareLizenz);
+
+            var themenTreffer = KategorieMerkmale
+                .SelectMany(value => value.Merkmale.Select(merkmal => (value.Kategorie, Merkmal: merkmal)))
+                .FirstOrDefault(value => text.Contains(value.Merkmal));
+            return themenTreffer.Merkmal != null
+                ? (AboHinweisStaerke.Moeglich, $"thementypischer Buchungstext ({themenTreffer.Merkmal})", themenTreffer.Kategorie)
+                : (AboHinweisStaerke.Moeglich, "regelmässige Zahlungsserie", AboKategorien.Sonstige);
+        }
+
+        /// <summary>
+        /// Ordnet bekannte Bestandsdaten einer Themenart zu.
+        /// </summary>
+        public static string KategorieErmitteln(string? text)
+        {
+            var normalized = (text ?? string.Empty).ToUpperInvariant();
+            if (StreamingMerkmale.Any(normalized.Contains) || StreamingGattungen.Any(normalized.Contains))
+                return AboKategorien.Streaming;
+            if (SoftwareLizenzMerkmale.Any(normalized.Contains) || SoftwareLizenzGattungen.Any(normalized.Contains))
+                return AboKategorien.SoftwareLizenz;
+            foreach (var (category, markers) in KategorieMerkmale)
+            {
+                if (markers.Any(normalized.Contains))
+                    return category;
+            }
+            return AboKategorien.Sonstige;
+        }
+
+        private static string RichtungErmitteln(
+            IReadOnlyList<Transaktion> cluster,
+            Func<int, bool>? istEinnahmenKonto)
+        {
+            var richtungen = cluster.Select(t =>
+            {
+                if (t.NachKontoId.HasValue)
+                    return istEinnahmenKonto?.Invoke(t.NachKontoId.Value) == true
+                        ? Zahlungsrichtungen.Einnahme
+                        : Zahlungsrichtungen.Ausgabe;
+                if (t.VonKontoId.HasValue || t.GeldinstitutId.HasValue)
+                    return Zahlungsrichtungen.Einnahme;
+                return Zahlungsrichtungen.Unklar;
+            }).Where(value => value != Zahlungsrichtungen.Unklar).ToList();
+
+            return richtungen.Count == 0
+                ? Zahlungsrichtungen.Unklar
+                : richtungen.GroupBy(value => value).OrderByDescending(group => group.Count()).First().Key;
+        }
+
+        private static bool IstIgnoriert(
+            AboKandidat kandidat,
+            IReadOnlyCollection<AboKandidatAusschluss>? ignorierteKandidaten)
+        {
+            if (ignorierteKandidaten == null || ignorierteKandidaten.Count == 0)
+                return false;
+
+            return ignorierteKandidaten.Any(ausschluss =>
+            {
+                if (ausschluss.AdresseId != kandidat.AdresseId)
+                    return false;
+
+                // Preisänderungen bis 20 % gehören weiterhin zum einmal abgewählten Muster.
+                // Ein deutlich anderer Betrag kann dagegen ein wirklich neues Abo desselben
+                // Anbieters sein und darf erneut vorgeschlagen werden.
+                var referenz = Math.Max(Math.Abs(ausschluss.ReferenzBetrag), Math.Abs(kandidat.MedianBetrag));
+                var toleranz = Math.Max(1m, referenz * 0.20m);
+                return Math.Abs(ausschluss.ReferenzBetrag - kandidat.MedianBetrag) <= toleranz;
+            });
+        }
+
+        private static AboKandidat BaueSemantischenKandidaten(
+            List<Transaktion> cluster,
+            string grund,
+            string kategorie,
+            string richtung)
+        {
+            var sortiert = cluster.OrderBy(t => t.Datum).ToList();
+            var vermutetePeriode = ErmittlePeriodeAusWenigenZahlungen(sortiert);
+            if (vermutetePeriode != null)
+            {
+                var kandidat = BaueKandidat(sortiert, vermutetePeriode);
+                kandidat.Kategorie = kategorie;
+                kandidat.Richtung = richtung;
+                kandidat.Erkennungsgrund = $"{grund}; Rhythmus aus zwei Zahlungen plausibel";
+                return kandidat;
+            }
+
+            // Ohne bestätigten Rhythmus nur die jüngste verdächtige Zahlung zuordnen.
+            // Der Vorschlag bleibt bewusst abgewählt und verwendet erst nach ausdrücklicher
+            // Wahl des Benutzers den vorläufigen Monatsrhythmus.
+            var letzte = sortiert[^1];
+            var einzelKandidat = BaueKandidat(new List<Transaktion> { letzte }, AboPerioden.Monatlich);
+            einzelKandidat.Kategorie = kategorie;
+            einzelKandidat.Richtung = richtung;
+            einzelKandidat.Erkennungsgrund = $"{grund}; Rhythmus noch nicht bestätigt (vorläufig monatlich)";
+            einzelKandidat.RhythmusNurVermutet = true;
+            einzelKandidat.Uebernehmen = false;
+            return einzelKandidat;
+        }
+
+        private static string? ErmittlePeriodeAusWenigenZahlungen(List<Transaktion> sortiert)
+        {
+            if (sortiert.Count < 2)
+                return null;
+
+            var abstaende = new List<int>();
+            for (var i = 1; i < sortiert.Count; i++)
+            {
+                var tage = (int)(sortiert[i].Datum.Date - sortiert[i - 1].Datum.Date).TotalDays;
+                if (tage > 0) abstaende.Add(tage);
+            }
+
+            if (abstaende.Count == 0)
+                return null;
+
+            var medianAbstand = (int)Median(abstaende.Select(value => (decimal)value).ToList());
+            foreach (var (code, min, max, _) in Perioden)
+            {
+                if (medianAbstand < min || medianAbstand > max)
+                    continue;
+
+                var passend = abstaende.Count(value => value >= min && value <= max);
+                if (passend * 2 >= abstaende.Count)
+                    return code;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -358,32 +578,37 @@ namespace MyCoinFlow.Services
                 if (passend * 2 < abstaende.Count)
                     continue;
 
-                var kontoIds = sortiert
-                    .Select(t => t.NachKontoId ?? t.VonKontoId)
-                    .Where(k => k.HasValue)
-                    .Select(k => k!.Value)
-                    .ToList();
-
-                var haeufigstesKonto = kontoIds.Count > 0
-                    ? kontoIds.GroupBy(k => k).OrderByDescending(g => g.Count()).First().Key
-                    : (int?)null;
-
-                return new AboKandidat
-                {
-                    AdresseId = sortiert[0].AdresseId!.Value,
-                    AdresseName = sortiert[0].AdresseName ?? $"Adresse #{sortiert[0].AdresseId}",
-                    Periodizitaet = code,
-                    MedianBetrag = Median(sortiert.Select(t => Math.Abs(t.Betrag)).ToList()),
-                    AnzahlZahlungen = sortiert.Count,
-                    ErsteZahlung = sortiert[0].Datum.Date,
-                    LetzteZahlung = sortiert[^1].Datum.Date,
-                    HaeufigstesKontoId = haeufigstesKonto,
-                    MehrereKonten = kontoIds.Distinct().Count() > 1,
-                    TransaktionIds = sortiert.Select(t => t.Id).ToList()
-                };
+                return BaueKandidat(sortiert, code);
             }
 
             return null;
+        }
+
+        private static AboKandidat BaueKandidat(List<Transaktion> sortiert, string periodizitaet)
+        {
+            var kontoIds = sortiert
+                .Select(t => t.NachKontoId ?? t.VonKontoId)
+                .Where(k => k.HasValue)
+                .Select(k => k!.Value)
+                .ToList();
+
+            var haeufigstesKonto = kontoIds.Count > 0
+                ? kontoIds.GroupBy(k => k).OrderByDescending(g => g.Count()).First().Key
+                : (int?)null;
+
+            return new AboKandidat
+            {
+                AdresseId = sortiert[0].AdresseId!.Value,
+                AdresseName = sortiert[0].AdresseName ?? $"Adresse #{sortiert[0].AdresseId}",
+                Periodizitaet = periodizitaet,
+                MedianBetrag = Median(sortiert.Select(t => Math.Abs(t.Betrag)).ToList()),
+                AnzahlZahlungen = sortiert.Count,
+                ErsteZahlung = sortiert[0].Datum.Date,
+                LetzteZahlung = sortiert[^1].Datum.Date,
+                HaeufigstesKontoId = haeufigstesKonto,
+                MehrereKonten = kontoIds.Distinct().Count() > 1,
+                TransaktionIds = sortiert.Select(t => t.Id).ToList()
+            };
         }
 
         private static decimal Median(List<decimal> werte)

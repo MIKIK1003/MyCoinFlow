@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="MyCoinFlow.WinUI.Views.StweSetsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Enabled">
+    <Grid Padding="28,22,28,24" RowSpacing="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel Spacing="3"><TextBlock Text="STWE" Style="{StaticResource PageTitleStyle}"/><TextBlock Text="Transaktions-Sets verteilen, abschließen und auswerten" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Aktualisieren" Click="OnRefreshClick"><AppBarButton.Icon><FontIcon Glyph="&#xE72C;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Set aus Transaktion" Click="OnNewSetClick"><AppBarButton.Icon><FontIcon Glyph="&#xE710;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="DistributeButton" Label="Verteilen / Anzeigen" IsEnabled="False" Click="OnDistributeClick"><AppBarButton.Icon><FontIcon Glyph="&#xE9D2;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="RenameButton" Label="Titel ändern" IsEnabled="False" Click="OnRenameClick"><AppBarButton.Icon><FontIcon Glyph="&#xE70F;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="DeleteButton" Label="Löschen" IsEnabled="False" Foreground="{StaticResource MyCoinFlowDangerBrush}" Click="OnDeleteClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;"/></AppBarButton.Icon></AppBarButton>
+            </CommandBar>
+        </Grid>
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="14,10">
+            <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="190"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="190"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Liegenschaft" VerticalAlignment="Center" FontWeight="SemiBold"/><ComboBox x:Name="PropertyBox" Grid.Column="1" DisplayMemberPath="Name" MinWidth="300" SelectionChanged="OnPropertyChanged"/>
+                <TextBlock Grid.Column="2" Text="Datum von" VerticalAlignment="Center"/><CalendarDatePicker x:Name="FromPicker" Grid.Column="3" DateChanged="OnFilterChanged"/>
+                <TextBlock Grid.Column="4" Text="Datum bis" VerticalAlignment="Center"/><CalendarDatePicker x:Name="ToPicker" Grid.Column="5" DateChanged="OnFilterChanged"/>
+            </Grid>
+        </Border>
+        <CommandBar Grid.Row="2" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+            <AppBarButton x:Name="CloseSetButton" Label="Abschließen" IsEnabled="False" Click="OnCloseSetClick"><AppBarButton.Icon><FontIcon Glyph="&#xE72E;"/></AppBarButton.Icon></AppBarButton>
+            <AppBarButton x:Name="ReopenButton" Label="Wieder öffnen" IsEnabled="False" Click="OnReopenClick"><AppBarButton.Icon><FontIcon Glyph="&#xE785;"/></AppBarButton.Icon></AppBarButton>
+            <AppBarButton x:Name="CreditButton" Label="Als Gutschrift" IsEnabled="False" Click="OnCreditClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74B;"/></AppBarButton.Icon></AppBarButton>
+            <AppBarButton x:Name="DebitButton" Label="Als Belastung" IsEnabled="False" Click="OnDebitClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74A;"/></AppBarButton.Icon></AppBarButton>
+            <AppBarSeparator/>
+            <AppBarButton Label="Zählerdaten" Click="OnMeterDataClick"><AppBarButton.Icon><FontIcon Glyph="&#xEC4A;"/></AppBarButton.Icon></AppBarButton>
+            <AppBarButton Label="STWE Bericht" Click="OnReportClick"><AppBarButton.Icon><FontIcon Glyph="&#xE9D2;"/></AppBarButton.Icon></AppBarButton>
+        </CommandBar>
+        <ListView x:Name="SetsList" Grid.Row="3" SelectionMode="Single" SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
+            <ListView.Header><Grid Padding="10,8" ColumnSpacing="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="2.4*"/><ColumnDefinition Width="130"/><ColumnDefinition Width="130"/><ColumnDefinition Width="130"/><ColumnDefinition Width="120"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions><TextBlock Text="Datum" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Titel" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Total" FontWeight="SemiBold"/><TextBlock Grid.Column="3" Text="Verteilt" FontWeight="SemiBold"/><TextBlock Grid.Column="4" Text="Rest" FontWeight="SemiBold"/><TextBlock Grid.Column="5" Text="Typ" FontWeight="SemiBold"/><TextBlock Grid.Column="6" Text="Status" FontWeight="SemiBold"/></Grid></ListView.Header>
+            <ListView.ItemTemplate><DataTemplate><Grid Padding="10,8" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="2.4*"/><ColumnDefinition Width="130"/><ColumnDefinition Width="130"/><ColumnDefinition Width="130"/><ColumnDefinition Width="120"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions><TextBlock Text="{Binding DateText}"/><TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="{Binding TotalText}"/><TextBlock Grid.Column="3" Text="{Binding DistributedText}"/><TextBlock Grid.Column="4" Text="{Binding RestText}"/><TextBlock Grid.Column="5" Text="{Binding TypeText}"/><TextBlock Grid.Column="6" Text="{Binding StatusText}"/></Grid></DataTemplate></ListView.ItemTemplate>
+        </ListView>
+        <InfoBar x:Name="StatusBar" Grid.Row="4" IsOpen="True" IsClosable="True" Severity="Informational"/>
+    </Grid>
+</Page>

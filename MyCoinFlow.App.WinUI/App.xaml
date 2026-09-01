@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="MyCoinFlow.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Color x:Key="MyCoinFlowAccentColor">#0F766E</Color>
+            <SolidColorBrush x:Key="MyCoinFlowAccentBrush" Color="{StaticResource MyCoinFlowAccentColor}" />
+            <SolidColorBrush x:Key="MyCoinFlowAccentSoftBrush" Color="#DDF4F1" />
+            <SolidColorBrush x:Key="MyCoinFlowPositiveBrush" Color="#15803D" />
+            <SolidColorBrush x:Key="MyCoinFlowDangerBrush" Color="#C2413B" />
+
+            <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="CardBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="16" />
+            </Style>
+
+            <!-- Einheitliche Funktionszone: Aktionen bleiben sichtbar, werden fachlich
+                 gruppiert und bei fehlendem Kontext über IsEnabled ausgegraut. -->
+            <Style x:Key="FunctionBarStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource MyCoinFlowAccentSoftBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource MyCoinFlowAccentBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="10,5" />
+            </Style>
+            <Style x:Key="FunctionGroupTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource MyCoinFlowAccentBrush}" />
+                <Setter Property="Margin" Value="4,0,4,2" />
+            </Style>
+            <Style x:Key="FunctionButtonStyle" TargetType="Button">
+                <Setter Property="Height" Value="34" />
+                <Setter Property="Margin" Value="2,1" />
+                <Setter Property="Padding" Value="9,4" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="FunctionPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource FunctionButtonStyle}">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+            <Style x:Key="FunctionButtonLabelStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="MaxLines" Value="1" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="FunctionGroupSeparatorStyle" TargetType="Rectangle">
+                <Setter Property="Width" Value="1" />
+                <Setter Property="Fill" Value="{StaticResource MyCoinFlowAccentBrush}" />
+                <Setter Property="Opacity" Value="0.3" />
+                <Setter Property="Margin" Value="8,1" />
+                <Setter Property="VerticalAlignment" Value="Stretch" />
+            </Style>
+
+            <!-- Verbindlicher Formular-Scrollbar-Gutter: Inhalte dürfen nie unter der Scrollbar liegen. -->
+            <Style x:Key="FormScrollViewerStyle" TargetType="ScrollViewer">
+                <Setter Property="Padding" Value="0,0,18,0" />
+                <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

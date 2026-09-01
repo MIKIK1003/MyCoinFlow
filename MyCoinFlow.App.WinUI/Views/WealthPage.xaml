@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="MyCoinFlow.WinUI.Views.WealthPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Enabled">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="WealthPurpleBrush" Color="#8060C9" />
+        <SolidColorBrush x:Key="WealthBlueBrush" Color="#4D9BC1" />
+        <SolidColorBrush x:Key="WealthGridBrush" Color="#D3D4DB" />
+        <SolidColorBrush x:Key="WealthChartTextBrush" Color="#55555F" />
+    </Page.Resources>
+
+    <Grid Padding="28,22,28,24" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="280" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Wealth" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="FilterTitleText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Aktualisieren" Click="OnRefreshClick"><AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Depot neu" Click="OnNewDepotClick"><AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="EditDepotButton" Label="Depot bearbeiten" Click="OnEditDepotClick"><AppBarButton.Icon><FontIcon Glyph="&#xE70F;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="HideDepotButton" Label="Depot ausblenden" Foreground="{StaticResource MyCoinFlowDangerBrush}" Click="OnHideDepotClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon></AppBarButton>
+            </CommandBar>
+        </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="14,10">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="1.2*" />
+                    <ColumnDefinition Width="1.2*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox" PlaceholderText="Titel, ISIN, Depot …" KeyDown="OnSearchKeyDown" />
+                <ComboBox x:Name="DepotFilterBox" Grid.Column="1" DisplayMemberPath="Name" />
+                <ComboBox x:Name="ClassFilterBox" Grid.Column="2" />
+                <Button Grid.Column="3" Content="Suchen" Click="OnSearchClick" />
+                <Button Grid.Column="4" Content="Leeren" Click="OnClearFilterClick" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnSpacing="12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}"><StackPanel><TextBlock Text="Depotwert" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="DepotValueText" FontSize="24" FontWeight="SemiBold" /></StackPanel></Border>
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}"><StackPanel><TextBlock Text="Einstand" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="CostValueText" FontSize="24" FontWeight="SemiBold" /></StackPanel></Border>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}"><StackPanel><TextBlock Text="Gewinn / Verlust" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="ProfitValueText" FontSize="24" FontWeight="SemiBold" /></StackPanel></Border>
+        </Grid>
+
+        <Grid Grid.Row="3" ColumnSpacing="14">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="1.25*" /></Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource CardBorderStyle}" Padding="16,12">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="Depotverlauf" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        <ComboBox x:Name="PeriodBox" Grid.Column="1" Width="150" Header="Zeitraum" SelectionChanged="OnPeriodSelectionChanged" />
+                    </Grid>
+                    <Canvas x:Name="DepotHistoryCanvas" Grid.Row="1" Background="Transparent" SizeChanged="OnDepotHistorySizeChanged" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="16,12">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <TextBlock Text="Vermögensaufteilung" Style="{StaticResource SectionTitleStyle}" />
+                    <Grid Grid.Row="1" ColumnSpacing="14">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Canvas x:Name="AllocationCanvas" Width="210" Height="210" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <StackPanel x:Name="AllocationLegendPanel" Grid.Column="1" Spacing="7" VerticalAlignment="Center" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <CommandBar Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Position neu" Click="OnNewPositionClick"><AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Excel importieren" Click="OnImportClick"><AppBarButton.Icon><FontIcon Glyph="&#xE8B5;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="EditPositionButton" Label="Bearbeiten" IsEnabled="False" Click="OnEditPositionClick"><AppBarButton.Icon><FontIcon Glyph="&#xE70F;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="DeletePositionButton" Label="Löschen" IsEnabled="False" Foreground="{StaticResource MyCoinFlowDangerBrush}" Click="OnDeletePositionClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton x:Name="HistoryButton" Label="Kursverlauf" IsEnabled="False" Click="OnHistoryClick"><AppBarButton.Icon><FontIcon Glyph="&#xE9D2;" /></AppBarButton.Icon></AppBarButton>
+            </CommandBar>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="API-Key" Click="OnApiClick"><AppBarButton.Icon><FontIcon Glyph="&#xE8D7;" /></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Kurse aktualisieren" Click="OnUpdatePricesClick"><AppBarButton.Icon><FontIcon Glyph="&#xE895;" /></AppBarButton.Icon></AppBarButton>
+            </CommandBar>
+        </Grid>
+
+        <ListView x:Name="PositionsList" Grid.Row="5" SelectionMode="Single" SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
+            <ListView.Header><Grid Padding="10,8" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"><Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="2*" /><ColumnDefinition Width="125" /><ColumnDefinition Width="120" /><ColumnDefinition Width="80" /><ColumnDefinition Width="90" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="180" /><ColumnDefinition Width="135" /><ColumnDefinition Width="105" /></Grid.ColumnDefinitions><TextBlock Text="Depot" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="Titel" FontWeight="SemiBold" /><TextBlock Grid.Column="2" Text="ISIN" FontWeight="SemiBold" /><TextBlock Grid.Column="3" Text="Anlageklasse" FontWeight="SemiBold" /><TextBlock Grid.Column="4" Text="Währung" FontWeight="SemiBold" /><TextBlock Grid.Column="5" Text="Stück" FontWeight="SemiBold" /><TextBlock Grid.Column="6" Text="Einstandswert" FontWeight="SemiBold" /><TextBlock Grid.Column="7" Text="Marktwert" FontWeight="SemiBold" /><TextBlock Grid.Column="8" Text="Gewinn / Verlust" FontWeight="SemiBold" /><TextBlock Grid.Column="9" Text="Marktwert CHF" FontWeight="SemiBold" /><TextBlock Grid.Column="10" Text="Kursdatum" FontWeight="SemiBold" /></Grid></ListView.Header>
+            <ListView.ItemTemplate><DataTemplate><Grid Padding="10,8" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="2*" /><ColumnDefinition Width="125" /><ColumnDefinition Width="120" /><ColumnDefinition Width="80" /><ColumnDefinition Width="90" /><ColumnDefinition Width="130" /><ColumnDefinition Width="130" /><ColumnDefinition Width="180" /><ColumnDefinition Width="135" /><ColumnDefinition Width="105" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Depot}" /><TextBlock Grid.Column="1" Text="{Binding Titel}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="2" Text="{Binding ISIN}" /><TextBlock Grid.Column="3" Text="{Binding Anlageklasse}" /><TextBlock Grid.Column="4" Text="{Binding Waehrung}" /><TextBlock Grid.Column="5" Text="{Binding AnzahlText}" /><TextBlock Grid.Column="6" Text="{Binding EinstandText}" /><TextBlock Grid.Column="7" Text="{Binding AktuellText}" /><TextBlock Grid.Column="8" Text="{Binding GewinnText}" /><TextBlock Grid.Column="9" Text="{Binding MarktwertChfText}" /><TextBlock Grid.Column="10" Text="{Binding KursdatumText}" /></Grid></DataTemplate></ListView.ItemTemplate>
+        </ListView>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="6" IsOpen="True" IsClosable="True" />
+    </Grid>
+</Page>

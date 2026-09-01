@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="MyCoinFlow.WinUI.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Enabled">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="DashboardTextBrush" Color="#FF2D2D35" />
+        <SolidColorBrush x:Key="DashboardSecondaryTextBrush" Color="#FF55555F" />
+        <SolidColorBrush x:Key="DashboardPurpleBarBrush" Color="#FF9874D0" />
+        <SolidColorBrush x:Key="DashboardBlueBarBrush" Color="#FF5FAED0" />
+        <SolidColorBrush x:Key="DashboardGreenBarBrush" Color="#FF79B967" />
+        <SolidColorBrush x:Key="DashboardRoseBarBrush" Color="#FFDF7787" />
+        <SolidColorBrush x:Key="DashboardAxisBrush" Color="#FF777780" />
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource DashboardTextBrush}" />
+        </Style>
+    </Page.Resources>
+
+    <Grid x:Name="RootGrid" Padding="28,22,18,24" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,10,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Dashboard" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="PeriodText" Foreground="{StaticResource DashboardSecondaryTextBrush}" />
+            </StackPanel>
+            <CommandBar Grid.Column="1" DefaultLabelPosition="Right" Background="Transparent"
+                        IsDynamicOverflowEnabled="False" VerticalAlignment="Center">
+                <AppBarButton x:Name="DashboardModeButton" Label="STWE" Visibility="Collapsed"
+                              Click="OnDashboardModeClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE809;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Aktualisieren" Click="OnRefreshClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Drucken" Click="OnPrintClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE749;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="10" Margin="0,0,10,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}" Background="#FFD7ECF7">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="KREDITKARTE (OFFEN)" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource DashboardSecondaryTextBrush}" />
+                    <TextBlock x:Name="CreditCardCountText" FontSize="22" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Background="#FFDCEFD8">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="BANK (OFFEN)" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource DashboardSecondaryTextBrush}" />
+                    <TextBlock x:Name="BankCountText" FontSize="22" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Background="#FFF8E8B5">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="GRUPPIERUNG" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource DashboardSecondaryTextBrush}" />
+                        <ComboBox x:Name="GroupingBox" DisplayMemberPath="Label" MinWidth="210"
+                                  SelectionChanged="OnGroupingChanged" />
+                    </StackPanel>
+                    <DropDownButton Grid.Column="1" Content="Kontenkreise" MinWidth="150"
+                                    VerticalAlignment="Bottom">
+                        <DropDownButton.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <Border Padding="4" MinWidth="840">
+                                    <Grid RowSpacing="12">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <ListView x:Name="RangesList" SelectionMode="None" MaxHeight="260">
+                                            <ListView.ItemsPanel>
+                                                <ItemsPanelTemplate><ItemsWrapGrid MaximumRowsOrColumns="3" Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ListView.ItemsPanel>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox Content="{Binding Display}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              Width="260" Margin="0,3" />
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8"
+                                                    HorizontalAlignment="Right">
+                                            <Button Content="Alle" Click="OnAllRangesClick" />
+                                            <Button Content="Keine" Click="OnNoRangesClick" />
+                                            <Button Content="Anwenden" Style="{StaticResource AccentButtonStyle}"
+                                                    Click="OnApplyRangesClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Flyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="0,0,10,0">
+          <Grid>
+            <Grid x:Name="BudgetDashboardContent" RowSpacing="12" ColumnSpacing="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource CardBorderStyle}" MinHeight="300">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Name="ComparisonTitleText" Style="{StaticResource SectionTitleStyle}" />
+                        <ListView x:Name="ComparisonList" SelectionMode="None" MaxHeight="360">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8" Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="92" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="3">
+                                            <Grid Height="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding BudgetNegativeBarWidth}" HorizontalAlignment="Right" Background="{StaticResource DashboardPurpleBarBrush}" CornerRadius="4"/><Border Grid.Column="1" Width="{Binding BudgetPositiveBarWidth}" HorizontalAlignment="Left" Background="{StaticResource DashboardPurpleBarBrush}" CornerRadius="4"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid>
+                                            <Grid Height="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding ActualNegativeBarWidth}" HorizontalAlignment="Right" Background="{StaticResource DashboardBlueBarBrush}" CornerRadius="4"/><Border Grid.Column="1" Width="{Binding ActualPositiveBarWidth}" HorizontalAlignment="Left" Background="{StaticResource DashboardBlueBarBrush}" CornerRadius="4"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{Binding BudgetText}" FontSize="11" HorizontalAlignment="Right" />
+                                            <TextBlock Text="{Binding ActualText}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" MinHeight="300">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="IST-Verteilung" Style="{StaticResource SectionTitleStyle}" />
+                            <CheckBox x:Name="PercentCheckBox" Grid.Column="1" Content="Werte im Kreisdiagramm in %"
+                                      Checked="OnPercentChanged" Unchecked="OnPercentChanged" />
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Canvas x:Name="DistributionChart" Width="240" Height="240"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ListView x:Name="DistributionList" Grid.Column="1" SelectionMode="None" MaxHeight="250">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="8" Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="14" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="86" />
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse Width="10" Height="10" Fill="{Binding SliceBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding DisplayValueText}" HorizontalAlignment="Right"
+                                                       FontWeight="SemiBold" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" MinHeight="260">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Top-Abweichungen (IST vs. Budget)" Style="{StaticResource SectionTitleStyle}" />
+                        <ListView x:Name="DeviationList" SelectionMode="None" MaxHeight="320">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8" Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <Grid Grid.Column="1" Height="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding NegativeBarWidth}" HorizontalAlignment="Right" Background="{StaticResource DashboardRoseBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="{Binding PositiveBarWidth}" HorizontalAlignment="Left" Background="{StaticResource DashboardGreenBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid>
+                                        <TextBlock Grid.Column="2" Text="{Binding ValueText}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardBorderStyle}" MinHeight="260">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Bestände der Geldinstitute" Style="{StaticResource SectionTitleStyle}" />
+                        <ListView x:Name="BanksList" SelectionMode="None" MaxHeight="320">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8" Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <Grid Grid.Column="1" Height="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding NegativeBarWidth}" HorizontalAlignment="Right" Background="{StaticResource DashboardRoseBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="{Binding PositiveBarWidth}" HorizontalAlignment="Left" Background="{StaticResource DashboardBlueBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid>
+                                        <TextBlock Grid.Column="2" Text="{Binding ValueText}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+            <Grid x:Name="StweDashboardContent" Visibility="Collapsed" RowSpacing="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel Spacing="3" Margin="2,0,2,2">
+                    <TextBlock x:Name="StweHeadingText" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="StweStatusText" TextWrapping="Wrap"
+                               Foreground="{StaticResource DashboardSecondaryTextBrush}" />
+                </StackPanel>
+                <Grid Grid.Row="1" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CardBorderStyle}" MinHeight="300">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Energie kWh (Rechnung / Interne / Solar direkt) – Q1–Q4" Style="{StaticResource SectionTitleStyle}" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Quartal" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="Rechnung" FontWeight="SemiBold" Foreground="#FF69419F" />
+                                <TextBlock Grid.Column="2" Text="Intern" FontWeight="SemiBold" Foreground="#FF2D728C" />
+                                <TextBlock Grid.Column="3" Text="Solar" FontWeight="SemiBold" Foreground="#FF3F7835" />
+                            </Grid>
+                            <ListView x:Name="EnergyList" SelectionMode="None" MaxHeight="230">
+                                <ListView.ItemTemplate><DataTemplate>
+                                    <Grid ColumnSpacing="8" Margin="0,3">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Quarter}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2"><Border Height="11" Width="{Binding InvoiceBarWidth}" MaxWidth="145" HorizontalAlignment="Left" Background="{StaticResource DashboardPurpleBarBrush}" CornerRadius="5" /><TextBlock Text="{Binding InvoiceText}" FontSize="11" FontWeight="SemiBold" /></StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="2"><Border Height="11" Width="{Binding InternalBarWidth}" MaxWidth="145" HorizontalAlignment="Left" Background="{StaticResource DashboardBlueBarBrush}" CornerRadius="5" /><TextBlock Text="{Binding InternalText}" FontSize="11" FontWeight="SemiBold" /></StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="2"><Border Height="11" Width="{Binding SolarBarWidth}" MaxWidth="145" HorizontalAlignment="Left" Background="{StaticResource DashboardGreenBarBrush}" CornerRadius="5" /><TextBlock Text="{Binding SolarText}" FontSize="11" FontWeight="SemiBold" /></StackPanel>
+                                    </Grid>
+                                </DataTemplate></ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" MinHeight="300">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Solar-Anteil % – Q1–Q4" Style="{StaticResource SectionTitleStyle}" />
+                            <ListView x:Name="SolarList" SelectionMode="None" MaxHeight="240">
+                                <ListView.ItemTemplate><DataTemplate>
+                                    <Grid ColumnSpacing="10" Margin="0,8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="50" /><ColumnDefinition Width="*" /><ColumnDefinition Width="74" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                        <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Percent}" Height="11" VerticalAlignment="Center" Foreground="{StaticResource DashboardGreenBarBrush}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding PercentText}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate></ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <Grid Grid.Row="2" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CardBorderStyle}" MinHeight="280">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="kWh pro Eigentümer (direkt + anteilig ALLG+HEIZ)" Style="{StaticResource SectionTitleStyle}" />
+                            <ListView x:Name="OwnerKwhList" SelectionMode="None" MaxHeight="230"><ListView.ItemTemplate><DataTemplate>
+                                <Grid ColumnSpacing="8" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" /><Grid Grid.Column="1" Height="13"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding NegativeBarWidth}" MaxWidth="220" HorizontalAlignment="Right" Background="{StaticResource DashboardRoseBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="{Binding PositiveBarWidth}" MaxWidth="220" HorizontalAlignment="Left" Background="{StaticResource DashboardBlueBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid><TextBlock Grid.Column="2" Text="{Binding ValueText}" HorizontalAlignment="Right" FontWeight="SemiBold" /></Grid>
+                            </DataTemplate></ListView.ItemTemplate></ListView>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" MinHeight="280">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="CHF pro Eigentümer (aus Verteilung / SetLines)" Style="{StaticResource SectionTitleStyle}" />
+                            <ListView x:Name="OwnerChfList" SelectionMode="None" MaxHeight="230"><ListView.ItemTemplate><DataTemplate>
+                                <Grid ColumnSpacing="8" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" /><Grid Grid.Column="1" Height="13"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="{Binding NegativeBarWidth}" MaxWidth="220" HorizontalAlignment="Right" Background="{StaticResource DashboardRoseBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="{Binding PositiveBarWidth}" MaxWidth="220" HorizontalAlignment="Left" Background="{StaticResource DashboardPurpleBarBrush}" CornerRadius="5"/><Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource DashboardAxisBrush}"/></Grid><TextBlock Grid.Column="2" Text="{Binding ValueText}" HorizontalAlignment="Right" FontWeight="SemiBold" /></Grid>
+                            </DataTemplate></ListView.ItemTemplate></ListView>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+          </Grid>
+        </ScrollViewer>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="3" Margin="0,0,10,0" IsOpen="False" IsClosable="True" />
+    </Grid>
+</Page>

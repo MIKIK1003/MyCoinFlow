@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.TransactionReportWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Transaktionsbericht">
+
+    <Grid x:Name="RootGrid" Padding="18" ColumnSpacing="16" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="420" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Padding="14">
+            <ScrollViewer Style="{StaticResource FormScrollViewerStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Bericht steuern" FontSize="22" FontWeight="SemiBold" />
+                    <TextBox x:Name="ReportTitleBox" Header="Berichtsname" />
+                    <ComboBox x:Name="BudgetPeriodBox" Header="Budgetzeitraum" DisplayMemberPath="Bezeichnung"
+                              HorizontalAlignment="Stretch" SelectionChanged="OnBudgetPeriodChanged" />
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <DatePicker x:Name="FromPicker" Header="Auswertung von" HorizontalAlignment="Stretch" />
+                        <DatePicker x:Name="ToPicker" Grid.Column="1" Header="Auswertung bis" HorizontalAlignment="Stretch" />
+                    </Grid>
+
+                    <ComboBox x:Name="ReportModeBox" Header="Berichtsart" DisplayMemberPath="Display"
+                              HorizontalAlignment="Stretch" SelectionChanged="OnReportOptionChanged" />
+                    <ComboBox x:Name="GroupingBox" Header="Gruppierung" DisplayMemberPath="Display"
+                              HorizontalAlignment="Stretch" SelectionChanged="OnReportOptionChanged" />
+
+                    <TextBlock Text="Nummernkreise" FontWeight="SemiBold" Margin="0,6,0,0" />
+                    <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" MaxHeight="145">
+                        <ListView x:Name="NumberRangesList" SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Anzeige}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                    <Button Content="Nummernkreise anwenden" Click="OnApplyNumberRangesClick" />
+
+                    <Grid Margin="0,5,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Konten" FontWeight="SemiBold" />
+                        <TextBlock x:Name="SelectedAccountCountText" Grid.Column="1" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Content="Alle" Click="OnAllAccountsClick" />
+                        <Button Grid.Column="1" Content="Keine" Click="OnNoAccountsClick" />
+                        <Button Grid.Column="2" Content="Budget" Click="OnBudgetAccountsClick" />
+                    </Grid>
+
+                    <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Height="250">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Padding="8,6" ColumnSpacing="7" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="32" />
+                                    <ColumnDefinition Width="50" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="70" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="NR." FontSize="10" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="2" Text="KONTO" FontSize="10" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="3" Text="ART" FontSize="10" FontWeight="SemiBold" />
+                            </Grid>
+                            <ListView x:Name="AccountsList" Grid.Row="1" SelectionMode="None">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="8,5" ColumnSpacing="7">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="32" />
+                                                <ColumnDefinition Width="50" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="70" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="OnAccountSelectionClick" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Kontonummer}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="3" Text="{Binding RichtungText}" FontSize="11" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <Button Content="Auswerten" Style="{StaticResource AccentButtonStyle}" Click="OnEvaluateClick" />
+                    <Button x:Name="AdjustBudgetButton" Content="Budget an Hochrechnung anpassen…" Click="OnAdjustBudgetClick" IsEnabled="False" />
+                    <Button x:Name="PrintButton" Content="Drucken / PDF" Click="OnPrintClick" IsEnabled="False" />
+                    <Button Content="Schließen" Click="OnCloseClick" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Grid Grid.Column="1" RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="245" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Berichtsvorschau" Style="{StaticResource PageTitleStyle}" />
+
+            <Grid Grid.Row="1" ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CardBorderStyle}" Padding="12">
+                    <TextBlock x:Name="ExpenseSummaryText" TextWrapping="Wrap" />
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="12">
+                    <TextBlock x:Name="IncomeSummaryText" TextWrapping="Wrap" />
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="12">
+                    <TextBlock x:Name="NetSummaryText" TextWrapping="Wrap" />
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="9,7" ColumnSpacing="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" MinWidth="150" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="105" />
+                            <ColumnDefinition Width="105" />
+                            <ColumnDefinition Width="105" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="105" />
+                            <ColumnDefinition Width="105" />
+                            <ColumnDefinition Width="95" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="AccountColumnTitle" Text="KONTO" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="BEZEICHNUNG" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="RICHTUNG" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="BUDGET JAHR" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="SOLL" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="5" Text="IST" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="6" Text="HOCHRECHNUNG" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="7" Text="Δ ZEITRAUM" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="8" Text="Δ JAHR" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="9" Text="ERFÜLLUNG" FontSize="10" FontWeight="SemiBold" />
+                    </Grid>
+                    <ListView x:Name="ResultRowsList" Grid.Row="1" SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="9,6" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" MinWidth="150" />
+                                        <ColumnDefinition Width="85" />
+                                        <ColumnDefinition Width="105" />
+                                        <ColumnDefinition Width="105" />
+                                        <ColumnDefinition Width="105" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="105" />
+                                        <ColumnDefinition Width="105" />
+                                        <ColumnDefinition Width="95" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Account}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Direction}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Budget}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Target}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="5" Text="{Binding Actual}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="6" Text="{Binding Projection}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="7" Text="{Binding PeriodDelta}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="8" Text="{Binding YearDelta}" TextAlignment="Right" />
+                                    <TextBlock Grid.Column="9" Text="{Binding Fulfillment}" TextAlignment="Right" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="3" RowSpacing="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <TextBlock Text="Spotlight" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SpotlightBasisText" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+                <TabView Grid.Row="1" IsAddTabButtonVisible="False">
+                    <TabViewItem Header="Top 5 Ausgaben" IsClosable="False">
+                        <ListView x:Name="TopExpensesList" SelectionMode="None" />
+                    </TabViewItem>
+                    <TabViewItem Header="Top 5 Einnahmen" IsClosable="False">
+                        <ListView x:Name="TopIncomeList" SelectionMode="None" />
+                    </TabViewItem>
+                    <TabViewItem Header="Kritische Abweichungen" IsClosable="False">
+                        <ListView x:Name="CriticalList" SelectionMode="None" />
+                    </TabViewItem>
+                </TabView>
+                <TextBlock x:Name="SpotlightSummaryText" Grid.Row="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+
+            <InfoBar x:Name="StatusBar" Grid.Row="4" IsOpen="True" IsClosable="True" Severity="Informational" />
+        </Grid>
+    </Grid>
+</window:PersistentWindow>

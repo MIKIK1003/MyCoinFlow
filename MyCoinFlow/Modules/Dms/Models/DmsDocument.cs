@@ -60,6 +60,7 @@ namespace MyCoinFlow.Models
         public DateTime? ExplizitFaelligAm { get; set; }
         public DateTime? AufbewahrenBis { get; set; }
         public bool IstFavorit { get; set; }
+        public bool IstSteuerunterlage { get; set; }
         public int AktuelleVersion { get; set; } = 1;
         public string? InhaltHash { get; set; }
         public DateTime? LetzteAenderungAmUtc { get; set; }
@@ -103,6 +104,7 @@ namespace MyCoinFlow.Models
         public string VerantwortlichAnzeige => string.IsNullOrWhiteSpace(Verantwortlich) ? "Nicht zugewiesen" : Verantwortlich;
         public string SchlagwoerterAnzeige => string.IsNullOrWhiteSpace(Schlagwoerter) ? "Keine Schlagwörter" : Schlagwoerter;
         public string FavoritSymbol => IstFavorit ? "★" : "☆";
+        public string SteuerAnzeige => IstSteuerunterlage ? "Steuerunterlage / Beilage" : "";
         public string VersionAnzeige => $"v{AktuelleVersion}";
         public string DuplikatAnzeige => IstMoeglichesDuplikat ? "Möglicher Doppelbeleg" : "";
 

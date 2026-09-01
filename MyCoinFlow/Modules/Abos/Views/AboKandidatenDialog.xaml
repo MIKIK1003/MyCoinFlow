@@ -3,7 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
                  xmlns:base="clr-namespace:MyCoinFlow.UI.Base"
-                 Title="Gefundene Abo-Kandidaten"
+                 Title="Gefundene Zahlungsserien"
                  Width="980"
                  Height="600"
                  WindowStartupLocation="CenterOwner">
@@ -24,7 +24,7 @@
         <TextBlock Grid.Row="0"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource MaterialDesignBodyMediumBrush}"
-                   Text="Diese wiederkehrenden Zahlungen wurden in den Transaktionen erkannt. Abwählen, was kein Abo ist – erst mit «Übernehmen» wird gespeichert."/>
+                   Text="Vorgeschlagen werden regelmässige Einnahmen und Ausgaben. Richtung und Serienart sind Vorschläge und können nach der Übernahme bearbeitet werden. Einzelne Verdachtsfälle sind vorsorglich nicht markiert; abgewählte Muster bleiben dauerhaft ausgeblendet."/>
 
         <DataGrid Grid.Row="2"
                   x:Name="KandidatenGrid"
@@ -39,6 +39,14 @@
                 <DataGridTextColumn Header="Anbieter / Adresse"
                                     Binding="{Binding AdresseName}"
                                     IsReadOnly="True" Width="*"/>
+
+                <DataGridTextColumn Header="Kategorie"
+                                    Binding="{Binding KategorieAnzeige}"
+                                    IsReadOnly="True" Width="135"/>
+
+                <DataGridTextColumn Header="Richtung"
+                                    Binding="{Binding Richtung}"
+                                    IsReadOnly="True" Width="90"/>
 
                 <DataGridTextColumn Header="Rhythmus"
                                     Binding="{Binding Periodizitaet}"
@@ -71,6 +79,10 @@
                 <DataGridTextColumn Header="Letzte"
                                     Binding="{Binding LetzteZahlung, StringFormat=dd.MM.yyyy}"
                                     IsReadOnly="True" Width="100"/>
+
+                <DataGridTextColumn Header="Erkennung"
+                                    Binding="{Binding Erkennungsgrund}"
+                                    IsReadOnly="True" Width="220"/>
 
                 <DataGridTemplateColumn Header="" Width="40">
                     <DataGridTemplateColumn.CellTemplate>

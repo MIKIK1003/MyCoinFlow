@@ -696,7 +696,8 @@ SELECT a.Id, a.TransaktionId, a.EntityType, a.EntityId, a.Titel, a.Kategorie,
        (
            SELECT 1 FROM dbo.Attachment duplicate
            WHERE duplicate.InhaltHash = a.InhaltHash AND duplicate.Id <> a.Id
-       ) THEN 1 ELSE 0 END AS BIT) AS IstMoeglichesDuplikat
+       ) THEN 1 ELSE 0 END AS BIT) AS IstMoeglichesDuplikat,
+       a.IstSteuerunterlage
 FROM dbo.Attachment a
 LEFT JOIN dbo.AttachmentText txt ON txt.AttachmentId = a.Id
 LEFT JOIN dbo.Transaktion tr ON a.EntityType = 'Transaktion' AND tr.Id = a.EntityId
@@ -770,7 +771,8 @@ ORDER BY a.ImportedAtUtc DESC;";
                     AktuelleVersion = r.GetInt32(30),
                     InhaltHash = r.IsDBNull(31) ? null : r.GetString(31),
                     LetzteAenderungAmUtc = r.GetDateTime(32),
-                    IstMoeglichesDuplikat = r.GetBoolean(33)
+                    IstMoeglichesDuplikat = r.GetBoolean(33),
+                    IstSteuerunterlage = r.GetBoolean(34)
                 });
             }
             return list;

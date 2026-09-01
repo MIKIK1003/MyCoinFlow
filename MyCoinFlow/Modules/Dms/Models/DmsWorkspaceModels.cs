@@ -79,4 +79,11 @@ namespace MyCoinFlow.Models
         DateTime LastChangedAtUtc,
         DateTime? RetainUntil,
         string DisplayTitle);
+
+    public sealed record DmsTaxExportResult(
+        int TotalDocuments,
+        int CopiedDocuments,
+        int DuplicateDocuments,
+        int MissingDocuments,
+        int RenamedDocuments);
 }

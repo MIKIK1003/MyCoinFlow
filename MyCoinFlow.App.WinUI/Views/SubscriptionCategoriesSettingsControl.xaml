@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="MyCoinFlow.WinUI.Views.SubscriptionCategoriesSettingsControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowSpacing="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel Spacing="3"><TextBlock Text="Zahlungsserien-Kategorien" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Eigene Themen, Bezeichnungen, Farben und Reihenfolge für Bildschirm und PDF-Bericht" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
+                <AppBarButton Label="Neu" Click="OnNewClick"><AppBarButton.Icon><FontIcon Glyph="&#xE710;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Speichern" Click="OnSaveClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74E;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Löschen" Click="OnDeleteClick"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;"/></AppBarButton.Icon></AppBarButton>
+                <AppBarButton Label="Neu laden" Click="OnReloadClick"><AppBarButton.Icon><FontIcon Glyph="&#xE72C;"/></AppBarButton.Icon></AppBarButton>
+            </CommandBar>
+        </Grid>
+        <Grid Grid.Row="1" ColumnSpacing="14">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="350"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}" Padding="18">
+                <StackPanel Spacing="13">
+                    <TextBlock Text="Kategorie bearbeiten" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBox x:Name="NameBox" Header="Bezeichnung *" PlaceholderText="z. B. Energie &amp; Versorgung"/>
+                    <TextBox x:Name="DescriptionBox" Header="Beschreibung" AcceptsReturn="True" MinHeight="82" TextWrapping="Wrap" PlaceholderText="Wofür wird diese Kategorie verwendet?"/>
+                    <ComboBox x:Name="ColorBox" Header="Farbe" DisplayMemberPath="Name" SelectedValuePath="Hex" HorizontalAlignment="Stretch" SelectionChanged="OnColorChanged"/>
+                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><NumberBox x:Name="SortBox" Header="Reihenfolge" Minimum="0" Maximum="9999" SpinButtonPlacementMode="Compact"/><Border x:Name="ColorPreview" Grid.Column="1" Width="58" Height="34" Margin="0,24,0,0" CornerRadius="8"/></Grid>
+                    <ToggleSwitch x:Name="ActiveBox" Header="Verwendung" OffContent="Nicht mehr auswählbar" OnContent="Aktiv" IsOn="True"/>
+                    <TextBlock x:Name="TypeHintText" Text="Eigene Kategorie" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Padding="16,13" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Kategorien" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Diese Reihenfolge wird auch in der Übersicht und im Bericht verwendet." FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel><TextBlock x:Name="CountText" Grid.Column="1" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></Grid>
+                    <ListView x:Name="CategoriesList" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnSelectionChanged" HorizontalContentAlignment="Stretch">
+                        <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="8,4"/></Style></ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate><DataTemplate><Grid Padding="8,9" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="8"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="90"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions><Border Background="{Binding ColorBrush}" CornerRadius="4"/><StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding Value.Bezeichnung}" FontWeight="SemiBold"/><TextBlock Text="{Binding Value.Beschreibung}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="{Binding Usage}" FontWeight="SemiBold"/><TextBlock Text="Serien" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel><StackPanel Grid.Column="3"><TextBlock Text="{Binding Type}"/><TextBlock Text="{Binding State}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid></DataTemplate></ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+        </Grid>
+        <InfoBar x:Name="StatusBar" Grid.Row="2" IsOpen="False" IsClosable="True"/>
+    </Grid>
+</UserControl>

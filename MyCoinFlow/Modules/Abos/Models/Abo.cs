@@ -3,7 +3,7 @@ using System;
 namespace MyCoinFlow.Models
 {
     /// <summary>
-    /// Wiederkehrende Zahlung (Abo, Versicherung, Mitgliedschaft, ...).
+    /// Wiederkehrende Zahlungsserie, z.B. Einnahme, Vertrag, Lizenz oder Streaming.
     /// Statuswerte: "Aktiv", "Gekuendigt", "Beendet".
     /// Periodizitaet: "Monatlich", "Quartalsweise", "Halbjaehrlich", "Jaehrlich".
     /// </summary>
@@ -16,6 +16,17 @@ namespace MyCoinFlow.Models
         public string? AdresseName { get; set; }
 
         public string Periodizitaet { get; set; } = AboPerioden.Monatlich;
+
+        /// <summary>Fachliche Zahlungsrichtung der Serie.</summary>
+        public string Richtung { get; set; } = Zahlungsrichtungen.Unklar;
+
+        /// <summary>
+        /// Thematische Art der Zahlungsserie.
+        /// </summary>
+        public string Kategorie { get; set; } = AboKategorien.Pruefen;
+
+        /// <summary>Vom Benutzer pflegbare Bezeichnung der Kategorie.</summary>
+        public string? KategorieBezeichnung { get; set; }
 
         public decimal? ErwarteterBetrag { get; set; }
         public decimal BetragToleranzProzent { get; set; } = 10m;
@@ -42,7 +53,78 @@ namespace MyCoinFlow.Models
         public int? ErwartetesKontoId { get; set; }
 
         public string? WebseiteUrl { get; set; }
+
+        /// <summary>Konkreter Kündigungsweg, z.B. Kundenkonto, App Store oder E-Mail.</summary>
+        public string? Kuendigungsweg { get; set; }
         public string? Notiz { get; set; }
+    }
+
+    public static class AboKategorien
+    {
+        public const string Streaming = "Streaming";
+        public const string SoftwareLizenz = "SoftwareLizenz";
+        public const string Vertrag = "Vertrag";
+        public const string Wohnen = "Wohnen";
+        public const string Versicherung = "Versicherung";
+        public const string Telekommunikation = "Telekommunikation";
+        public const string Mitgliedschaft = "Mitgliedschaft";
+        public const string Finanzierung = "Finanzierung";
+        public const string SteuernGebuehren = "SteuernGebuehren";
+        public const string VorsorgeSparen = "VorsorgeSparen";
+        public const string Dienstleistung = "Dienstleistung";
+        public const string Sonstige = "Sonstige";
+        public const string Pruefen = "Pruefen";
+
+        public static string Anzeige(string? kategorie) => kategorie switch
+        {
+            Streaming => "Streaming",
+            SoftwareLizenz => "Lizenzen & Software",
+            Vertrag => "Verträge",
+            Wohnen => "Wohnen & Immobilien",
+            Versicherung => "Versicherungen",
+            Telekommunikation => "Telekommunikation & Internet",
+            Mitgliedschaft => "Mitgliedschaften",
+            Finanzierung => "Finanzierung & Kredite",
+            SteuernGebuehren => "Steuern & Gebühren",
+            VorsorgeSparen => "Sparen & Vorsorge",
+            Dienstleistung => "Dienstleistungen",
+            Sonstige => "Sonstige Serien",
+            Pruefen or null or "" => "Noch nicht kategorisiert",
+            _ => kategorie
+        };
+
+        public static bool IstZahlungsserie(string? kategorie) => !string.IsNullOrWhiteSpace(kategorie);
+
+        // Kompatibilität für bestehende Aufrufer und Datenmigration.
+        public static bool IstDigitalesAbo(string? kategorie) => IstZahlungsserie(kategorie);
+    }
+
+    /// <summary>Benutzerdefinierbare Kategorie für Zahlungsserien.</summary>
+    public class AboKategorie
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = "";
+        public string Bezeichnung { get; set; } = "";
+        public string Beschreibung { get; set; } = "";
+        public string FarbeHex { get; set; } = "#5B2DA9";
+        public int Sortierung { get; set; }
+        public bool IstSystem { get; set; }
+        public bool IstAktiv { get; set; } = true;
+        public int AnzahlSerien { get; set; }
+    }
+
+    public static class Zahlungsrichtungen
+    {
+        public const string Einnahme = "Einnahme";
+        public const string Ausgabe = "Ausgabe";
+        public const string Unklar = "Unklar";
+
+        public static string Anzeige(string? richtung) => richtung switch
+        {
+            Einnahme => "Einnahmen",
+            Ausgabe => "Ausgaben",
+            _ => "Richtung prüfen"
+        };
     }
 
     public static class AboStatus
@@ -95,6 +177,12 @@ namespace MyCoinFlow.Models
         public string? Notiz { get; set; }
         public bool ManuellZugeordnet { get; set; }
 
+        /// <summary>
+        /// Gehört fachlich zur Serie, ist aber keine erwartete Wiederholung.
+        /// Die Zahlung zählt zum historischen Total, nicht zu Rhythmus und Jahreswert.
+        /// </summary>
+        public bool IstEinmalig { get; set; }
+
         /// <summary>Buchungskonto der Zahlung (Aufwandsseite; bei Bankimporten ist Von die Bank).</summary>
         public int? BuchungsKontoId => NachKontoId ?? VonKontoId;
     }
@@ -137,6 +225,9 @@ namespace MyCoinFlow.Models
         public int AdresseId { get; set; }
         public string AdresseName { get; set; } = "";
         public string Periodizitaet { get; set; } = AboPerioden.Monatlich;
+        public string Richtung { get; set; } = Zahlungsrichtungen.Unklar;
+        public string Kategorie { get; set; } = AboKategorien.Pruefen;
+        public string KategorieAnzeige => AboKategorien.Anzeige(Kategorie);
         public decimal MedianBetrag { get; set; }
         public int AnzahlZahlungen { get; set; }
         public DateTime ErsteZahlung { get; set; }
@@ -144,11 +235,28 @@ namespace MyCoinFlow.Models
         public int? HaeufigstesKontoId { get; set; }
         public bool MehrereKonten { get; set; }
 
+        /// <summary>Für den Benutzer sichtbare Begründung der Erkennung.</summary>
+        public string Erkennungsgrund { get; set; } = "";
+
+        /// <summary>
+        /// Kennzeichnet einen semantischen Streaming-/App-Verdacht ohne ausreichend
+        /// bestätigten Zahlungsrhythmus. Solche Treffer sind nicht vorselektiert.
+        /// </summary>
+        public bool RhythmusNurVermutet { get; set; }
+
         /// <summary>Die Adresse hat bereits ein Abo (Kandidat ist z.B. ein zweiter Vertrag beim gleichen Anbieter).</summary>
         public bool AdresseHatAbo { get; set; }
         public System.Collections.Generic.List<int> TransaktionIds { get; set; } = new();
 
         /// <summary>Vom Benutzer im Kandidaten-Dialog an-/abwählbar.</summary>
         public bool Uebernehmen { get; set; } = true;
+    }
+
+    /// <summary>Dauerhaft vom Benutzer ausgeschlossener Kandidat.</summary>
+    public class AboKandidatAusschluss
+    {
+        public int AdresseId { get; set; }
+        public string Periodizitaet { get; set; } = AboPerioden.Monatlich;
+        public decimal ReferenzBetrag { get; set; }
     }
 }

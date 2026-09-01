@@ -361,6 +361,37 @@ namespace MyCoinFlow.ViewModels
             });
         }
 
+        /// <summary>
+        /// Liefert für den Dashboard-Druck dieselbe Gruppierung wie die Bildschirmdarstellung,
+        /// jedoch auf genau einen Nummernkreis begrenzt. Die Methode verändert weder Filter
+        /// noch Bildschirmdaten.
+        /// </summary>
+        public IReadOnlyList<DashboardGroupValue> GetGroupedValuesForRange(int rangeStart, int rangeEnd)
+        {
+            var accounts = _db.LadeKontenplan()
+                .Where(account => account.Kontonummer >= rangeStart && account.Kontonummer <= rangeEnd)
+                .ToList();
+            var key = SelectedGrouping?.Key ?? "Untergruppe";
+
+            string GroupKey(KontoplanEintrag account) => key switch
+            {
+                "Art" => account.Art ?? "",
+                "Gruppe" => account.Gruppe ?? "",
+                _ => account.Untergruppe ?? ""
+            };
+
+            return accounts
+                .GroupBy(GroupKey)
+                .Select(group => new DashboardGroupValue
+                {
+                    Label = string.IsNullOrWhiteSpace(group.Key) ? "(leer)" : group.Key,
+                    Budget = group.Sum(account => account.Budgetwert ?? 0m),
+                    Actual = group.Sum(account => account.Gebucht)
+                })
+                .OrderByDescending(value => Math.Abs(value.Actual))
+                .ToList();
+        }
+
         // ===== kleine Hilfsklassen =====
 
         public sealed class GroupingOption
@@ -368,6 +399,13 @@ namespace MyCoinFlow.ViewModels
             public GroupingOption(string key, string label) { Key = key; Label = label; }
             public string Key { get; }
             public string Label { get; }
+        }
+
+        public sealed class DashboardGroupValue
+        {
+            public string Label { get; init; } = "";
+            public decimal Budget { get; init; }
+            public decimal Actual { get; init; }
         }
 
         public sealed class NumberRangeVm : BaseViewModel

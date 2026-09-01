@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    xmlns:views="using:MyCoinFlow.WinUI.Views"
+    Title="MyCoinFlow 3 Preview">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0,150,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="28" Height="28" CornerRadius="8" Background="{StaticResource MyCoinFlowAccentBrush}">
+                    <FontIcon Glyph="&#xE8C7;" FontSize="16" Foreground="White" />
+                </Border>
+                <TextBlock Text="MyCoinFlow" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Border Background="{StaticResource MyCoinFlowAccentSoftBrush}" CornerRadius="10" Padding="8,2">
+                    <TextBlock Text="VERSION 3 · PREVIEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="SessionPanel" Grid.Column="2" Orientation="Horizontal" Spacing="10"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock x:Name="DatabaseText" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Border Width="1" Height="22" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="12" Padding="10,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE77B;" FontSize="14" />
+                        <TextBlock x:Name="UserText" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Button Content="Abmelden" Click="OnLogoutClick" />
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="LoginRoot" Grid.Row="1">
+            <views:LoginPage x:Name="LoginPage" />
+        </Grid>
+
+        <Grid x:Name="ShellRoot" Grid.Row="1" Visibility="Collapsed">
+            <NavigationView x:Name="RootNavigationView"
+                            IsBackButtonVisible="Collapsed"
+                            IsSettingsVisible="False"
+                            PaneDisplayMode="Auto"
+                            OpenPaneLength="236"
+                            CompactPaneLength="52"
+                            ExpandedModeThresholdWidth="1120"
+                            CompactModeThresholdWidth="720"
+                            SelectionChanged="OnNavigationSelectionChanged">
+                <NavigationView.MenuItems>
+                    <NavigationViewItemHeader Content="FINANZEN" />
+                    <NavigationViewItem x:Name="DashboardNavItem" Content="Dashboard" Tag="Dashboard">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="TransactionsNavItem" Content="Transaktionen" Tag="Transactions">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE8AB;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="AccountsNavItem" Content="Kontenplan" Tag="Accounts">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE8EF;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="InstitutionsNavItem" Content="Geldinstitute" Tag="Institutions">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE825;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="AddressesNavItem" Content="Adressen" Tag="Addresses">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE77B;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="BudgetNavItem" Content="Budget" Tag="Budget">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+
+                    <NavigationViewItemSeparator />
+                    <NavigationViewItemHeader Content="IMMOBILIEN" />
+                    <NavigationViewItem x:Name="StweNavItem" Content="STWE" Tag="Stwe">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE710;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="PropertiesNavItem" Content="Liegenschaften" Tag="Properties">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+
+                    <NavigationViewItemSeparator />
+                    <NavigationViewItemHeader Content="MODULE" />
+                    <NavigationViewItem x:Name="WealthNavItem" Content="Wealth" Tag="Wealth">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="HomeNavItem" Content="Haushalt" Tag="Home">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xEA8A;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="DmsNavItem" Tag="Dms">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A5;" /></NavigationViewItem.Icon>
+                        <NavigationViewItem.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="DMS" VerticalAlignment="Center" />
+                                <ProgressRing x:Name="DmsWatcherProgress" Width="16" Height="16"
+                                              IsIndeterminate="True" IsActive="False" Visibility="Collapsed" />
+                                <TextBlock x:Name="DmsWatcherQueueText" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource MyCoinFlowAccentBrush}"
+                                           VerticalAlignment="Center" Visibility="Collapsed" />
+                            </StackPanel>
+                        </NavigationViewItem.Content>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="SubscriptionsNavItem" Content="Zahlungsserien" Tag="Subscriptions">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE8D4;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+                <NavigationView.FooterMenuItems>
+                    <NavigationViewItemHeader Content="SYSTEM" />
+                    <NavigationViewItem x:Name="SettingsNavItem" Content="Einstellungen" Tag="Settings">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.FooterMenuItems>
+                <Frame x:Name="ContentFrame" />
+            </NavigationView>
+        </Grid>
+    </Grid>
+</window:PersistentWindow>

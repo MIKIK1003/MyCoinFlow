@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.AddressTransactionsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    xmlns:converters="using:MyCoinFlow.WinUI.Converters"
+    Title="Adresse – Transaktionen">
+
+    <Grid x:Name="RootGrid" Padding="24,18,24,20" RowSpacing="14"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.Resources>
+            <converters:BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock x:Name="TitleText" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Kontobewegungen, Einnahmen, Ausgaben und Saldo dieser Adresse"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <CommandBar Grid.Column="1" DefaultLabelPosition="Right" Background="Transparent"
+                        IsDynamicOverflowEnabled="False" VerticalAlignment="Center">
+                <AppBarButton x:Name="EditButton" Label="Bearbeiten" IsEnabled="False" Click="OnEditClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE70F;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Drucken" Click="OnPrintClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE749;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Schließen" Click="OnCloseClick">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8BB;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+        </Grid>
+
+        <Expander Grid.Row="1" Header="Filter" IsExpanded="True">
+            <Border Style="{StaticResource CardBorderStyle}" CornerRadius="0,0,12,12">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="MinimumBox" Header="Betrag min." />
+                        <TextBox x:Name="MaximumBox" Grid.Column="1" Header="Betrag max." />
+                        <DatePicker x:Name="FromPicker" Grid.Column="2" Header="Von"
+                                    MinWidth="300" HorizontalAlignment="Stretch" />
+                        <DatePicker x:Name="ToPicker" Grid.Column="3" Header="Bis"
+                                    MinWidth="300" HorizontalAlignment="Stretch" />
+                    </Grid>
+
+                    <Grid Grid.Row="1" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="AccountBox" Header="Konto"
+                                  IsEditable="True" IsTextSearchEnabled="True"
+                                  DisplayMemberPath="Anzeige" SelectedValuePath="Id" HorizontalAlignment="Stretch" />
+                        <ComboBox x:Name="InstitutionBox" Grid.Column="1" Header="Geldinstitut"
+                                  DisplayMemberPath="Name" SelectedValuePath="Id" HorizontalAlignment="Stretch" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                            <Button Content="Anwenden" Style="{StaticResource AccentButtonStyle}" Click="OnApplyFilterClick" />
+                            <Button Content="Zurücksetzen" Click="OnResetFilterClick" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Expander>
+
+        <Grid Grid.Row="2" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="EINNAHMEN" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="IncomeText" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="AUSGABEN" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="ExpenseText" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="SALDO" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="BalanceText" FontSize="20" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Padding="14,10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="36" />
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Text="KONTO" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="DATUM" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="3" Text="EINNAHMEN" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="4" Text="AUSGABEN" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="5" Text="GELDINSTITUT" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="6" Text="NOTIZ" FontSize="11" FontWeight="SemiBold" />
+                </Grid>
+
+                <ListView x:Name="TransactionsList" Grid.Row="1" SelectionMode="Single"
+                          SelectionChanged="OnSelectionChanged">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="8,5" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnSpacing="10" MinHeight="36">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="92" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE787;" FontSize="16"
+                                          Visibility="{Binding HasBudgetDateOverride, Converter={StaticResource BoolToVisibility}}"
+                                          ToolTipService.ToolTip="{Binding BudgetDateTooltip}"
+                                          Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Account}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{Binding DateText}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="{Binding IncomeText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="4" Text="{Binding ExpenseText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="5" Text="{Binding Institution}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="6" Text="{Binding Note}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Border>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="4" IsOpen="False" IsClosable="True" />
+    </Grid>
+</window:PersistentWindow>

@@ -31,6 +31,8 @@ namespace MyCoinFlow.Views
                     AdresseId = vorlage.AdresseId,
                     AdresseName = vorlage.AdresseName,
                     Periodizitaet = vorlage.Periodizitaet,
+                    Richtung = vorlage.Richtung,
+                    Kategorie = vorlage.Kategorie,
                     ErwarteterBetrag = vorlage.ErwarteterBetrag,
                     BetragToleranzProzent = vorlage.BetragToleranzProzent,
                     Status = vorlage.Status,
@@ -40,6 +42,7 @@ namespace MyCoinFlow.Views
                     VorwarnTage = vorlage.VorwarnTage,
                     ErwartetesKontoId = vorlage.ErwartetesKontoId,
                     WebseiteUrl = vorlage.WebseiteUrl,
+                    Kuendigungsweg = vorlage.Kuendigungsweg,
                     Notiz = vorlage.Notiz
                 };
 

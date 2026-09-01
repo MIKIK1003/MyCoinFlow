@@ -31,6 +31,14 @@ namespace MyCoinFlow.ViewModels
         public ObservableCollection<string> AnlageklasseFilterListe { get; } = new();
         public ObservableCollection<VermoegenPositionRow> Positionen { get; } = new();
 
+        // UI-neutrale Diagrammdaten. Die WPF- und WinUI-Oberflaechen verwenden damit
+        // dieselbe bestehende Filter- und Bewertungslogik.
+        public IReadOnlyList<VermoegenDepotVerlaufRow> DepotVerlaufDaten { get; private set; }
+            = Array.Empty<VermoegenDepotVerlaufRow>();
+
+        public IReadOnlyList<VermoegenAufteilungRow> VermoegenAufteilungDaten { get; private set; }
+            = Array.Empty<VermoegenAufteilungRow>();
+
         public ObservableCollection<string> ZeitraumFilterListe { get; } = new()
         {
             "1 Monat",
@@ -398,6 +406,9 @@ namespace MyCoinFlow.ViewModels
                 .OrderBy(x => x.Datum)
                 .ToList();
 
+            DepotVerlaufDaten = daten;
+            OnPropertyChanged(nameof(DepotVerlaufDaten));
+
             DepotVerlaufSeries = new ISeries[]
             {
         new LineSeries<decimal>
@@ -457,6 +468,17 @@ namespace MyCoinFlow.ViewModels
                 .ToList();
 
             var total = daten.Sum(x => x.Wert);
+
+            VermoegenAufteilungDaten = daten
+                .Select(x => new VermoegenAufteilungRow
+                {
+                    Anlageklasse = x.Anlageklasse,
+                    WertChf = x.Wert,
+                    AnteilProzent = total > 0 ? x.Wert / total * 100m : 0m,
+                    LegendeText = $"{x.Anlageklasse} · {(total > 0 ? x.Wert / total * 100m : 0m):N1}% · {FormatCurrency(x.Wert, "CHF")}"
+                })
+                .ToArray();
+            OnPropertyChanged(nameof(VermoegenAufteilungDaten));
 
             VermoegenAufteilungSeries = daten
                 .Select(x =>
@@ -930,5 +952,13 @@ namespace MyCoinFlow.ViewModels
         public string GewinnChfText { get; set; } = "";
 
         public string KursdatumText { get; set; } = "";
+    }
+
+    public class VermoegenAufteilungRow
+    {
+        public string Anlageklasse { get; set; } = "";
+        public decimal WertChf { get; set; }
+        public decimal AnteilProzent { get; set; }
+        public string LegendeText { get; set; } = "";
     }
 }

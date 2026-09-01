@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow x:Class="MyCoinFlow.WinUI.Views.SubscriptionEditorDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI" Title="Zahlungsserie bearbeiten">
+    <Grid Padding="20,16,20,18" RowSpacing="12" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Background="{StaticResource MyCoinFlowAccentSoftBrush}" CornerRadius="12" Padding="17,13">
+            <Grid ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="42" Height="42" CornerRadius="11" Background="#CBEAE7"><FontIcon Glyph="&#xE8D7;" FontSize="21" Foreground="{StaticResource MyCoinFlowAccentBrush}"/></Border><StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center"><TextBlock x:Name="WindowHeadingText" Text="Zahlungsserie bearbeiten" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Serie, Zahlungszuordnung und Vertragsplanung sind nach Themen geordnet. Dokumente bleiben im DMS." Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+        </Border>
+        <Grid Grid.Row="1" ColumnSpacing="14">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <StackPanel Spacing="14">
+                <Border Style="{StaticResource CardBorderStyle}" Background="#F4F0FA" Padding="17"><StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="34" Height="34" CornerRadius="9" Background="#E3D8F5"><FontIcon Glyph="&#xE8EC;" FontSize="17" Foreground="#684CB9"/></Border><StackPanel Grid.Column="1"><TextBlock Text="Serie und Einordnung" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Richtung, Kategorie und Anbieter" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+                    <TextBox x:Name="NameBox" Header="Bezeichnung *" PlaceholderText="z. B. Netflix Premium"/>
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="DirectionBox" Header="Richtung *" HorizontalAlignment="Stretch"/><ComboBox x:Name="CategoryBox" Grid.Column="1" Header="Kategorie *" HorizontalAlignment="Stretch"/><ComboBox x:Name="StatusBox" Grid.Column="2" Header="Status" HorizontalAlignment="Stretch"/></Grid>
+                    <ComboBox x:Name="AddressBox" Header="Anbieter / Adresse für automatische Zuordnung" DisplayMemberPath="Name" SelectedValuePath="Id" HorizontalAlignment="Stretch"/>
+                    <TextBox x:Name="WebsiteBox" Header="Verwaltungs- oder Kündigungsseite" PlaceholderText="https://..."/>
+                </StackPanel></Border>
+                <Border Style="{StaticResource CardBorderStyle}" Background="#E8F5F4" Padding="17"><StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="34" Height="34" CornerRadius="9" Background="#CFEAE8"><FontIcon Glyph="&#xE8C7;" FontSize="17" Foreground="#167E91"/></Border><StackPanel Grid.Column="1"><TextBlock Text="Betrag und Rhythmus" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Erwartete Zahlung pro Intervall" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="PeriodBox" Header="Zahlungsrhythmus" HorizontalAlignment="Stretch"/><TextBox x:Name="AmountBox" Grid.Column="1" Header="Erwarteter Betrag (CHF)" TextAlignment="Right"/></Grid>
+                </StackPanel></Border>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="14">
+                <Border Style="{StaticResource CardBorderStyle}" Background="#EDF5FA" Padding="17"><StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="34" Height="34" CornerRadius="9" Background="#D8EAF4"><FontIcon Glyph="&#xE8B7;" FontSize="17" Foreground="#357999"/></Border><StackPanel Grid.Column="1"><TextBlock Text="Zahlungszuordnung" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Automatische Treffer und Warnungen" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+                    <ComboBox x:Name="AccountBox" Header="Erwartetes Buchungskonto" DisplayMemberPath="Display" SelectedValuePath="Id" HorizontalAlignment="Stretch"/>
+                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBox x:Name="ToleranceBox" Header="Betragstoleranz (%)" TextAlignment="Right"/><TextBox x:Name="WarningDaysBox" Grid.Column="1" Header="Zahlungswarnung vorher (Tage)" TextAlignment="Right"/></Grid>
+                </StackPanel></Border>
+                <Border Style="{StaticResource CardBorderStyle}" Padding="17"><StackPanel Spacing="10">
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="34" Height="34" CornerRadius="9" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"><FontIcon Glyph="&#xE70B;" FontSize="17" Foreground="{StaticResource MyCoinFlowAccentBrush}"/></Border><StackPanel Grid.Column="1"><TextBlock Text="Interne Hinweise" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Nur Vertragsnotizen – Dokumente bleiben im DMS" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+                    <TextBox x:Name="NoteBox" Header="Notiz" AcceptsReturn="True" Height="190" TextWrapping="Wrap" PlaceholderText="z. B. Kundennummer oder besondere Vertragsregel"/>
+                </StackPanel></Border>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="14">
+                <Border Style="{StaticResource CardBorderStyle}" Background="#FFF5E8" Padding="17"><StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="34" Height="34" CornerRadius="9" Background="#F7E3C5"><FontIcon Glyph="&#xE823;" FontSize="17" Foreground="#B06C1F"/></Border><StackPanel Grid.Column="1"><TextBlock Text="Kündigungsplanung" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Termin und Kündigungsweg" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></Grid>
+                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><CalendarDatePicker x:Name="EndDatePicker" Header="Gewünschtes Vertragsende" DateChanged="OnCancellationChanged" HorizontalAlignment="Stretch"/><TextBox x:Name="NoticeDaysBox" Grid.Column="1" Header="Kündigungsfrist (Tage)" TextAlignment="Right" TextChanged="OnCancellationChanged"/></Grid>
+                    <Border Background="#FBE9CF" CornerRadius="9" Padding="12,10"><TextBlock x:Name="CancellationHintText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#9A5D18" MinHeight="20"/></Border>
+                    <ComboBox x:Name="CancellationRouteBox" Header="Kündigungsweg" IsEditable="True" HorizontalAlignment="Stretch" PlaceholderText="z. B. Kundenkonto, App Store oder E-Mail"/>
+                    <CalendarDatePicker x:Name="CancelledDatePicker" Header="Kündigung tatsächlich eingereicht am" HorizontalAlignment="Stretch"/>
+                </StackPanel></Border>
+                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="10" Padding="14,11"><Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE946;" Foreground="{StaticResource MyCoinFlowAccentBrush}"/><TextBlock Grid.Column="1" Text="Die Angaben erscheinen mit Termin und Kündigungsweg im Zahlungsserien-PDF." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></Grid></Border>
+            </StackPanel>
+        </Grid>
+        <InfoBar x:Name="ErrorBar" Grid.Row="2" IsOpen="False" IsClosable="True" Severity="Warning"/>
+        <Grid Grid.Row="3" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="180"/><ColumnDefinition Width="180"/></Grid.ColumnDefinitions><TextBlock Text="Position und Grösse werden beim Schliessen gespeichert." VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><Button Grid.Column="1" Content="Abbrechen" HorizontalAlignment="Stretch" Click="OnCancelClick"/><Button Grid.Column="2" Content="Speichern" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" Click="OnSaveClick"/></Grid>
+    </Grid>
+</window:PersistentWindow>
