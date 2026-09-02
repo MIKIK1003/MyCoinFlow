@@ -46,7 +46,7 @@
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                    <TextBlock Text="MyCoinFlow 3 · WinUI Preview" VerticalAlignment="Bottom"
+                    <TextBlock Text="MyCoinFlow · WinUI 3" VerticalAlignment="Bottom"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Grid>
             </Border>

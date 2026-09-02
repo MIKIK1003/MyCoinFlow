@@ -3,7 +3,7 @@
 ## Zielbild
 
 MyCoinFlow übernimmt schrittweise die ShopFlow-Designsprache: ruhig, präzise,
-informationsreich und klar hierarchisiert. Die WPF-Anwendung bleibt ein eigenes Produkt.
+informationsreich und klar hierarchisiert. Die WinUI-3-Anwendung bleibt ein eigenes Produkt.
 Wiedererkennung entsteht durch dieselben Grundmuster und Aktionssemantiken, nicht durch das
 Kopieren fachfremder ShopFlow-Inhalte.
 
@@ -33,7 +33,7 @@ In geeigneten Arbeitsbereichen gilt dieselbe Reihenfolge:
 
 Eine fachlich nicht sinnvolle Zone darf entfallen. Die übrigen Zonen werden nicht lokal neu
 gestaltet oder umsortiert. Mehrere notwendige Suchfelder bleiben gemeinsam in der Suchzone.
-Höhe, Rahmen, Abstände, Auswahlzustände und Tastaturfokus werden zentral als WPF-Ressourcen
+Höhe, Rahmen, Abstände, Auswahlzustände und Tastaturfokus werden zentral als WinUI-Ressourcen
 beziehungsweise gemeinsames Control umgesetzt.
 
 ## Gemeinsame Funktionsleiste
@@ -43,7 +43,7 @@ beziehungsweise gemeinsames Control umgesetzt.
 - Icon und Text bleiben als Einheit sichtbar; Beschriftungen werden nicht abgeschnitten.
 - Bei knapper Breite entstehen zuerst passende Spalten oder zusätzliche Zeilen; danach ist
   horizontales Scrollen besser als Textverlust.
-- Gleiche Wirkung verwendet Bezeichnung und PackIcon aus DOCS/UI_ACTION_CATALOG.md.
+- Gleiche Wirkung verwendet Bezeichnung und WinUI-Iconsemantik aus DOCS/UI_ACTION_CATALOG.md.
 - Höchstens eine Einstiegs- oder nächste Aktion ist primär.
 - Gefährliche Aktionen verwenden einen eigenen Stil und Abstand.
 - Nicht anwendbare Funktionen werden kontextgerecht deaktiviert oder ausgeblendet, ohne große
@@ -60,19 +60,28 @@ beziehungsweise gemeinsames Control umgesetzt.
 - Icons ergänzen wichtige Begriffe; sie ersetzen sie nur bei allgemein bekannten Aktionen mit
   Tooltip und zugänglichem Namen.
 
-## WPF-spezifische Regeln
+## WinUI-spezifische Regeln
 
-- ShopFlow-Semantik wird mit MaterialDesign-PackIcons und WPF-Ressourcen umgesetzt; Segoe-
-  Glyphcodes und WinUI-Controls werden nicht wörtlich kopiert.
-- App-weite Farben erhalten semantische Ressourcennamen. Bestehende DeepPurple-, Lime- und
-  Coral-Werte sind Ausgangsbestand, nicht automatisch das endgültige Ziel.
+- ShopFlow-Semantik wird mit WinUI-Controls, ThemeResources und gemeinsamen Styles umgesetzt.
+  Ganze ShopFlow-Seiten, fachliche Services und lokale Sonderlösungen werden nicht kopiert.
+- Standardaktionen verwenden den zentralen `ActionIconStyle` und semantisch benannte
+  native WinUI-FontIcon-Glyphen mit Grundgröße 16. Die Fontfamilie folgt wie beim
+  AppBarButton dem WinUI-Theme; so bleiben Kontur, Feinheit und Skalierung in Funktionsleisten
+  einheitlich. SymbolIcon wird dort wegen seiner sichtbar abweichenden, gröberen Geometrie
+  nicht verwendet; rohe Glyphcodes werden nicht je Seite neu gewählt.
+- App-weite Farben erhalten semantische Ressourcennamen. Die vorhandenen Teal-, Positiv- und
+  Gefahrenressourcen sind Ausgangsbestand und werden nicht lokal dupliziert.
 - Neue Seiten hardcodieren keine weitere Markenfarbe. Eine produktspezifische Abweichung
   benötigt eine bewusste zentrale Entscheidung.
+- Die vorhandene NavigationView bleibt für schmale Breiten adaptiv. Inhaltsseiten ergänzen
+  eigene VisualStates oder kontrolliertes horizontales Scrollen, wenn ihre Struktur sonst
+  Texte oder Aktionen abschneidet.
 - Eigenständige Fenster bewahren Position, normale Größe und Maximierungszustand monitor-
   sicher. Minimierte Fenster werden nicht minimiert wiederhergestellt.
 - Eigenständige Arbeitsfenster lassen sich mit Esc schließen beziehungsweise abbrechen; das
   Hauptfenster bleibt ausgenommen.
-- Scrollbare Formulare reservieren rechts Platz für die Scrollbar.
+- Scrollbare Formulare verwenden FormScrollViewerStyle oder reservieren gleichwertig rechts
+  Platz für die Scrollbar.
 - Abhängige Auswahlen bleiben räumlich zusammen; die wirksame Auswahlkette ist sichtbar und
   technische IDs sind nur ein erkennbarer Fallback.
 
@@ -82,4 +91,3 @@ Unveränderte Seiten dürfen vorübergehend im bisherigen Stil bleiben. Eine bea
 Pilotseite wird als zusammenhängender Bereich auf das Zielbild gebracht und liefert gemeinsame
 Bausteine für die nächste Seite. Eine Fachaufgabe darf bekannte globale Abweichungen nicht
 nebenbei vollständig sanieren, sie aber auch nicht vergrößern.
-

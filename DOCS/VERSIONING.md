@@ -5,12 +5,14 @@
 Der Chat ist nicht das Projektgedächtnis. Maßgeblich sind Code, AGENTS.md, DOCS-Verträge und
 das Blatt der aktiven Version.
 
-- App-Version: vierteilige Nummer in MyCoinFlow/MyCoinFlow.csproj.
+- App-Version: vierteilige Nummer in
+  MyCoinFlow.App.WinUI/MyCoinFlow.App.WinUI.csproj.
 - Arbeitspaket (AP): ein begrenztes Ergebnis innerhalb der Version.
 - Task: genau ein Chat für genau ein Arbeitspaket.
 - Versionsblatt: DOCS/VERSIONS/<Version>.md.
 
-Die WinUI-Projektversion wird nur in ausdrücklich benannten WinUI-Arbeitspaketen geändert.
+MyCoinFlow.App.WinUI ist die produktive App. Die Version der früheren WPF-Anwendung unter
+MyCoinFlow/ wird nur in ausdrücklich benannten WPF-Wartungspaketen geändert.
 
 ## Tasktitel und Status
 
@@ -65,4 +67,3 @@ Starte eine neue MyCoinFlow-Version: <Thema>.
 
 Der neue Task startet vom letzten abgeschlossenen Git-Stand. Ein abweichender oder unsauberer
 Arbeitsbaum wird ausdrücklich benannt und geschützt.
-

@@ -14,9 +14,11 @@
 
 ## Projektgrenze
 
-- Aktives Produkt für Version 2.0.2.1 ist die WPF-Anwendung unter MyCoinFlow/.
-- MyCoinFlow.App.WinUI ist getrennt versioniert und wird nur in einem ausdrücklich benannten
-  Arbeitspaket geändert.
+- Aktives, veröffentlichtes Produkt ist die WinUI-3-Anwendung unter MyCoinFlow.App.WinUI/.
+  Die aktuelle Entwicklungslinie beginnt mit Version 3.1.0.0.
+- MyCoinFlow/ enthält die frühere WPF-Oberfläche und weiterhin von WinUI referenzierte
+  Fach-, Modell-, Import- und Servicebestandteile. WPF-XAML wird nur in einem ausdrücklich
+  benannten Arbeitspaket geändert.
 - ShopFlow ist Designreferenz, nicht Fach- oder Codebasis. Fachlogik, Datenmodell,
   Lizenzierung und technische Plattform werden nicht durch Kopieren angeglichen.
 
@@ -32,12 +34,12 @@
 ## Änderungsregeln
 
 - Angleiche MyCoinFlow Modul für Modul. Eine lokale Aufgabe darf nicht ungefragt zum Umbau
-  aller 89 XAML-Dateien wachsen.
+  aller WinUI-XAML-Dateien wachsen.
 - Der Wiedererkennungseffekt entsteht durch gleiche Hierarchie, Abstände, Aktionssemantik,
   Such-/Status-/Filterstruktur und Zustände, nicht durch eine kopierte Fachmaske.
-- Neue gemeinsame Muster gehören in zentrale WPF-Ressourcen oder wiederverwendbare Controls.
+- Neue gemeinsame Muster gehören in zentrale WinUI-Ressourcen oder wiederverwendbare Controls.
 - Funktionsnamen bleiben vollständig sichtbar. Gleiche Aktionen verwenden innerhalb von
-  MyCoinFlow dasselbe MaterialDesign-PackIcon und entsprechen semantisch dem ShopFlow-Katalog.
+  MyCoinFlow dieselbe WinUI-Iconsemantik und entsprechen dem ShopFlow-Katalog.
 - Bei einem Konflikt zwischen MyCoinFlow-Fachzweck und ShopFlow-Muster wird die Auswirkung vor
   der Umsetzung benannt und eine bestätigte Ausnahme zentral dokumentiert.
 - Finanzdaten, Mandantentrennung, Berechtigungen, Lizenzierung und revisionsrelevante Abläufe
@@ -51,4 +53,3 @@
 - Bei UI-Arbeiten sind normale und kleine Fensterbreite, erhöhte Skalierung, vollständige
   Texte, Auswahl-, Leer-, Fehler- und deaktivierte Zustände sowie Tastaturfokus geprüft.
 - Geänderte Projekt-, Architektur- oder UX-Entscheidungen sind mit dem Code dokumentiert.
-

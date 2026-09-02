@@ -1,34 +1,24 @@
-# MyCoinFlow 3 – WinUI Preview
+# MyCoinFlow – WinUI 3
 
-Dieses Projekt wird parallel zur bestehenden WPF-Anwendung entwickelt. Es verwendet denselben
-Mandanten und dieselbe SQL-Express-Datenbank. Die produktive WPF-Anwendung bleibt als Projekt
-`MyCoinFlow` unverändert startbar.
+Dieses Projekt ist die produktive MyCoinFlow-Anwendung. Version 3.0.0.2 ist veröffentlicht;
+die strukturierte Weiterentwicklung beginnt mit Version 3.1.0.0.
 
-## Vollständiger Vertical Slice „Transaktionen“
+## Architektur
 
-- moderner Einstieg mit Mandantenauswahl, Benutzerlogin und Aktivierungsprüfung
-- adaptive WinUI-3-Shell mit `NavigationView`, dauerhaft sichtbarer CommandBar und Mica
-- Transaktionsliste mit Suche, Zeitraum, Konto-, Adress- und Betragsfiltern
-- Neuanlage, Bearbeitung und geschütztes Löschen der bestehenden Buchungswege
-- Dokumente verknüpfen, direkt öffnen und verwalten; bei mehreren Dokumenten mit Auswahl
-- Dublettensuche mit dem bestehenden Schutz vor abhängigen Daten
-- Bankimport als eigenes WinUI-Arbeitsfenster mit dem bestehenden CAMT.053-Parser
-- unveränderter Bankimport-Ablauf: Datei prüfen, leeren, Staging speichern/laden, Zuordnung,
-  Einzelbuchung oder Bulk-Verbuchung
-- dieselben bestehenden Regeln für Adresserkennung, interne Umbuchung, Sonderregeln,
-  Geldinstitut, Importhash und Duplikatprüfung beim Verbuchen
-- Kreditkartenimport als eigenes WinUI-Arbeitsfenster mit dem bestehenden Excel-Mapping,
-  Batch-Staging und Duplikatprüfung bereits beim Einlesen
-- gemeinsame WinUI-Zuordnungsmaske für Bank und Kreditkarte mit Adressen, Budgeteinnahmen,
-  Standardkonto, Konto-Schnellwahl, Contains-Suche, Alias- und Sonderregeln
-- vollständiges bestehendes Berichtswesen mit Budgetzeitraum, Nummernkreisen, Kontenauswahl,
-  Berichtsarten, Gruppierung, Soll/Ist, Jahreshochrechnung, Spotlight, Budgetanpassung und
-  Drucken beziehungsweise PDF
+- .NET 10, WinUI 3 und Windows App SDK
+- unpackaged x64-Anwendung mit eigener Login-, Aktivierungs- und Navigationsebene
+- adaptive Shell mit `NavigationView`, Mica und persistenten Fensterzuständen
+- produktive Bereiche für Finanzen, Immobilien, Vermögen, Haushalt, DMS, Zahlungsserien und
+  Einstellungen
+- gemeinsamer Mandanten- und SQL-Express-Datenbestand
 
-Die Import- und Berichtsalgorithmen werden direkt aus dem bestehenden Projekt `MyCoinFlow`
-verwendet. Das WinUI-Projekt ersetzt nur Darstellung und Fensterführung.
+Das Projekt referenziert `MyCoinFlow/MyCoinFlow.csproj`, weil dort weiterhin bewährte Fach-,
+Modell-, Import-, Berichts- und Servicebestandteile liegen. Diese gemeinsame Codebasis ist
+eine technische Abhängigkeit; die frühere WPF-Oberfläche ist nicht die aktive Produktlinie.
 
-Noch nicht migrierte Navigationsziele sind sichtbar, aber deaktiviert.
+Die WinUI-Bereiche sind funktional migriert, aber gestalterisch noch nicht überall
+vereinheitlicht. Die schrittweise Angleichung richtet sich nach den Verträgen unter
+`DOCS/` und verwendet ShopFlow als Designreferenz.
 
 ## Start in Visual Studio
 
@@ -36,5 +26,4 @@ Noch nicht migrierte Navigationsziele sind sichtbar, aber deaktiviert.
 2. `MyCoinFlow.App.WinUI` als Startprojekt auswählen.
 3. Plattform `x64` wählen und starten.
 
-Die bestehende WPF-Anwendung bleibt das Startprojekt `MyCoinFlow`, solange Version 3 noch nicht
-releasefähig ist.
+Das Startprojekt für die produktive Anwendung ist `MyCoinFlow.App.WinUI`.

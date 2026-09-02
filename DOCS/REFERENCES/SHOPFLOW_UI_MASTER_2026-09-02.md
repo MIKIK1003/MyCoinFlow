@@ -1,7 +1,7 @@
 # ShopFlow-UI-Master für MyCoinFlow
 
 **Quellstand:** ShopFlow-Verträge und visuelle Referenzen vom 2. September 2026  
-**Zweck:** reproduzierbare Designreferenz für die schrittweise WPF-Angleichung
+**Zweck:** reproduzierbare Designreferenz für die schrittweise WinUI-Angleichung
 
 ## Referenzbilder
 
@@ -13,11 +13,10 @@
 ## Übertragungsregel
 
 Die Bilder definieren Hierarchie, Gruppierung, Abstände, vollständige Texte, Aktionssemantik
-und ruhige Flächenwirkung. Pixelgenaue WinUI-Implementierung, ShopFlow-Funktionen und Segoe-
-Glyphcodes werden nicht kopiert. MyCoinFlow setzt dasselbe Muster mit WPF,
-MaterialDesign-PackIcons und seinem Fachkontext um.
+und ruhige Flächenwirkung. ShopFlow-Seiten, Fachfunktionen, Datenzugriffe und lokale
+Sonderlösungen werden nicht kopiert. MyCoinFlow setzt die passenden Muster mit eigenen
+WinUI-Ressourcen, Controls und seinem Fachkontext um.
 
 Debitoren ist der bevorzugte Master für Transaktionen und DMS. Vermietung liefert die
 Listen-/Detailgrammatik für Bestände und Verträge. Reparatur zeigt die Reduktion auf einen
 echten Statusworkflow.
-

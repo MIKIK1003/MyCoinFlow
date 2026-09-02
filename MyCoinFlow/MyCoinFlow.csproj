@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\Icons\piggybank.ico</ApplicationIcon>
     <!-- Versionsangaben dieser WPF-App; ein externer Release-Feed beschreibt nur verfügbare Updates. -->
-    <Version>2.0.2.1</Version>
-    <AssemblyVersion>2.0.2.1</AssemblyVersion>
-    <FileVersion>2.0.2.1</FileVersion>
+    <Version>2.0.2.0</Version>
+    <AssemblyVersion>2.0.2.0</AssemblyVersion>
+    <FileVersion>2.0.2.0</FileVersion>
 </PropertyGroup>
 
   <ItemGroup>

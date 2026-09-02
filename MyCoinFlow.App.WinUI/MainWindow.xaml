@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:window="using:MyCoinFlow.WinUI"
     xmlns:views="using:MyCoinFlow.WinUI.Views"
-    Title="MyCoinFlow 3 Preview">
+    Title="MyCoinFlow">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -29,7 +29,7 @@
                 </Border>
                 <TextBlock Text="MyCoinFlow" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Border Background="{StaticResource MyCoinFlowAccentSoftBrush}" CornerRadius="10" Padding="8,2">
-                    <TextBlock Text="VERSION 3 · PREVIEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                    <TextBlock Text="WINUI 3" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
                 </Border>
             </StackPanel>
 

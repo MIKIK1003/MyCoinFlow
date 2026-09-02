@@ -5,56 +5,70 @@
 
 ## Tragfähige Grundlagen
 
-- App.xaml enthält zentrale Abstände, AppBrandBrush, IconTextButton,
-  IconTextButton.Danger, Navigation und DataGrid-Grundstyles.
-- MainWindow besitzt eine gruppierte Navigation und sichtbare App-Version.
-- BaseWindow und WindowStateService bilden eine Grundlage für Fensterzustand und Esc.
-- MaterialDesign-PackIcons erlauben eine zentrale semantische Iconzuordnung.
-- Git-Stand 7192aba entsprach beim Start origin/master und war sauber.
+- App.xaml enthält semantische Akzent-, Positiv- und Gefahrenfarben sowie PageTitleStyle,
+  CardBorderStyle, FunctionBarStyle und FormScrollViewerStyle.
+- MainWindow besitzt eine adaptive NavigationView, Mica und sichtbaren Mandanten- und
+  Benutzerkontext.
+- PersistentWindow und WinUiWindowStateService bilden die gemeinsame Grundlage für
+  monitor-sichere Fensterzustände.
+- Die aktive App umfasst 67 WinUI-XAML-Dateien, darunter 14 Seiten, 17 Fenster und 25 Dialoge.
+- Git-Stand 501f3b1 entsprach beim Start der Korrektur origin/master und war sauber.
 
 ## Bekannte Konsolidierungspunkte
 
-### Gemischte visuelle Identität
+### Produktstatus und Preview-Reste
 
-Die WPF-Ressourcen kombinieren MaterialDesign DeepPurple/Lime mit Coral. Das ShopFlow-Ziel
-arbeitet mit ruhigen semantischen Flächen und Akzenten.
+Die WinUI-App ist produktiv veröffentlicht. Beim Start von 3.1.0.0 bezeichneten README,
+Fenstertitel, Login und eine Transaktions-InfoBar sie noch als Preview oder Musterversion.
 
-Ziel: semantische MyCoinFlow-Ressourcen definieren und im Pilot auf die ShopFlow-Hierarchie
-abbilden. Keine weitere hart codierte Markenfarbe einführen.
+Ziel: Diese überholten Kennzeichnungen im Versionsstart entfernen und künftige
+Produktinformation nicht mehr an den früheren Migrationsstatus koppeln.
 
-### Große Navigation
+### Unterschiedliche Funktionsleisten
 
-MainWindow verwendet eine feste 320-Pixel-Seitenleiste, 60-Pixel-Kacheln und 12-Pixel-Radien.
-Das ist brauchbarer Bestand, aber nicht die kompakte ShopFlow-Zielsprache.
+31 WinUI-XAML-Dateien enthalten CommandBars. Daneben bestehen FunctionBarStyle, einfache
+Buttonzeilen und seitenspezifische Gruppierungen.
 
-Ziel: Navigation in einem eigenen Arbeitspaket angleichen. Ein Inhaltsseiten-Pilot baut sie
-nicht nebenbei um.
+Ziel: Im Pilot eine gemeinsame Hierarchie und Gruppierung festlegen, ohne alle bestehenden
+Seiten nebenbei umzubauen.
 
 ### Kein gemeinsamer Such-/Status-/Filtermaster
 
-28 XAML-Dateien enthalten Such- oder Filterelemente; ihre Struktur ist seitenspezifisch.
+Such- und Filterelemente sind bereits in mehreren produktiven Seiten vorhanden, ihre
+Reihenfolge, Statusdarstellung und Schnellansichten bleiben jedoch seitenspezifisch.
 
-Ziel: Im ersten passenden Pilot einen WPF-Master für Suchzone, Statuslegende,
+Ziel: Im ersten passenden Pilot einen WinUI-Master für Suchzone, Statuslegende,
 Schnellansichten und Fachfilter entwickeln.
 
-### Lokale Styles und direkte Icons
+### Direkte Icons und lokale Varianten
 
-Von 89 XAML-Dateien enthalten 36 lokale Styledefinitionen und 34 PackIcons.
+Viele Views verwenden rohe FontIcon-Glyphcodes oder lokal gewählte Symbolnamen. Dadurch kann
+dieselbe Aktion zwischen Seiten unterschiedlich aussehen.
 
-Ziel: gemeinsame Ressourcen aus dem Pilot gewinnen. Lokale Varianten werden nur in bewusst
-beauftragten Modulen konsolidiert.
+Ziel: katalogisierte Standardaktionen mit dem zentralen FontIcon-Stil und semantisch benannten
+Glyph-Ressourcen umsetzen. Spezielle IconSource-Varianten werden ebenfalls zentral benannt.
+Lokale Varianten werden nur im beauftragten Modul konsolidiert.
 
 ### Vollständig sichtbare Aktionstexte
 
-IconTextButton besitzt Mindesthöhe und Padding, garantiert aber weder responsive
-Funktionsleisten noch vollständige Texte bei knapper Breite und Skalierung.
+FunctionButtonLabelStyle verwendet derzeit CharacterEllipsis und eine Zeile. Das widerspricht
+dem Ziel vollständig sichtbarer Funktionsnamen bei knapper Breite und Skalierung.
 
 Ziel: Funktionsleistenmaster mit textabhängiger Breite, Umbruch oder horizontalem
 Scroll-Fallback. Keine Ellipsen als Dauerlösung.
 
-### Zwei UI-Technologien
+### Seitenspezifische Responsivität
 
-Die WPF-App steht auf 2.0.2.x, MyCoinFlow.App.WinUI auf 3.0.0.2.
+Die NavigationView besitzt sinnvolle Breakpoints; in den Inhaltsseiten sind jedoch keine
+VisualState-Definitionen vorhanden. Breite Kennzahlen-, Filter- und Listengrids können deshalb
+bei kleiner Fensterbreite Text oder Aktionen verdrängen.
 
-Ziel: Diese Angleichung gilt ausschließlich für WPF. WinUI wird separat geprüft.
+Ziel: Der Pilot definiert ein belastbares Verhalten für normale und kleine Breiten sowie
+erhöhte Skalierung.
 
+### Frühere WPF-Anwendung als Abhängigkeit
+
+MyCoinFlow.App.WinUI referenziert MyCoinFlow/MyCoinFlow.csproj für vorhandenen Fachcode.
+
+Ziel: Die Designangleichung gilt für WinUI. Gemeinsam genutzte Fachlogik bleibt erhalten;
+WPF-XAML wird nicht automatisch mitgeändert.

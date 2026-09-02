@@ -2,14 +2,15 @@
 
 **Stand:** 2. September 2026  
 **Status:** verbindlich  
-**Aktive Produktlinie:** WPF, Version 2.0.2.x  
+**Aktive Produktlinie:** WinUI 3, Version 3.1.x
 **Designreferenz:** ShopFlow
 
 ## Zweck
 
-Dieser Vertrag bewahrt die vereinbarte Richtung über kurze Codex-Tasks hinweg. MyCoinFlow wird
-schrittweise an die ruhige, präzise und informationsreiche ShopFlow-Designsprache angeglichen,
-ohne seinen anderen Fachzweck oder seine WPF-Technik zu verleugnen.
+Dieser Vertrag bewahrt die vereinbarte Richtung über kurze Codex-Tasks hinweg. Die produktive
+WinUI-3-App MyCoinFlow.App.WinUI wird schrittweise an die ruhige, präzise und
+informationsreiche ShopFlow-Designsprache angeglichen, ohne ihren eigenen Fachzweck oder ihre
+bestehende technische Architektur zu verleugnen.
 
 Er ersetzt das frühere MyCoinFlow Working Agreement v1.1 als aktive Vereinbarung. Nützliche
 technische Invarianten daraus wurden übernommen; die alte Datei bleibt nur als Historie.
@@ -22,7 +23,7 @@ technische Invarianten daraus wurden übernommen; die alte Datei bleibt nur als 
 4. DOCS/UX_DESIGN_SYSTEM.md: Zielbild und Migrationsregeln
 5. DOCS/UI_ACTION_CATALOG.md: gleiche Aktion, Bezeichnung und Iconsemantik
 6. DOCS/VERSIONING.md und DOCS/VERSIONS/: kurze Tasks und aktueller Stand
-7. aktuelle MyCoinFlow-Implementierung und ausdrücklich benannte Fachanforderungen
+7. aktuelle WinUI-Implementierung und ausdrücklich benannte Fachanforderungen
 
 DOCS/UI_CONTRACT_BASELINE.md hält bestehende Abweichungen sichtbar. Eine bestehende Abweichung
 ist keine erlaubte Vorlage.
@@ -40,8 +41,16 @@ Such-/Status-/Filterzeile, Funktionsleisten, Abstände, Statusbilder, vollständ
 Beschriftungen, Aktionsorte und konsistente Icons.
 
 Nicht automatisch übernommen werden Fachmodell, konkrete Texte, Datenbankzugriffe,
-ShopFlow-Services, WinUI-Controls oder der Aufbau eines fachlich unpassenden Moduls. Die
-technische Umsetzung bleibt WPF-gerecht.
+ShopFlow-Services, ganze Seiten oder der Aufbau eines fachlich unpassenden Moduls. Die
+technische Umsetzung bleibt MyCoinFlow- und WinUI-gerecht.
+
+## Verhältnis zur früheren WPF-Anwendung
+
+MyCoinFlow.App.WinUI ist das aktive und veröffentlichte Produkt. Das Projekt MyCoinFlow enthält
+neben der früheren WPF-Oberfläche weiterhin Fach-, Modell-, Import-, Berichts- und
+Servicebestandteile, die WinUI per ProjectReference verwendet. Gemeinsamer Fachcode wird
+bewahrt und nicht aus Designgründen dupliziert; WPF-XAML wird nur in ausdrücklich benannten
+Wartungspaketen geändert.
 
 ## Unveränderliche Grundsätze
 
@@ -70,8 +79,7 @@ nicht wieder auf den alten lokalen Stil zurückfallen.
 ## Umgang mit neuen Entscheidungen
 
 1. Vertrag, Versionsblatt und aktuelle Implementierung prüfen.
-2. Passende ShopFlow-Masterreferenz und WPF-Übersetzung bestimmen.
+2. Passende ShopFlow-Masterreferenz und WinUI-Übersetzung bestimmen.
 3. Konflikte oder fachlich notwendige Ausnahmen vor der Umsetzung benennen.
 4. Nach bestätigter Richtungsänderung die zentrale Quelle im selben Änderungssatz anpassen.
 5. Ersetzte Regeln als historisch kennzeichnen; keine zwei aktiven Standards führen.
-

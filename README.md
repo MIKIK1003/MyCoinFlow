@@ -1,7 +1,9 @@
 # MyCoinFlow
 
-Die produktive WPF-Anwendung wird ab Version 2.0.2.1 in kurzen, klar begrenzten
-Arbeitspaketen weiterentwickelt und schrittweise an die ShopFlow-Designsprache angeglichen.
+Die produktive WinUI-3-Anwendung unter MyCoinFlow.App.WinUI wird ab Version 3.1.0.0 in
+kurzen, klar begrenzten Arbeitspaketen weiterentwickelt und schrittweise an die
+ShopFlow-Designsprache angeglichen. MyCoinFlow bleibt als frühere WPF-Oberfläche und als
+referenzierter Fach-/Servicebestand erhalten.
 
 ## Verbindliche Projektdokumentation
 
@@ -11,5 +13,5 @@ Arbeitspaketen weiterentwickelt und schrittweise an die ShopFlow-Designsprache a
 - [Aktions- und Iconkatalog](DOCS/UI_ACTION_CATALOG.md)
 - [UI-Ausgangslage](DOCS/UI_CONTRACT_BASELINE.md)
 - [Versionen und kurze Tasks](DOCS/VERSIONING.md)
-- [Aktiver Versionsabschnitt 2.0.2.1](DOCS/VERSIONS/2.0.2.1.md)
+- [Aktiver Versionsabschnitt 3.1.0.0](DOCS/VERSIONS/3.1.0.0.md)
 - [Gesicherte ShopFlow-UI-Referenz](DOCS/REFERENCES/SHOPFLOW_UI_MASTER_2026-09-02.md)

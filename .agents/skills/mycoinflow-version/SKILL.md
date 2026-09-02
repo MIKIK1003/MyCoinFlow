@@ -1,15 +1,16 @@
 ---
 name: mycoinflow-version
-description: MyCoinFlow-WPF-Versionsabschnitte und kurze Codex-Tasks eröffnen, fortführen oder abschließen sowie Versionsblätter, begrenzte Commits, Pushes und Archivierung führen. Verwenden bei Versionsstart, neuem Arbeitspaket, Taskwechsel oder Abschnittsabschluss in MyCoinFlow; nicht für ShopFlow oder die WinUI-Linie.
+description: MyCoinFlow-WinUI-Versionsabschnitte und kurze Codex-Tasks eröffnen, fortführen oder abschließen sowie Versionsblätter, begrenzte Commits, Pushes und Archivierung führen. Verwenden bei Versionsstart, neuem Arbeitspaket, Taskwechsel oder Abschnittsabschluss der produktiven MyCoinFlow-App; nicht für ShopFlow oder normale WPF-Wartung.
 ---
 
 # MyCoinFlow-Version führen
 
 ## Quellen prüfen
 
-Lies AGENTS.md, DOCS/VERSIONING.md, die WPF-Versionswerte in MyCoinFlow/MyCoinFlow.csproj, das
-aktive Versionsblatt und den Git-Status. Geerbte Änderungen gelten als geschützter Bestand,
-bis sie sicher dem Arbeitspaket zugeordnet sind.
+Lies AGENTS.md, MyCoinFlow.App.WinUI/AGENTS.md, DOCS/VERSIONING.md, die Versionswerte in
+MyCoinFlow.App.WinUI/MyCoinFlow.App.WinUI.csproj, das aktive Versionsblatt und den Git-Status.
+Geerbte Änderungen gelten als geschützter Bestand, bis sie sicher dem Arbeitspaket zugeordnet
+sind.
 
 Verwende bei Code- oder UI-Änderungen zusätzlich mycoinflow-change.
 
@@ -20,7 +21,8 @@ Verwende bei Code- oder UI-Änderungen zusätzlich mycoinflow-change.
 - Lege oder aktualisiere vor der Umsetzung DOCS/VERSIONS/<Version>.md.
 - Halte Ziel, Nicht-Ziele, Ausgangscommit, Verträge, Akzeptanzkriterien und Parkplatz fest.
 - Fachlich unklare Anforderungen beginnen in Klärung; erfinde keinen fehlenden Ablauf.
-- Erhöhe nur die WPF-Version. Die WinUI-Version bleibt ohne ausdrücklichen Auftrag unberührt.
+- Erhöhe nur die WinUI-Version. Die frühere WPF-Version bleibt ohne ausdrücklich benanntes
+  Wartungspaket unberührt.
 - Neue Tasks laufen auf Wunsch des Benutzers direkt im gespeicherten Projekt
   C:\DEV\MyCoinFlow und starten vom letzten abgeschlossenen Git-Stand.
 

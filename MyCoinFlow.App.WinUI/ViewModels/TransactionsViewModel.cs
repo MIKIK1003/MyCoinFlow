@@ -24,6 +24,7 @@ public sealed class TransactionsViewModel : INotifyPropertyChanged
     private BudgetPeriod? _activeBudgetPeriod;
     private decimal _incomeAmount;
     private decimal _expenseAmount;
+    private bool _isInitialized;
 
     public TransactionsViewModel(TransactionRepository repository)
     {
@@ -72,17 +73,33 @@ public sealed class TransactionsViewModel : INotifyPropertyChanged
                         group.IsExpanded = true;
                 }
                 OnPropertyChanged(nameof(HasSelection));
+                OnPropertyChanged(nameof(CanActOnSelection));
+                OnPropertyChanged(nameof(SelectionContextText));
             }
         }
     }
 
     public bool HasSelection => SelectedTransaction is not null;
+    public bool CanActOnSelection => HasSelection && IsNotBusy;
+    public string SelectionContextText => SelectedTransaction is null
+        ? "Keine Transaktion markiert"
+        : $"Markiert: #{SelectedTransaction.Id} · {SelectedTransaction.DatumAnzeige} · {SelectedTransaction.BetragAnzeige}";
 
     public bool IsBusy
     {
         get => _isBusy;
-        private set => Set(ref _isBusy, value);
+        private set
+        {
+            if (Set(ref _isBusy, value))
+            {
+                OnPropertyChanged(nameof(IsNotBusy));
+                OnPropertyChanged(nameof(CanActOnSelection));
+                OnPropertyChanged(nameof(HasNoResults));
+            }
+        }
     }
+
+    public bool IsNotBusy => !IsBusy;
 
     public string? StatusMessage
     {
@@ -96,11 +113,15 @@ public sealed class TransactionsViewModel : INotifyPropertyChanged
         private set
         {
             if (Set(ref _errorMessage, value))
+            {
                 OnPropertyChanged(nameof(HasError));
+                OnPropertyChanged(nameof(HasNoResults));
+            }
         }
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool HasNoResults => _isInitialized && !IsBusy && !HasError && Transactions.Count == 0;
     public int ResultCount => Transactions.Count;
     public string ResultCountText => ResultCount == 1 ? "1 Transaktion" : $"{ResultCount:N0} Transaktionen";
     public decimal IncomeAmount => _incomeAmount;
@@ -122,6 +143,8 @@ public sealed class TransactionsViewModel : INotifyPropertyChanged
             ApplyActivePeriod();
             await LoadCoreAsync();
         });
+        _isInitialized = true;
+        OnPropertyChanged(nameof(HasNoResults));
     }
 
     public Task RefreshAsync() => RunBusyAsync(LoadCoreAsync);
@@ -367,6 +390,7 @@ public sealed class TransactionsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(AttachmentCount));
         OnPropertyChanged(nameof(AttachmentCountText));
         OnPropertyChanged(nameof(PeriodText));
+        OnPropertyChanged(nameof(HasNoResults));
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

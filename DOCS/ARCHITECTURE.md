@@ -2,23 +2,29 @@
 
 ## Aktive Anwendung
 
-Die produktive Versionslinie 2.0.2.x ist MyCoinFlow/MyCoinFlow.csproj auf .NET 9, WPF und
-MaterialDesignThemes. MyCoinFlow.App.WinUI ist getrennt versioniert und nicht Teil eines
-normalen WPF-Arbeitspakets.
+Die produktive Versionslinie 3.1.x ist
+MyCoinFlow.App.WinUI/MyCoinFlow.App.WinUI.csproj auf .NET 10, WinUI 3 und Windows App SDK.
+Die Anwendung läuft unpackaged auf x64.
 
 ## Verantwortlichkeiten
 
-- Modules/<Fachbereich>/Views enthält WPF-Views und Dialoge.
-- Modules/<Fachbereich>/ViewModels enthält darstellungsbezogenen Zustand und Befehle.
-- Modules/<Fachbereich>/Services sowie Services enthält Fach-, Integrations- und
-  Datenzugriffslogik.
-- Shared enthält Basisklassen, Hilfen und wiederverwendbare UI-Bausteine.
+- MyCoinFlow.App.WinUI/Views enthält WinUI-Seiten, Fenster, Dialoge und Einstellungscontrols.
+- MyCoinFlow.App.WinUI/ViewModels enthält darstellungsbezogenen Zustand und Befehle.
+- MyCoinFlow.App.WinUI/Data kapselt WinUI-spezifische Repositories und Datenzugriffe.
+- MyCoinFlow.App.WinUI/Services enthält WinUI-spezifische Abläufe und Infrastruktur.
+- MyCoinFlow.App.WinUI/Models enthält WinUI-Anzeige- und Übergabemodelle.
 - App.xaml und gezielt ausgelagerte ResourceDictionaries enthalten zentrale Designressourcen.
-- MainWindow stellt Hauptnavigation und aktiven Inhaltsbereich bereit.
+- MainWindow stellt Login, NavigationView, Mandanten-/Benutzerkontext und aktiven Frame bereit.
+- PersistentWindow und WinUiWindowStateService bilden die gemeinsame Fensterinfrastruktur.
 
-Die partiellen DatabaseService-Dateien sind ein bestehender Übergang. Neue Fachlogik wird dem
-passenden Modul oder Service zugeordnet und nicht allein aus Bequemlichkeit in Code-behind
-oder eine allgemeine Sammeldatei gelegt.
+MyCoinFlow.App.WinUI referenziert MyCoinFlow/MyCoinFlow.csproj. Bewährte Fach-, Modell-,
+Import-, Berichts- und Servicebestandteile aus diesem Projekt bleiben die gemeinsame
+Implementierung. Die frühere WPF-Oberfläche ist keine Design- oder Navigationsvorlage für
+neue WinUI-Arbeit.
+
+Code-behind darf WinUI-Ereignisse, Dialoge und Darstellungszustände koordinieren. Neue
+wiederverwendbare Fach- oder Datenzugriffslogik wird dem passenden ViewModel, Repository oder
+Service zugeordnet und nicht allein aus Bequemlichkeit in eine Seite gelegt.
 
 ## Geschützte Invarianten
 
@@ -31,7 +37,6 @@ oder eine allgemeine Sammeldatei gelegt.
 
 ## Gemeinsame UI-Bausteine
 
-Wiederkehrende ShopFlow-Muster werden als WPF-Ressource oder gemeinsames Control eingeführt.
+Wiederkehrende ShopFlow-Muster werden als WinUI-Ressource oder gemeinsames Control eingeführt.
 Ein Pilot darf eine lokale Vorstufe enthalten, wenn Wiederverwendung noch nicht belegt ist;
 spätestens bei der zweiten Verwendung wird sie zentralisiert.
-
