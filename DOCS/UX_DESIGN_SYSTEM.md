@@ -1,0 +1,85 @@
+# MyCoinFlow – UX- und Designsystem
+
+## Zielbild
+
+MyCoinFlow übernimmt schrittweise die ShopFlow-Designsprache: ruhig, präzise,
+informationsreich und klar hierarchisiert. Die WPF-Anwendung bleibt ein eigenes Produkt.
+Wiedererkennung entsteht durch dieselben Grundmuster und Aktionssemantiken, nicht durch das
+Kopieren fachfremder ShopFlow-Inhalte.
+
+Die visuelle Referenz steht unter DOCS/REFERENCES/SHOPFLOW_UI_MASTER_2026-09-02.md.
+
+## ShopFlow-Master nach Seitentyp
+
+- Dichte Transaktions-, DMS- und Finanzarbeit orientiert sich an ShopFlow Debitoren.
+- Bestände, Konten, Adressen, Abos und Vermögen orientieren sich an der
+  Listen-/Detailgrammatik von ShopFlow Vermietung.
+- Import-, Zuordnungs- und Bearbeitungsfortschritte orientieren sich bei echten Statusabläufen
+  an ShopFlow Reparatur.
+- Einstellungen und abhängige Immobilien-Stammdaten behalten ihre fachlich notwendige
+  Struktur, verwenden aber dieselben Grundressourcen und Aktionsregeln.
+
+Die Referenz wird pro Arbeitspaket gewählt. Ein Modul wird nicht allein aufgrund eines ähnlich
+aussehenden Screens einem Seitentyp zugeordnet.
+
+## Gemeinsame Such-/Status-/Filterzeile
+
+In geeigneten Arbeitsbereichen gilt dieselbe Reihenfolge:
+
+1. Suchzone links, flexibel wachsend,
+2. kompakte Statuslegende mit Symbol, Farbe und lesbarer Bezeichnung,
+3. segmentierte Schnellansichten,
+4. Fachfilter mit sichtbarer Bezeichnung Filter.
+
+Eine fachlich nicht sinnvolle Zone darf entfallen. Die übrigen Zonen werden nicht lokal neu
+gestaltet oder umsortiert. Mehrere notwendige Suchfelder bleiben gemeinsam in der Suchzone.
+Höhe, Rahmen, Abstände, Auswahlzustände und Tastaturfokus werden zentral als WPF-Ressourcen
+beziehungsweise gemeinsames Control umgesetzt.
+
+## Gemeinsame Funktionsleiste
+
+- Sie steht unter dem Seitenkopf und vor Suche beziehungsweise Inhalt.
+- Aktionen sind fachlich gruppiert und durch ruhige Trenner strukturiert.
+- Icon und Text bleiben als Einheit sichtbar; Beschriftungen werden nicht abgeschnitten.
+- Bei knapper Breite entstehen zuerst passende Spalten oder zusätzliche Zeilen; danach ist
+  horizontales Scrollen besser als Textverlust.
+- Gleiche Wirkung verwendet Bezeichnung und PackIcon aus DOCS/UI_ACTION_CATALOG.md.
+- Höchstens eine Einstiegs- oder nächste Aktion ist primär.
+- Gefährliche Aktionen verwenden einen eigenen Stil und Abstand.
+- Nicht anwendbare Funktionen werden kontextgerecht deaktiviert oder ausgeblendet, ohne große
+  tote Leistenbereiche.
+
+## Layout und Zustände
+
+- Abstände folgen einem 4-/8-Pixel-Raster; übliche Inhaltsränder liegen bei 16 bis 24 Pixeln.
+- Kompakte Desktopaktionen sind üblicherweise 32 bis 40 Pixel hoch.
+- Standardradius: 4 Pixel für kompakte Elemente, 6 Pixel für größere Flächen.
+- Tabellen und Listen zeigen stabile Überschriften, Auswahl und Leerzustand.
+- Detailbereiche benennen eindeutig, auf welchen Datensatz Aktionen wirken.
+- Status ist nie nur über Farbe verständlich.
+- Icons ergänzen wichtige Begriffe; sie ersetzen sie nur bei allgemein bekannten Aktionen mit
+  Tooltip und zugänglichem Namen.
+
+## WPF-spezifische Regeln
+
+- ShopFlow-Semantik wird mit MaterialDesign-PackIcons und WPF-Ressourcen umgesetzt; Segoe-
+  Glyphcodes und WinUI-Controls werden nicht wörtlich kopiert.
+- App-weite Farben erhalten semantische Ressourcennamen. Bestehende DeepPurple-, Lime- und
+  Coral-Werte sind Ausgangsbestand, nicht automatisch das endgültige Ziel.
+- Neue Seiten hardcodieren keine weitere Markenfarbe. Eine produktspezifische Abweichung
+  benötigt eine bewusste zentrale Entscheidung.
+- Eigenständige Fenster bewahren Position, normale Größe und Maximierungszustand monitor-
+  sicher. Minimierte Fenster werden nicht minimiert wiederhergestellt.
+- Eigenständige Arbeitsfenster lassen sich mit Esc schließen beziehungsweise abbrechen; das
+  Hauptfenster bleibt ausgenommen.
+- Scrollbare Formulare reservieren rechts Platz für die Scrollbar.
+- Abhängige Auswahlen bleiben räumlich zusammen; die wirksame Auswahlkette ist sichtbar und
+  technische IDs sind nur ein erkennbarer Fallback.
+
+## Migrationsregel
+
+Unveränderte Seiten dürfen vorübergehend im bisherigen Stil bleiben. Eine bearbeitete
+Pilotseite wird als zusammenhängender Bereich auf das Zielbild gebracht und liefert gemeinsame
+Bausteine für die nächste Seite. Eine Fachaufgabe darf bekannte globale Abweichungen nicht
+nebenbei vollständig sanieren, sie aber auch nicht vergrößern.
+

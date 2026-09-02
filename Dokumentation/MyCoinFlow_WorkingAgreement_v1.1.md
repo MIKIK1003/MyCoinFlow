@@ -1,5 +1,9 @@
 # MyCoinFlow - Working Agreement v1.1
 
+> **Status seit 2. September 2026: historisch und abgelöst.** Verbindlich sind AGENTS.md und
+> die Verträge unter DOCS/. Technische Invarianten zu Fensterzustand, Scrollbar-Reserve und
+> abhängigen Auswahlen wurden dort übernommen. Diese Datei steuert neue Codex-Arbeit nicht mehr.
+
 ## 1. Ablauf und Kommunikation
 
 - Du beschreibst dein Anliegen in Alltagssprache (ohne Fachbegriffe).
