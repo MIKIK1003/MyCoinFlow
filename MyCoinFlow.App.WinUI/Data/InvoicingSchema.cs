@@ -6,14 +6,16 @@ namespace MyCoinFlow.WinUI.Data;
 
 public static class InvoicingSchema
 {
-    public const int CurrentVersion = 2;
-    private const int ExpectedTableCount = 8;
-    private const int ExpectedForeignKeyCount = 7;
-    private const int ExpectedUniqueIndexCount = 3;
+    public const int CurrentVersion = 3;
+    private const int ExpectedTableCount = 12;
+    private const int ExpectedForeignKeyCount = 14;
+    private const int ExpectedUniqueIndexCount = 4;
+    private const int ExpectedTriggerCount = 2;
 
     public static async Task EnsureAsync(CancellationToken cancellationToken = default)
     {
         RequireAuthenticated();
+        await Task.Run(() => new DatabaseService().EnsureStweSchema(), cancellationToken);
         await using var connection = await OpenTenantConnectionAsync(cancellationToken);
         await using var command = new SqlCommand(InstallationSql, connection)
         {
@@ -85,7 +87,11 @@ SELECT
         OBJECT_ID(N'dbo.FakturierungWechselkurs'),
         OBJECT_ID(N'dbo.FakturierungMwstSatz'),
         OBJECT_ID(N'dbo.FakturierungZahlungskonto'),
-        OBJECT_ID(N'dbo.FakturierungErtragskonto'))) AS TableCount,
+        OBJECT_ID(N'dbo.FakturierungErtragskonto'),
+        OBJECT_ID(N'dbo.FakturierungArtikel'),
+        OBJECT_ID(N'dbo.FakturierungEigentuemerProfil'),
+        OBJECT_ID(N'dbo.FakturierungEinheitNutzung'),
+        OBJECT_ID(N'dbo.FakturierungMietverhaeltnis'))) AS TableCount,
     (SELECT COUNT(*) FROM sys.foreign_keys
      WHERE name IN (
         N'FK_FaktEinstellung_Basiswaehrung',
@@ -94,12 +100,24 @@ SELECT
         N'FK_FaktWechselkurs_Waehrung',
         N'FK_FaktZahlungskonto_Waehrung',
         N'FK_FaktZahlungskonto_Geldinstitut',
-        N'FK_FaktErtragskonto_Konto')) AS ForeignKeyCount,
+        N'FK_FaktErtragskonto_Konto',
+        N'FK_FaktArtikel_Mwst',
+        N'FK_FaktArtikel_Ertragskonto',
+        N'FK_FaktEigentuemerProfil_Eigentuemer',
+        N'FK_FaktEigentuemerProfil_Rechnungsadresse',
+        N'FK_FaktEinheitNutzung_Einheit',
+        N'FK_FaktMietverhaeltnis_Einheit',
+        N'FK_FaktMietverhaeltnis_Mieteradresse')) AS ForeignKeyCount,
     (SELECT COUNT(*) FROM sys.indexes
      WHERE name IN (
         N'UX_FaktWechselkurs_Waehrung_GueltigAb',
         N'UX_FaktMwst_Code_GueltigAb',
-        N'UX_FaktZahlungskonto_Iban')) AS UniqueIndexCount;
+        N'UX_FaktZahlungskonto_Iban',
+        N'UX_FaktArtikel_Artikelnummer')) AS UniqueIndexCount,
+    (SELECT COUNT(*) FROM sys.triggers
+     WHERE name IN (
+        N'TR_FaktEinheitNutzung_Zeitraum',
+        N'TR_FaktMietverhaeltnis_Zeitraum')) AS TriggerCount;
 """;
 
         await using var command = new SqlCommand(sql, connection);
@@ -111,16 +129,19 @@ SELECT
         var tableCount = reader.GetInt32(1);
         var foreignKeyCount = reader.GetInt32(2);
         var uniqueIndexCount = reader.GetInt32(3);
+        var triggerCount = reader.GetInt32(4);
         if (version != CurrentVersion ||
             tableCount != ExpectedTableCount ||
             foreignKeyCount != ExpectedForeignKeyCount ||
-            uniqueIndexCount != ExpectedUniqueIndexCount)
+            uniqueIndexCount != ExpectedUniqueIndexCount ||
+            triggerCount != ExpectedTriggerCount)
         {
             throw new InvalidOperationException(
                 $"Fakturierungsschema unvollständig: Version {version}/{CurrentVersion}, " +
                 $"Tabellen {tableCount}/{ExpectedTableCount}, Fremdschlüssel " +
                 $"{foreignKeyCount}/{ExpectedForeignKeyCount}, eindeutige Indizes " +
-                $"{uniqueIndexCount}/{ExpectedUniqueIndexCount}.");
+                $"{uniqueIndexCount}/{ExpectedUniqueIndexCount}, Trigger " +
+                $"{triggerCount}/{ExpectedTriggerCount}.");
         }
 
         return version;
@@ -134,6 +155,13 @@ IF OBJECT_ID(N'dbo.Kontenplan', N'U') IS NULL
     THROW 51000, N'Der vorhandene MyCoinFlow-Kontenplan fehlt in der aktiven Mandantendatenbank.', 1;
 IF OBJECT_ID(N'dbo.Geldinstitut', N'U') IS NULL
     THROW 51002, N'Der vorhandene MyCoinFlow-Geldinstitut-Stamm fehlt in der aktiven Mandantendatenbank.', 1;
+IF OBJECT_ID(N'dbo.Adresse', N'U') IS NULL
+    THROW 51003, N'Der vorhandene MyCoinFlow-Adressstamm fehlt in der aktiven Mandantendatenbank.', 1;
+IF OBJECT_ID(N'dbo.StweLiegenschaft', N'U') IS NULL
+   OR OBJECT_ID(N'dbo.StweEinheit', N'U') IS NULL
+   OR OBJECT_ID(N'dbo.StweEigentuemer', N'U') IS NULL
+   OR OBJECT_ID(N'dbo.StweEinheitEigentum', N'U') IS NULL
+    THROW 51004, N'Der vorhandene MyCoinFlow-Liegenschaftenstamm ist unvollständig.', 1;
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -379,12 +407,179 @@ BEGIN TRY
         );
     END;
 
+    IF OBJECT_ID(N'dbo.FakturierungArtikel', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungArtikel
+        (
+            Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungArtikel PRIMARY KEY,
+            ArticleNumber nvarchar(64) COLLATE Latin1_General_100_CI_AS NOT NULL,
+            Designation nvarchar(200) NOT NULL,
+            [Description] nvarchar(2000) NOT NULL
+                CONSTRAINT DF_FakturierungArtikel_Description DEFAULT(N''),
+            Unit nvarchar(40) NOT NULL,
+            Category nvarchar(100) NOT NULL,
+            IsActive bit NOT NULL CONSTRAINT DF_FakturierungArtikel_IsActive DEFAULT(1),
+            SalePrice decimal(19,4) NOT NULL,
+            VatRateId int NOT NULL,
+            RevenueAccountId int NOT NULL,
+            AncillaryClassification varchar(32) COLLATE Latin1_General_100_BIN2 NOT NULL
+                CONSTRAINT DF_FakturierungArtikel_AncillaryClass DEFAULT('STANDARD'),
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FakturierungArtikel_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungArtikel_Number
+                CHECK (
+                    LEN(ArticleNumber) BETWEEN 1 AND 64
+                    AND ArticleNumber COLLATE Latin1_General_100_BIN2 =
+                        UPPER(LTRIM(RTRIM(ArticleNumber))) COLLATE Latin1_General_100_BIN2
+                    AND ArticleNumber NOT LIKE N'%  %'),
+            CONSTRAINT CK_FakturierungArtikel_Price CHECK (SalePrice >= 0),
+            CONSTRAINT CK_FakturierungArtikel_AncillaryClass CHECK (
+                AncillaryClassification IN (
+                    'STANDARD',
+                    'TENANT_OPERATING_COST',
+                    'REPAIR',
+                    'RENEWAL',
+                    'NON_TRANSFERABLE')),
+            CONSTRAINT FK_FaktArtikel_Mwst
+                FOREIGN KEY (VatRateId) REFERENCES dbo.FakturierungMwstSatz(Id),
+            CONSTRAINT FK_FaktArtikel_Ertragskonto
+                FOREIGN KEY (RevenueAccountId) REFERENCES dbo.FakturierungErtragskonto(AccountId)
+        );
+        CREATE UNIQUE INDEX UX_FaktArtikel_Artikelnummer
+            ON dbo.FakturierungArtikel(ArticleNumber);
+        CREATE INDEX IX_FaktArtikel_Aktiv_Kategorie
+            ON dbo.FakturierungArtikel(IsActive, Category, Designation);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungEigentuemerProfil', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungEigentuemerProfil
+        (
+            OwnerId int NOT NULL CONSTRAINT PK_FakturierungEigentuemerProfil PRIMARY KEY,
+            BillingAddressId int NOT NULL,
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktEigentuemerProfil_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT FK_FaktEigentuemerProfil_Eigentuemer
+                FOREIGN KEY (OwnerId) REFERENCES dbo.StweEigentuemer(Id),
+            CONSTRAINT FK_FaktEigentuemerProfil_Rechnungsadresse
+                FOREIGN KEY (BillingAddressId) REFERENCES dbo.Adresse(Id)
+        );
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungEinheitNutzung', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungEinheitNutzung
+        (
+            Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungEinheitNutzung PRIMARY KEY,
+            UnitId int NOT NULL,
+            UsageType varchar(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ValidFrom date NOT NULL,
+            ValidTo date NULL,
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktEinheitNutzung_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungEinheitNutzung_Type
+                CHECK (UsageType IN ('OWNER_OCCUPIED', 'RENTED', 'VACANT')),
+            CONSTRAINT CK_FakturierungEinheitNutzung_Dates
+                CHECK (ValidTo IS NULL OR ValidTo >= ValidFrom),
+            CONSTRAINT FK_FaktEinheitNutzung_Einheit
+                FOREIGN KEY (UnitId) REFERENCES dbo.StweEinheit(Id)
+        );
+        CREATE INDEX IX_FaktEinheitNutzung_Einheit_Zeitraum
+            ON dbo.FakturierungEinheitNutzung(UnitId, ValidFrom, ValidTo);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungMietverhaeltnis', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungMietverhaeltnis
+        (
+            Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungMietverhaeltnis PRIMARY KEY,
+            UnitId int NOT NULL,
+            TenantAddressId int NOT NULL,
+            ValidFrom date NOT NULL,
+            ValidTo date NULL,
+            AncillaryMode varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ContractReference nvarchar(160) NOT NULL,
+            DirectBillingAllowed bit NOT NULL
+                CONSTRAINT DF_FaktMietverhaeltnis_DirectBilling DEFAULT(0),
+            DirectBillingApprovalReference nvarchar(240) NULL,
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktMietverhaeltnis_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungMietverhaeltnis_Dates
+                CHECK (ValidTo IS NULL OR ValidTo >= ValidFrom),
+            CONSTRAINT CK_FakturierungMietverhaeltnis_Mode
+                CHECK (AncillaryMode IN ('INCLUDED', 'ADVANCE', 'FLAT_RATE')),
+            CONSTRAINT CK_FakturierungMietverhaeltnis_Contract
+                CHECK (LEN(LTRIM(RTRIM(ContractReference))) > 0),
+            CONSTRAINT CK_FakturierungMietverhaeltnis_DirectBilling
+                CHECK (
+                    DirectBillingAllowed = 0
+                    OR (
+                        AncillaryMode IN ('ADVANCE', 'FLAT_RATE')
+                        AND LEN(LTRIM(RTRIM(COALESCE(DirectBillingApprovalReference, N'')))) > 0
+                    )),
+            CONSTRAINT FK_FaktMietverhaeltnis_Einheit
+                FOREIGN KEY (UnitId) REFERENCES dbo.StweEinheit(Id),
+            CONSTRAINT FK_FaktMietverhaeltnis_Mieteradresse
+                FOREIGN KEY (TenantAddressId) REFERENCES dbo.Adresse(Id)
+        );
+        CREATE INDEX IX_FaktMietverhaeltnis_Einheit_Zeitraum
+            ON dbo.FakturierungMietverhaeltnis(UnitId, ValidFrom, ValidTo);
+    END;
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktEinheitNutzung_Zeitraum
+    ON dbo.FakturierungEinheitNutzung
+    AFTER INSERT, UPDATE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM inserted i
+            JOIN dbo.FakturierungEinheitNutzung existing WITH (UPDLOCK, HOLDLOCK)
+              ON existing.UnitId = i.UnitId
+             AND existing.Id <> i.Id
+             AND i.ValidFrom <= COALESCE(existing.ValidTo, CONVERT(date, ''99991231''))
+             AND existing.ValidFrom <= COALESCE(i.ValidTo, CONVERT(date, ''99991231''))
+        )
+            THROW 51010, N''Nutzungszeiträume derselben Einheit dürfen sich nicht überschneiden.'', 1;
+
+    END;';
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktMietverhaeltnis_Zeitraum
+    ON dbo.FakturierungMietverhaeltnis
+    AFTER INSERT, UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM inserted i
+            JOIN dbo.FakturierungMietverhaeltnis existing WITH (UPDLOCK, HOLDLOCK)
+              ON existing.UnitId = i.UnitId
+             AND existing.Id <> i.Id
+             AND i.ValidFrom <= COALESCE(existing.ValidTo, CONVERT(date, ''99991231''))
+             AND existing.ValidFrom <= COALESCE(i.ValidTo, CONVERT(date, ''99991231''))
+        )
+            THROW 51012, N''Mietverhältnisse derselben Einheit dürfen sich nicht überschneiden.'', 1;
+
+    END;';
+
     IF NOT EXISTS (SELECT 1 FROM dbo.FakturierungSchemaVersion WHERE Id = 1)
-        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 2);
+        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 3);
     ELSE
         UPDATE dbo.FakturierungSchemaVersion
-        SET [Version] = 2, AppliedAt = SYSDATETIME()
-        WHERE Id = 1 AND [Version] < 2;
+        SET [Version] = 3, AppliedAt = SYSDATETIME()
+        WHERE Id = 1 AND [Version] < 3;
 
     COMMIT TRANSACTION;
 END TRY

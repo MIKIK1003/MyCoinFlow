@@ -1,7 +1,7 @@
 # DMS-Feature – portable Spezifikation (für Portierung nach ShopFlow / WinUI3)
 
 > Zweck dieses Dokuments: Beschreibt die in MyCoinFlow (WPF) gebaute DMS-Funktionalität
-> **framework-neutral**, damit eine Claude-Code-Session im ShopFlow-Repo sie umsetzen kann,
+> **framework-neutral**, damit eine spätere Entwicklungssession im ShopFlow-Repo sie umsetzen kann,
 > ohne dass der fachliche Hintergrund erneut erklärt werden muss. Es ist **keine 1:1-Codevorlage**
 > – WinUI3 hat andere Controls/Dialoge als WPF/MaterialDesignInXaml, daher muss die UI-Schicht
 > neu gebaut werden. Die reine Logik (Textanalyse, Queue-Orchestrierung) ist grösstenteils

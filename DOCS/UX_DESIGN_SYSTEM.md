@@ -80,6 +80,17 @@ beziehungsweise gemeinsames Control umgesetzt.
   sicher. Minimierte Fenster werden nicht minimiert wiederhergestellt.
 - Eigenständige Arbeitsfenster lassen sich mit Esc schließen beziehungsweise abbrechen; das
   Hauptfenster bleibt ausgenommen.
+- Umfangreiche oder fachlich gegliederte Datenerfassung wird als frei verschiebbares und
+  skalierbares eigenständiges Fenster umgesetzt. `ContentDialog` bleibt kurzen Bestätigungen
+  und atomaren Entscheidungen vorbehalten; es ist kein Container für mehrteilige
+  Stammdatenformulare.
+- Editorfenster verwenden `PersistentWindow`, bewahren Position, normale Größe und
+  Maximierungszustand und halten Kopfkontext sowie Speichern/Abbrechen unabhängig vom
+  scrollbaren Formularinhalt sichtbar.
+- Zusammengehörige Daten stehen in benannten Karten und bei ausreichender Breite
+  nebeneinander. Bei schmaler Breite werden die Gruppen vollständig gestapelt oder über
+  eindeutig bezeichnete Register gegliedert; eine unstrukturierte lineare Feldkette ist
+  kein Zielmuster.
 - Scrollbare Formulare verwenden FormScrollViewerStyle oder reservieren gleichwertig rechts
   Platz für die Scrollbar.
 - Abhängige Auswahlen bleiben räumlich zusammen; die wirksame Auswahlkette ist sichtbar und

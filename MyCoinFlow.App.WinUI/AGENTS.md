@@ -12,5 +12,9 @@
   ersetzt werden; WPF-XAML wird dadurch nicht Teil eines normalen WinUI-Arbeitspakets.
 - Eigenständige Fenster verwenden PersistentWindow und WinUiWindowStateService, sofern keine
   dokumentierte technische Ausnahme besteht.
+- Umfangreiche oder fachlich gegliederte Editoren sind frei verschiebbare und skalierbare
+  PersistentWindow-Fenster mit gespeichertem Zustand, benannten Datengruppen, adaptiver
+  Breitenanordnung und dauerhaft sichtbaren Abschlussaktionen. ContentDialog ist auf kurze
+  Bestätigungen und atomare Entscheidungen begrenzt.
 - Scrollbare Formulare verwenden FormScrollViewerStyle oder reservieren gleichwertig rechts
   Platz. Abhängige Auswahlen bleiben gleichzeitig sichtbar und benennen ihren Fachkontext.

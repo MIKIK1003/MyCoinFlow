@@ -28,7 +28,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
                 <TextBlock Text="Fakturieren" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Offerten, Aufträge, Lieferungen und Rechnungen als zusammengehörende Vorgänge"
+                <TextBlock Text="Artikel, Leistungen und Immobilien als belastbare fakturierbare Objekte"
                            TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <Border Grid.Column="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
@@ -47,30 +47,38 @@
                 <StackPanel Orientation="Horizontal">
                     <StackPanel>
                         <TextBlock Text="VORGANG" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <StackPanel Orientation="Horizontal">
-                            <Button x:Name="NewCaseButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
-                                    IsEnabled="False"
-                                    AutomationProperties.Name="Neuer Vorgang"
-                                    ToolTipService.ToolTip="Die Dokumenterfassung wird in einem späteren Fakturieren-Ausbauschritt freigeschaltet.">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <FontIcon Glyph="{StaticResource ActionAddIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                    <TextBlock Text="Neuer Vorgang" Style="{StaticResource FunctionButtonFullLabelStyle}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
+                        <Button x:Name="NewCaseButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
+                                IsEnabled="False"
+                                AutomationProperties.Name="Neuer Vorgang"
+                                ToolTipService.ToolTip="Die Dokumenterfassung beginnt in AP04.">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionAddIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Neuer Vorgang" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="STAMMDATEN" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button x:Name="MasterDataButton" Style="{StaticResource FunctionButtonStyle}"
+                                Click="OnMasterDataClick"
+                                AutomationProperties.Name="Stammdaten verwalten">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionEditIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Stammdaten verwalten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel>
                         <TextBlock Text="ANSICHT" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource FunctionButtonStyle}" Click="OnRefreshClick"
-                                    AutomationProperties.Name="Aktualisieren">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                    <TextBlock Text="Aktualisieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
+                        <Button Style="{StaticResource FunctionButtonStyle}" Click="OnRefreshClick"
+                                AutomationProperties.Name="Aktualisieren">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Aktualisieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <Rectangle x:Name="SettingsSeparator" Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel x:Name="SettingsActionGroup">
@@ -90,59 +98,61 @@
         <Border Grid.Row="2" Style="{StaticResource WorkspaceFilterBarStyle}">
             <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
-                <Grid ColumnSpacing="8" MinWidth="980">
+                <Grid ColumnSpacing="8" MinWidth="1080">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="260" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
                     <StackPanel>
                         <TextBlock Text="SUCHE" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
-                        <TextBox x:Name="SearchBox" Height="34" IsEnabled="False"
-                                 PlaceholderText="Vorgang, Adresse oder Dokumentnummer"
-                                 AutomationProperties.Name="Fakturierungsvorgänge durchsuchen" />
+                        <TextBox x:Name="SearchBox" Height="34"
+                                 PlaceholderText="Artikel, Leistung, Liegenschaft, Einheit oder Adresse"
+                                 TextChanged="OnFilterChanged"
+                                 AutomationProperties.Name="Fakturierbare Objekte durchsuchen" />
                     </StackPanel>
-
                     <StackPanel Grid.Column="1">
+                        <TextBlock Text="STICHTAG" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
+                        <DatePicker x:Name="EffectiveDatePicker" Height="34" MinWidth="180"
+                                    DateChanged="OnEffectiveDateChanged"
+                                    AutomationProperties.Name="Stichtag für Nutzung und Empfänger" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
                         <TextBlock Text="STATUS" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9,7">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="9">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="8" Height="8" Fill="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock Text="Entwurf" FontSize="12" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowAccentBrush}" />
-                                    <TextBlock Text="Offen" FontSize="12" />
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowPositiveBrush}" />
+                                    <TextBlock Text="Bereit" FontSize="12" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowDangerBrush}" />
-                                    <TextBlock Text="Überfällig" FontSize="12" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowPositiveBrush}" />
-                                    <TextBlock Text="Bezahlt" FontSize="12" />
+                                    <TextBlock Text="Prüfung" FontSize="12" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
-
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Grid.Column="3">
                         <TextBlock Text="SCHNELLANSICHT" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <ToggleButton Content="Alle · 0" Height="34" IsChecked="True" IsEnabled="False" />
-                            <ToggleButton Content="Offen · 0" Height="34" IsEnabled="False" />
-                            <ToggleButton Content="Überfällig · 0" Height="34" IsEnabled="False" />
+                            <ToggleButton x:Name="AllStatusButton" Content="Alle" Height="34"
+                                          IsChecked="True" Click="OnStatusFilterClick" />
+                            <ToggleButton x:Name="ReadyStatusButton" Content="Bereit" Height="34"
+                                          Click="OnStatusFilterClick" />
+                            <ToggleButton x:Name="ReviewStatusButton" Content="Prüfung" Height="34"
+                                          Click="OnStatusFilterClick" />
                         </StackPanel>
                     </StackPanel>
-
-                    <StackPanel Grid.Column="3">
+                    <StackPanel Grid.Column="4">
                         <TextBlock Text="FILTER" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
-                        <ComboBox Width="180" Height="34" IsEnabled="False"
-                                  Header="Filter" HeaderTemplate="{x:Null}" SelectedIndex="0">
-                            <ComboBoxItem Content="Alle Dokumentarten" />
+                        <ComboBox x:Name="SourceFilterBox" Width="190" Height="34"
+                                  SelectionChanged="OnFilterChanged"
+                                  AutomationProperties.Name="Objektquelle filtern">
+                            <ComboBoxItem Content="Alle Quellen" Tag="ALL" />
+                            <ComboBoxItem Content="Artikel / Leistungen" Tag="ARTICLE" />
+                            <ComboBoxItem Content="Immobilien" Tag="PROPERTY" />
                         </ComboBox>
                     </StackPanel>
                 </Grid>
@@ -159,40 +169,39 @@
         <ScrollViewer Grid.Row="4" HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
                       VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="176">
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
                     <StackPanel>
-                        <TextBlock Text="VORGÄNGE" FontSize="10" FontWeight="SemiBold"
+                        <TextBlock Text="ARTIKEL / LEISTUNGEN" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="0" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock Text="Noch keine erfasst" FontSize="11"
+                        <TextBlock x:Name="DirectObjectCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="aktive direkte Objekte" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="176">
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
                     <StackPanel>
-                        <TextBlock Text="OFFENE RECHNUNGEN" FontSize="10" FontWeight="SemiBold"
+                        <TextBlock Text="IMMOBILIENEINHEITEN" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="0" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock Text="0,00 in Basiswährung" FontSize="11"
+                        <TextBlock x:Name="PropertyObjectCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="zum gewählten Stichtag" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="176">
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
                     <StackPanel>
-                        <TextBlock Text="ÜBERFÄLLIG" FontSize="10" FontWeight="SemiBold"
+                        <TextBlock Text="AUSWÄHLBAR" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="0" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock Text="Keine Mahnfälle" FontSize="11"
+                        <TextBlock x:Name="SelectableCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="mit sicherem Grundkontext" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="208">
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
                     <StackPanel>
-                        <TextBlock Text="FINANZGRUNDLAGE" FontSize="10" FontWeight="SemiBold"
+                        <TextBlock Text="PRÜFUNG NÖTIG" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="ConfigurationMetricText" Text="Wird geprüft …"
-                                   FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock x:Name="CurrencyMetricText" Text="Basiswährung —" FontSize="11"
+                        <TextBlock x:Name="ReviewCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="fehlender sicherer Kontext" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -202,7 +211,7 @@
         <Grid x:Name="WorkspaceGrid" Grid.Row="5" ColumnSpacing="8" RowSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="5*" />
-                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="4*" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
@@ -211,87 +220,134 @@
             <VisualStateManager.VisualStateGroups>
                 <VisualStateGroup>
                     <VisualState x:Name="NarrowWorkspace">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="0" />
-                        </VisualState.StateTriggers>
+                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
                     </VisualState>
                     <VisualState x:Name="WideWorkspace">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="900" />
-                        </VisualState.StateTriggers>
+                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="820" /></VisualState.StateTriggers>
                         <VisualState.Setters>
-                            <Setter Target="CaseListCard.(Grid.ColumnSpan)" Value="1" />
-                            <Setter Target="ContextCard.(Grid.Row)" Value="0" />
-                            <Setter Target="ContextCard.(Grid.Column)" Value="1" />
-                            <Setter Target="ContextCard.(Grid.ColumnSpan)" Value="1" />
-                            <Setter Target="ContextCard.Visibility" Value="Visible" />
+                            <Setter Target="ObjectListCard.(Grid.ColumnSpan)" Value="1" />
+                            <Setter Target="ObjectDetailCard.(Grid.Row)" Value="0" />
+                            <Setter Target="ObjectDetailCard.(Grid.Column)" Value="1" />
+                            <Setter Target="ObjectDetailCard.(Grid.ColumnSpan)" Value="1" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
 
-            <Border x:Name="CaseListCard" Grid.ColumnSpan="2" Style="{StaticResource CardBorderStyle}"
-                    CornerRadius="6" MinHeight="250">
+            <Border x:Name="ObjectListCard" Grid.ColumnSpan="2"
+                    Style="{StaticResource CardBorderStyle}" Padding="0" MinHeight="240">
                 <Grid>
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
-                                MaxWidth="520" Spacing="10">
-                        <Border Width="58" Height="58" CornerRadius="18"
-                                Background="{StaticResource MyCoinFlowAccentSoftBrush}">
-                            <FontIcon Glyph="&#xE8A5;" FontSize="28"
-                                      Foreground="{StaticResource MyCoinFlowAccentBrush}" />
-                        </Border>
-                        <TextBlock x:Name="EmptyStateTitle" Text="Fakturieren wird vorbereitet"
-                                   FontSize="20" FontWeight="SemiBold"
-                                   TextAlignment="Center" TextWrapping="Wrap" />
-                        <TextBlock x:Name="EmptyStateDescription"
-                                   Text="Schema und Finanzstammdaten werden geprüft."
+                    <ListView x:Name="BillableObjectsList" SelectionMode="Single"
+                              SelectionChanged="OnObjectSelectionChanged">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,8" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12" MinHeight="52">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="2*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding SourceDisplay}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel x:Name="EmptyObjectsState" HorizontalAlignment="Center"
+                                VerticalAlignment="Center" MaxWidth="460" Spacing="8"
+                                Visibility="Collapsed">
+                        <FontIcon Glyph="&#xE8A5;" FontSize="30" Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                        <TextBlock Text="Keine fakturierbaren Objekte gefunden"
+                                   FontSize="18" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="Passen Sie Suche oder Filter an oder erfassen Sie Stammdaten."
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <Button x:Name="EmptyStateSettingsButton" Content="Finanzen einstellen"
-                                HorizontalAlignment="Center" Visibility="Collapsed"
-                                Click="OnFinanceSettingsClick" />
+                        <Button Content="Stammdaten verwalten" HorizontalAlignment="Center"
+                                Click="OnMasterDataClick" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Border x:Name="ContextCard" Grid.Row="1" Grid.ColumnSpan="2"
-                    Style="{StaticResource CardBorderStyle}" CornerRadius="6"
-                    Visibility="Collapsed">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Auswahl und Konfiguration" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Kein Vorgang ausgewählt"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                    <Grid ColumnSpacing="12" RowSpacing="7">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Aussteller" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="IssuerText" Grid.Column="1" Text="—" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="1" Text="Währungen" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="CurrenciesText" Grid.Row="1" Grid.Column="1" Text="—" />
-                        <TextBlock Grid.Row="2" Text="MWST" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="VatText" Grid.Row="2" Grid.Column="1" Text="—" />
-                        <TextBlock Grid.Row="3" Text="Zahlung" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="PaymentText" Grid.Row="3" Grid.Column="1" Text="—" />
-                    </Grid>
-                    <TextBlock x:Name="MissingConfigurationText" TextWrapping="Wrap"
-                               Foreground="{StaticResource MyCoinFlowDangerBrush}" />
-                </StackPanel>
+            <Border x:Name="ObjectDetailCard" Grid.Row="1" Grid.ColumnSpan="2"
+                    Style="{StaticResource CardBorderStyle}">
+                <ScrollViewer Style="{StaticResource FormScrollViewerStyle}" MaxHeight="560">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Name="ObjectDetailTitle" Text="Kein Objekt ausgewählt"
+                                   Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="ObjectDetailSubtitle"
+                                   Text="Wählen Sie links einen Artikel, eine Leistung oder eine Immobilieneinheit."
+                                   TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <ScrollViewer x:Name="PropertyChainScroll" HorizontalScrollMode="Auto"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <Grid MinWidth="980" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9">
+                                    <StackPanel>
+                                        <TextBlock Text="LIEGENSCHAFT" FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ChainPropertyText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9">
+                                    <StackPanel>
+                                        <TextBlock Text="EINHEIT" FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ChainUnitText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9">
+                                    <StackPanel>
+                                        <TextBlock Text="ZEITRAUM / NUTZUNG" FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ChainUsageText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="3" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9">
+                                    <StackPanel>
+                                        <TextBlock Text="VERANTWORTLICHE PARTEI" FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ChainOwnerText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="4" Padding="9">
+                                    <StackPanel>
+                                        <TextBlock Text="RECHNUNGSEMPFÄNGER" FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ChainRecipientText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </ScrollViewer>
+                        <ComboBox x:Name="RecipientChoiceBox" Header="Rechnungsempfänger für die Auswahl"
+                                  DisplayMemberPath="Display" SelectedValuePath="AddressId"
+                                  HorizontalAlignment="Stretch"
+                                  SelectionChanged="OnRecipientChoiceChanged" />
+                        <InfoBar x:Name="SelectionStatusInfo" IsOpen="True" IsClosable="False"
+                                 Severity="Informational" />
+                        <InfoBar x:Name="LegalInfoBar" IsOpen="True" IsClosable="False"
+                                 Severity="Warning" Title="Rechtlicher Prüfrahmen" />
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" Grid.ColumnSpan="2"
                   Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
                     <ProgressRing IsActive="True" Width="32" Height="32" />
-                    <TextBlock Text="Fakturieren wird geladen …" />
+                    <TextBlock Text="Fakturierbare Objekte werden geladen …" />
                 </StackPanel>
             </Grid>
         </Grid>

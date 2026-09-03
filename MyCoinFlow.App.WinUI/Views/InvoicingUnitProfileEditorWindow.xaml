@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingUnitProfileEditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Fakturierungsprofil der Einheit bearbeiten">
+
+    <Grid x:Name="RootGrid"
+          Padding="24,20,24,18"
+          RowSpacing="10"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" Invoked="OnCancelShortcut" />
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="OnSaveShortcut" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorWindowHeaderStyle}">
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="42" Height="42" CornerRadius="21"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <FontIcon Glyph="{StaticResource ActionEditIconGlyph}"
+                              Foreground="{StaticResource MyCoinFlowAccentBrush}"
+                              FontSize="20" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Fakturierungsprofil der Einheit"
+                               FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock x:Name="UnitHeadingText" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="* Pflichtfelder"
+                           VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+        </Border>
+
+        <InfoBar x:Name="EditorError" Grid.Row="1"
+                 IsOpen="False" IsClosable="True" Severity="Error"
+                 Title="Speichern nicht möglich" />
+
+        <ScrollViewer Grid.Row="2" Style="{StaticResource FormScrollViewerStyle}">
+            <Grid x:Name="EditorContentGrid" Margin="0,4,0,8"
+                  ColumnSpacing="14" RowSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1.2*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border x:Name="UsageCard" Style="{StaticResource EditorSectionCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Zeitraum und Nutzung"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Datierte Verwendung der bestehenden Stockwerkeinheit"
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ComboBox x:Name="UsageBox" Header="Nutzung *"
+                                  DisplayMemberPath="Display" SelectedValuePath="Code"
+                                  HorizontalAlignment="Stretch"
+                                  SelectionChanged="OnUsageChanged" />
+                        <DatePicker x:Name="FromPicker" Header="Gültig ab *"
+                                    HorizontalAlignment="Stretch" />
+                        <DatePicker x:Name="ToPicker" Header="Gültig bis (optional)"
+                                    HorizontalAlignment="Stretch" />
+                        <TextBlock Text="Die bestehende Liegenschaft und Einheit werden nur referenziert; der Immobilien-Stamm wird nicht dupliziert."
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="OwnerCard" Grid.Row="1"
+                        Style="{StaticResource EditorSectionCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Verantwortlicher Eigentümer"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Sicherer Standardempfänger am Nutzungsbeginn"
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ComboBox x:Name="OwnerBox" Header="Eigentümer am Nutzungsbeginn *"
+                                  DisplayMemberPath="Name" SelectedValuePath="Id"
+                                  HorizontalAlignment="Stretch"
+                                  SelectionChanged="OnOwnerChanged" />
+                        <ComboBox x:Name="OwnerAddressBox" Header="Eigentümer-Rechnungsadresse *"
+                                  DisplayMemberPath="Display" SelectedValuePath="Id"
+                                  HorizontalAlignment="Stretch" />
+                        <TextBlock Text="Die Auswahl muss mit der datierten Eigentumszuordnung im Liegenschaften-Modul übereinstimmen. Der Eigentümer bleibt die sichtbar verantwortliche Partei."
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="RentalCard" Grid.RowSpan="2" Grid.Column="1"
+                        Style="{StaticResource EditorSectionCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Mietverhältnis und Nebenkostenvereinbarung"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock x:Name="RentalStatusText"
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ComboBox x:Name="TenantAddressBox" Header="Mieteradresse *"
+                                  DisplayMemberPath="Display" SelectedValuePath="Id"
+                                  HorizontalAlignment="Stretch" />
+                        <ComboBox x:Name="AncillaryModeBox" Header="Nebenkostenmodus *"
+                                  DisplayMemberPath="Display" SelectedValuePath="Code"
+                                  HorizontalAlignment="Stretch" />
+                        <TextBox x:Name="ContractReferenceBox" Header="Vertragsreferenz *"
+                                 MaxLength="160"
+                                 PlaceholderText="z. B. Mietvertrag vom 15.03.2026, Ziffer 8" />
+                        <CheckBox x:Name="DirectBillingCheck"
+                                  Content="Direktfakturierung an Mieter ist ausdrücklich erlaubt"
+                                  Click="OnDirectBillingChanged" />
+                        <TextBox x:Name="DirectBillingApprovalBox"
+                                 Header="Dokumentierter Freigabenachweis *"
+                                 MaxLength="240"
+                                 PlaceholderText="z. B. Vertragsklausel oder Nachtrag mit Datum" />
+                        <InfoBar IsOpen="True" IsClosable="False" Severity="Warning"
+                                 Title="Rechtliche Prüfung bleibt erforderlich"
+                                 Message="Prüfrahmen: Art. 712h ZGB, Art. 257a/257b OR, VMWG und BWO-Hinweise zur jährlichen Akontoabrechnung. Ein Mieter ist nur bei aktivem Mietverhältnis, dokumentierter Nebenkostenvereinbarung und dokumentierter Direktfakturierungsfreigabe wählbar. Reparaturen, Erneuerungen und nicht überwälzbare Kosten bleiben beim Eigentümer; die Software trifft keine automatische Rechtsentscheidung." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <Border Grid.Row="3" Style="{StaticResource EditorWindowFooterStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Position und Grösse werden beim Schliessen gespeichert."
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button x:Name="CancelButton" Content="Abbrechen" Width="140"
+                            Click="OnCancelClick" />
+                    <Button x:Name="SaveButton" Content="Speichern" Width="160"
+                            Style="{StaticResource AccentButtonStyle}" Click="OnSaveClick" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</window:PersistentWindow>

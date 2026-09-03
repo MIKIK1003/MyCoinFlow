@@ -11,6 +11,3 @@ obj/
 # Drittanbieter-Redistributables, Build-Output). Liegen jetzt separat bei Michel.
 /Installer/
 /InnoSetup/
-
-# Claude Code CLI-Binary (lokales Werkzeug, kein Projektcode)
-/claude.exe
