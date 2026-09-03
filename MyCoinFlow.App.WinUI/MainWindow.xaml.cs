@@ -87,6 +87,23 @@ public sealed partial class MainWindow : PersistentWindow
         if (args.SelectedItemContainer?.Tag is string tag) Navigate(tag);
     }
 
+    internal void NavigateToFinanceSettings()
+    {
+        if (_session is null || !CurrentUserContext.IsAdmin) return;
+
+        _suppressNavigationSelection = true;
+        try
+        {
+            RootNavigationView.SelectedItem = SettingsNavItem;
+        }
+        finally
+        {
+            _suppressNavigationSelection = false;
+        }
+
+        ContentFrame.Navigate(typeof(SettingsPage), SettingsPage.FinanceSectionKey);
+    }
+
     private void ConnectDmsUiBridge()
     {
         var watcher = DmsWatcherService.Instance;
@@ -179,6 +196,8 @@ public sealed partial class MainWindow : PersistentWindow
             ContentFrame.Navigate(typeof(DashboardPage));
         else if (tag == "Transactions" && ContentFrame.CurrentSourcePageType != typeof(TransactionsPage))
             ContentFrame.Navigate(typeof(TransactionsPage));
+        else if (tag == "Invoicing" && ContentFrame.CurrentSourcePageType != typeof(InvoicingPage))
+            ContentFrame.Navigate(typeof(InvoicingPage));
         else if (tag == "Accounts" && ContentFrame.CurrentSourcePageType != typeof(AccountsPage))
             ContentFrame.Navigate(typeof(AccountsPage));
         else if (tag == "Institutions" && ContentFrame.CurrentSourcePageType != typeof(InstitutionsPage))

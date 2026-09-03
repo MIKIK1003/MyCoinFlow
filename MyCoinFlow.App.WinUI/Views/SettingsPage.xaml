@@ -5,6 +5,7 @@
   <StackPanel Spacing="3"><TextBlock x:Name="HeadingText" Text="Einstellungen" Style="{StaticResource PageTitleStyle}"/><TextBlock Text="Konfiguration der bestehenden MyCoinFlow-Funktionen" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
   <NavigationView x:Name="SettingsNavigation" Grid.Row="1" PaneDisplayMode="Left" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" IsPaneToggleButtonVisible="False" SelectionChanged="OnSelectionChanged">
    <NavigationView.MenuItems>
+    <NavigationViewItem x:Name="FinanceItem" Content="Finanzen" Tag="Finance"><NavigationViewItem.Icon><FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}"/></NavigationViewItem.Icon></NavigationViewItem>
     <NavigationViewItem Content="Nummernkreise" Tag="NumberRanges"><NavigationViewItem.Icon><FontIcon Glyph="&#xE9D5;"/></NavigationViewItem.Icon></NavigationViewItem>
     <NavigationViewItem Content="Kontenplan" Tag="AccountStructure"><NavigationViewItem.Icon><FontIcon Glyph="&#xE8EF;"/></NavigationViewItem.Icon></NavigationViewItem>
     <NavigationViewItem Content="Transaktionen" Tag="Transactions"><NavigationViewItem.Icon><FontIcon Glyph="&#xE8AB;"/></NavigationViewItem.Icon></NavigationViewItem>

@@ -70,6 +70,9 @@
                     <NavigationViewItem x:Name="TransactionsNavItem" Content="Transaktionen" Tag="Transactions">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE8AB;" /></NavigationViewItem.Icon>
                     </NavigationViewItem>
+                    <NavigationViewItem x:Name="InvoicingNavItem" Content="Fakturieren" Tag="Invoicing">
+                        <NavigationViewItem.Icon><FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" /></NavigationViewItem.Icon>
+                    </NavigationViewItem>
                     <NavigationViewItem x:Name="AccountsNavItem" Content="Kontenplan" Tag="Accounts">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE8EF;" /></NavigationViewItem.Icon>
                     </NavigationViewItem>

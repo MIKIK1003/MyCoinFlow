@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="MyCoinFlow.WinUI.Views.FinanceSettingsControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid RowSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Finanzen" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock Text="Aussteller, Rechnungsgrundlagen, Währungen, MWST und Kontenzuordnung"
+                           TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <Border Grid.Column="1" Style="{StaticResource WorkspaceFunctionBarStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="SaveButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
+                            Click="OnSaveClick" AutomationProperties.Name="Speichern">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <FontIcon Glyph="&#xE74E;" Style="{StaticResource ActionIconStyle}" />
+                            <TextBlock Text="Speichern" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource FunctionButtonStyle}" Click="OnReloadClick"
+                            AutomationProperties.Name="Neu laden">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                            <TextBlock Text="Neu laden" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <ProgressRing x:Name="BusyRing" Width="22" Height="22" IsActive="False"
+                                  Margin="8,0,4,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <InfoBar x:Name="StatusInfoBar" Grid.Row="1" IsOpen="False" IsClosable="True" />
+
+        <ScrollViewer x:Name="EditorScrollViewer" Grid.Row="2"
+                      Style="{StaticResource FormScrollViewerStyle}">
+            <StackPanel Spacing="10" Padding="0,0,0,12">
+                <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                         Title="Mandantenbezogen und administrativ geschützt"
+                         Message="Diese Werte gelten nur für die beim Login gewählte Datenbank. Rechnungs-E-Mail und Telefon sind Kontaktdaten; Passwörter, Tokens und andere Versandgeheimnisse werden hier bewusst nicht gespeichert." />
+
+                <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Aussteller und Rechnungsstammdaten"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Diese Angaben bilden später den reproduzierbaren Rechnungskopf."
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <TextBox x:Name="IssuerNameBox" Header="Firma / Organisation"
+                                 PlaceholderText="Vollständiger Ausstellername" />
+                        <TextBox x:Name="IssuerStreetBox" Header="Strasse und Hausnummer" />
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="100" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="IssuerPostalCodeBox" Header="PLZ" />
+                            <TextBox x:Name="IssuerCityBox" Grid.Column="1" Header="Ort" />
+                            <TextBox x:Name="IssuerCountryCodeBox" Grid.Column="2"
+                                     Header="Land" MaxLength="2" CharacterCasing="Upper" />
+                        </Grid>
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="VatNumberBox" Header="MWST-/UID-Nummer"
+                                     PlaceholderText="Optional, wenn nicht MWST-pflichtig" />
+                            <NumberBox x:Name="PaymentDaysBox" Grid.Column="1"
+                                       Header="Standard-Zahlungsziel (Tage)"
+                                       Minimum="0" Maximum="365" SpinButtonPlacementMode="Compact" />
+                        </Grid>
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="InvoiceEmailBox" Header="Rechnungs-E-Mail"
+                                     InputScope="EmailSmtpAddress" />
+                            <TextBox x:Name="InvoicePhoneBox" Grid.Column="1" Header="Telefon" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Dokumentnummernkreise" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Die nächste Nummer wird erst in den späteren Dokumentpaketen atomar bezogen. Korrektur und Storno verwenden einen gemeinsamen nachvollziehbaren Kreis."
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel MinWidth="760">
+                                <Grid Padding="8,5" ColumnSpacing="10"
+                                      Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="210" />
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="130" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Dokumentart" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="Präfix" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="2" Text="Nächste Nummer" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="3" Text="Stellen" FontWeight="SemiBold" />
+                                </Grid>
+                                <ItemsControl x:Name="NumberRangesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="8,5" ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="210" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="180" />
+                                                    <ColumnDefinition Width="130" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                                           TextWrapping="Wrap" />
+                                                <TextBox Grid.Column="1" Text="{Binding Prefix, Mode=TwoWay}"
+                                                         MaxLength="12"
+                                                         AutomationProperties.Name="Nummernkreis-Präfix" />
+                                                <NumberBox Grid.Column="2"
+                                                           Value="{Binding NextNumberValue, Mode=TwoWay}"
+                                                           Minimum="1" Maximum="999999999999"
+                                                           SpinButtonPlacementMode="Compact"
+                                                           AutomationProperties.Name="Nächste Dokumentnummer" />
+                                                <NumberBox Grid.Column="3"
+                                                           Value="{Binding DigitsValue, Mode=TwoWay}"
+                                                           Minimum="3" Maximum="12"
+                                                           SpinButtonPlacementMode="Compact"
+                                                           AutomationProperties.Name="Nummernkreis-Stellen" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Basis- und Dokumentwährungen" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Swiss-QR ist normgemäss nur für CHF und EUR vorgesehen. Alle anderen aktivierten Währungen erhalten im PDF-Paket alternative Zahlungsangaben."
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ComboBox x:Name="BaseCurrencyBox" Header="Basiswährung"
+                                  DisplayMemberPath="Code" SelectedValuePath="Code"
+                                  HorizontalAlignment="Stretch" />
+                        <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel MinWidth="720">
+                                <Grid Padding="8,5" ColumnSpacing="10"
+                                      Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="210" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Aktiv" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="Währung" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="2" Text="Zahlungsausgabe" FontWeight="SemiBold" />
+                                </Grid>
+                                <ItemsControl x:Name="CurrenciesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="8,5" ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="210" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                                          AutomationProperties.Name="Dokumentwährung aktiv" />
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding Code}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding PaymentOutput}"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="NewCurrencyCodeBox" Header="ISO-Code" MaxLength="3"
+                                     CharacterCasing="Upper" PlaceholderText="EUR" />
+                            <TextBox x:Name="NewCurrencyNameBox" Grid.Column="1" Header="Bezeichnung"
+                                     PlaceholderText="Euro" />
+                            <Button Grid.Column="2" Content="Währung hinzufügen"
+                                    VerticalAlignment="Bottom" Click="OnAddCurrencyClick" />
+                        </Grid>
+                        <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Manuelle Wechselkurse" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Kurs: eine Einheit Dokumentwährung in Basiswährung; Datum und Quelle werden später mit dem Beleg eingefroren."
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Wechselkurs hinzufügen"
+                                    VerticalAlignment="Bottom" Click="OnAddExchangeRateClick" />
+                        </Grid>
+                        <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="ExchangeRatesList" MinWidth="920">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="8,5" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="75" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="220" />
+                                                <ColumnDefinition Width="80" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{Binding CurrencyOptions}"
+                                                      DisplayMemberPath="Code" SelectedValuePath="Code"
+                                                      SelectedValue="{Binding DocumentCurrency, Mode=TwoWay}"
+                                                      AutomationProperties.Name="Wechselkurs-Währung" />
+                                            <NumberBox Grid.Column="1" Value="{Binding RateToBase, Mode=TwoWay}"
+                                                       Minimum="0.00000001" Maximum="99999999"
+                                                       SmallChange="0.01" SpinButtonPlacementMode="Compact"
+                                                       AutomationProperties.Name="Kurs zur Basiswährung" />
+                                            <DatePicker Grid.Column="2" Date="{Binding ValidFrom, Mode=TwoWay}"
+                                                        AutomationProperties.Name="Wechselkurs gültig ab" />
+                                            <DatePicker Grid.Column="3" Date="{Binding ValidTo, Mode=TwoWay}"
+                                                        AutomationProperties.Name="Wechselkurs gültig bis" />
+                                            <TextBox Grid.Column="4" Text="{Binding Source, Mode=TwoWay}"
+                                                     MaxLength="120" PlaceholderText="Quelle"
+                                                     AutomationProperties.Name="Wechselkurs-Quelle" />
+                                            <CheckBox Grid.Column="5" Content="Aktiv"
+                                                      IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                                      VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="MWST-Konfiguration" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Sätze besitzen einen fachlichen Code und eine explizite zeitliche Gültigkeit. Genau ein aktiver Satz ist Standard."
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="MWST-Satz hinzufügen"
+                                    VerticalAlignment="Bottom" Click="OnAddVatRateClick" />
+                        </Grid>
+                        <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="VatRatesList" MinWidth="940">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="8,5" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="115" />
+                                                <ColumnDefinition Width="210" />
+                                                <ColumnDefinition Width="120" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="80" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{Binding Code, Mode=TwoWay}" MaxLength="24"
+                                                     CharacterCasing="Upper" PlaceholderText="STANDARD"
+                                                     AutomationProperties.Name="MWST-Code" />
+                                            <TextBox Grid.Column="1" Text="{Binding DisplayName, Mode=TwoWay}"
+                                                     MaxLength="100" PlaceholderText="Bezeichnung"
+                                                     AutomationProperties.Name="MWST-Bezeichnung" />
+                                            <NumberBox Grid.Column="2" Value="{Binding RatePercent, Mode=TwoWay}"
+                                                       Minimum="0" Maximum="100" SmallChange="0.1"
+                                                       SpinButtonPlacementMode="Compact"
+                                                       AutomationProperties.Name="MWST-Satz in Prozent" />
+                                            <DatePicker Grid.Column="3" Date="{Binding ValidFrom, Mode=TwoWay}"
+                                                        AutomationProperties.Name="MWST gültig ab" />
+                                            <DatePicker Grid.Column="4" Date="{Binding ValidTo, Mode=TwoWay}"
+                                                        AutomationProperties.Name="MWST gültig bis" />
+                                            <CheckBox Grid.Column="5" Content="Standard"
+                                                      IsChecked="{Binding IsDefault, Mode=TwoWay}"
+                                                      Click="OnDefaultVatClick" VerticalAlignment="Center" />
+                                            <CheckBox Grid.Column="6" Content="Aktiv"
+                                                      IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                                      VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Zahlungs- und QR-Konten" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Wählen Sie ein bestehendes Geldinstitut; dessen IBAN wird als Stammdatenquelle verwendet. QR-IBAN wird nur für CHF/EUR und QR-IID 30000–31999 akzeptiert."
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Zahlungskonto hinzufügen"
+                                    VerticalAlignment="Bottom" Click="OnAddPaymentAccountClick" />
+                        </Grid>
+                        <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="PaymentAccountsList" MinWidth="820">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="8,5" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="500" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="80" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{Binding InstitutionOptions}"
+                                                      DisplayMemberPath="Display" SelectedValuePath="Id"
+                                                      SelectedValue="{Binding InstitutionId, Mode=TwoWay}"
+                                                      PlaceholderText="Geldinstitut wählen"
+                                                      AutomationProperties.Name="Zahlungskonto-Geldinstitut"
+                                                      SelectionChanged="OnPaymentInstitutionChanged" />
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding CurrencyOptions}"
+                                                      DisplayMemberPath="Code" SelectedValuePath="Code"
+                                                      SelectedValue="{Binding CurrencyCode, Mode=TwoWay}"
+                                                      AutomationProperties.Name="Zahlungskonto-Währung" />
+                                            <TextBlock Grid.Column="2" Text="{Binding IbanType}"
+                                                       VerticalAlignment="Center"
+                                                       AutomationProperties.Name="Automatisch erkannter IBAN-Typ" />
+                                            <CheckBox Grid.Column="3" Content="Aktiv"
+                                                      IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                                      VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Zulässige Ertragskonten" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Die Auswahl verwendet den vorhandenen Kontenplan. Artikel erhalten ihre Standardzuordnung erst im nächsten Arbeitspaket."
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ListView x:Name="RevenueAccountsList" SelectionMode="Multiple"
+                                  MaxHeight="260" AutomationProperties.Name="Zulässige Ertragskonten">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Display}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Kursdifferenzkonten" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Diese Konten sind erforderlich, sobald mindestens eine Fremdwährung aktiv ist."
+                                       TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ExchangeGainAccountBox" Header="Kursgewinnkonto"
+                                      DisplayMemberPath="Display" SelectedValuePath="Id"
+                                      PlaceholderText="Kontenplan-Konto wählen" />
+                            <ComboBox x:Name="ExchangeLossAccountBox" Grid.Column="1"
+                                      Header="Kursverlustkonto"
+                                      DisplayMemberPath="Display" SelectedValuePath="Id"
+                                      PlaceholderText="Kontenplan-Konto wählen" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
