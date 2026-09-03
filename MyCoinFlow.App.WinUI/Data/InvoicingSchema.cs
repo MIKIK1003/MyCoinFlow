@@ -6,10 +6,10 @@ namespace MyCoinFlow.WinUI.Data;
 
 public static class InvoicingSchema
 {
-    public const int CurrentVersion = 4;
-    private const int ExpectedTableCount = 14;
-    private const int ExpectedForeignKeyCount = 17;
-    private const int ExpectedUniqueIndexCount = 6;
+    public const int CurrentVersion = 5;
+    private const int ExpectedTableCount = 16;
+    private const int ExpectedForeignKeyCount = 19;
+    private const int ExpectedUniqueIndexCount = 10;
     private const int ExpectedTriggerCount = 2;
 
     public static async Task EnsureAsync(CancellationToken cancellationToken = default)
@@ -91,6 +91,8 @@ SELECT
         OBJECT_ID(N'dbo.FakturierungArtikel'),
         OBJECT_ID(N'dbo.FakturierungTextbaustein'),
         OBJECT_ID(N'dbo.FakturierungPositionsentwurf'),
+        OBJECT_ID(N'dbo.FakturierungDokument'),
+        OBJECT_ID(N'dbo.FakturierungDokumentPosition'),
         OBJECT_ID(N'dbo.FakturierungEigentuemerProfil'),
         OBJECT_ID(N'dbo.FakturierungEinheitNutzung'),
         OBJECT_ID(N'dbo.FakturierungMietverhaeltnis'))) AS TableCount,
@@ -108,6 +110,8 @@ SELECT
         N'FK_FaktPosition_Artikel',
         N'FK_FaktPosition_Mwst',
         N'FK_FaktPosition_Ertragskonto',
+        N'FK_FaktDokument_Vorgaenger',
+        N'FK_FaktDokumentPosition_Dokument',
         N'FK_FaktEigentuemerProfil_Eigentuemer',
         N'FK_FaktEigentuemerProfil_Rechnungsadresse',
         N'FK_FaktEinheitNutzung_Einheit',
@@ -120,7 +124,11 @@ SELECT
         N'UX_FaktZahlungskonto_Iban',
         N'UX_FaktArtikel_Artikelnummer',
         N'UX_FaktTextbaustein_Name',
-        N'UX_FaktPosition_Kontext_Reihenfolge')) AS UniqueIndexCount,
+        N'UX_FaktPosition_Kontext_Reihenfolge',
+        N'UX_FaktDokument_Typ_Nummer',
+        N'UX_FaktDokument_Fluss_Typ',
+        N'UX_FaktDokument_Vorgaenger',
+        N'UX_FaktDokumentPosition_Dokument_Reihenfolge')) AS UniqueIndexCount,
     (SELECT COUNT(*) FROM sys.triggers
      WHERE name IN (
         N'TR_FaktEinheitNutzung_Zeitraum',
@@ -601,6 +609,176 @@ BEGIN TRY
                 (ContextSource, ContextSourceId, PositionType, IsFooter);
     END;
 
+    IF OBJECT_ID(N'dbo.FakturierungDokument', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungDokument
+        (
+            Id int IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungDokument PRIMARY KEY,
+            FlowId uniqueidentifier NOT NULL,
+            DocumentType varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            DocumentNumber nvarchar(40) NOT NULL,
+            DocumentDate date NOT NULL,
+            [Status] varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            Subject nvarchar(240) NOT NULL,
+            ContextSource varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ContextSourceId int NOT NULL,
+            ContextTitleSnapshot nvarchar(300) NOT NULL,
+            ContextSubtitleSnapshot nvarchar(300) NOT NULL,
+            IssuerName nvarchar(200) NOT NULL,
+            IssuerStreet nvarchar(200) NOT NULL,
+            IssuerPostalCode nvarchar(24) NOT NULL,
+            IssuerCity nvarchar(120) NOT NULL,
+            IssuerCountryCode char(2) NOT NULL,
+            IssuerVatNumber nvarchar(40) NOT NULL,
+            IssuerEmail nvarchar(256) NOT NULL,
+            IssuerPhone nvarchar(80) NOT NULL,
+            RecipientAddressIdSnapshot int NOT NULL,
+            RecipientKind varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            RecipientName nvarchar(200) NOT NULL,
+            RecipientStreet nvarchar(200) NOT NULL,
+            RecipientPostalCode nvarchar(24) NOT NULL,
+            RecipientCity nvarchar(120) NOT NULL,
+            RecipientCountry nvarchar(100) NOT NULL,
+            CurrencyCode char(3) NOT NULL,
+            ExchangeRateToBase decimal(19,8) NOT NULL,
+            ExchangeRateSource nvarchar(120) NOT NULL,
+            PreviousDocumentId int NULL,
+            CreatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FakturierungDokument_CreatedAt DEFAULT(SYSDATETIME()),
+            CreatedBy nvarchar(64) NOT NULL,
+            TransitionedAt datetime2(0) NULL,
+            TransitionedBy nvarchar(64) NULL,
+            [RowVersion] rowversion NOT NULL,
+            CONSTRAINT CK_FakturierungDokument_Type
+                CHECK (DocumentType IN ('OFFER', 'ORDER', 'DELIVERY', 'INVOICE')),
+            CONSTRAINT CK_FakturierungDokument_Status
+                CHECK ([Status] IN ('DRAFT', 'TRANSFERRED')),
+            CONSTRAINT CK_FakturierungDokument_Context
+                CHECK (
+                    ContextSource IN ('ARTICLE', 'PROPERTY')
+                    AND ContextSourceId > 0),
+            CONSTRAINT CK_FakturierungDokument_Recipient
+                CHECK (
+                    RecipientAddressIdSnapshot > 0
+                    AND RecipientKind IN ('CUSTOMER', 'OWNER', 'TENANT')
+                    AND LEN(LTRIM(RTRIM(RecipientName))) > 0),
+            CONSTRAINT CK_FakturierungDokument_Header
+                CHECK (
+                    LEN(LTRIM(RTRIM(DocumentNumber))) > 0
+                    AND LEN(LTRIM(RTRIM(Subject))) > 0
+                    AND LEN(LTRIM(RTRIM(ContextTitleSnapshot))) > 0
+                    AND LEN(LTRIM(RTRIM(IssuerName))) > 0),
+            CONSTRAINT CK_FakturierungDokument_Currency
+                CHECK (
+                    CurrencyCode = UPPER(CurrencyCode)
+                    AND LEN(CurrencyCode) = 3
+                    AND ExchangeRateToBase > 0
+                    AND LEN(LTRIM(RTRIM(ExchangeRateSource))) > 0),
+            CONSTRAINT CK_FakturierungDokument_Transition
+                CHECK (
+                    ([Status] = 'DRAFT' AND TransitionedAt IS NULL AND TransitionedBy IS NULL)
+                    OR
+                    ([Status] = 'TRANSFERRED' AND TransitionedAt IS NOT NULL
+                     AND LEN(LTRIM(RTRIM(TransitionedBy))) > 0)),
+            CONSTRAINT FK_FaktDokument_Vorgaenger
+                FOREIGN KEY (PreviousDocumentId) REFERENCES dbo.FakturierungDokument(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktDokument_Typ_Nummer
+            ON dbo.FakturierungDokument(DocumentType, DocumentNumber);
+        CREATE UNIQUE INDEX UX_FaktDokument_Fluss_Typ
+            ON dbo.FakturierungDokument(FlowId, DocumentType);
+        CREATE UNIQUE INDEX UX_FaktDokument_Vorgaenger
+            ON dbo.FakturierungDokument(PreviousDocumentId)
+            WHERE PreviousDocumentId IS NOT NULL;
+        CREATE INDEX IX_FaktDokument_Status_Datum
+            ON dbo.FakturierungDokument([Status], DocumentDate DESC, Id DESC);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungDokumentPosition', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungDokumentPosition
+        (
+            Id int IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungDokumentPosition PRIMARY KEY,
+            DocumentId int NOT NULL,
+            SequenceNumber int NOT NULL,
+            PositionType varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            SourcePositionId int NULL,
+            ArticleIdSnapshot int NULL,
+            Designation nvarchar(200) NOT NULL,
+            Category nvarchar(100) NOT NULL,
+            Unit nvarchar(40) NOT NULL,
+            Quantity decimal(19,4) NOT NULL,
+            UnitPrice decimal(19,4) NOT NULL,
+            VatCodeSnapshot nvarchar(32) NOT NULL,
+            VatRatePercentSnapshot decimal(9,4) NULL,
+            RevenueAccountSnapshot nvarchar(200) NOT NULL,
+            AncillaryClassificationSnapshot varchar(32)
+                COLLATE Latin1_General_100_BIN2 NOT NULL,
+            MainTextPlain nvarchar(max) NOT NULL,
+            MainTextFormatted nvarchar(max) NULL,
+            AdditionalTextPlain nvarchar(max) NOT NULL,
+            AdditionalTextFormatted nvarchar(max) NULL,
+            IsFooter bit NOT NULL,
+            CONSTRAINT CK_FakturierungDokumentPosition_Sequence
+                CHECK (SequenceNumber > 0 AND SequenceNumber % 10 = 0),
+            CONSTRAINT CK_FakturierungDokumentPosition_Type
+                CHECK (PositionType IN ('ARTICLE', 'TEXT')),
+            CONSTRAINT CK_FakturierungDokumentPosition_TextLengths
+                CHECK (
+                    DATALENGTH(MainTextPlain) <= 200000
+                    AND DATALENGTH(AdditionalTextPlain) <= 200000
+                    AND (MainTextFormatted IS NULL OR DATALENGTH(MainTextFormatted) <= 500000)
+                    AND (AdditionalTextFormatted IS NULL OR DATALENGTH(AdditionalTextFormatted) <= 500000)),
+            CONSTRAINT CK_FakturierungDokumentPosition_Rtf
+                CHECK (
+                    (MainTextFormatted IS NULL OR LTRIM(MainTextFormatted) LIKE N'{\rtf%')
+                    AND
+                    (AdditionalTextFormatted IS NULL OR LTRIM(AdditionalTextFormatted) LIKE N'{\rtf%')),
+            CONSTRAINT CK_FakturierungDokumentPosition_Values
+                CHECK (
+                    (
+                        PositionType = 'ARTICLE'
+                        AND IsFooter = 0
+                        AND LEN(LTRIM(RTRIM(Designation))) > 0
+                        AND LEN(LTRIM(RTRIM(Category))) > 0
+                        AND LEN(LTRIM(RTRIM(Unit))) > 0
+                        AND Quantity > 0
+                        AND UnitPrice >= 0
+                        AND VatRatePercentSnapshot IS NOT NULL
+                    )
+                    OR
+                    (
+                        PositionType = 'TEXT'
+                        AND ArticleIdSnapshot IS NULL
+                        AND LEN(MainTextPlain) > 0
+                        AND Category = N''
+                        AND Unit = N''
+                        AND Quantity = 0
+                        AND UnitPrice = 0
+                        AND VatCodeSnapshot = N''
+                        AND VatRatePercentSnapshot IS NULL
+                        AND RevenueAccountSnapshot = N''
+                        AND AdditionalTextPlain = N''
+                        AND AdditionalTextFormatted IS NULL
+                    )),
+            CONSTRAINT CK_FakturierungDokumentPosition_AncillaryClass
+                CHECK (
+                    AncillaryClassificationSnapshot IN (
+                        'STANDARD',
+                        'TENANT_OPERATING_COST',
+                        'REPAIR',
+                        'RENEWAL',
+                        'NON_TRANSFERABLE')),
+            CONSTRAINT FK_FaktDokumentPosition_Dokument
+                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungDokument(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktDokumentPosition_Dokument_Reihenfolge
+            ON dbo.FakturierungDokumentPosition(DocumentId, SequenceNumber);
+    END;
+
+
     IF OBJECT_ID(N'dbo.FakturierungEigentuemerProfil', N'U') IS NULL
     BEGIN
         CREATE TABLE dbo.FakturierungEigentuemerProfil
@@ -724,11 +902,11 @@ BEGIN TRY
     END;';
 
     IF NOT EXISTS (SELECT 1 FROM dbo.FakturierungSchemaVersion WHERE Id = 1)
-        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 4);
+        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 5);
     ELSE
         UPDATE dbo.FakturierungSchemaVersion
-        SET [Version] = 4, AppliedAt = SYSDATETIME()
-        WHERE Id = 1 AND [Version] < 4;
+        SET [Version] = 5, AppliedAt = SYSDATETIME()
+        WHERE Id = 1 AND [Version] < 5;
 
     COMMIT TRANSACTION;
 END TRY

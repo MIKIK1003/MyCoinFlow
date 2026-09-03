@@ -28,7 +28,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
                 <TextBlock Text="Fakturieren" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Artikel, Leistungen und Immobilien als belastbare fakturierbare Objekte"
+                <TextBlock Text="Offerten, Auftragsbestätigungen, Lieferungen und Rechnungsentwürfe als zusammengehörende Dokumentfolgen"
                            TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <Border Grid.Column="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
@@ -45,6 +45,31 @@
             <ScrollViewer HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal">
+                    <StackPanel>
+                        <TextBlock Text="DOKUMENTFLUSS" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="NewOfferButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
+                                    IsEnabled="False" Click="OnNewOfferClick"
+                                    AutomationProperties.Name="Neue Offerte">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionAddIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Neue Offerte" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="NextStepButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnNextStepClick"
+                                    AutomationProperties.Name="Nächster Schritt"
+                                    ToolTipService.ToolTip="Zuerst ein weiterführbares Dokument wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionForwardIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock x:Name="NextStepButtonText" Text="Nächster Schritt"
+                                               Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+
                     <StackPanel>
                         <TextBlock Text="POSITIONEN" Style="{StaticResource FunctionGroupTitleStyle}" />
                         <Button x:Name="ComposeButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
@@ -82,13 +107,29 @@
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel>
                         <TextBlock Text="ANSICHT" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <Button Style="{StaticResource FunctionButtonStyle}" Click="OnRefreshClick"
-                                AutomationProperties.Name="Aktualisieren">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                <TextBlock Text="Aktualisieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="ShowDocumentsButton" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnShowDocumentsClick" AutomationProperties.Name="Dokumente anzeigen">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Dokumente" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="ShowObjectsButton" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnShowObjectsClick" AutomationProperties.Name="Objekte anzeigen">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionOpenIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Objekte" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource FunctionButtonStyle}" Click="OnRefreshClick"
+                                    AutomationProperties.Name="Aktualisieren">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Aktualisieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                     <Rectangle x:Name="SettingsSeparator" Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel x:Name="SettingsActionGroup">
@@ -105,7 +146,70 @@
             </ScrollViewer>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource WorkspaceFilterBarStyle}">
+        <Border x:Name="DocumentFilterBar" Grid.Row="2"
+                Style="{StaticResource WorkspaceFilterBarStyle}">
+            <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                <Grid ColumnSpacing="8" MinWidth="900">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="280" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="SUCHE" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
+                        <TextBox x:Name="DocumentSearchBox" Height="34"
+                                 PlaceholderText="Nummer, Typ, Betreff, Objekt, Empfänger oder Dokumentfolge"
+                                 TextChanged="OnDocumentFilterChanged"
+                                 AutomationProperties.Name="Dokumente durchsuchen" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="STATUS" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
+                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                CornerRadius="4" Padding="9,7">
+                            <StackPanel Orientation="Horizontal" Spacing="9">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowAccentBrush}" />
+                                    <TextBlock Text="Entwurf" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowPositiveBrush}" />
+                                    <TextBlock Text="Weitergeführt" FontSize="12" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="SCHNELLANSICHT" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <ToggleButton x:Name="AllDocumentStatusButton" Content="Alle" Height="34"
+                                          IsChecked="True" Click="OnDocumentStatusFilterClick" />
+                            <ToggleButton x:Name="DraftDocumentStatusButton" Content="Entwurf" Height="34"
+                                          Click="OnDocumentStatusFilterClick" />
+                            <ToggleButton x:Name="TransferredDocumentStatusButton" Content="Weitergeführt" Height="34"
+                                          Click="OnDocumentStatusFilterClick" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="FILTER" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
+                        <ComboBox x:Name="DocumentTypeFilterBox" Width="210" Height="34"
+                                  SelectionChanged="OnDocumentFilterChanged"
+                                  AutomationProperties.Name="Dokumenttyp filtern">
+                            <ComboBoxItem Content="Alle Dokumenttypen" Tag="ALL" />
+                            <ComboBoxItem Content="Offerten" Tag="OFFER" />
+                            <ComboBoxItem Content="Auftragsbestätigungen" Tag="ORDER" />
+                            <ComboBoxItem Content="Lieferungen" Tag="DELIVERY" />
+                            <ComboBoxItem Content="Rechnungsentwürfe" Tag="INVOICE" />
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Border>
+
+
+        <Border x:Name="ObjectFilterBar" Grid.Row="2"
+                Style="{StaticResource WorkspaceFilterBarStyle}" Visibility="Collapsed">
             <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
                 <Grid ColumnSpacing="8" MinWidth="1080">
@@ -176,7 +280,52 @@
             </InfoBar.ActionButton>
         </InfoBar>
 
-        <ScrollViewer Grid.Row="4" HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="DocumentMetricsPanel" Grid.Row="4"
+                      HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="DOKUMENTE" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="DocumentCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="gespeicherte Snapshots" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="DOKUMENTFOLGEN" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="DocumentFlowCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="zusammengehörende Abläufe" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="ENTWÜRFE" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="DocumentDraftCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="für den nächsten Schritt" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="RECHNUNGSENTWÜRFE" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="InvoiceDraftCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="nicht finanzwirksam" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+
+        <ScrollViewer x:Name="ObjectMetricsPanel" Grid.Row="4" Visibility="Collapsed"
+                      HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
                       VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
@@ -218,7 +367,233 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Grid x:Name="WorkspaceGrid" Grid.Row="5" ColumnSpacing="8" RowSpacing="8">
+        <Grid x:Name="DocumentWorkspaceGrid" Grid.Row="5" ColumnSpacing="8" RowSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="5*" />
+                <ColumnDefinition Width="6*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border x:Name="DocumentListCard" Grid.ColumnSpan="2"
+                    Style="{StaticResource CardBorderStyle}" Padding="0" MinHeight="260">
+                <Grid>
+                    <ListView x:Name="DocumentsList" SelectionMode="Single"
+                              SelectionChanged="OnDocumentSelectionChanged">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,8" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12" MinHeight="58">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="130" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DocumentNumber}" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding DocumentTypeDisplay}" FontSize="11"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Subject}" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding ContextTitleSnapshot}" FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding RecipientName}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding DateDisplay}" FontSize="11"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="3" Text="{Binding StatusDisplay}"
+                                               FontWeight="SemiBold" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel x:Name="EmptyDocumentsState" Visibility="Collapsed"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                MaxWidth="460" Spacing="8">
+                        <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" FontSize="30"
+                                  Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                        <TextBlock Text="Noch keine Dokumente" FontSize="18" FontWeight="SemiBold"
+                                   TextAlignment="Center" />
+                        <TextBlock Text="Erstellen Sie aus einem auswählbaren Objekt und seinen Positionen die erste Offerte."
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button x:Name="EmptyNewOfferButton" Content="Neue Offerte" HorizontalAlignment="Center"
+                                Click="OnNewOfferClick" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="DocumentDetailCard" Grid.Row="1" Grid.ColumnSpan="2"
+                    Style="{StaticResource CardBorderStyle}" Visibility="Collapsed">
+                <ScrollViewer Style="{StaticResource FormScrollViewerStyle}" MaxHeight="620">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="DocumentDetailTitle" Text="Kein Dokument ausgewählt"
+                                       Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DocumentDetailSubtitle" Text="—" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <InfoBar x:Name="DocumentStatusInfoBar" IsOpen="True" IsClosable="False"
+                                 Severity="Informational" Title="Dokumentstatus" Message="—" />
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Dokumentfolge" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ListView x:Name="DocumentFlowList" SelectionMode="Single"
+                                      SelectionChanged="OnDocumentFlowSelectionChanged"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                      ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                <ListView.ItemsPanel>
+                                    <ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ListView.ItemsPanel>
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Width" Value="188" />
+                                        <Setter Property="MinHeight" Value="72" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,6,6" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1" CornerRadius="4" Padding="9,7">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding StepDisplay}" FontSize="11"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{Binding DocumentNumber}" FontWeight="SemiBold"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding StatusDisplay}" FontSize="11"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                        <Grid x:Name="DocumentSnapshotGrid" ColumnSpacing="8" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border x:Name="DocumentHeaderSnapshotCard" Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Dokumentkopf" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="DocumentSubjectText" Text="—" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="DocumentContextText" Text="—" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="DocumentDateText" Text="—" />
+                                    <TextBlock x:Name="DocumentCurrencyText" Text="—" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="DocumentRecipientSnapshotCard" Grid.Column="1" Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Empfängersnapshot" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="DocumentRecipientKindText" Text="—" />
+                                    <TextBlock x:Name="DocumentRecipientAddressText" Text="—"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="DocumentIssuerSnapshotCard" Grid.Row="1" Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Ausstellersnapshot" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="DocumentIssuerText" Text="—" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="DocumentTransitionSnapshotCard" Grid.Row="1" Grid.Column="1"
+                                    Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Übergang" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="DocumentPreviousText" Text="Vorgänger: —"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock x:Name="DocumentNextText" Text="Nachfolger: —"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Positionssnapshots" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ListView x:Name="DocumentPositionsList" SelectionMode="None" MaxHeight="280">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="8,6" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="125" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="170" />
+                                                <ColumnDefinition Width="90" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding PositionTypeDisplay}"
+                                                           FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding SequenceNumber}" FontSize="11"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Designation}" FontWeight="SemiBold"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding TextPreview}" FontSize="11"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="{Binding QuantityAndPriceDisplay}"
+                                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="3" Text="{Binding LineTotalDisplay}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <TextBlock x:Name="DocumentPositionsTotalText" Text="—"
+                                       HorizontalAlignment="Right" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <InfoBar x:Name="InvoiceDraftInfoBar" IsOpen="True" IsClosable="False"
+                                 Severity="Warning" Title="Keine Finanz- oder Lagerwirkung"
+                                 Message="Auch eine Rechnung bleibt in AP05 ein Entwurf. Es entstehen weder Buchung noch offener Posten, Zahlung, PDF/QR-Ausgabe oder Bestandsbewegung." />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+            <Grid x:Name="DocumentLoadingOverlay" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                  Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                    <ProgressRing IsActive="True" Width="32" Height="32" />
+                    <TextBlock Text="Dokumente und Dokumentfolgen werden geladen …" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+
+        <Grid x:Name="ObjectWorkspaceGrid" Grid.Row="5" ColumnSpacing="8" RowSpacing="8"
+              Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="5*" />
                 <ColumnDefinition Width="4*" />
@@ -233,7 +608,7 @@
                         <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
                     </VisualState>
                     <VisualState x:Name="WideWorkspace">
-                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="820" /></VisualState.StateTriggers>
+                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1120" /></VisualState.StateTriggers>
                         <VisualState.Setters>
                             <Setter Target="ObjectListCard.(Grid.ColumnSpan)" Value="1" />
                             <Setter Target="ObjectDetailCard.(Grid.Row)" Value="0" />

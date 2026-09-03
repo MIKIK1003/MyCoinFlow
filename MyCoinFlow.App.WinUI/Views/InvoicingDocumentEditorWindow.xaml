@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingDocumentEditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Neue Offerte">
+
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnSearchShortcut" />
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="OnSaveShortcut" />
+            <KeyboardAccelerator Key="Escape" Invoked="OnCancelShortcut" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorWindowHeaderStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="3">
+                    <TextBlock Text="Neue Offerte" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock Text="Objekt, Empfänger und AP04-Positionen als unveränderlichen Dokumentstand übernehmen"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <Border Grid.Column="1" Padding="10,5" CornerRadius="12"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="Nicht finanzwirksamer Entwurf" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer Style="{StaticResource FormScrollViewerStyle}">
+                <StackPanel Padding="20" Spacing="12">
+                    <InfoBar x:Name="ErrorInfoBar" IsOpen="False" IsClosable="True"
+                             Severity="Error" Title="Offerte konnte nicht erstellt werden" />
+                    <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                             Title="Snapshotgrenze"
+                             Message="Die Offerte übernimmt Aussteller, Empfänger, Währung und Positionen. Spätere Stamm- oder Entwurfsänderungen schreiben dieses Dokument nicht um." />
+
+                    <Grid x:Name="EditorGrid" ColumnSpacing="12" RowSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="5*" />
+                            <ColumnDefinition Width="4*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Border x:Name="ObjectCard" Style="{StaticResource EditorSectionCardStyle}">
+                            <Grid RowSpacing="10">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="260" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Fakturierbares Objekt" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="Nur zum Dokumentdatum vollständig auswählbare Objekte"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <TextBox x:Name="ObjectSearchBox" Grid.Row="1"
+                                         PlaceholderText="Artikel, Leistung, Liegenschaft oder Einheit suchen"
+                                         TextChanged="OnObjectSearchChanged"
+                                         AutomationProperties.Name="Fakturierbares Objekt suchen" />
+                                <Grid Grid.Row="2">
+                                    <ListView x:Name="ObjectsList" SelectionMode="Single"
+                                              SelectionChanged="OnObjectSelectionChanged">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Padding" Value="10,7" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Text="{Binding SourceDisplay}" FontSize="11"
+                                                               Foreground="{StaticResource MyCoinFlowAccentBrush}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <StackPanel x:Name="EmptyObjectsState" Visibility="Collapsed"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                MaxWidth="360" Spacing="6">
+                                        <TextBlock Text="Keine auswählbaren Objekte" FontWeight="SemiBold"
+                                                   TextAlignment="Center" />
+                                        <TextBlock Text="Passen Sie die Suche oder das Dokumentdatum an und prüfen Sie Stammdaten sowie Positionen."
+                                                   TextWrapping="Wrap" TextAlignment="Center"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Border Grid.Row="3" Padding="10" CornerRadius="4"
+                                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock x:Name="SelectedObjectText" Text="Kein Objekt ausgewählt"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="PositionCountText" Text="Positionen werden nach Auswahl geprüft."
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel x:Name="HeaderColumn" Grid.Column="1" Spacing="12">
+                            <Border Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Dokumentkopf" Style="{StaticResource SectionTitleStyle}" />
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Dokumentdatum" />
+                                            <DatePicker x:Name="DocumentDatePicker"
+                                                        DateChanged="OnDocumentDateChanged"
+                                                        AutomationProperties.Name="Dokumentdatum" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Dokumentwährung" />
+                                            <ComboBox x:Name="CurrencyBox" DisplayMemberPath="Display"
+                                                      HorizontalAlignment="Stretch"
+                                                      AutomationProperties.Name="Dokumentwährung" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2">
+                                            <TextBlock Text="Betreff / Dokumentkopf" />
+                                            <TextBox x:Name="SubjectBox" MaxLength="240"
+                                                     PlaceholderText="Leistung oder Anlass vollständig benennen"
+                                                     AutomationProperties.Name="Betreff oder Dokumentkopf" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Dokumentempfänger" Style="{StaticResource SectionTitleStyle}" />
+                                    <ComboBox x:Name="RecipientBox" DisplayMemberPath="Display"
+                                              HorizontalAlignment="Stretch"
+                                              SelectionChanged="OnRecipientSelectionChanged"
+                                              AutomationProperties.Name="Dokumentempfänger" />
+                                    <InfoBar x:Name="RecipientInfoBar" IsOpen="True" IsClosable="False"
+                                             Severity="Informational"
+                                             Title="Empfänger wird nach Objektauswahl bestimmt"
+                                             Message="Direkte Objekte erlauben eine bewusste Adresswahl; Immobilien verwenden den Eigentümerstandard oder eine dokumentierte Mieteroption." />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource EditorSectionCardStyle}">
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="Dokumentfolge" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="1. Offerte → 2. Auftragsbestätigung → 3. Lieferung → 4. Rechnung"
+                                               TextWrapping="Wrap" FontWeight="SemiBold" />
+                                    <TextBlock Text="Die Rechnung bleibt in AP05 ein bearbeitungsfreier, nicht finanzwirksamer Entwurf. Direkte Sprünge oder Verzweigungen sind nicht möglich."
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Grid x:Name="LoadingOverlay" Background="#66000000" Visibility="Collapsed">
+                <ProgressRing IsActive="True" Width="44" Height="44"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource EditorWindowFooterStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Text="Arbeitsbereich wird geladen …"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Abbrechen" Click="OnCancelClick"
+                            AutomationProperties.Name="Offertenerfassung abbrechen" />
+                    <Button x:Name="SaveButton" Content="Offerte erstellen"
+                            Style="{StaticResource AccentButtonStyle}" IsEnabled="False"
+                            Click="OnSaveClick"
+                            AutomationProperties.Name="Offerte erstellen" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</window:PersistentWindow>

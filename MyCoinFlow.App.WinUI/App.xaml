@@ -53,6 +53,7 @@
             <x:String x:Key="ActionPasteIconGlyph">&#xE77F;</x:String>
             <x:String x:Key="ActionMoveUpIconGlyph">&#xE70E;</x:String>
             <x:String x:Key="ActionMoveDownIconGlyph">&#xE70D;</x:String>
+            <x:String x:Key="ActionForwardIconGlyph">&#xE72A;</x:String>
             <x:String x:Key="ActionAttachIconGlyph">&#xE723;</x:String>
             <x:String x:Key="ActionDocumentIconGlyph">&#xE8A5;</x:String>
             <x:String x:Key="ActionReportIconGlyph">&#xE9D2;</x:String>
