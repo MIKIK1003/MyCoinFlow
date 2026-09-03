@@ -13,6 +13,8 @@ public sealed partial class InvoicingPage : Page
     private string _statusFilter = "ALL";
     private bool _initialized;
     private InvoicingMasterDataWindow? _masterDataWindow;
+    private InvoicingPositionComposerWindow? _positionComposerWindow;
+    private InvoicingTextTemplateManagerWindow? _textTemplateWindow;
 
     public InvoicingPage()
     {
@@ -94,6 +96,47 @@ public sealed partial class InvoicingPage : Page
             await ReloadAsync();
     }
 
+    private void OnComposeClick(object sender, RoutedEventArgs e)
+    {
+        if (SelectedObject is not { IsSelectable: true } context) return;
+        if (_positionComposerWindow is not null)
+        {
+            _positionComposerWindow.Activate();
+            return;
+        }
+
+        _positionComposerWindow = new InvoicingPositionComposerWindow(context);
+        _positionComposerWindow.Closed += OnPositionComposerWindowClosed;
+        _positionComposerWindow.Activate();
+    }
+
+    private void OnPositionComposerWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_positionComposerWindow is not null)
+            _positionComposerWindow.Closed -= OnPositionComposerWindowClosed;
+        _positionComposerWindow = null;
+    }
+
+    private void OnTextTemplatesClick(object sender, RoutedEventArgs e)
+    {
+        if (_textTemplateWindow is not null)
+        {
+            _textTemplateWindow.Activate();
+            return;
+        }
+
+        _textTemplateWindow = new InvoicingTextTemplateManagerWindow();
+        _textTemplateWindow.Closed += OnTextTemplateWindowClosed;
+        _textTemplateWindow.Activate();
+    }
+
+    private void OnTextTemplateWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_textTemplateWindow is not null)
+            _textTemplateWindow.Closed -= OnTextTemplateWindowClosed;
+        _textTemplateWindow = null;
+    }
+
     private async void OnEffectiveDateChanged(
         object sender,
         DatePickerValueChangedEventArgs args)
@@ -141,11 +184,14 @@ public sealed partial class InvoicingPage : Page
         LoadingOverlay.Visibility = Visibility.Visible;
         ErrorInfoBar.IsOpen = false;
         MasterDataButton.IsEnabled = false;
+        TextTemplatesButton.IsEnabled = false;
+        ComposeButton.IsEnabled = false;
         var effectiveDate = EffectiveDatePicker.SelectedDate?.Date ?? DateTime.Today;
         await _viewModel.LoadAsync(DateOnly.FromDateTime(effectiveDate));
         RenderOverview();
         ApplyFilters(selectedKey);
         MasterDataButton.IsEnabled = _viewModel.Overview is not null;
+        TextTemplatesButton.IsEnabled = _viewModel.Overview is not null;
         LoadingOverlay.Visibility = Visibility.Collapsed;
     }
 
@@ -224,6 +270,8 @@ public sealed partial class InvoicingPage : Page
         var item = SelectedObject;
         if (item is null)
         {
+            ComposeButton.IsEnabled = false;
+            ToolTipService.SetToolTip(ComposeButton, "Zuerst ein auswählbares Objekt wählen.");
             ObjectDetailTitle.Text = "Kein Objekt ausgewählt";
             ObjectDetailSubtitle.Text = "Die Suche oder der Filter liefert aktuell keine Auswahl.";
             ChainPropertyText.Text = ChainUnitText.Text = ChainUsageText.Text =
@@ -237,6 +285,13 @@ public sealed partial class InvoicingPage : Page
             LegalInfoBar.Message = "Die Software trifft keine automatische Rechtsentscheidung.";
             return;
         }
+
+        ComposeButton.IsEnabled = item.IsSelectable;
+        ToolTipService.SetToolTip(
+            ComposeButton,
+            item.IsSelectable
+                ? $"Positionen für «{item.Title}» verfassen"
+                : "Der Objektkontext muss vor der Positionserfassung vollständig geprüft sein.");
 
         ObjectDetailTitle.Text = item.Title;
         ObjectDetailSubtitle.Text = $"{item.SourceDisplay} · {item.Subtitle}";

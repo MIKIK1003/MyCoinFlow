@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingFormattedTextEditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Formatierter Text">
+
+    <Grid x:Name="RootGrid"
+          Padding="24,20,24,18"
+          RowSpacing="10"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+          Loaded="OnRootLoaded">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" Invoked="OnCancelShortcut" />
+            <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="OnApplyShortcut" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorWindowHeaderStyle}">
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="42" Height="42" CornerRadius="21"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <FontIcon Glyph="{StaticResource ActionEditIconGlyph}"
+                              Foreground="{StaticResource MyCoinFlowAccentBrush}"
+                              FontSize="20" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeadingText" Text="Formatierter Text"
+                               FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="DescriptionText"
+                               Text="Klartext und Formatierung werden gemeinsam geprüft und übernommen."
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="Strg+Enter · übernehmen"
+                           VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource WorkspaceFilterBarStyle}">
+            <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                <Grid MinWidth="760" ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="210" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition x:Name="TemplateColumn" Width="280" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="FontFamilyBox" Header="Schriftart"
+                              SelectionChanged="OnFontFamilyChanged" />
+                    <ComboBox x:Name="FontSizeBox" Grid.Column="1" Header="Grösse"
+                              SelectionChanged="OnFontSizeChanged" />
+                    <ComboBox x:Name="TemplateBox" Grid.Column="2"
+                              Header="Textbaustein (ersetzt Inhalt)"
+                              DisplayMemberPath="Name"
+                              PlaceholderText="Baustein auswählen"
+                              SelectionChanged="OnTemplateChanged" />
+                    <TextBlock Grid.Column="3" Margin="0,0,0,8"
+                               VerticalAlignment="Bottom"
+                               Text="Text markieren und formatieren. Die zuletzt markierte Auswahl bleibt beim Klick auf eine Funktion erhalten."
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource WorkspaceFunctionBarStyle}">
+            <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Padding="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="ZEICHENFORMAT" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Width="76" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnBoldClick" AutomationProperties.Name="Fett">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="B" FontWeight="Bold" FontSize="17" />
+                                    <TextBlock Text="Fett" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Width="82" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnItalicClick" AutomationProperties.Name="Kursiv">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="I" FontStyle="Italic" FontSize="17" />
+                                    <TextBlock Text="Kursiv" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Width="126" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnUnderlineClick" AutomationProperties.Name="Unterstrichen">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="U" TextDecorations="Underline" FontSize="17" />
+                                    <TextBlock Text="Unterstrichen" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="AUFZÄHLUNG" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button Width="84" Style="{StaticResource FunctionButtonStyle}"
+                                Click="OnListClick" AutomationProperties.Name="Aufzählung">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <TextBlock Text="•" FontSize="22" />
+                                <TextBlock Text="Liste" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="ZWISCHENABLAGE" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Width="126" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnCutClick" AutomationProperties.Name="Ausschneiden">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionCutIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Ausschneiden" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Width="106" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnCopyClick" AutomationProperties.Name="Kopieren">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionCopyIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Kopieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Width="106" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnPasteClick" AutomationProperties.Name="Einfügen">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionPasteIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Einfügen" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="TEXTFARBEN" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,2,2,0">
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextBlackBrush}"
+                                    Tag="{StaticResource DocumentTextBlackHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Schwarz"
+                                    AutomationProperties.Name="Textfarbe Schwarz" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextRedBrush}"
+                                    Tag="{StaticResource DocumentTextRedHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Rot"
+                                    AutomationProperties.Name="Textfarbe Rot" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextOrangeBrush}"
+                                    Tag="{StaticResource DocumentTextOrangeHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Orange"
+                                    AutomationProperties.Name="Textfarbe Orange" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextGreenBrush}"
+                                    Tag="{StaticResource DocumentTextGreenHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Grün"
+                                    AutomationProperties.Name="Textfarbe Grün" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextBlueBrush}"
+                                    Tag="{StaticResource DocumentTextBlueHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Blau"
+                                    AutomationProperties.Name="Textfarbe Blau" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextPurpleBrush}"
+                                    Tag="{StaticResource DocumentTextPurpleHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Violett"
+                                    AutomationProperties.Name="Textfarbe Violett" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextPastelGrayBrush}"
+                                    Tag="{StaticResource DocumentTextPastelGrayHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Pastellgrau"
+                                    AutomationProperties.Name="Textfarbe Pastellgrau" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextPastelRedBrush}"
+                                    Tag="{StaticResource DocumentTextPastelRedHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Pastellrot"
+                                    AutomationProperties.Name="Textfarbe Pastellrot" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextPastelGreenBrush}"
+                                    Tag="{StaticResource DocumentTextPastelGreenHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Pastellgrün"
+                                    AutomationProperties.Name="Textfarbe Pastellgrün" />
+                            <Button Style="{StaticResource DocumentTextColorButtonStyle}"
+                                    Background="{StaticResource DocumentTextPastelBlueBrush}"
+                                    Tag="{StaticResource DocumentTextPastelBlueHex}"
+                                    Click="OnTextColorClick" ToolTipService.ToolTip="Pastellblau"
+                                    AutomationProperties.Name="Textfarbe Pastellblau" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Row="3" Background="White"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="6" Padding="8">
+            <RichEditBox x:Name="Editor" AcceptsReturn="True" TextWrapping="Wrap"
+                         IsSpellCheckEnabled="True" Background="White"
+                         Foreground="{StaticResource DocumentTextBlackBrush}"
+                         BorderThickness="0"
+                         PreviewKeyDown="OnEditorKeyDown"
+                         SelectionChanged="OnEditorSelectionChanged"
+                         LosingFocus="OnEditorLosingFocus"
+                         ContextRequested="OnEditorContextRequested"
+                         AutomationProperties.Name="Formatierter Dokumenttext" />
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource EditorWindowFooterStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusText" Text="Bereit" TextWrapping="Wrap" />
+                    <TextBlock Text="Änderungen werden erst mit «Text übernehmen» in den Snapshot geschrieben."
+                               FontSize="11" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Content="Abbrechen" Width="140" Click="OnCancelClick" />
+                    <Button Content="Text übernehmen" Width="180"
+                            Style="{StaticResource AccentButtonStyle}" Click="OnApplyClick" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</window:PersistentWindow>

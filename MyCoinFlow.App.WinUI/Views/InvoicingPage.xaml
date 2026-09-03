@@ -46,28 +46,38 @@
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal">
                     <StackPanel>
-                        <TextBlock Text="VORGANG" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <Button x:Name="NewCaseButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
-                                IsEnabled="False"
-                                AutomationProperties.Name="Neuer Vorgang"
-                                ToolTipService.ToolTip="Die Dokumenterfassung beginnt in AP04.">
+                        <TextBlock Text="POSITIONEN" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button x:Name="ComposeButton" Style="{StaticResource FunctionPrimaryButtonStyle}"
+                                IsEnabled="False" Click="OnComposeClick"
+                                AutomationProperties.Name="Positionen verfassen"
+                                ToolTipService.ToolTip="Zuerst ein auswählbares Objekt wählen.">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <FontIcon Glyph="{StaticResource ActionAddIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                <TextBlock Text="Neuer Vorgang" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                <TextBlock Text="Positionen verfassen" Style="{StaticResource FunctionButtonFullLabelStyle}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel>
                         <TextBlock Text="STAMMDATEN" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <Button x:Name="MasterDataButton" Style="{StaticResource FunctionButtonStyle}"
-                                Click="OnMasterDataClick"
-                                AutomationProperties.Name="Stammdaten verwalten">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <FontIcon Glyph="{StaticResource ActionEditIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                <TextBlock Text="Stammdaten verwalten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="MasterDataButton" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnMasterDataClick"
+                                    AutomationProperties.Name="Stammdaten verwalten">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionEditIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Stammdaten verwalten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="TextTemplatesButton" Style="{StaticResource FunctionButtonStyle}"
+                                    Click="OnTextTemplatesClick"
+                                    AutomationProperties.Name="Textbausteine verwalten">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Textbausteine verwalten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
                     <StackPanel>

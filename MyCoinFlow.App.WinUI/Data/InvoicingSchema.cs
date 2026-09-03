@@ -6,10 +6,10 @@ namespace MyCoinFlow.WinUI.Data;
 
 public static class InvoicingSchema
 {
-    public const int CurrentVersion = 3;
-    private const int ExpectedTableCount = 12;
-    private const int ExpectedForeignKeyCount = 14;
-    private const int ExpectedUniqueIndexCount = 4;
+    public const int CurrentVersion = 4;
+    private const int ExpectedTableCount = 14;
+    private const int ExpectedForeignKeyCount = 17;
+    private const int ExpectedUniqueIndexCount = 6;
     private const int ExpectedTriggerCount = 2;
 
     public static async Task EnsureAsync(CancellationToken cancellationToken = default)
@@ -89,6 +89,8 @@ SELECT
         OBJECT_ID(N'dbo.FakturierungZahlungskonto'),
         OBJECT_ID(N'dbo.FakturierungErtragskonto'),
         OBJECT_ID(N'dbo.FakturierungArtikel'),
+        OBJECT_ID(N'dbo.FakturierungTextbaustein'),
+        OBJECT_ID(N'dbo.FakturierungPositionsentwurf'),
         OBJECT_ID(N'dbo.FakturierungEigentuemerProfil'),
         OBJECT_ID(N'dbo.FakturierungEinheitNutzung'),
         OBJECT_ID(N'dbo.FakturierungMietverhaeltnis'))) AS TableCount,
@@ -103,6 +105,9 @@ SELECT
         N'FK_FaktErtragskonto_Konto',
         N'FK_FaktArtikel_Mwst',
         N'FK_FaktArtikel_Ertragskonto',
+        N'FK_FaktPosition_Artikel',
+        N'FK_FaktPosition_Mwst',
+        N'FK_FaktPosition_Ertragskonto',
         N'FK_FaktEigentuemerProfil_Eigentuemer',
         N'FK_FaktEigentuemerProfil_Rechnungsadresse',
         N'FK_FaktEinheitNutzung_Einheit',
@@ -113,7 +118,9 @@ SELECT
         N'UX_FaktWechselkurs_Waehrung_GueltigAb',
         N'UX_FaktMwst_Code_GueltigAb',
         N'UX_FaktZahlungskonto_Iban',
-        N'UX_FaktArtikel_Artikelnummer')) AS UniqueIndexCount,
+        N'UX_FaktArtikel_Artikelnummer',
+        N'UX_FaktTextbaustein_Name',
+        N'UX_FaktPosition_Kontext_Reihenfolge')) AS UniqueIndexCount,
     (SELECT COUNT(*) FROM sys.triggers
      WHERE name IN (
         N'TR_FaktEinheitNutzung_Zeitraum',
@@ -452,6 +459,148 @@ BEGIN TRY
             ON dbo.FakturierungArtikel(IsActive, Category, Designation);
     END;
 
+    IF OBJECT_ID(N'dbo.FakturierungTextbaustein', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungTextbaustein
+        (
+            Id int IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungTextbaustein PRIMARY KEY,
+            [Name] nvarchar(160) COLLATE Latin1_General_100_CI_AS NOT NULL,
+            PlainText nvarchar(max) NOT NULL,
+            FormattedText nvarchar(max) NULL,
+            IsActive bit NOT NULL
+                CONSTRAINT DF_FakturierungTextbaustein_IsActive DEFAULT(1),
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FakturierungTextbaustein_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungTextbaustein_Name
+                CHECK (LEN(LTRIM(RTRIM([Name]))) BETWEEN 1 AND 160),
+            CONSTRAINT CK_FakturierungTextbaustein_PlainText
+                CHECK (LEN(PlainText) > 0 AND DATALENGTH(PlainText) <= 200000),
+            CONSTRAINT CK_FakturierungTextbaustein_FormattedText
+                CHECK (
+                    FormattedText IS NULL
+                    OR (
+                        DATALENGTH(FormattedText) <= 500000
+                        AND LTRIM(FormattedText) LIKE N'{\rtf%'
+                    ))
+        );
+        CREATE UNIQUE INDEX UX_FaktTextbaustein_Name
+            ON dbo.FakturierungTextbaustein([Name]);
+        CREATE INDEX IX_FaktTextbaustein_Aktiv_Name
+            ON dbo.FakturierungTextbaustein(IsActive, [Name]);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungPositionsentwurf', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungPositionsentwurf
+        (
+            Id int IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungPositionsentwurf PRIMARY KEY,
+            ContextSource varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ContextSourceId int NOT NULL,
+            SequenceNumber int NOT NULL,
+            PositionType varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ArticleId int NULL,
+            Designation nvarchar(200) NOT NULL,
+            Category nvarchar(100) NOT NULL,
+            Unit nvarchar(40) NOT NULL,
+            Quantity decimal(19,4) NOT NULL,
+            UnitPrice decimal(19,4) NOT NULL,
+            VatRateId int NULL,
+            VatCodeSnapshot nvarchar(32) NOT NULL,
+            VatRatePercentSnapshot decimal(9,4) NULL,
+            RevenueAccountId int NULL,
+            RevenueAccountSnapshot nvarchar(200) NOT NULL,
+            AncillaryClassificationSnapshot varchar(32)
+                COLLATE Latin1_General_100_BIN2 NOT NULL,
+            MainTextPlain nvarchar(max) NOT NULL,
+            MainTextFormatted nvarchar(max) NULL,
+            AdditionalTextPlain nvarchar(max) NOT NULL,
+            AdditionalTextFormatted nvarchar(max) NULL,
+            IsFooter bit NOT NULL
+                CONSTRAINT DF_FakturierungPositionsentwurf_IsFooter DEFAULT(0),
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FakturierungPositionsentwurf_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungPosition_Context
+                CHECK (
+                    ContextSource IN ('ARTICLE', 'PROPERTY')
+                    AND ContextSourceId > 0),
+            CONSTRAINT CK_FakturierungPosition_Sequence
+                CHECK (SequenceNumber > 0 AND SequenceNumber % 10 = 0),
+            CONSTRAINT CK_FakturierungPosition_Type
+                CHECK (PositionType IN ('ARTICLE', 'TEXT')),
+            CONSTRAINT CK_FakturierungPosition_TextLengths
+                CHECK (
+                    DATALENGTH(MainTextPlain) <= 200000
+                    AND DATALENGTH(AdditionalTextPlain) <= 200000
+                    AND (
+                        MainTextFormatted IS NULL
+                        OR DATALENGTH(MainTextFormatted) <= 500000)
+                    AND (
+                        AdditionalTextFormatted IS NULL
+                        OR DATALENGTH(AdditionalTextFormatted) <= 500000)),
+            CONSTRAINT CK_FakturierungPosition_Rtf
+                CHECK (
+                    (
+                        MainTextFormatted IS NULL
+                        OR LTRIM(MainTextFormatted) LIKE N'{\rtf%')
+                    AND (
+                        AdditionalTextFormatted IS NULL
+                        OR LTRIM(AdditionalTextFormatted) LIKE N'{\rtf%')),
+            CONSTRAINT CK_FakturierungPosition_ArticleValues
+                CHECK (
+                    (
+                        PositionType = 'ARTICLE'
+                        AND IsFooter = 0
+                        AND LEN(LTRIM(RTRIM(Designation))) > 0
+                        AND LEN(LTRIM(RTRIM(Category))) > 0
+                        AND LEN(LTRIM(RTRIM(Unit))) > 0
+                        AND Quantity > 0
+                        AND UnitPrice >= 0
+                        AND VatRateId IS NOT NULL
+                        AND VatRatePercentSnapshot IS NOT NULL
+                        AND RevenueAccountId IS NOT NULL
+                    )
+                    OR (
+                        PositionType = 'TEXT'
+                        AND ArticleId IS NULL
+                        AND LEN(MainTextPlain) > 0
+                        AND Category = N''
+                        AND Unit = N''
+                        AND Quantity = 0
+                        AND UnitPrice = 0
+                        AND VatRateId IS NULL
+                        AND VatCodeSnapshot = N''
+                        AND VatRatePercentSnapshot IS NULL
+                        AND RevenueAccountId IS NULL
+                        AND RevenueAccountSnapshot = N''
+                        AND AdditionalTextPlain = N''
+                        AND AdditionalTextFormatted IS NULL
+                    )),
+            CONSTRAINT CK_FakturierungPosition_AncillaryClass CHECK (
+                AncillaryClassificationSnapshot IN (
+                    'STANDARD',
+                    'TENANT_OPERATING_COST',
+                    'REPAIR',
+                    'RENEWAL',
+                    'NON_TRANSFERABLE')),
+            CONSTRAINT FK_FaktPosition_Artikel
+                FOREIGN KEY (ArticleId) REFERENCES dbo.FakturierungArtikel(Id),
+            CONSTRAINT FK_FaktPosition_Mwst
+                FOREIGN KEY (VatRateId) REFERENCES dbo.FakturierungMwstSatz(Id),
+            CONSTRAINT FK_FaktPosition_Ertragskonto
+                FOREIGN KEY (RevenueAccountId) REFERENCES dbo.FakturierungErtragskonto(AccountId)
+        );
+        CREATE UNIQUE INDEX UX_FaktPosition_Kontext_Reihenfolge
+            ON dbo.FakturierungPositionsentwurf
+                (ContextSource, ContextSourceId, SequenceNumber);
+        CREATE INDEX IX_FaktPosition_Kontext_Typ
+            ON dbo.FakturierungPositionsentwurf
+                (ContextSource, ContextSourceId, PositionType, IsFooter);
+    END;
+
     IF OBJECT_ID(N'dbo.FakturierungEigentuemerProfil', N'U') IS NULL
     BEGIN
         CREATE TABLE dbo.FakturierungEigentuemerProfil
@@ -575,11 +724,11 @@ BEGIN TRY
     END;';
 
     IF NOT EXISTS (SELECT 1 FROM dbo.FakturierungSchemaVersion WHERE Id = 1)
-        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 3);
+        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 4);
     ELSE
         UPDATE dbo.FakturierungSchemaVersion
-        SET [Version] = 3, AppliedAt = SYSDATETIME()
-        WHERE Id = 1 AND [Version] < 3;
+        SET [Version] = 4, AppliedAt = SYSDATETIME()
+        WHERE Id = 1 AND [Version] < 4;
 
     COMMIT TRANSACTION;
 END TRY

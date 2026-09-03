@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingPositionComposerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Positionen verfassen">
+
+    <Grid x:Name="RootGrid" Padding="24,20,24,18" RowSpacing="10"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" Invoked="OnCloseShortcut" />
+            <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnSearchShortcut" />
+            <KeyboardAccelerator Key="N" Modifiers="Control" Invoked="OnNewShortcut" />
+            <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="OnAcceptShortcut" />
+            <KeyboardAccelerator Key="F2" Invoked="OnEditShortcut" />
+            <KeyboardAccelerator Key="Delete" Modifiers="Control" Invoked="OnDeleteShortcut" />
+            <KeyboardAccelerator Key="Up" Modifiers="Control" Invoked="OnMoveUpShortcut" />
+            <KeyboardAccelerator Key="Down" Modifiers="Control" Invoked="OnMoveDownShortcut" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorWindowHeaderStyle}">
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="42" Height="42" CornerRadius="21"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}"
+                              Foreground="{StaticResource MyCoinFlowAccentBrush}" FontSize="20" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="Positionen verfassen" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ContextText" Text="Objektkontext wird geladen …"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <Border Grid.Column="2" CornerRadius="4" Padding="10,6"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <TextBlock Text="Entwurf · noch kein Dokument"
+                               TextWrapping="Wrap" VerticalAlignment="Center" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <InfoBar x:Name="ErrorInfoBar" Grid.Row="1" IsOpen="False" IsClosable="True"
+                 Severity="Error" Title="Position konnte nicht gespeichert werden" />
+
+        <Border Grid.Row="2" Style="{StaticResource WorkspaceFunctionBarStyle}">
+            <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel>
+                        <TextBlock Text="ERFASSEN" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button Style="{StaticResource FunctionPrimaryButtonStyle}"
+                                Click="OnNewClick" AutomationProperties.Name="Neue Position">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionAddIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Neue Position" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="AUSWAHL" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="EditButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnEditClick"
+                                    AutomationProperties.Name="Position bearbeiten">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionEditIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Bearbeiten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DeleteButton" Style="{StaticResource FunctionDangerButtonStyle}"
+                                    IsEnabled="False" Click="OnDeleteClick"
+                                    AutomationProperties.Name="Position entfernen">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionDeleteIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Entfernen" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="REIHENFOLGE" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="MoveUpButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnMoveUpClick"
+                                    AutomationProperties.Name="Position nach oben">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionMoveUpIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Nach oben" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="MoveDownButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnMoveDownClick"
+                                    AutomationProperties.Name="Position nach unten">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionMoveDownIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Nach unten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+                    <StackPanel>
+                        <TextBlock Text="TEXT" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button Style="{StaticResource FunctionButtonStyle}"
+                                Click="OnManageTemplatesClick"
+                                AutomationProperties.Name="Textbausteine verwalten">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Textbausteine verwalten" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Grid x:Name="ContentGrid" Grid.Row="3" ColumnSpacing="14" RowSpacing="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="5*" />
+                <ColumnDefinition Width="7*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border x:Name="PositionsCard" Style="{StaticResource EditorSectionCardStyle}" Padding="0">
+                <Grid>
+                    <ListView x:Name="PositionsList" SelectionMode="Single"
+                              SelectionChanged="OnPositionSelectionChanged"
+                              DoubleTapped="OnPositionDoubleTapped">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,9" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="44" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding SequenceDisplay}" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{Binding Designation}" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding PositionTypeDisplay}" FontSize="11" />
+                                        <TextBlock Text="{Binding TextPreview}" FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding AmountDisplay}" FontSize="11"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Text="{Binding LineTotalDisplay}" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel x:Name="EmptyState" Visibility="Collapsed"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                MaxWidth="340" Spacing="8">
+                        <TextBlock Text="Noch keine Positionen" FontSize="18"
+                                   FontWeight="SemiBold" TextAlignment="Center" />
+                        <TextBlock Text="Erfassen Sie rechts die erste Artikel-/Leistungs- oder Textposition."
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="EntryCard" Grid.Column="1"
+                    Style="{StaticResource EditorSectionCardStyle}">
+                <ScrollViewer Style="{StaticResource FormScrollViewerStyle}">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="EntryTitle" Text="Neue Position"
+                                           Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Alle Werte bleiben bis zur Übernahme in einen späteren Dokumentfluss ein eigenständiger Entwurf."
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <RadioButton x:Name="ArticlePositionRadio" Content="Artikel / Leistung"
+                                             GroupName="PositionType" IsChecked="True"
+                                             Checked="OnPositionTypeChanged" />
+                                <RadioButton x:Name="TextPositionRadio" Content="Text / Abschnitt"
+                                             GroupName="PositionType"
+                                             Checked="OnPositionTypeChanged" />
+                            </StackPanel>
+                        </Grid>
+
+                        <AutoSuggestBox x:Name="ArticleSearchBox" Header="Artikel suchen (optional)"
+                                        PlaceholderText="Artikelnummer, Bezeichnung oder Kategorie"
+                                        TextMemberPath="Designation"
+                                        TextChanged="OnArticleSearchTextChanged"
+                                        GotFocus="OnArticleSearchGotFocus"
+                                        SuggestionChosen="OnArticleSuggestionChosen"
+                                        QuerySubmitted="OnArticleQuerySubmitted"
+                                        AutomationProperties.Name="Artikel suchen">
+                            <AutoSuggestBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="10" MinWidth="360">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding ArticleNumber}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Grid.Column="1" Spacing="1">
+                                            <TextBlock Text="{Binding Designation}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Category}" FontSize="11"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding PriceDisplay}"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </AutoSuggestBox.ItemTemplate>
+                        </AutoSuggestBox>
+
+                        <ComboBox x:Name="TemplateBox" Visibility="Collapsed"
+                                  Header="Textbaustein (optional)"
+                                  PlaceholderText="Baustein als Ausgangspunkt wählen"
+                                  DisplayMemberPath="Name"
+                                  SelectionChanged="OnTemplateSelectionChanged" />
+
+                        <TextBox x:Name="DesignationBox"
+                                 Header="Bezeichnung / Abschnittstitel"
+                                 MaxLength="200"
+                                 PlaceholderText="Bei Textpositionen optional; sonst Pflicht"
+                                 AutomationProperties.Name="Positionsbezeichnung" />
+
+                        <Border Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                            <StackPanel Spacing="10">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Haupttext" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="Eigener Klartext-/Formatsnapshot der Position"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <TextBox x:Name="MainTextPreview" IsReadOnly="True"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"
+                                         PlaceholderText="Noch kein Haupttext erfasst" />
+                                <Button Content="Haupttext im Editor öffnen"
+                                        HorizontalAlignment="Stretch" Click="OnEditMainTextClick" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="AdditionalTextCard" Style="{StaticResource CardBorderStyle}"
+                                CornerRadius="6">
+                            <StackPanel Spacing="10">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Zusatztext" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="Formatierter Zusatz direkt unter der Artikelposition"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <TextBox x:Name="AdditionalTextPreview" IsReadOnly="True"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="86"
+                                         PlaceholderText="Kein Zusatztext erfasst" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="Zusatztext im Editor öffnen"
+                                            HorizontalAlignment="Stretch" Click="OnEditAdditionalTextClick" />
+                                    <Button Grid.Column="1" Content="Entfernen"
+                                            Click="OnClearAdditionalTextClick" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="ArticleValuesCard" Style="{StaticResource CardBorderStyle}"
+                                CornerRadius="6">
+                            <StackPanel Spacing="12">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Kategorie, Menge und Preis"
+                                               Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="Artikelwerte werden übernommen und können für diesen Entwurf überschrieben werden."
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="180" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="CategoryBox" Header="Kategorie *" MaxLength="100" />
+                                    <TextBox x:Name="UnitBox" Grid.Column="1" Header="Einheit *" MaxLength="40" />
+                                </Grid>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <NumberBox x:Name="QuantityBox" Header="Menge *" Value="1"
+                                               Minimum="0" SpinButtonPlacementMode="Compact" />
+                                    <NumberBox x:Name="UnitPriceBox" Grid.Column="1"
+                                               Header="Einzelpreis in Basiswährung *" Minimum="0"
+                                               SpinButtonPlacementMode="Compact" />
+                                </Grid>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="VatBox" Header="MWST *"
+                                              DisplayMemberPath="Display" SelectedValuePath="Id"
+                                              HorizontalAlignment="Stretch" />
+                                    <ComboBox x:Name="RevenueAccountBox" Grid.Column="1"
+                                              Header="Ertragskonto *"
+                                              DisplayMemberPath="Display" SelectedValuePath="Id"
+                                              HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <TextBlock x:Name="ClassificationText"
+                                           Text="Nebenkostenklassifikation: Allgemeine Sach-/Leistung"
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="TextOptionsCard" Visibility="Collapsed"
+                                Style="{StaticResource CardBorderStyle}" CornerRadius="6">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Ausgabe" Style="{StaticResource SectionTitleStyle}" />
+                                <ToggleSwitch x:Name="FooterToggle"
+                                              Header="Positionstyp"
+                                              OffContent="Im Positionsbereich"
+                                              OnContent="Als Fusstext nach normalen Positionen"
+                                              AutomationProperties.Name="Position als Fusstext einordnen" />
+                                <TextBlock Text="Fusstexte bleiben beim Umordnen in ihrer eigenen Gruppe am Ende."
+                                           TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Grid x:Name="LoadingOverlay" Grid.ColumnSpan="2"
+                  Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                    <ProgressRing IsActive="True" Width="32" Height="32" />
+                    <TextBlock Text="Positionsentwurf wird geladen …" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="4" Style="{StaticResource EditorWindowFooterStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusText" Text="Positionen werden unmittelbar im Entwurf gespeichert."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Strg+F · Suche   Strg+N · neu   Strg+Enter · übernehmen   F2 · bearbeiten   Strg+↑/↓ · verschieben   Strg+Entf · entfernen"
+                               FontSize="11" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Content="Schliessen" Width="140" Click="OnCloseClick" />
+                    <Button x:Name="AcceptButton" Content="Position übernehmen" Width="190"
+                            Style="{StaticResource AccentButtonStyle}" Click="OnAcceptClick" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</window:PersistentWindow>

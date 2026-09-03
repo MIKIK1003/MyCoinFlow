@@ -15,6 +15,29 @@
             <SolidColorBrush x:Key="MyCoinFlowPositiveBrush" Color="#15803D" />
             <SolidColorBrush x:Key="MyCoinFlowDangerBrush" Color="#C2413B" />
 
+            <!-- Definierte Dokumenttextpalette. Tags und sichtbare Farbfelder verwenden
+                 dieselben zentralen Werte, damit RichEdit-Snapshots reproduzierbar bleiben. -->
+            <x:String x:Key="DocumentTextBlackHex">#1F1F1F</x:String>
+            <x:String x:Key="DocumentTextRedHex">#C62828</x:String>
+            <x:String x:Key="DocumentTextOrangeHex">#EF6C00</x:String>
+            <x:String x:Key="DocumentTextGreenHex">#2E7D32</x:String>
+            <x:String x:Key="DocumentTextBlueHex">#1565C0</x:String>
+            <x:String x:Key="DocumentTextPurpleHex">#6A1B9A</x:String>
+            <x:String x:Key="DocumentTextPastelGrayHex">#7D8790</x:String>
+            <x:String x:Key="DocumentTextPastelRedHex">#C47A7A</x:String>
+            <x:String x:Key="DocumentTextPastelGreenHex">#739D78</x:String>
+            <x:String x:Key="DocumentTextPastelBlueHex">#6F94B8</x:String>
+            <SolidColorBrush x:Key="DocumentTextBlackBrush" Color="#1F1F1F" />
+            <SolidColorBrush x:Key="DocumentTextRedBrush" Color="#C62828" />
+            <SolidColorBrush x:Key="DocumentTextOrangeBrush" Color="#EF6C00" />
+            <SolidColorBrush x:Key="DocumentTextGreenBrush" Color="#2E7D32" />
+            <SolidColorBrush x:Key="DocumentTextBlueBrush" Color="#1565C0" />
+            <SolidColorBrush x:Key="DocumentTextPurpleBrush" Color="#6A1B9A" />
+            <SolidColorBrush x:Key="DocumentTextPastelGrayBrush" Color="#7D8790" />
+            <SolidColorBrush x:Key="DocumentTextPastelRedBrush" Color="#C47A7A" />
+            <SolidColorBrush x:Key="DocumentTextPastelGreenBrush" Color="#739D78" />
+            <SolidColorBrush x:Key="DocumentTextPastelBlueBrush" Color="#6F94B8" />
+
             <!-- Semantische Segoe-Fluent-Glyphen für fein gerenderte WinUI-Aktionsicons.
                  Seiten verwenden nur diese Namen; rohe Zeichencodes bleiben zentral. -->
             <x:String x:Key="ActionAddIconGlyph">&#xE710;</x:String>
@@ -26,6 +49,10 @@
             <x:String x:Key="ActionRefreshIconGlyph">&#xE72C;</x:String>
             <x:String x:Key="ActionDownloadIconGlyph">&#xE896;</x:String>
             <x:String x:Key="ActionCopyIconGlyph">&#xE8C8;</x:String>
+            <x:String x:Key="ActionCutIconGlyph">&#xE8C6;</x:String>
+            <x:String x:Key="ActionPasteIconGlyph">&#xE77F;</x:String>
+            <x:String x:Key="ActionMoveUpIconGlyph">&#xE70E;</x:String>
+            <x:String x:Key="ActionMoveDownIconGlyph">&#xE70D;</x:String>
             <x:String x:Key="ActionAttachIconGlyph">&#xE723;</x:String>
             <x:String x:Key="ActionDocumentIconGlyph">&#xE8A5;</x:String>
             <x:String x:Key="ActionReportIconGlyph">&#xE9D2;</x:String>
@@ -156,6 +183,16 @@
                 <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="0,1,0,0" />
                 <Setter Property="Padding" Value="0,12,0,0" />
+            </Style>
+            <Style x:Key="DocumentTextColorButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="30" />
+                <Setter Property="Height" Value="30" />
+                <Setter Property="MinWidth" Value="30" />
+                <Setter Property="MinHeight" Value="30" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="4" />
             </Style>
 
             <!-- Verbindlicher Formular-Scrollbar-Gutter: Inhalte dürfen nie unter der Scrollbar liegen. -->
