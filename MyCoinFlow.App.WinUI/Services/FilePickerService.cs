@@ -24,10 +24,23 @@ public static class FilePickerService
     }
 
     public static async Task<string?> PickSaveAsync(string suggestedName, string description, string extension)
+        => await PickSaveAsync(
+            ((App)Microsoft.UI.Xaml.Application.Current).MainWindow,
+            suggestedName,
+            description,
+            extension);
+
+    public static async Task<string?> PickSaveAsync(
+        Microsoft.UI.Xaml.Window owner,
+        string suggestedName,
+        string description,
+        string extension)
     {
         var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = suggestedName };
         picker.FileTypeChoices.Add(description, new List<string> { extension });
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(((App)Microsoft.UI.Xaml.Application.Current).MainWindow));
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(owner));
         return (await picker.PickSaveFileAsync())?.Path;
     }
 

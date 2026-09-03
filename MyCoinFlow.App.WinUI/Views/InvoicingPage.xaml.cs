@@ -11,6 +11,7 @@ public sealed partial class InvoicingPage : Page
 {
     private readonly InvoicingViewModel _viewModel = new();
     private readonly InvoicingDocumentRepository _documentRepository = new();
+    private readonly InvoicingInvoiceRepository _invoiceRepository = new();
     private IReadOnlyList<BillableObjectRecord> _allObjects = [];
     private IReadOnlyList<InvoicingDocumentRecord> _allDocuments = [];
     private string _statusFilter = "ALL";
@@ -23,6 +24,9 @@ public sealed partial class InvoicingPage : Page
     private InvoicingPositionComposerWindow? _positionComposerWindow;
     private InvoicingTextTemplateManagerWindow? _textTemplateWindow;
     private InvoicingDocumentEditorWindow? _documentEditorWindow;
+    private InvoicingInvoiceEditorWindow? _invoiceEditorWindow;
+    private InvoicingDocumentPreviewWindow? _documentPreviewWindow;
+    private int? _previewDocumentId;
 
     public InvoicingPage()
     {
@@ -64,7 +68,7 @@ public sealed partial class InvoicingPage : Page
         Grid.SetRow(DocumentDetailCard, wide ? 0 : 1);
         Grid.SetColumn(DocumentDetailCard, wide ? 1 : 0);
         Grid.SetColumnSpan(DocumentDetailCard, wide ? 1 : 2);
-        DocumentListCard.MinHeight = wide ? 260 : 170;
+        DocumentListCard.MinHeight = wide ? 260 : 96;
         DocumentDetailCard.MaxHeight = wide ? double.PositiveInfinity : 220;
         DocumentMetricsPanel.Visibility = _showDocuments && wide
             ? Visibility.Visible
@@ -72,6 +76,7 @@ public sealed partial class InvoicingPage : Page
         ObjectMetricsPanel.Visibility = !_showDocuments && wide
             ? Visibility.Visible
             : Visibility.Collapsed;
+        ApplyDocumentFilterLayout(wide);
         DocumentSnapshotGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
         DocumentSnapshotGrid.ColumnDefinitions[1].Width = wide
             ? new GridLength(1, GridUnitType.Star)
@@ -80,7 +85,32 @@ public sealed partial class InvoicingPage : Page
         PlaceSnapshotCard(DocumentRecipientSnapshotCard, wide ? 1 : 0, wide ? 0 : 1, wide);
         PlaceSnapshotCard(DocumentIssuerSnapshotCard, 0, wide ? 1 : 2, wide);
         PlaceSnapshotCard(DocumentTransitionSnapshotCard, wide ? 1 : 0, wide ? 1 : 3, wide);
+        FinancialSnapshotGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+        FinancialSnapshotGrid.ColumnDefinitions[1].Width = wide
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0);
+        PlaceSnapshotCard(FinancialSnapshotCard, 0, 0, wide);
+        PlaceSnapshotCard(OpenItemSnapshotCard, wide ? 1 : 0, wide ? 0 : 1, wide);
     }
+
+    private void ApplyDocumentFilterLayout(bool wide)
+    {
+        DocumentFilterGrid.MinWidth = wide ? 900 : 0;
+        DocumentFilterGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+        DocumentFilterGrid.ColumnDefinitions[1].Width = GridLength.Auto;
+        DocumentFilterGrid.ColumnDefinitions[2].Width = wide ? GridLength.Auto : new GridLength(0);
+        DocumentFilterGrid.ColumnDefinitions[3].Width = wide ? GridLength.Auto : new GridLength(0);
+
+        Grid.SetColumn(DocumentSearchZone, 0);
+        Grid.SetRow(DocumentSearchZone, 0);
+        Grid.SetColumn(DocumentStatusLegendZone, 1);
+        Grid.SetRow(DocumentStatusLegendZone, 0);
+        Grid.SetColumn(DocumentQuickFilterZone, wide ? 2 : 0);
+        Grid.SetRow(DocumentQuickFilterZone, wide ? 0 : 1);
+        Grid.SetColumn(DocumentTypeFilterZone, wide ? 3 : 1);
+        Grid.SetRow(DocumentTypeFilterZone, wide ? 0 : 1);
+    }
+
     private static void PlaceSnapshotCard(FrameworkElement card, int column, int row, bool wide)
     {
         Grid.SetColumn(card, column);
@@ -136,6 +166,8 @@ public sealed partial class InvoicingPage : Page
         else
         {
             NextStepButton.IsEnabled = false;
+            AdjustmentButton.IsEnabled = false;
+            PreviewPdfButton.IsEnabled = false;
             RenderSelectedObject();
         }
         RenderWorkspaceStatus();
@@ -277,15 +309,45 @@ public sealed partial class InvoicingPage : Page
             ? InvoicingDocumentStatusCodes.Draft
             : ReferenceEquals(sender, TransferredDocumentStatusButton)
                 ? InvoicingDocumentStatusCodes.Transferred
-                : "ALL";
+                : ReferenceEquals(sender, DefinitiveDocumentStatusButton)
+                    ? InvoicingDocumentStatusCodes.Definitive
+                    : "ALL";
         AllDocumentStatusButton.IsChecked = _documentStatusFilter == "ALL";
         DraftDocumentStatusButton.IsChecked = _documentStatusFilter == InvoicingDocumentStatusCodes.Draft;
         TransferredDocumentStatusButton.IsChecked = _documentStatusFilter == InvoicingDocumentStatusCodes.Transferred;
+        DefinitiveDocumentStatusButton.IsChecked = _documentStatusFilter == InvoicingDocumentStatusCodes.Definitive;
         ApplyDocumentFilters();
     }
 
     private void OnDocumentSelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RenderSelectedDocument();
+
+    private void OnPreviewPdfClick(object sender, RoutedEventArgs e)
+    {
+        if (SelectedDocument is not { } document) return;
+        if (_documentPreviewWindow is not null && _previewDocumentId == document.Id)
+        {
+            _documentPreviewWindow.Activate();
+            return;
+        }
+        if (_documentPreviewWindow is not null)
+        {
+            _documentPreviewWindow.Close();
+            _documentPreviewWindow = null;
+        }
+        _previewDocumentId = document.Id;
+        _documentPreviewWindow = new InvoicingDocumentPreviewWindow(document.Id);
+        _documentPreviewWindow.Closed += OnDocumentPreviewWindowClosed;
+        _documentPreviewWindow.Activate();
+    }
+
+    private void OnDocumentPreviewWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_documentPreviewWindow is not null)
+            _documentPreviewWindow.Closed -= OnDocumentPreviewWindowClosed;
+        _documentPreviewWindow = null;
+        _previewDocumentId = null;
+    }
 
     private void OnDocumentFlowSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -299,6 +361,7 @@ public sealed partial class InvoicingPage : Page
         AllDocumentStatusButton.IsChecked = true;
         DraftDocumentStatusButton.IsChecked = false;
         TransferredDocumentStatusButton.IsChecked = false;
+        DefinitiveDocumentStatusButton.IsChecked = false;
         DocumentSearchBox.Text = string.Empty;
         DocumentTypeFilterBox.SelectedIndex = 0;
         ApplyDocumentFilters(step.DocumentId);
@@ -307,7 +370,52 @@ public sealed partial class InvoicingPage : Page
     private async void OnNextStepClick(object sender, RoutedEventArgs e)
     {
         var document = SelectedDocument;
-        if (document is not { CanTransition: true } || _transitioning) return;
+        if (document is null || _transitioning) return;
+
+        if (document.CanFinalizeInvoice)
+        {
+            OpenInvoiceEditor(document);
+            return;
+        }
+        if (document.CanCreateNextInvoice)
+        {
+            await CreateNextInvoiceAsync(document);
+            return;
+        }
+        if (document.CanTransition)
+            await TransitionDocumentAsync(document);
+    }
+
+    private void OpenInvoiceEditor(InvoicingDocumentRecord document, string? preferredKind = null)
+    {
+        if (_invoiceEditorWindow is not null)
+        {
+            _invoiceEditorWindow.Activate();
+            return;
+        }
+
+        _invoiceEditorWindow = new InvoicingInvoiceEditorWindow(
+            document,
+            _invoiceRepository,
+            preferredKind);
+        _invoiceEditorWindow.Closed += OnInvoiceEditorWindowClosed;
+        _invoiceEditorWindow.Activate();
+    }
+
+    private async void OnInvoiceEditorWindowClosed(object sender, WindowEventArgs args)
+    {
+        var changed = _invoiceEditorWindow?.Changed == true;
+        var documentId = _invoiceEditorWindow?.FinalizedDocumentId;
+        if (_invoiceEditorWindow is not null)
+            _invoiceEditorWindow.Closed -= OnInvoiceEditorWindowClosed;
+        _invoiceEditorWindow = null;
+        if (changed && documentId is > 0)
+            await ReloadAsync(documentId);
+    }
+
+    private async Task TransitionDocumentAsync(InvoicingDocumentRecord document)
+    {
+        if (!document.CanTransition) return;
 
         var targetType = InvoicingDocumentTypeCodes.DisplayName(document.NextDocumentType);
         var confirmation = new ContentDialog
@@ -332,6 +440,195 @@ public sealed partial class InvoicingPage : Page
             var createdId = await _documentRepository.TransitionAsync(
                 document.Id,
                 DateOnly.FromDateTime(DateTime.Today));
+            await ReloadAsync(createdId);
+        }
+        catch (Exception exception)
+        {
+            ErrorInfoBar.Message = exception.Message;
+            ErrorInfoBar.IsOpen = true;
+        }
+        finally
+        {
+            _transitioning = false;
+            RenderSelectedDocument();
+        }
+    }
+
+    private async Task CreateNextInvoiceAsync(InvoicingDocumentRecord document)
+    {
+        if (!document.CanCreateNextInvoice || document.Financial is null) return;
+
+        var kinds = InvoicingInvoiceKindCodes.PositiveOptions
+            .Where(option => option.Code is
+                InvoicingInvoiceKindCodes.Partial or InvoicingInvoiceKindCodes.Final)
+            .ToList();
+        var kindBox = new ComboBox
+        {
+            Header = "Folgerechnung",
+            DisplayMemberPath = "Display",
+            ItemsSource = kinds,
+            SelectedItem = kinds[0],
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var datePicker = new DatePicker
+        {
+            Header = "Dokumentdatum",
+            SelectedDate = new DateTimeOffset(DateTime.Today),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var content = new StackPanel { Spacing = 10, MinWidth = 420 };
+        content.Children.Add(new TextBlock
+        {
+            Text =
+                $"Verbleibende Rechnungsbasis: {document.Financial.BillingRemaining:N2} " +
+                $"{document.CurrencyCode}. Der neue Entwurf erhält eine eigene Rechnungsnummer.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(kindBox);
+        content.Children.Add(datePicker);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = $"{document.DocumentNumber} weiter fakturieren",
+            Content = content,
+            PrimaryButtonText = "Entwurf anlegen",
+            CloseButtonText = "Abbrechen",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary ||
+            kindBox.SelectedItem is not InvoicingCodeOption kind)
+            return;
+
+        _transitioning = true;
+        ErrorInfoBar.IsOpen = false;
+        RenderSelectedDocument();
+        try
+        {
+            var createdId = await _invoiceRepository.CreateNextInvoiceDraftAsync(
+                document.Id,
+                kind.Code,
+                DateOnly.FromDateTime(datePicker.SelectedDate?.Date ?? DateTime.Today));
+            await ReloadAsync(createdId);
+            if (SelectedDocument is { CanFinalizeInvoice: true } created)
+                OpenInvoiceEditor(created, kind.Code);
+        }
+        catch (Exception exception)
+        {
+            ErrorInfoBar.Message = exception.Message;
+            ErrorInfoBar.IsOpen = true;
+        }
+        finally
+        {
+            _transitioning = false;
+            RenderSelectedDocument();
+        }
+    }
+
+    private async void OnAdjustmentClick(object sender, RoutedEventArgs e)
+    {
+        var document = SelectedDocument;
+        if (document is not { CanCreateAdjustment: true } ||
+            document.Financial?.OpenItem is not { } openItem ||
+            _transitioning)
+            return;
+
+        var kinds = new List<InvoicingCodeOption>();
+        if (openItem.OpenAmount >= 0.02m)
+            kinds.Add(new(InvoicingInvoiceKindCodes.Correction, "Teilbetrag korrigieren"));
+        kinds.Add(new(InvoicingInvoiceKindCodes.Cancellation, "Offenen Rest stornieren"));
+        var kindBox = new ComboBox
+        {
+            Header = "Art",
+            DisplayMemberPath = "Display",
+            ItemsSource = kinds,
+            SelectedItem = kinds[0],
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var suggestedCorrectionAmount = InvoicingInvoiceCalculator.RoundMoney(openItem.OpenAmount / 2m);
+        var amountBox = new NumberBox
+        {
+            Header = $"Korrekturbetrag in {document.CurrencyCode}",
+            Minimum = 0.01,
+            Maximum = (double)(openItem.OpenAmount - 0.01m),
+            Value = (double)suggestedCorrectionAmount,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        void ApplyAdjustmentKind()
+        {
+            var isCancellation = kindBox.SelectedItem is InvoicingCodeOption option &&
+                                 option.Code == InvoicingInvoiceKindCodes.Cancellation;
+            amountBox.IsEnabled = !isCancellation;
+            amountBox.Header = isCancellation
+                ? $"Stornobetrag in {document.CurrencyCode} · offener Rest wird automatisch übernommen"
+                : $"Korrekturbetrag in {document.CurrencyCode}";
+            amountBox.Maximum = (double)(isCancellation
+                ? openItem.OpenAmount
+                : openItem.OpenAmount - 0.01m);
+            amountBox.Value = (double)(isCancellation
+                ? openItem.OpenAmount
+                : suggestedCorrectionAmount);
+        }
+        kindBox.SelectionChanged += (_, _) => ApplyAdjustmentKind();
+        ApplyAdjustmentKind();
+        var reasonBox = new TextBox
+        {
+            Header = "Begründung",
+            PlaceholderText = "Grund der Korrektur oder des Stornos vollständig festhalten",
+            MaxLength = 500,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 88
+        };
+        var datePicker = new DatePicker
+        {
+            Header = "Belegdatum",
+            SelectedDate = new DateTimeOffset(DateTime.Today),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var content = new StackPanel { Spacing = 10, MinWidth = 460 };
+        content.Children.Add(new TextBlock
+        {
+            Text =
+                $"Bezugsrechnung {document.DocumentNumber} · offen {openItem.OpenAmount:N2} " +
+                $"{document.CurrencyCode}. Der Originalbeleg bleibt unverändert.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(kindBox);
+        content.Children.Add(amountBox);
+        content.Children.Add(reasonBox);
+        content.Children.Add(datePicker);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Korrektur oder Storno erstellen",
+            Content = content,
+            PrimaryButtonText = "Definitiven Beleg erstellen",
+            CloseButtonText = "Abbrechen",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary ||
+            kindBox.SelectedItem is not InvoicingCodeOption kind)
+            return;
+
+        _transitioning = true;
+        ErrorInfoBar.IsOpen = false;
+        RenderSelectedDocument();
+        try
+        {
+            var amount = double.IsNaN(amountBox.Value)
+                ? 0m
+                : Convert.ToDecimal(amountBox.Value);
+            var createdId = await _invoiceRepository.CreateAdjustmentAsync(
+                new InvoicingAdjustmentDraft
+                {
+                    ReferenceInvoiceDocumentId = document.Id,
+                    AdjustmentKind = kind.Code,
+                    Amount = amount,
+                    Reason = reasonBox.Text
+                },
+                DateOnly.FromDateTime(datePicker.SelectedDate?.Date ?? DateTime.Today));
             await ReloadAsync(createdId);
         }
         catch (Exception exception)
@@ -376,6 +673,7 @@ public sealed partial class InvoicingPage : Page
         ComposeButton.IsEnabled = false;
         NewOfferButton.IsEnabled = false;
         NextStepButton.IsEnabled = false;
+        AdjustmentButton.IsEnabled = false;
 
         var effectiveDate = EffectiveDatePicker.SelectedDate?.Date ?? DateTime.Today;
         await _viewModel.LoadAsync(DateOnly.FromDateTime(effectiveDate));
@@ -442,6 +740,8 @@ public sealed partial class InvoicingPage : Page
         DocumentFlowCountText.Text = (workspace?.FlowCount ?? 0).ToString("N0");
         DocumentDraftCountText.Text = (workspace?.DraftCount ?? 0).ToString("N0");
         InvoiceDraftCountText.Text = (workspace?.InvoiceDraftCount ?? 0).ToString("N0");
+        DefinitiveInvoiceCountText.Text = (workspace?.DefinitiveInvoiceCount ?? 0).ToString("N0");
+        OpenItemCountText.Text = (workspace?.OpenItemCount ?? 0).ToString("N0");
         ApplyDocumentFilters(selectedDocumentId);
     }
 
@@ -473,29 +773,44 @@ public sealed partial class InvoicingPage : Page
         if (document is null)
         {
             NextStepButton.IsEnabled = false;
+            AdjustmentButton.IsEnabled = false;
+            PreviewPdfButton.IsEnabled = false;
             NextStepButtonText.Text = "Nächster Schritt";
             ToolTipService.SetToolTip(NextStepButton, "Zuerst ein weiterführbares Dokument wählen.");
+            ToolTipService.SetToolTip(
+                AdjustmentButton,
+                "Zuerst eine korrigierbare definitive Rechnung wählen.");
             DocumentFlowList.ItemsSource = null;
             DocumentPositionsList.ItemsSource = null;
+            FinancialPanel.Visibility = Visibility.Collapsed;
+            InstallmentDetailList.ItemsSource = null;
+            RevisionDetailList.ItemsSource = null;
             return;
         }
 
         DocumentDetailTitle.Text = document.Title;
         DocumentDetailSubtitle.Text =
             $"{document.Subject} · {document.ContextTitleSnapshot} · {document.DateDisplay}";
-        var isInvoiceDraft = document.DocumentType == InvoicingDocumentTypeCodes.Invoice;
+        var isInvoiceDraft = document.CanFinalizeInvoice;
+        var isDefinitive = document.Status == InvoicingDocumentStatusCodes.Definitive;
         DocumentStatusInfoBar.Severity = isInvoiceDraft
             ? InfoBarSeverity.Warning
+            : isDefinitive
+                ? InfoBarSeverity.Success
             : document.Status == InvoicingDocumentStatusCodes.Draft
                 ? InfoBarSeverity.Informational
                 : InfoBarSeverity.Success;
         DocumentStatusInfoBar.Title = isInvoiceDraft
-            ? "Rechnungsentwurf · letzter AP05-Schritt"
+            ? "Rechnungsentwurf · bereit zur Definitivsetzung"
+            : isDefinitive
+                ? $"Definitiv · {document.DocumentTypeDisplay}"
             : document.Status == InvoicingDocumentStatusCodes.Draft
                 ? "Entwurf · nächster Schritt wird bewusst ausgelöst"
                 : "Weitergeführt · Snapshot bleibt unverändert";
         DocumentStatusInfoBar.Message = isInvoiceDraft
-            ? $"Nicht finanzwirksam; erstellt von {document.CreatedBy} am {document.CreatedAt:dd.MM.yyyy HH:mm}."
+            ? $"Noch ohne Finanzwirkung; erstellt von {document.CreatedBy} am {document.CreatedAt:dd.MM.yyyy HH:mm}."
+            : isDefinitive
+                ? $"Definitiv gesetzt von {document.TransitionedBy} am {document.TransitionedAt:dd.MM.yyyy HH:mm}; Änderungen erfolgen nur über einen neuen Beleg."
             : document.Status == InvoicingDocumentStatusCodes.Draft
                 ? $"Erstellt von {document.CreatedBy} am {document.CreatedAt:dd.MM.yyyy HH:mm}."
                 : $"Weitergeführt von {document.TransitionedBy} am {document.TransitionedAt:dd.MM.yyyy HH:mm}.";
@@ -529,15 +844,87 @@ public sealed partial class InvoicingPage : Page
             : $"Nachfolger: {document.NextDocumentNumber}";
         DocumentPositionsList.ItemsSource = document.Positions;
         DocumentPositionsTotalText.Text = document.PositionsTotalDisplay;
-        InvoiceDraftInfoBar.Visibility = document.DocumentType == InvoicingDocumentTypeCodes.Invoice
+        InvoiceDraftInfoBar.Visibility = isInvoiceDraft
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        NextStepButtonText.Text = document.CanTransition
+        var financial = document.Financial;
+        FinancialPanel.Visibility = financial is null ? Visibility.Collapsed : Visibility.Visible;
+        if (financial is not null)
+        {
+            InvoiceKindValueText.Text = financial.InvoiceKindDisplay;
+            InvoiceAmountsText.Text =
+                $"Netto {financial.NetAmount:N2} · MWST {financial.VatAmount:N2} · " +
+                $"Brutto {financial.GrossAmount:N2} {document.CurrencyCode}";
+            InvoiceBasisText.Text = financial.IsPositiveInvoice
+                ? $"Gesamtbasis {financial.FullGrossBasis:N2} · zuvor fakturiert " +
+                  $"{financial.PreviouslyInvoicedGross:N2} · im Fluss {financial.FlowInvoicedGross:N2} " +
+                  document.CurrencyCode
+                : $"Bezug Dokument #{financial.ReferenceInvoiceDocumentId} · {financial.AdjustmentReason}";
+            InvoiceTermsText.Text = financial.IsPositiveInvoice
+                ? $"Rabatt {financial.DiscountPercent:N2} % · Rundung {financial.RoundingAdjustment:N2} · " +
+                  $"Zahlungsziel {financial.PaymentDays ?? 0} Tage · fällig {financial.DueDateDisplay} · " +
+                  financial.SkontoDisplay
+                : "Korrekturbeleg ohne eigenes Zahlungsziel oder Skonto";
+            PaymentReferenceText.Text = string.IsNullOrWhiteSpace(financial.PaymentReference)
+                ? "Zahlungsreferenz: —"
+                : $"Zahlungsreferenz: {financial.PaymentReference}";
+
+            if (financial.OpenItem is { } openItem)
+            {
+                OpenItemAmountText.Text = openItem.OpenAmountDisplay;
+                OpenItemStatusText.Text =
+                    $"{openItem.StatusDisplay} · ursprünglich {openItem.OriginalAmount:N2} · " +
+                    $"Korrekturen {openItem.CorrectionAmount:N2} {openItem.CurrencyCode}";
+                OpenItemDueDateText.Text =
+                    $"Fällig {openItem.DueDateDisplay} · Basis offen {openItem.BaseOpenAmountDisplay}";
+            }
+            else
+            {
+                OpenItemAmountText.Text = "Kein eigener offener Posten";
+                OpenItemStatusText.Text = financial.IsAdjustment
+                    ? "Der Beleg reduziert den offenen Posten seiner Bezugsrechnung."
+                    : "—";
+                OpenItemDueDateText.Text = "—";
+            }
+
+            InstallmentDetailPanel.Visibility = financial.Installments.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            InstallmentDetailList.ItemsSource = financial.Installments
+                .Select(rate => new InstallmentDetailRow(
+                    rate.DueDateDisplay,
+                    rate.Label,
+                    rate.AmountDisplay(document.CurrencyCode)))
+                .ToList();
+            RevisionDetailPanel.Visibility = financial.Revisions.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            RevisionDetailList.ItemsSource = financial.Revisions;
+        }
+
+        NextStepButtonText.Text = document.CanTransition ||
+                                  document.CanFinalizeInvoice ||
+                                  document.CanCreateNextInvoice
             ? document.NextActionLabel
             : "Nächster Schritt";
-        NextStepButton.IsEnabled = _showDocuments && document.CanTransition && !_transitioning;
+        NextStepButton.IsEnabled = _showDocuments &&
+                                   (document.CanTransition ||
+                                    document.CanFinalizeInvoice ||
+                                    document.CanCreateNextInvoice) &&
+                                   !_transitioning;
         ToolTipService.SetToolTip(NextStepButton, document.NextActionLabel);
+        AdjustmentButton.IsEnabled =
+            _showDocuments && document.CanCreateAdjustment && !_transitioning;
+        PreviewPdfButton.IsEnabled = _showDocuments && !_transitioning;
+        ToolTipService.SetToolTip(
+            PreviewPdfButton,
+            $"Vorschau öffnen und {document.DocumentTypeDisplay} {document.DocumentNumber} als PDF speichern.");
+        ToolTipService.SetToolTip(
+            AdjustmentButton,
+            document.CanCreateAdjustment
+                ? $"Korrektur oder Storno zu {document.DocumentNumber} erstellen."
+                : "Nur eine vollständig fakturierte definitive Rechnung mit offenem Posten kann korrigiert werden.");
     }
 
     private void RenderWorkspaceStatus()
@@ -676,4 +1063,8 @@ public sealed partial class InvoicingPage : Page
     }
 
     private sealed record RecipientChoice(int AddressId, string Display, bool IsTenant);
+    private sealed record InstallmentDetailRow(
+        string DueDateDisplay,
+        string Label,
+        string AmountDisplay);
 }

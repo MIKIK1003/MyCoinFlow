@@ -53,9 +53,10 @@ public sealed class InvoicingDocumentRepository
             .ToDictionary(
                 group => group.Key,
                 group => (IReadOnlyList<InvoicingDocumentFlowStep>)group
-                    .OrderBy(document => InvoicingDocumentTypeCodes.Step(document.DocumentType))
+                    .OrderBy(document => document.FlowSequence)
                     .Select(document => new InvoicingDocumentFlowStep(
                         document.Id,
+                        document.FlowSequence,
                         document.DocumentType,
                         document.DocumentNumber,
                         document.Status,
@@ -310,7 +311,7 @@ ORDER BY ValidFrom DESC, Id DESC;
             code, displayName, rateReader.GetDecimal(0), rateReader.GetString(1).Trim());
     }
 
-    private static async Task<string> AllocateNumberAsync(
+    internal static async Task<string> AllocateNumberAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         string documentType,
@@ -367,7 +368,7 @@ WHERE DocumentType = @type AND NextNumber = @expected;
         const string sql = """
 INSERT dbo.FakturierungDokument
 (
-    FlowId, DocumentType, DocumentNumber, DocumentDate, [Status], Subject,
+    FlowId, FlowSequence, DocumentType, DocumentNumber, DocumentDate, [Status], Subject,
     ContextSource, ContextSourceId, ContextTitleSnapshot, ContextSubtitleSnapshot,
     IssuerName, IssuerStreet, IssuerPostalCode, IssuerCity, IssuerCountryCode,
     IssuerVatNumber, IssuerEmail, IssuerPhone,
@@ -378,7 +379,7 @@ INSERT dbo.FakturierungDokument
 OUTPUT INSERTED.Id
 VALUES
 (
-    @flowId, 'OFFER', @number, @date, 'DRAFT', @subject,
+    @flowId, 10, 'OFFER', @number, @date, 'DRAFT', @subject,
     @contextSource, @contextId, @contextTitle, @contextSubtitle,
     @issuerName, @issuerStreet, @issuerPostal, @issuerCity, @issuerCountry,
     @issuerVat, @issuerEmail, @issuerPhone,
@@ -493,7 +494,7 @@ WHERE source.Id = @id;
         const string sql = """
 INSERT dbo.FakturierungDokument
 (
-    FlowId, DocumentType, DocumentNumber, DocumentDate, [Status], Subject,
+    FlowId, FlowSequence, DocumentType, DocumentNumber, DocumentDate, [Status], Subject,
     ContextSource, ContextSourceId, ContextTitleSnapshot, ContextSubtitleSnapshot,
     IssuerName, IssuerStreet, IssuerPostalCode, IssuerCity, IssuerCountryCode,
     IssuerVatNumber, IssuerEmail, IssuerPhone,
@@ -502,7 +503,7 @@ INSERT dbo.FakturierungDokument
     CurrencyCode, ExchangeRateToBase, ExchangeRateSource, PreviousDocumentId, CreatedBy
 )
 OUTPUT INSERTED.Id
-SELECT FlowId, @type, @number, @date, 'DRAFT', Subject,
+SELECT FlowId, FlowSequence + 10, @type, @number, @date, 'DRAFT', Subject,
        ContextSource, ContextSourceId, ContextTitleSnapshot, ContextSubtitleSnapshot,
        IssuerName, IssuerStreet, IssuerPostalCode, IssuerCity, IssuerCountryCode,
        IssuerVatNumber, IssuerEmail, IssuerPhone,
@@ -524,7 +525,7 @@ WHERE Id = @sourceId;
         return Convert.ToInt32(result, CultureInfo.InvariantCulture);
     }
 
-    private static async Task<int> CopyDocumentPositionsAsync(
+    internal static async Task<int> CopyDocumentPositionsAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         int sourceId,
@@ -578,7 +579,7 @@ WHERE Id = @sourceId AND [Status] = 'DRAFT';
         CancellationToken cancellationToken)
     {
         const string sql = """
-SELECT document.Id, document.FlowId, document.DocumentType, document.DocumentNumber,
+SELECT document.Id, document.FlowId, document.FlowSequence, document.DocumentType, document.DocumentNumber,
        document.DocumentDate, document.[Status], document.Subject,
        document.ContextSource, document.ContextSourceId,
        document.ContextTitleSnapshot, document.ContextSubtitleSnapshot,
@@ -609,41 +610,42 @@ ORDER BY document.DocumentDate DESC, document.Id DESC;
             {
                 Id = reader.GetInt32(0),
                 FlowId = reader.GetGuid(1),
-                DocumentType = reader.GetString(2),
-                DocumentNumber = reader.GetString(3),
-                DocumentDate = DateOnly.FromDateTime(reader.GetDateTime(4)),
-                Status = reader.GetString(5),
-                Subject = reader.GetString(6),
-                ContextSource = reader.GetString(7),
-                ContextSourceId = reader.GetInt32(8),
-                ContextTitleSnapshot = reader.GetString(9),
-                ContextSubtitleSnapshot = reader.GetString(10),
-                IssuerName = reader.GetString(11),
-                IssuerStreet = reader.GetString(12),
-                IssuerPostalCode = reader.GetString(13),
-                IssuerCity = reader.GetString(14),
-                IssuerCountryCode = reader.GetString(15).Trim(),
-                IssuerVatNumber = reader.GetString(16),
-                IssuerEmail = reader.GetString(17),
-                IssuerPhone = reader.GetString(18),
-                RecipientAddressIdSnapshot = reader.GetInt32(19),
-                RecipientKind = reader.GetString(20),
-                RecipientName = reader.GetString(21),
-                RecipientStreet = reader.GetString(22),
-                RecipientPostalCode = reader.GetString(23),
-                RecipientCity = reader.GetString(24),
-                RecipientCountry = reader.GetString(25),
-                CurrencyCode = reader.GetString(26).Trim(),
-                ExchangeRateToBase = reader.GetDecimal(27),
-                ExchangeRateSource = reader.GetString(28),
-                PreviousDocumentId = reader.IsDBNull(29) ? null : reader.GetInt32(29),
-                PreviousDocumentNumber = reader.GetString(30),
-                NextDocumentId = reader.IsDBNull(31) ? null : reader.GetInt32(31),
-                NextDocumentNumber = reader.GetString(32),
-                CreatedAt = reader.GetDateTime(33),
-                CreatedBy = reader.GetString(34),
-                TransitionedAt = reader.IsDBNull(35) ? null : reader.GetDateTime(35),
-                TransitionedBy = reader.GetString(36)
+                FlowSequence = reader.GetInt32(2),
+                DocumentType = reader.GetString(3),
+                DocumentNumber = reader.GetString(4),
+                DocumentDate = DateOnly.FromDateTime(reader.GetDateTime(5)),
+                Status = reader.GetString(6),
+                Subject = reader.GetString(7),
+                ContextSource = reader.GetString(8),
+                ContextSourceId = reader.GetInt32(9),
+                ContextTitleSnapshot = reader.GetString(10),
+                ContextSubtitleSnapshot = reader.GetString(11),
+                IssuerName = reader.GetString(12),
+                IssuerStreet = reader.GetString(13),
+                IssuerPostalCode = reader.GetString(14),
+                IssuerCity = reader.GetString(15),
+                IssuerCountryCode = reader.GetString(16).Trim(),
+                IssuerVatNumber = reader.GetString(17),
+                IssuerEmail = reader.GetString(18),
+                IssuerPhone = reader.GetString(19),
+                RecipientAddressIdSnapshot = reader.GetInt32(20),
+                RecipientKind = reader.GetString(21),
+                RecipientName = reader.GetString(22),
+                RecipientStreet = reader.GetString(23),
+                RecipientPostalCode = reader.GetString(24),
+                RecipientCity = reader.GetString(25),
+                RecipientCountry = reader.GetString(26),
+                CurrencyCode = reader.GetString(27).Trim(),
+                ExchangeRateToBase = reader.GetDecimal(28),
+                ExchangeRateSource = reader.GetString(29),
+                PreviousDocumentId = reader.IsDBNull(30) ? null : reader.GetInt32(30),
+                PreviousDocumentNumber = reader.GetString(31),
+                NextDocumentId = reader.IsDBNull(32) ? null : reader.GetInt32(32),
+                NextDocumentNumber = reader.GetString(33),
+                CreatedAt = reader.GetDateTime(34),
+                CreatedBy = reader.GetString(35),
+                TransitionedAt = reader.IsDBNull(36) ? null : reader.GetDateTime(36),
+                TransitionedBy = reader.GetString(37)
             });
         }
         return result;
@@ -750,7 +752,7 @@ ORDER BY CASE WHEN currency.Code = setting.BaseCurrency THEN 0 ELSE 1 END, curre
     private static InvoicingDocumentValidationException Validation(string message) =>
         new([message]);
 
-    private static async Task RollbackQuietlyAsync(SqlTransaction transaction)
+    internal static async Task RollbackQuietlyAsync(SqlTransaction transaction)
     {
         try
         {

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingDocumentPreviewWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Dokumentvorschau">
+
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="OnSaveShortcut" />
+            <KeyboardAccelerator Key="F5" Invoked="OnRefreshShortcut" />
+            <KeyboardAccelerator Key="Escape" Invoked="OnCloseShortcut" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorWindowHeaderStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="3">
+                    <TextBlock x:Name="HeaderTitleText" Text="Dokumentvorschau"
+                               Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock x:Name="HeaderSubtitleText"
+                               Text="PDF wird aus dem gespeicherten Dokumentstand erzeugt"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <Border Grid.Column="1" Padding="10,5" CornerRadius="12"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="OutputBadgeText" Text="AP07 · PDF" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Padding="16,10"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel Spacing="8">
+                <InfoBar x:Name="ErrorInfoBar" IsOpen="False" IsClosable="True"
+                         Severity="Error" Title="PDF konnte nicht erzeugt werden" />
+                <InfoBar x:Name="SnapshotInfoBar" IsOpen="False" IsClosable="False"
+                         Severity="Warning" Title="Zahlungskonto verbindlich festlegen"
+                         Message="Die erste Auswahl wird zusammen mit Referenz und Zahlungsangaben unveränderlich eingefroren." />
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Zahlungsausgabe" FontWeight="SemiBold" />
+                        <ComboBox x:Name="PaymentAccountBox"
+                                  MinWidth="360"
+                                  HorizontalAlignment="Stretch"
+                                  DisplayMemberPath="Display"
+                                  SelectionChanged="OnPaymentAccountSelectionChanged"
+                                  AutomationProperties.Name="Zahlungskonto" />
+                        <TextBlock x:Name="PaymentAccountHelpText"
+                                   Text="Für dieses Dokument ist kein Zahlungsteil erforderlich."
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Button x:Name="GenerateButton" Grid.Column="1"
+                            VerticalAlignment="Bottom"
+                            Content="Vorschau erstellen"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="OnGenerateClick" />
+                    <Button Grid.Column="2"
+                            VerticalAlignment="Bottom"
+                            Content="Neu laden"
+                            Click="OnReloadClick" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <WebView2 x:Name="PdfWebView"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      NavigationCompleted="OnPreviewNavigationCompleted" />
+            <StackPanel x:Name="EmptyPreviewPanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        MaxWidth="480"
+                        Spacing="8">
+                <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" FontSize="34"
+                          HorizontalAlignment="Center" />
+                <TextBlock Text="PDF-Vorschau wird vorbereitet"
+                           FontSize="17" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="EmptyPreviewText"
+                           Text="Das Dokument und seine eingefrorenen Ausgabedaten werden geladen."
+                           TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <Grid x:Name="LoadingOverlay" Background="#66000000" Visibility="Collapsed">
+                <ProgressRing IsActive="True" Width="44" Height="44"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="3" Style="{StaticResource EditorWindowFooterStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Text="Dokument wird geladen …"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Schließen" Click="OnCloseClick" />
+                    <Button x:Name="SaveButton" Content="Als PDF speichern"
+                            Style="{StaticResource AccentButtonStyle}"
+                            IsEnabled="False"
+                            Click="OnSaveClick"
+                            AutomationProperties.Name="Als PDF speichern" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</window:PersistentWindow>

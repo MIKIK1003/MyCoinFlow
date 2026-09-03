@@ -8,17 +8,19 @@ public static class InvoicingDocumentTypeCodes
     public const string Order = "ORDER";
     public const string Delivery = "DELIVERY";
     public const string Invoice = "INVOICE";
+    public const string Correction = "CORRECTION";
 
     public static readonly IReadOnlyList<InvoicingCodeOption> Options =
     [
         new(Offer, "Offerte"),
         new(Order, "Auftragsbestätigung"),
         new(Delivery, "Lieferung"),
-        new(Invoice, "Rechnung")
+        new(Invoice, "Rechnung"),
+        new(Correction, "Korrektur / Storno")
     ];
 
     public static bool IsKnown(string? value) =>
-        value is Offer or Order or Delivery or Invoice;
+        value is Offer or Order or Delivery or Invoice or Correction;
 
     public static string DisplayName(string? value) =>
         Options.FirstOrDefault(option => option.Code == value)?.DisplayName ?? value ?? "Dokument";
@@ -29,6 +31,7 @@ public static class InvoicingDocumentTypeCodes
         Order => 2,
         Delivery => 3,
         Invoice => 4,
+        Correction => 5,
         _ => 0
     };
 
@@ -45,13 +48,15 @@ public static class InvoicingDocumentStatusCodes
 {
     public const string Draft = "DRAFT";
     public const string Transferred = "TRANSFERRED";
+    public const string Definitive = "DEFINITIVE";
 
-    public static bool IsKnown(string? value) => value is Draft or Transferred;
+    public static bool IsKnown(string? value) => value is Draft or Transferred or Definitive;
 
     public static string DisplayName(string? value) => value switch
     {
         Draft => "Entwurf",
         Transferred => "Weitergeführt",
+        Definitive => "Definitiv",
         _ => value ?? "Unbekannt"
     };
 }
@@ -192,12 +197,13 @@ public sealed record InvoicingDocumentPositionRecord(
 
 public sealed record InvoicingDocumentFlowStep(
     int DocumentId,
+    int FlowSequence,
     string DocumentType,
     string DocumentNumber,
     string Status,
     DateOnly DocumentDate)
 {
-    public int Step => InvoicingDocumentTypeCodes.Step(DocumentType);
+    public int Step => FlowSequence / 10;
     public string StepDisplay => $"{Step}. {InvoicingDocumentTypeCodes.DisplayName(DocumentType)}";
     public string StatusDisplay => InvoicingDocumentStatusCodes.DisplayName(Status);
     public string DateDisplay => DocumentDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
@@ -209,6 +215,7 @@ public sealed class InvoicingDocumentRecord
 
     public int Id { get; init; }
     public Guid FlowId { get; init; }
+    public int FlowSequence { get; init; }
     public string DocumentType { get; init; } = string.Empty;
     public string DocumentNumber { get; init; } = string.Empty;
     public DateOnly DocumentDate { get; init; }
@@ -246,8 +253,10 @@ public sealed class InvoicingDocumentRecord
     public string TransitionedBy { get; init; } = string.Empty;
     public IReadOnlyList<InvoicingDocumentPositionRecord> Positions { get; set; } = [];
     public IReadOnlyList<InvoicingDocumentFlowStep> Flow { get; set; } = [];
+    public InvoicingFinancialRecord? Financial { get; set; }
 
-    public string DocumentTypeDisplay => InvoicingDocumentTypeCodes.DisplayName(DocumentType);
+    public string DocumentTypeDisplay =>
+        Financial?.InvoiceKindDisplay ?? InvoicingDocumentTypeCodes.DisplayName(DocumentType);
     public string StatusDisplay => InvoicingDocumentStatusCodes.DisplayName(Status);
     public string Title => $"{DocumentTypeDisplay} {DocumentNumber}";
     public string DateDisplay => DocumentDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
@@ -258,7 +267,10 @@ public sealed class InvoicingDocumentRecord
         IssuerName, IssuerStreet, IssuerPostalCode, IssuerCity, IssuerCountryCode);
     public decimal PositionsTotal => Positions.Sum(position => position.LineTotal);
     public string PositionsTotalDisplay =>
-        $"{PositionsTotal.ToString("N2", SwissCulture)} {CurrencyCode} · nicht finanzwirksamer Positionswert";
+        Financial is null
+            ? $"{PositionsTotal.ToString("N2", SwissCulture)} {CurrencyCode} · Positionswert"
+            : $"{Financial.GrossAmount.ToString("N2", SwissCulture)} {CurrencyCode} · " +
+              $"{Financial.InvoiceKindDisplay}";
     public string FlowDisplay => string.Join(
         " → ",
         Flow.OrderBy(step => step.Step).Select(step => step.DocumentNumber));
@@ -267,11 +279,22 @@ public sealed class InvoicingDocumentRecord
         Status == InvoicingDocumentStatusCodes.Draft &&
         NextDocumentType is not null &&
         NextDocumentId is null;
+    public bool CanFinalizeInvoice =>
+        DocumentType == InvoicingDocumentTypeCodes.Invoice &&
+        Status == InvoicingDocumentStatusCodes.Draft &&
+        Financial is null;
+    public bool CanCreateNextInvoice =>
+        Financial?.CanCreateNextInvoice == true && NextDocumentId is null;
+    public bool CanCreateAdjustment => Financial?.CanAdjust == true;
     public string NextActionLabel => CanTransition
         ? $"In {InvoicingDocumentTypeCodes.DisplayName(NextDocumentType)} übernehmen"
-        : DocumentType == InvoicingDocumentTypeCodes.Invoice
-            ? "Rechnungsentwurf ist letzter AP05-Schritt"
-            : "Bereits weitergeführt";
+        : CanFinalizeInvoice
+            ? "Rechnung definitiv setzen"
+            : CanCreateNextInvoice
+                ? "Weitere Teil- / Schlussrechnung"
+                : Status == InvoicingDocumentStatusCodes.Definitive
+                    ? "Definitiver Beleg"
+                    : "Bereits weitergeführt";
     public string SearchText => string.Join(
         " ",
         DocumentNumber,
@@ -281,7 +304,11 @@ public sealed class InvoicingDocumentRecord
         ContextTitleSnapshot,
         ContextSubtitleSnapshot,
         RecipientDisplay,
-        FlowDisplay);
+        FlowDisplay,
+        Financial?.InvoiceKindDisplay ?? string.Empty,
+        Financial?.PaymentReference ?? string.Empty,
+        Financial?.OpenItem?.StatusDisplay ?? string.Empty,
+        Financial?.AdjustmentReason ?? string.Empty);
 
     private static string JoinAddress(
         string name,
@@ -305,9 +332,15 @@ public sealed record InvoicingDocumentWorkspace(IReadOnlyList<InvoicingDocumentR
         Documents.Count(document => document.Status == InvoicingDocumentStatusCodes.Draft);
     public int TransferredCount =>
         Documents.Count(document => document.Status == InvoicingDocumentStatusCodes.Transferred);
+    public int DefinitiveCount =>
+        Documents.Count(document => document.Status == InvoicingDocumentStatusCodes.Definitive);
+    public int DefinitiveInvoiceCount =>
+        Documents.Count(document => document.Financial?.IsPositiveInvoice == true);
     public int FlowCount => Documents.Select(document => document.FlowId).Distinct().Count();
     public int InvoiceDraftCount =>
-        Documents.Count(document => document.DocumentType == InvoicingDocumentTypeCodes.Invoice);
+        Documents.Count(document => document.CanFinalizeInvoice);
+    public int OpenItemCount =>
+        Documents.Count(document => document.Financial?.OpenItem is { OpenAmount: > 0m });
 }
 
 public sealed class InvoicingDocumentValidationException(IReadOnlyList<string> errors)

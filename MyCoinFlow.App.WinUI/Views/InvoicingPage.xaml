@@ -28,7 +28,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
                 <TextBlock Text="Fakturieren" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Offerten, Auftragsbestätigungen, Lieferungen und Rechnungsentwürfe als zusammengehörende Dokumentfolgen"
+                <TextBlock Text="Dokumentfolgen von der Offerte bis zur definitiven Rechnung, zum offenen Posten und zur Korrektur"
                            TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <Border Grid.Column="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
@@ -66,7 +66,30 @@
                                                Style="{StaticResource FunctionButtonFullLabelStyle}" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="AdjustmentButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnAdjustmentClick"
+                                    AutomationProperties.Name="Korrektur oder Storno erstellen"
+                                    ToolTipService.ToolTip="Zuerst eine korrigierbare definitive Rechnung wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionEditIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Korrektur / Storno" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
+                    </StackPanel>
+                    <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
+
+                    <StackPanel>
+                        <TextBlock Text="AUSGABE" Style="{StaticResource FunctionGroupTitleStyle}" />
+                        <Button x:Name="PreviewPdfButton" Style="{StaticResource FunctionButtonStyle}"
+                                IsEnabled="False" Click="OnPreviewPdfClick"
+                                AutomationProperties.Name="Vorschau und PDF"
+                                ToolTipService.ToolTip="Zuerst ein Dokument wählen.">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                <TextBlock Text="Vorschau / PDF" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
 
@@ -150,21 +173,25 @@
                 Style="{StaticResource WorkspaceFilterBarStyle}">
             <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
-                <Grid ColumnSpacing="8" MinWidth="900">
+                <Grid x:Name="DocumentFilterGrid" ColumnSpacing="8" RowSpacing="8" MinWidth="900">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="280" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel x:Name="DocumentSearchZone">
                         <TextBlock Text="SUCHE" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <TextBox x:Name="DocumentSearchBox" Height="34"
                                  PlaceholderText="Nummer, Typ, Betreff, Objekt, Empfänger oder Dokumentfolge"
                                  TextChanged="OnDocumentFilterChanged"
                                  AutomationProperties.Name="Dokumente durchsuchen" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1">
+                    <StackPanel x:Name="DocumentStatusLegendZone" Grid.Column="1">
                         <TextBlock Text="STATUS" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="4" Padding="9,7">
@@ -177,10 +204,14 @@
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowPositiveBrush}" />
                                     <TextBlock Text="Weitergeführt" FontSize="12" />
                                 </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource MyCoinFlowAccentBrush}" />
+                                    <TextBlock Text="Definitiv" FontSize="12" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
+                    <StackPanel x:Name="DocumentQuickFilterZone" Grid.Column="2">
                         <TextBlock Text="SCHNELLANSICHT" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <ToggleButton x:Name="AllDocumentStatusButton" Content="Alle" Height="34"
@@ -189,9 +220,11 @@
                                           Click="OnDocumentStatusFilterClick" />
                             <ToggleButton x:Name="TransferredDocumentStatusButton" Content="Weitergeführt" Height="34"
                                           Click="OnDocumentStatusFilterClick" />
+                            <ToggleButton x:Name="DefinitiveDocumentStatusButton" Content="Definitiv" Height="34"
+                                          Click="OnDocumentStatusFilterClick" />
                         </StackPanel>
                     </StackPanel>
-                    <StackPanel Grid.Column="3">
+                    <StackPanel x:Name="DocumentTypeFilterZone" Grid.Column="3">
                         <TextBlock Text="FILTER" Style="{StaticResource WorkspaceFilterZoneTitleStyle}" />
                         <ComboBox x:Name="DocumentTypeFilterBox" Width="210" Height="34"
                                   SelectionChanged="OnDocumentFilterChanged"
@@ -200,7 +233,8 @@
                             <ComboBoxItem Content="Offerten" Tag="OFFER" />
                             <ComboBoxItem Content="Auftragsbestätigungen" Tag="ORDER" />
                             <ComboBoxItem Content="Lieferungen" Tag="DELIVERY" />
-                            <ComboBoxItem Content="Rechnungsentwürfe" Tag="INVOICE" />
+                            <ComboBoxItem Content="Rechnungen" Tag="INVOICE" />
+                            <ComboBoxItem Content="Korrekturen / Stornos" Tag="CORRECTION" />
                         </ComboBox>
                     </StackPanel>
                 </Grid>
@@ -316,7 +350,25 @@
                         <TextBlock Text="RECHNUNGSENTWÜRFE" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock x:Name="InvoiceDraftCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock Text="nicht finanzwirksam" FontSize="11"
+                        <TextBlock Text="zur Definitivsetzung bereit" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="DEFINITIVE RECHNUNGEN" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="DefinitiveInvoiceCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="mit Finanzsnapshot" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource WorkspaceMetricCardStyle}" Width="188">
+                    <StackPanel>
+                        <TextBlock Text="OFFENE POSTEN" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="OpenItemCountText" Text="0" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="noch offen" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -532,6 +584,89 @@
                                 </StackPanel>
                             </Border>
                         </Grid>
+                        <StackPanel x:Name="FinancialPanel" Spacing="8" Visibility="Collapsed">
+                            <Grid x:Name="FinancialSnapshotGrid" ColumnSpacing="8" RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Border x:Name="FinancialSnapshotCard" Style="{StaticResource EditorSectionCardStyle}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Definitiver Finanzsnapshot" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="InvoiceKindValueText" Text="—" FontSize="16"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="InvoiceAmountsText" Text="—" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="InvoiceBasisText" Text="—" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock x:Name="InvoiceTermsText" Text="—" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock x:Name="PaymentReferenceText" Text="—" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border x:Name="OpenItemSnapshotCard" Grid.Column="1"
+                                        Style="{StaticResource EditorSectionCardStyle}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Offener Posten" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="OpenItemAmountText" Text="—" FontSize="16"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="OpenItemStatusText" Text="—" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="OpenItemDueDateText" Text="—" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <StackPanel x:Name="InstallmentDetailPanel" Spacing="5" Visibility="Collapsed">
+                                <TextBlock Text="Abzahlungsplan" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ListView x:Name="InstallmentDetailList" SelectionMode="None" MaxHeight="220">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding DueDateDisplay}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Label}" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="2" Text="{Binding AmountDisplay}" FontWeight="SemiBold" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+
+                            <StackPanel x:Name="RevisionDetailPanel" Spacing="5" Visibility="Collapsed">
+                                <TextBlock Text="Revisionsverlauf" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ListView x:Name="RevisionDetailList" SelectionMode="None" MaxHeight="240">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding EventTypeDisplay}" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding EventAtDisplay}" FontSize="11"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding Narrative}" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="2" Text="{Binding AmountDisplay}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </StackPanel>
                         <StackPanel Spacing="5">
                             <TextBlock Text="Positionssnapshots" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -577,8 +712,8 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                         <InfoBar x:Name="InvoiceDraftInfoBar" IsOpen="True" IsClosable="False"
-                                 Severity="Warning" Title="Keine Finanz- oder Lagerwirkung"
-                                 Message="Auch eine Rechnung bleibt in AP05 ein Entwurf. Es entstehen weder Buchung noch offener Posten, Zahlung, PDF/QR-Ausgabe oder Bestandsbewegung." />
+                                 Severity="Warning" Title="Noch nicht definitiv"
+                                 Message="Dieser Rechnungsentwurf erzeugt erst mit «Rechnung definitiv setzen» einen Finanzsnapshot und offenen Posten. Zahlung, Buchung, PDF/QR-Ausgabe, Versand und Bestandsbewegung bleiben ausserhalb von AP06." />
                     </StackPanel>
                 </ScrollViewer>
             </Border>

@@ -8,15 +8,18 @@ public sealed class InvoicingViewModel
     private readonly InvoicingWorkspaceRepository _repository;
     private readonly InvoicingMasterDataRepository _masterDataRepository;
     private readonly InvoicingDocumentRepository _documentRepository;
+    private readonly InvoicingInvoiceRepository _invoiceRepository;
 
     public InvoicingViewModel(
         InvoicingWorkspaceRepository? repository = null,
         InvoicingMasterDataRepository? masterDataRepository = null,
-        InvoicingDocumentRepository? documentRepository = null)
+        InvoicingDocumentRepository? documentRepository = null,
+        InvoicingInvoiceRepository? invoiceRepository = null)
     {
         _repository = repository ?? new InvoicingWorkspaceRepository();
         _masterDataRepository = masterDataRepository ?? new InvoicingMasterDataRepository();
         _documentRepository = documentRepository ?? new InvoicingDocumentRepository(_masterDataRepository);
+        _invoiceRepository = invoiceRepository ?? new InvoicingInvoiceRepository();
     }
 
     public InvoicingWorkspaceOverview? Overview { get; private set; }
@@ -39,7 +42,11 @@ public sealed class InvoicingViewModel
                 effectiveDate ?? DateOnly.FromDateTime(DateTime.Today),
                 searchText,
                 cancellationToken);
-            Documents = await _documentRepository.LoadDocumentsAsync(cancellationToken);
+            var documents = await _documentRepository.LoadDocumentsAsync(cancellationToken);
+            var enriched = await _invoiceRepository.EnrichDocumentsAsync(
+                documents.Documents,
+                cancellationToken);
+            Documents = new InvoicingDocumentWorkspace(enriched);
         }
         catch (Exception exception)
         {
