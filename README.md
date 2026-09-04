@@ -13,5 +13,5 @@ referenzierter Fach-/Servicebestand erhalten.
 - [Aktions- und Iconkatalog](DOCS/UI_ACTION_CATALOG.md)
 - [UI-Ausgangslage](DOCS/UI_CONTRACT_BASELINE.md)
 - [Versionen und kurze Tasks](DOCS/VERSIONING.md)
-- [Aktiver Versionsabschnitt 3.1.1.0](DOCS/VERSIONS/3.1.1.0.md)
+- [Aktiver Versionsabschnitt 3.1.1.1](DOCS/VERSIONS/3.1.1.1.md)
 - [Gesicherte ShopFlow-UI-Referenz](DOCS/REFERENCES/SHOPFLOW_UI_MASTER_2026-09-02.md)
