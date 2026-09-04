@@ -35,6 +35,7 @@ namespace MyCoinFlow.Import
 
 
         public string ServiceRef { get; set; } = "";
+        public string? StructuredReference { get; set; }
         public string Text { get; set; } = "";
         public string? CounterpartyName { get; set; }
         public string? CounterpartyIban { get; set; }

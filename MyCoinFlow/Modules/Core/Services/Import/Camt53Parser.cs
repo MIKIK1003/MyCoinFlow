@@ -121,6 +121,11 @@ namespace MyCoinFlow.Import
                                        .ToList()
                                ?? new List<string>();
 
+                    var structuredReference = txFirst?.Element(ns + "RmtInf")
+                        ?.Elements(ns + "Strd")
+                        .Select(element => element.Element(ns + "CdtrRefInf")?.Element(ns + "Ref")?.Value)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
                     if (ustrd.Count > 0)
                     {
                         var joined = string.Join(" | ", ustrd);
@@ -169,6 +174,7 @@ namespace MyCoinFlow.Import
                         Amount = amount,
                         Direction = direction,
                         ServiceRef = serviceRef,
+                        StructuredReference = TrimOrNull(structuredReference),
                         Text = text,
                         CounterpartyName = TrimOrNull(cpName),
                         CounterpartyIban = TrimOrNull(cpIban),

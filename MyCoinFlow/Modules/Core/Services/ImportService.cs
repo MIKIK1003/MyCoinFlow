@@ -37,27 +37,45 @@ namespace MyCoinFlow.Services
             int ins = 0, skip = 0;
             using var c = CreateConnection();
             c.Open();
+            EnsureStructuredReferenceColumns(c);
 
             foreach (var it in items)
             {
                 var uniq = BuildUniqKey(it);
-                const string sqlCheck = @"SELECT COUNT(*) FROM BankImportItem WHERE AccountIban = @iban AND UniqKey = @uk";
+                const string sqlCheck = @"
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1 FROM BankImportItem WHERE AccountIban = @iban AND UniqKey = @uk
+)
+OR EXISTS
+(
+    SELECT 1
+    FROM BankImportItemArchive
+    WHERE AccountIban = @iban
+      AND BookingDate = @bookingDate
+      AND Amount = @amount
+      AND COALESCE(ServiceRef, N'') = @serviceRef
+)
+THEN 1 ELSE 0 END;";
                 using (var check = new SqlCommand(sqlCheck, c))
                 {
                     check.Parameters.AddWithValue("@iban", (object?)it.AccountIban ?? DBNull.Value);
                     check.Parameters.AddWithValue("@uk", uniq);
+                    check.Parameters.AddWithValue("@bookingDate", it.BookingDate.Date);
+                    check.Parameters.AddWithValue("@amount", it.Amount);
+                    check.Parameters.AddWithValue("@serviceRef", it.ServiceRef ?? string.Empty);
                     int count = (int)check.ExecuteScalar();
                     if (count > 0) { skip++; continue; }
                 }
 
                 const string sqlIns = @"
 INSERT INTO BankImportItem
-(BatchId, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, [Text],
+(BatchId, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, StructuredReference, [Text],
  CounterpartyName, CounterpartyIban, Uetr, PurposeCode,
  VorschlagAdresseId, VorschlagNachKontoId, VorschlagVonKontoId, VorschlagGeldinstitutId,
  UniqKey)
 VALUES
-(@b, @iban, @ccy, @bd, @vd, @amt, @dir, @ref, @txt,
+(@b, @iban, @ccy, @bd, @vd, @amt, @dir, @ref, @structuredRef, @txt,
  @cpn, @cpi, @uetr, @purp,
  @adr, @nach, @von, @gi,
  @uk)";
@@ -70,6 +88,7 @@ VALUES
                 insCmd.Parameters.AddWithValue("@amt", it.Amount);
                 insCmd.Parameters.AddWithValue("@dir", it.Direction == KreditDebit.Credit ? "CRDT" : "DBIT");
                 insCmd.Parameters.AddWithValue("@ref", (object?)it.ServiceRef ?? DBNull.Value);
+                insCmd.Parameters.AddWithValue("@structuredRef", (object?)it.StructuredReference ?? DBNull.Value);
                 insCmd.Parameters.AddWithValue("@txt", (object?)it.Text ?? DBNull.Value);
                 insCmd.Parameters.AddWithValue("@cpn", (object?)it.CounterpartyName ?? DBNull.Value);
                 insCmd.Parameters.AddWithValue("@cpi", (object?)it.CounterpartyIban ?? DBNull.Value);
@@ -91,9 +110,10 @@ VALUES
             var list = new List<BankImportItem>();
             using var c = CreateConnection();
             c.Open();
+            EnsureStructuredReferenceColumns(c);
 
             const string sql = @"
-SELECT Id, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, [Text],
+SELECT Id, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, StructuredReference, [Text],
        CounterpartyName, CounterpartyIban, Uetr, PurposeCode,
        VorschlagAdresseId, VorschlagNachKontoId, VorschlagVonKontoId, VorschlagGeldinstitutId
 FROM BankImportItem
@@ -113,15 +133,16 @@ ORDER BY BookingDate, Id";
                     Amount = r.GetDecimal(5),
                     Direction = r.GetString(6) == "CRDT" ? KreditDebit.Credit : KreditDebit.Debit,
                     ServiceRef = r.IsDBNull(7) ? "" : r.GetString(7),
-                    Text = r.IsDBNull(8) ? "" : r.GetString(8),
-                    CounterpartyName = r.IsDBNull(9) ? null : r.GetString(9),
-                    CounterpartyIban = r.IsDBNull(10) ? null : r.GetString(10),
-                    Uetr = r.IsDBNull(11) ? null : r.GetString(11),
-                    PurposeCode = r.IsDBNull(12) ? null : r.GetString(12),
-                    VorschlagAdresseId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
-                    VorschlagNachKontoId = r.IsDBNull(14) ? (int?)null : r.GetInt32(14),
-                    VorschlagVonKontoId = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
-                    VorschlagGeldinstitutId = r.IsDBNull(16) ? (int?)null : r.GetInt32(16)
+                    StructuredReference = r.IsDBNull(8) ? null : r.GetString(8),
+                    Text = r.IsDBNull(9) ? "" : r.GetString(9),
+                    CounterpartyName = r.IsDBNull(10) ? null : r.GetString(10),
+                    CounterpartyIban = r.IsDBNull(11) ? null : r.GetString(11),
+                    Uetr = r.IsDBNull(12) ? null : r.GetString(12),
+                    PurposeCode = r.IsDBNull(13) ? null : r.GetString(13),
+                    VorschlagAdresseId = r.IsDBNull(14) ? (int?)null : r.GetInt32(14),
+                    VorschlagNachKontoId = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
+                    VorschlagVonKontoId = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),
+                    VorschlagGeldinstitutId = r.IsDBNull(17) ? (int?)null : r.GetInt32(17)
                 });
             }
             return list;
@@ -152,15 +173,16 @@ WHERE Id = @id";
         {
             using var c = CreateConnection();
             c.Open();
+            EnsureStructuredReferenceColumns(c);
             using var tx = c.BeginTransaction();
 
             const string insArc = @"
 INSERT INTO BankImportItemArchive
-(SourceItemId, BatchId, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, [Text],
+(SourceItemId, BatchId, AccountIban, Currency, BookingDate, ValueDate, Amount, Direction, ServiceRef, StructuredReference, [Text],
  CounterpartyName, CounterpartyIban, Uetr, PurposeCode,
  VorschlagAdresseId, VorschlagNachKontoId, VorschlagVonKontoId, VorschlagGeldinstitutId,
  BookedTransaktionId, ArchiveReason)
-SELECT i.Id, i.BatchId, i.AccountIban, i.Currency, i.BookingDate, i.ValueDate, i.Amount, i.Direction, i.ServiceRef, i.[Text],
+SELECT i.Id, i.BatchId, i.AccountIban, i.Currency, i.BookingDate, i.ValueDate, i.Amount, i.Direction, i.ServiceRef, i.StructuredReference, i.[Text],
        i.CounterpartyName, i.CounterpartyIban, i.Uetr, i.PurposeCode,
        i.VorschlagAdresseId, i.VorschlagNachKontoId, i.VorschlagVonKontoId, i.VorschlagGeldinstitutId,
        @tId, @reason
@@ -197,6 +219,17 @@ WHERE i.Id = @id;";
             var a = it.Amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
             var r = it.ServiceRef ?? "";
             return $"{d}|{a}|{r}";
+        }
+
+        private static void EnsureStructuredReferenceColumns(SqlConnection connection)
+        {
+            const string sql = @"
+IF COL_LENGTH(N'dbo.BankImportItem', N'StructuredReference') IS NULL
+    ALTER TABLE dbo.BankImportItem ADD StructuredReference nvarchar(80) NULL;
+IF COL_LENGTH(N'dbo.BankImportItemArchive', N'StructuredReference') IS NULL
+    ALTER TABLE dbo.BankImportItemArchive ADD StructuredReference nvarchar(80) NULL;";
+            using var command = new SqlCommand(sql, connection);
+            command.ExecuteNonQuery();
         }
     }
 }

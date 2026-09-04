@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using MyCoinFlow.Services;
 using MyCoinFlow.WinUI.Data;
 using MyCoinFlow.WinUI.Models;
 using MyCoinFlow.WinUI.ViewModels;
@@ -12,6 +13,7 @@ public sealed partial class InvoicingPage : Page
     private readonly InvoicingViewModel _viewModel = new();
     private readonly InvoicingDocumentRepository _documentRepository = new();
     private readonly InvoicingInvoiceRepository _invoiceRepository = new();
+    private readonly InvoicingPaymentRepository _paymentRepository = new();
     private IReadOnlyList<BillableObjectRecord> _allObjects = [];
     private IReadOnlyList<InvoicingDocumentRecord> _allDocuments = [];
     private string _statusFilter = "ALL";
@@ -27,6 +29,8 @@ public sealed partial class InvoicingPage : Page
     private InvoicingInvoiceEditorWindow? _invoiceEditorWindow;
     private InvoicingDocumentPreviewWindow? _documentPreviewWindow;
     private int? _previewDocumentId;
+    private InvoicingDeliveryWindow? _deliveryWindow;
+    private int? _deliveryDocumentId;
 
     public InvoicingPage()
     {
@@ -167,6 +171,7 @@ public sealed partial class InvoicingPage : Page
         {
             NextStepButton.IsEnabled = false;
             AdjustmentButton.IsEnabled = false;
+            DunningButton.IsEnabled = false;
             PreviewPdfButton.IsEnabled = false;
             RenderSelectedObject();
         }
@@ -347,6 +352,43 @@ public sealed partial class InvoicingPage : Page
             _documentPreviewWindow.Closed -= OnDocumentPreviewWindowClosed;
         _documentPreviewWindow = null;
         _previewDocumentId = null;
+    }
+
+    private void OnEmailClick(object sender, RoutedEventArgs e) =>
+        OpenDeliveryWindow(InvoicingDeliverySection.Email);
+
+    private void OnDmsClick(object sender, RoutedEventArgs e) =>
+        OpenDeliveryWindow(InvoicingDeliverySection.Dms);
+
+    private void OpenDeliveryWindow(InvoicingDeliverySection section)
+    {
+        if (SelectedDocument is not { } document) return;
+        if (_deliveryWindow is not null && _deliveryDocumentId == document.Id)
+        {
+            _deliveryWindow.FocusSection(section);
+            _deliveryWindow.Activate();
+            return;
+        }
+        if (_deliveryWindow is not null)
+        {
+            _deliveryWindow.Close();
+            _deliveryWindow = null;
+        }
+        _deliveryDocumentId = document.Id;
+        _deliveryWindow = new InvoicingDeliveryWindow(document.Id, section);
+        _deliveryWindow.Closed += OnDeliveryWindowClosed;
+        _deliveryWindow.Activate();
+    }
+
+    private async void OnDeliveryWindowClosed(object sender, WindowEventArgs args)
+    {
+        var changed = _deliveryWindow?.Changed == true;
+        var documentId = _deliveryDocumentId;
+        if (_deliveryWindow is not null)
+            _deliveryWindow.Closed -= OnDeliveryWindowClosed;
+        _deliveryWindow = null;
+        _deliveryDocumentId = null;
+        if (changed) await ReloadAsync(documentId);
     }
 
     private void OnDocumentFlowSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -643,6 +685,69 @@ public sealed partial class InvoicingPage : Page
         }
     }
 
+    private async void OnDunningClick(object sender, RoutedEventArgs e)
+    {
+        var document = SelectedDocument;
+        var openItem = document?.Financial?.OpenItem;
+        if (document is null || openItem is not { OpenAmount: > 0m } || _transitioning) return;
+
+        var levelBox = new NumberBox
+        {
+            Header = "Mahnstufe (0 bis 4)",
+            Minimum = 0,
+            Maximum = 4,
+            SmallChange = 1,
+            Value = openItem.DunningLevel,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        var blockedSwitch = new ToggleSwitch
+        {
+            Header = "Mahnsperre",
+            OffContent = "Nicht gesperrt",
+            OnContent = "Gesperrt",
+            IsOn = openItem.IsDunningBlocked
+        };
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"{document.DocumentNumber} · offen {openItem.OpenAmountDisplay}",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(levelBox);
+        content.Children.Add(blockedSwitch);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Mahnstatus bearbeiten",
+            Content = content,
+            PrimaryButtonText = "Mahnstatus speichern",
+            CloseButtonText = "Abbrechen",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        _transitioning = true;
+        RenderSelectedDocument();
+        try
+        {
+            await _paymentRepository.SetDunningAsync(
+                document.Id,
+                (byte)Math.Clamp((int)Math.Round(levelBox.Value), 0, 4),
+                blockedSwitch.IsOn);
+            await ReloadAsync(document.Id);
+        }
+        catch (Exception exception)
+        {
+            ErrorInfoBar.Message = exception.Message;
+            ErrorInfoBar.IsOpen = true;
+        }
+        finally
+        {
+            _transitioning = false;
+            RenderSelectedDocument();
+        }
+    }
+
     private void OnObjectSelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RenderSelectedObject();
 
@@ -674,6 +779,7 @@ public sealed partial class InvoicingPage : Page
         NewOfferButton.IsEnabled = false;
         NextStepButton.IsEnabled = false;
         AdjustmentButton.IsEnabled = false;
+        DunningButton.IsEnabled = false;
 
         var effectiveDate = EffectiveDatePicker.SelectedDate?.Date ?? DateTime.Today;
         await _viewModel.LoadAsync(DateOnly.FromDateTime(effectiveDate));
@@ -774,7 +880,10 @@ public sealed partial class InvoicingPage : Page
         {
             NextStepButton.IsEnabled = false;
             AdjustmentButton.IsEnabled = false;
+            DunningButton.IsEnabled = false;
             PreviewPdfButton.IsEnabled = false;
+            EmailButton.IsEnabled = false;
+            DmsButton.IsEnabled = false;
             NextStepButtonText.Text = "Nächster Schritt";
             ToolTipService.SetToolTip(NextStepButton, "Zuerst ein weiterführbares Dokument wählen.");
             ToolTipService.SetToolTip(
@@ -874,10 +983,11 @@ public sealed partial class InvoicingPage : Page
             {
                 OpenItemAmountText.Text = openItem.OpenAmountDisplay;
                 OpenItemStatusText.Text =
-                    $"{openItem.StatusDisplay} · ursprünglich {openItem.OriginalAmount:N2} · " +
+                    $"{openItem.StatusDisplay} · bezahlt {openItem.PaidAmountDisplay} · ursprünglich {openItem.OriginalAmount:N2} · " +
                     $"Korrekturen {openItem.CorrectionAmount:N2} {openItem.CurrencyCode}";
                 OpenItemDueDateText.Text =
                     $"Fällig {openItem.DueDateDisplay} · Basis offen {openItem.BaseOpenAmountDisplay}";
+                OpenItemDunningText.Text = $"Mahnstatus: {openItem.DunningStatusDisplay}";
             }
             else
             {
@@ -886,6 +996,7 @@ public sealed partial class InvoicingPage : Page
                     ? "Der Beleg reduziert den offenen Posten seiner Bezugsrechnung."
                     : "—";
                 OpenItemDueDateText.Text = "—";
+                OpenItemDunningText.Text = "—";
             }
 
             InstallmentDetailPanel.Visibility = financial.Installments.Count > 0
@@ -916,10 +1027,23 @@ public sealed partial class InvoicingPage : Page
         ToolTipService.SetToolTip(NextStepButton, document.NextActionLabel);
         AdjustmentButton.IsEnabled =
             _showDocuments && document.CanCreateAdjustment && !_transitioning;
+        DunningButton.IsEnabled = _showDocuments &&
+                                  financial?.OpenItem is { OpenAmount: > 0m } &&
+                                  !_transitioning;
         PreviewPdfButton.IsEnabled = _showDocuments && !_transitioning;
+        EmailButton.IsEnabled = _showDocuments && !_transitioning;
+        DmsButton.IsEnabled = _showDocuments && !_transitioning && AppModules.IsDmsEnabled;
         ToolTipService.SetToolTip(
             PreviewPdfButton,
             $"Vorschau öffnen und {document.DocumentTypeDisplay} {document.DocumentNumber} als PDF speichern.");
+        ToolTipService.SetToolTip(
+            EmailButton,
+            $"{document.DocumentTypeDisplay} {document.DocumentNumber} als PDF per E-Mail senden.");
+        ToolTipService.SetToolTip(
+            DmsButton,
+            AppModules.IsDmsEnabled
+                ? $"PDF und Beilagen zu {document.DocumentNumber} im DMS verwalten."
+                : "Das DMS-Modul ist nicht freigeschaltet.");
         ToolTipService.SetToolTip(
             AdjustmentButton,
             document.CanCreateAdjustment

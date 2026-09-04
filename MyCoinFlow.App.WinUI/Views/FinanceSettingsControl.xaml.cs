@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using MyCoinFlow.Services;
 using MyCoinFlow.WinUI.Data;
 using MyCoinFlow.WinUI.Models;
+using MyCoinFlow.WinUI.Services;
 using WinUiConnectionStrings = MyCoinFlow.WinUI.Data.ConnectionStrings;
 
 namespace MyCoinFlow.WinUI.Views;
@@ -10,6 +11,8 @@ namespace MyCoinFlow.WinUI.Views;
 public sealed partial class FinanceSettingsControl : UserControl
 {
     private readonly FinanceSettingsRepository _repository = new();
+    private readonly IInvoicingSmtpCredentialStore _smtpCredentialStore =
+        new InvoicingSmtpCredentialStore();
     private FinanceSettingsDraft? _draft;
     private string? _loadedDatabase;
     private bool _busy;
@@ -53,10 +56,25 @@ public sealed partial class FinanceSettingsControl : UserControl
         try
         {
             var result = await _repository.SaveAsync(_draft);
+            var warnings = result.Warnings.ToList();
+            try
+            {
+                if (RemoveSmtpPasswordBox.IsChecked == true)
+                    _smtpCredentialStore.RemovePassword();
+                else if (!string.IsNullOrEmpty(SmtpPasswordBox.Password))
+                    _smtpCredentialStore.SavePassword(SmtpPasswordBox.Password);
+            }
+            catch (Exception exception)
+            {
+                warnings.Add("Das SMTP-Kennwort konnte lokal nicht gespeichert werden: " + exception.Message);
+            }
             _draft = result.Draft;
+            _draft.HasStoredSmtpPassword = _smtpCredentialStore.HasPassword();
             _loadedDatabase = WinUiConnectionStrings.ActiveDatabaseName;
+            SmtpPasswordBox.Password = string.Empty;
+            RemoveSmtpPasswordBox.IsChecked = false;
             ApplyDraft();
-            if (result.IsComplete)
+            if (warnings.Count == 0)
             {
                 Show(
                     $"Finanzstammdaten für Mandant '{_loadedDatabase}' wurden vollständig validiert und gespeichert.",
@@ -69,7 +87,7 @@ public sealed partial class FinanceSettingsControl : UserControl
                     "Alle unabhängig speicherbaren Daten wurden gesichert. " +
                     "Die folgenden Eingaben sind noch unvollständig oder konnten in ihrem Bereich nicht gespeichert werden; " +
                     "sie bleiben zur Korrektur im Formular:  •  " +
-                    string.Join("  •  ", result.Warnings),
+                    string.Join("  •  ", warnings),
                     InfoBarSeverity.Warning,
                     "Mit Hinweisen gespeichert");
             }
@@ -103,6 +121,7 @@ public sealed partial class FinanceSettingsControl : UserControl
         try
         {
             _draft = await _repository.LoadAsync();
+            _draft.HasStoredSmtpPassword = _smtpCredentialStore.HasPassword();
             _loadedDatabase = WinUiConnectionStrings.ActiveDatabaseName;
             ApplyDraft();
             Show(
@@ -145,6 +164,14 @@ public sealed partial class FinanceSettingsControl : UserControl
         InvoiceEmailBox.Text = _draft.InvoiceEmail;
         InvoicePhoneBox.Text = _draft.InvoicePhone;
         PaymentDaysBox.Value = _draft.DefaultPaymentDays;
+        SmtpHostBox.Text = _draft.SmtpHost;
+        SmtpPortBox.Value = _draft.SmtpPort;
+        SmtpTlsBox.IsChecked = _draft.SmtpUseTls;
+        SmtpUserBox.Text = _draft.SmtpUserName;
+        SmtpFromBox.Text = _draft.SmtpFromAddress;
+        SmtpPasswordStatusText.Text = _draft.HasStoredSmtpPassword
+            ? "Ein SMTP-Kennwort ist für diesen Mandanten lokal geschützt gespeichert."
+            : "Kein SMTP-Kennwort gespeichert.";
 
         NumberRangesList.ItemsSource = _draft.NumberRanges;
         CurrenciesList.ItemsSource = _draft.Currencies;
@@ -176,6 +203,13 @@ public sealed partial class FinanceSettingsControl : UserControl
         _draft.VatNumber = VatNumberBox.Text;
         _draft.InvoiceEmail = InvoiceEmailBox.Text;
         _draft.InvoicePhone = InvoicePhoneBox.Text;
+        _draft.SmtpHost = SmtpHostBox.Text;
+        _draft.SmtpPort = double.IsFinite(SmtpPortBox.Value)
+            ? checked((int)SmtpPortBox.Value)
+            : 0;
+        _draft.SmtpUseTls = SmtpTlsBox.IsChecked == true;
+        _draft.SmtpUserName = SmtpUserBox.Text;
+        _draft.SmtpFromAddress = SmtpFromBox.Text;
         _draft.DefaultPaymentDays = double.IsFinite(PaymentDaysBox.Value)
             ? checked((int)PaymentDaysBox.Value)
             : -1;

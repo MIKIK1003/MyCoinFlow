@@ -35,12 +35,16 @@ public static class InvoicingOpenItemStatusCodes
 {
     public const string Open = "OPEN";
     public const string Corrected = "CORRECTED";
+    public const string PartiallyPaid = "PARTIALLY_PAID";
+    public const string Paid = "PAID";
     public const string Cancelled = "CANCELLED";
 
     public static string DisplayName(string? value) => value switch
     {
         Open => "Offen",
         Corrected => "Teilweise korrigiert",
+        PartiallyPaid => "Teilbezahlt",
+        Paid => "Bezahlt",
         Cancelled => "Storniert",
         _ => value ?? "Unbekannt"
     };
@@ -53,6 +57,7 @@ public static class InvoicingRevisionEventTypeCodes
     public const string NextFinalCreated = "NEXT_FINAL_CREATED";
     public const string CorrectionCreated = "CORRECTION_CREATED";
     public const string CancellationCreated = "CANCELLATION_CREATED";
+    public const string PaymentApplied = "PAYMENT_APPLIED";
 
     public static string DisplayName(string? value) => value switch
     {
@@ -61,6 +66,7 @@ public static class InvoicingRevisionEventTypeCodes
         NextFinalCreated => "Schlussrechnung angelegt",
         CorrectionCreated => "Korrektur erstellt",
         CancellationCreated => "Storno erstellt",
+        PaymentApplied => "Zahlung verbucht",
         _ => value ?? "Revisionsereignis"
     };
 }
@@ -164,7 +170,10 @@ public sealed record InvoicingOpenItemRecord(
     decimal BaseOpenAmount,
     DateOnly DueDate,
     string Status,
-    DateTime UpdatedAt)
+    DateTime UpdatedAt,
+    byte DunningLevel,
+    bool IsDunningBlocked,
+    DateTime? LastDunningAt)
 {
     private static readonly CultureInfo SwissCulture = CultureInfo.GetCultureInfo("de-CH");
     public string StatusDisplay => InvoicingOpenItemStatusCodes.DisplayName(Status);
@@ -173,6 +182,18 @@ public sealed record InvoicingOpenItemRecord(
     public string BaseOpenAmountDisplay =>
         $"{BaseOpenAmount.ToString("N2", SwissCulture)} {BaseCurrencyCode}";
     public string DueDateDisplay => DueDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+    public string PaidAmountDisplay =>
+        $"{PaidAmount.ToString("N2", SwissCulture)} {CurrencyCode}";
+    public string DunningStatusDisplay => Status is InvoicingOpenItemStatusCodes.Paid or
+        InvoicingOpenItemStatusCodes.Cancelled
+        ? "Abgeschlossen"
+        : IsDunningBlocked
+            ? "Mahnsperre"
+            : DunningLevel > 0
+                ? $"Mahnstufe {DunningLevel}"
+                : DueDate < DateOnly.FromDateTime(DateTime.Today)
+                    ? "Überfällig"
+                    : "Nicht fällig";
 }
 
 public sealed record InvoicingRevisionEventRecord(

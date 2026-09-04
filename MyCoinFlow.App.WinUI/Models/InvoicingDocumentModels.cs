@@ -173,6 +173,7 @@ public sealed record InvoicingDocumentPositionRecord(
     decimal UnitPrice,
     string VatCodeSnapshot,
     decimal? VatRatePercentSnapshot,
+    int? RevenueAccountIdSnapshot,
     string RevenueAccountSnapshot,
     string AncillaryClassificationSnapshot,
     string MainTextPlain,

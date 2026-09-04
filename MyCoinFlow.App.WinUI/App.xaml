@@ -58,6 +58,7 @@
             <x:String x:Key="ActionDocumentIconGlyph">&#xE8A5;</x:String>
             <x:String x:Key="ActionReportIconGlyph">&#xE9D2;</x:String>
             <x:String x:Key="ActionMessageIconGlyph">&#xE8BD;</x:String>
+            <x:String x:Key="ActionMailIconGlyph">&#xE715;</x:String>
 
             <Style x:Key="ActionIconStyle" TargetType="FontIcon">
                 <Setter Property="FontSize" Value="16" />

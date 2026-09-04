@@ -27,6 +27,12 @@ public sealed class FinanceSettingsDraft
     public string VatNumber { get; set; } = string.Empty;
     public string InvoiceEmail { get; set; } = string.Empty;
     public string InvoicePhone { get; set; } = string.Empty;
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; } = 587;
+    public bool SmtpUseTls { get; set; } = true;
+    public string SmtpUserName { get; set; } = string.Empty;
+    public string SmtpFromAddress { get; set; } = string.Empty;
+    public bool HasStoredSmtpPassword { get; set; }
     public int DefaultPaymentDays { get; set; } = 30;
     public string BaseCurrency { get; set; } = "CHF";
     public int? ExchangeGainAccountId { get; set; }
@@ -211,6 +217,21 @@ public static class FinanceSettingsValidator
             errors.Add($"Das Standard-Zahlungsziel muss zwischen 0 und {MaximumPaymentDays} Tagen liegen.");
         if (!string.IsNullOrWhiteSpace(draft.InvoiceEmail) && !IsEmailAddress(draft.InvoiceEmail))
             errors.Add("Die Rechnungs-E-Mail-Adresse ist ungültig.");
+        var hasSmtpConfiguration = !string.IsNullOrWhiteSpace(draft.SmtpHost) ||
+            !string.IsNullOrWhiteSpace(draft.SmtpUserName) ||
+            !string.IsNullOrWhiteSpace(draft.SmtpFromAddress);
+        if (hasSmtpConfiguration)
+        {
+            Require(draft.SmtpHost, "E-Mail-Versand: SMTP-Host", errors);
+            Require(draft.SmtpFromAddress, "E-Mail-Versand: Absenderadresse", errors);
+            if (!string.IsNullOrWhiteSpace(draft.SmtpFromAddress) &&
+                !IsEmailAddress(draft.SmtpFromAddress))
+            {
+                errors.Add("Die SMTP-Absenderadresse ist ungültig.");
+            }
+        }
+        if (draft.SmtpPort is < 1 or > 65535)
+            errors.Add("Der SMTP-Port muss zwischen 1 und 65535 liegen.");
         if (!IsIsoCurrencyCode(draft.BaseCurrency))
             errors.Add("Die Basiswährung muss ein dreistelliger ISO-Währungscode sein.");
 
@@ -261,6 +282,9 @@ public static class FinanceSettingsValidator
         draft.VatNumber = draft.VatNumber.Trim();
         draft.InvoiceEmail = draft.InvoiceEmail.Trim();
         draft.InvoicePhone = draft.InvoicePhone.Trim();
+        draft.SmtpHost = draft.SmtpHost.Trim();
+        draft.SmtpUserName = draft.SmtpUserName.Trim();
+        draft.SmtpFromAddress = draft.SmtpFromAddress.Trim();
         draft.BaseCurrency = draft.BaseCurrency.Trim().ToUpperInvariant();
 
         foreach (var range in draft.NumberRanges)
@@ -501,6 +525,9 @@ public static class FinanceSettingsValidator
         Maximum(draft.VatNumber, 40, "MWST-/UID-Nummer", errors);
         Maximum(draft.InvoiceEmail, 256, "Rechnungs-E-Mail", errors);
         Maximum(draft.InvoicePhone, 80, "Telefon", errors);
+        Maximum(draft.SmtpHost, 256, "SMTP-Host", errors);
+        Maximum(draft.SmtpUserName, 256, "SMTP-Benutzername", errors);
+        Maximum(draft.SmtpFromAddress, 256, "SMTP-Absenderadresse", errors);
         foreach (var currency in draft.Currencies)
             Maximum(currency.DisplayName, 80, $"Währung {currency.Code}: Bezeichnung", errors);
         foreach (var rate in draft.ExchangeRates)

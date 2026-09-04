@@ -1,10 +1,8 @@
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using MyCoinFlow.Import;
 using MyCoinFlow.ViewModels;
 using System.Collections.ObjectModel;
-using Windows.Graphics;
 
 namespace MyCoinFlow.WinUI.Views;
 
@@ -12,16 +10,13 @@ public sealed partial class BankImportWindow : PersistentWindow
 {
     private readonly BankImportViewModel _viewModel = new();
     private BookingAssignmentWindow? _assignmentWindow;
+    private InvoicingPaymentAssignmentWindow? _paymentWindow;
+    private InvoicingClarificationWindow? _clarificationWindow;
 
     public BankImportWindow()
     {
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(1500, 880));
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.PreferredMinimumWidth = 1120;
-            presenter.PreferredMinimumHeight = 680;
-        }
+        ConfigureDpiAwareSizing(RootGrid, 1500, 880, 780, 620);
 
         RowsList.ItemsSource = VisibleItems;
         RefreshView();
@@ -37,6 +32,16 @@ public sealed partial class BankImportWindow : PersistentWindow
 
     private void OnBulkClick(object sender, RoutedEventArgs e)
     {
+        var referencedCredits = _viewModel.Items.Count(item =>
+            item.StagingId.HasValue && item.Direction == KreditDebit.Credit &&
+            !string.IsNullOrWhiteSpace(item.StructuredReference));
+        if (referencedCredits > 0)
+        {
+            ShowStatus(
+                $"{referencedCredits} Gutschrift(en) mit strukturierter Zahlungsreferenz müssen zuerst über „Zahlung zuordnen“ geprüft werden.",
+                InfoBarSeverity.Warning);
+            return;
+        }
         if (!_viewModel.BulkUebernehmenCommand.CanExecute(null))
         {
             ShowStatus("Es sind keine verbuchbaren, vollständig zugeordneten Staging-Zeilen vorhanden.", InfoBarSeverity.Warning);
@@ -51,6 +56,18 @@ public sealed partial class BankImportWindow : PersistentWindow
     {
         _viewModel.OnlyIncomplete = IncompleteOnlyCheck.IsChecked == true;
         RefreshView();
+    }
+
+    private void OnOpenClarificationClick(object sender, RoutedEventArgs e)
+    {
+        if (_clarificationWindow is not null)
+        {
+            _clarificationWindow.Activate();
+            return;
+        }
+        _clarificationWindow = new InvoicingClarificationWindow();
+        _clarificationWindow.Closed += (_, _) => _clarificationWindow = null;
+        _clarificationWindow.Activate();
     }
 
     private void OnAssignRowClick(object sender, RoutedEventArgs e)
@@ -91,11 +108,61 @@ public sealed partial class BankImportWindow : PersistentWindow
     private void OnBookRowClick(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not BankImportItem item) return;
+        if (item.Direction == KreditDebit.Credit && !string.IsNullOrWhiteSpace(item.StructuredReference))
+        {
+            ShowStatus("Diese Gutschrift besitzt eine Zahlungsreferenz und wird zuerst mit offenen Rechnungen abgeglichen.",
+                InfoBarSeverity.Informational);
+            OpenPaymentWindow(item);
+            return;
+        }
         if (!_viewModel.EinzelBuchenCommand.CanExecute(item)) return;
 
         Changed = true;
         _viewModel.EinzelBuchenCommand.Execute(item);
         RefreshView();
+    }
+
+    private void OnMatchPaymentClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not BankImportItem item) return;
+        OpenPaymentWindow(item);
+    }
+
+    private void OpenPaymentWindow(BankImportItem item)
+    {
+        if (_paymentWindow is not null)
+        {
+            _paymentWindow.Activate();
+            return;
+        }
+
+        try
+        {
+            var window = new InvoicingPaymentAssignmentWindow(item);
+            _paymentWindow = window;
+            window.PaymentCompleted += (_, result) =>
+            {
+                Changed = true;
+                if (_viewModel.LoadPendingFromDbCommand.CanExecute(null))
+                    _viewModel.LoadPendingFromDbCommand.Execute(null);
+                RefreshView();
+                ShowStatus(result.Summary, result.SurplusAmount > 0m
+                    ? InfoBarSeverity.Warning
+                    : InfoBarSeverity.Success);
+            };
+            window.Closed += (_, _) =>
+            {
+                var changed = window.Changed;
+                _paymentWindow = null;
+                if (changed) RefreshView();
+            };
+            window.Activate();
+        }
+        catch (Exception exception)
+        {
+            ShowStatus("Zahlungszuordnung konnte nicht geöffnet werden: " + exception.Message,
+                InfoBarSeverity.Error);
+        }
     }
 
     private void OnDeleteRowClick(object sender, RoutedEventArgs e)

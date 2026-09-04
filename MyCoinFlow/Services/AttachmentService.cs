@@ -162,6 +162,93 @@ namespace MyCoinFlow.Services
         }
 
         /// <summary>
+        /// Kopiert eine PDF-/Bilddatei in die vorhandene DMS-Ablage und verknüpft sie über
+        /// die generische EntityType-/EntityId-Grenze. Die Quelldatei bleibt unverändert.
+        /// </summary>
+        public (string TargetPath, int AttachmentId) AttachEntityCopy(
+            string sourceFilePath,
+            string entityType,
+            int entityId,
+            string? titel,
+            string? kategorie,
+            DateTime? dokumentDatum = null)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFilePath))
+                throw new ArgumentException("Dateipfad fehlt.", nameof(sourceFilePath));
+            if (!File.Exists(sourceFilePath))
+                throw new FileNotFoundException("Quelldatei nicht gefunden.", sourceFilePath);
+            entityType = (entityType ?? string.Empty).Trim();
+            if (entityType.Length is < 1 or > 32)
+                throw new ArgumentException("Der DMS-Entitätstyp muss 1 bis 32 Zeichen enthalten.", nameof(entityType));
+            if (entityId <= 0)
+                throw new ArgumentException("Die DMS-Entitäts-ID ist ungültig.", nameof(entityId));
+
+            _db.EnsureAttachmentsSchema();
+            var ext = Path.GetExtension(sourceFilePath)?.ToLowerInvariant();
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".pdf", ".jpg", ".jpeg", ".png" };
+            if (string.IsNullOrWhiteSpace(ext) || !allowed.Contains(ext))
+                throw new InvalidOperationException("Nur PDF/JPG/PNG sind als DMS-Beilage erlaubt.");
+
+            var (root, maxMb) = _db.GetAttachmentSettings();
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                root = Path.Combine(documents, "MyCoinFlow", "Attachments");
+            }
+
+            var source = new FileInfo(sourceFilePath);
+            if (source.Length > (long)Math.Max(1, maxMb) * 1024L * 1024L)
+                throw new InvalidOperationException($"Datei ist größer als das Limit von {maxMb} MB.");
+
+            var date = (dokumentDatum ?? DateTime.Today).Date;
+            var folderRel = Path.Combine("Fakturierung", date.ToString("yyyy"), date.ToString("MM"));
+            var targetDirectory = Path.Combine(root, folderRel);
+            Directory.CreateDirectory(targetDirectory);
+            var temporaryName = $"DOK-TMP-{Guid.NewGuid():N}{ext}";
+            var temporaryPath = Path.Combine(targetDirectory, temporaryName);
+            File.Copy(sourceFilePath, temporaryPath, overwrite: false);
+
+            int attachmentId;
+            try
+            {
+                attachmentId = _db.SaveAttachment(
+                    transaktionId: null,
+                    fileName: temporaryName,
+                    originalName: source.Name,
+                    folderRel: folderRel.Replace('/', '\\'),
+                    sizeBytes: source.Length,
+                    ocrStatus: null,
+                    entityType: entityType,
+                    entityId: entityId,
+                    titel: string.IsNullOrWhiteSpace(titel) ? null : titel.Trim(),
+                    kategorie: string.IsNullOrWhiteSpace(kategorie) ? null : kategorie.Trim(),
+                    dokumentDatum: date);
+            }
+            catch
+            {
+                try { File.Delete(temporaryPath); } catch { }
+                throw;
+            }
+
+            var finalName = $"DOK-{attachmentId:D6}{ext}";
+            var targetPath = Path.Combine(targetDirectory, finalName);
+            try
+            {
+                File.Move(temporaryPath, targetPath);
+                _db.UpdateAttachmentFileName(attachmentId, finalName);
+            }
+            catch (IOException)
+            {
+                targetPath = temporaryPath;
+            }
+
+            RunOcrIndexing(attachmentId, targetPath, ext);
+            InitializeWorkspaceFile(attachmentId, targetPath);
+            return (targetPath, attachmentId);
+        }
+
+        /// <summary>
         /// DMS-Arbeitsordner-Überwachung: legt ein Dokument mit einheitlichem, ID-basiertem
         /// Dateinamen (DOK-000123.pdf – gleiche Länge für alle Dokumente, keine Inhalts-Infos im
         /// Namen; Adresse/Betrag/Titel sind stattdessen als Grid-Spalten sichtbar) im

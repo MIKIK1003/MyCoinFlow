@@ -55,6 +55,10 @@ public sealed class FinanceSettingsRepository
                 () => SaveIssuerAsync(connection, transaction, draft, cancellationToken),
                 persistenceWarnings, cancellationToken);
             await TrySaveSectionAsync(
+                connection, transaction, "Smtp", "E-Mail-Versanddaten",
+                () => SaveSmtpAsync(connection, transaction, draft, cancellationToken),
+                persistenceWarnings, cancellationToken);
+            await TrySaveSectionAsync(
                 connection, transaction, "Country", "Aussteller-Ländercode",
                 () => SaveIssuerCountryAsync(connection, transaction, draft, cancellationToken),
                 persistenceWarnings, cancellationToken);
@@ -121,7 +125,8 @@ public sealed class FinanceSettingsRepository
         const string sql = """
 SELECT IssuerName, IssuerStreet, IssuerPostalCode, IssuerCity, IssuerCountryCode,
        VatNumber, InvoiceEmail, InvoicePhone, DefaultPaymentDays, BaseCurrency,
-       ExchangeGainAccountId, ExchangeLossAccountId
+       ExchangeGainAccountId, ExchangeLossAccountId,
+       SmtpHost, SmtpPort, SmtpUseTls, SmtpUserName, SmtpFromAddress
 FROM dbo.FakturierungEinstellung
 WHERE Id = 1;
 """;
@@ -142,6 +147,11 @@ WHERE Id = 1;
         draft.BaseCurrency = reader.GetString(9).Trim();
         draft.ExchangeGainAccountId = reader.IsDBNull(10) ? null : reader.GetInt32(10);
         draft.ExchangeLossAccountId = reader.IsDBNull(11) ? null : reader.GetInt32(11);
+        draft.SmtpHost = reader.GetString(12);
+        draft.SmtpPort = reader.GetInt32(13);
+        draft.SmtpUseTls = reader.GetBoolean(14);
+        draft.SmtpUserName = reader.GetString(15);
+        draft.SmtpFromAddress = reader.GetString(16);
     }
 
     private static async Task<IReadOnlyList<FinanceAccountOption>> LoadAccountOptionsAsync(
@@ -470,6 +480,34 @@ WHERE Id = 1;
         AddText(command, "@user", SqlDbType.NVarChar, 64, CurrentUserContext.Username);
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
             throw new InvalidOperationException("Der Aussteller-Ländercode konnte nicht gespeichert werden.");
+    }
+
+    private static async Task SaveSmtpAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        FinanceSettingsDraft draft,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+UPDATE dbo.FakturierungEinstellung
+SET SmtpHost = @host,
+    SmtpPort = @port,
+    SmtpUseTls = @useTls,
+    SmtpUserName = @userName,
+    SmtpFromAddress = @fromAddress,
+    UpdatedAt = SYSDATETIME(),
+    UpdatedBy = @user
+WHERE Id = 1;
+""";
+        await using var command = new SqlCommand(sql, connection, transaction);
+        AddText(command, "@host", SqlDbType.NVarChar, 256, draft.SmtpHost);
+        command.Parameters.Add(new SqlParameter("@port", SqlDbType.Int) { Value = draft.SmtpPort });
+        command.Parameters.Add(new SqlParameter("@useTls", SqlDbType.Bit) { Value = draft.SmtpUseTls });
+        AddText(command, "@userName", SqlDbType.NVarChar, 256, draft.SmtpUserName);
+        AddText(command, "@fromAddress", SqlDbType.NVarChar, 256, draft.SmtpFromAddress);
+        AddText(command, "@user", SqlDbType.NVarChar, 64, CurrentUserContext.Username);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("Die E-Mail-Versanddaten konnten nicht gespeichert werden.");
     }
 
     private static async Task SaveFinanceHeaderAsync(

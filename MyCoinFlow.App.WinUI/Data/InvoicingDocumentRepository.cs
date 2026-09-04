@@ -439,13 +439,13 @@ INSERT dbo.FakturierungDokumentPosition
 (
     DocumentId, SequenceNumber, PositionType, SourcePositionId, ArticleIdSnapshot,
     Designation, Category, Unit, Quantity, UnitPrice,
-    VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+    VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountIdSnapshot, RevenueAccountSnapshot,
     AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
     AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 )
 SELECT @documentId, SequenceNumber, PositionType, Id, ArticleId,
        Designation, Category, Unit, Quantity, UnitPrice,
-       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountId, RevenueAccountSnapshot,
        AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
        AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 FROM dbo.FakturierungPositionsentwurf WITH (UPDLOCK, HOLDLOCK)
@@ -537,13 +537,13 @@ INSERT dbo.FakturierungDokumentPosition
 (
     DocumentId, SequenceNumber, PositionType, SourcePositionId, ArticleIdSnapshot,
     Designation, Category, Unit, Quantity, UnitPrice,
-    VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+    VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountIdSnapshot, RevenueAccountSnapshot,
     AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
     AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 )
 SELECT @targetId, SequenceNumber, PositionType, SourcePositionId, ArticleIdSnapshot,
        Designation, Category, Unit, Quantity, UnitPrice,
-       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountIdSnapshot, RevenueAccountSnapshot,
        AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
        AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 FROM dbo.FakturierungDokumentPosition WITH (UPDLOCK, HOLDLOCK)
@@ -658,7 +658,7 @@ ORDER BY document.DocumentDate DESC, document.Id DESC;
         const string sql = """
 SELECT Id, DocumentId, SequenceNumber, PositionType, SourcePositionId, ArticleIdSnapshot,
        Designation, Category, Unit, Quantity, UnitPrice,
-       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountIdSnapshot, RevenueAccountSnapshot,
        AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
        AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 FROM dbo.FakturierungDokumentPosition
@@ -676,9 +676,10 @@ ORDER BY DocumentId, SequenceNumber;
                 reader.GetString(6), reader.GetString(7), reader.GetString(8),
                 reader.GetDecimal(9), reader.GetDecimal(10), reader.GetString(11),
                 reader.IsDBNull(12) ? null : reader.GetDecimal(12),
-                reader.GetString(13), reader.GetString(14), reader.GetString(15),
-                reader.IsDBNull(16) ? null : reader.GetString(16), reader.GetString(17),
-                reader.IsDBNull(18) ? null : reader.GetString(18), reader.GetBoolean(19)));
+                reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                reader.GetString(14), reader.GetString(15), reader.GetString(16),
+                reader.IsDBNull(17) ? null : reader.GetString(17), reader.GetString(18),
+                reader.IsDBNull(19) ? null : reader.GetString(19), reader.GetBoolean(20)));
         }
         return result;
     }

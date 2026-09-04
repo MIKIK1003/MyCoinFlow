@@ -401,7 +401,7 @@ public sealed class InvoicingInvoiceRepository
                 draft, amount, baseAmount, cancellationToken);
             await ApplyAdjustmentToOpenItemAsync(
                 connection, transaction, target.Id, openItem, amount, baseAmount,
-                draft.AdjustmentKind, cancellationToken);
+                cancellationToken);
             await InsertRevisionAsync(
                 connection, transaction, target.Id,
                 draft.AdjustmentKind == InvoicingInvoiceKindCodes.Cancellation
@@ -508,7 +508,8 @@ ORDER BY InvoiceDocumentId, SequenceNumber;
         const string sql = """
 SELECT DocumentId, CurrencyCode, BaseCurrencyCode, OriginalAmount, CorrectionAmount,
        PaidAmount, OpenAmount, BaseOriginalAmount, BaseCorrectionAmount, BasePaidAmount,
-       BaseOpenAmount, DueDate, [Status], UpdatedAt
+       BaseOpenAmount, DueDate, [Status], UpdatedAt,
+       DunningLevel, IsDunningBlocked, LastDunningAt
 FROM dbo.FakturierungOffenerPosten;
 """;
         await using var command = new SqlCommand(sql, connection);
@@ -522,7 +523,8 @@ FROM dbo.FakturierungOffenerPosten;
                 reader.GetDecimal(6), reader.GetDecimal(7), reader.GetDecimal(8),
                 reader.GetDecimal(9), reader.GetDecimal(10),
                 DateOnly.FromDateTime(reader.GetDateTime(11)), reader.GetString(12),
-                reader.GetDateTime(13));
+                reader.GetDateTime(13), reader.GetByte(14), reader.GetBoolean(15),
+                reader.IsDBNull(16) ? null : reader.GetDateTime(16));
             result.Add(record.DocumentId, record);
         }
         return result;
@@ -593,7 +595,7 @@ WHERE document.Id = @documentId;
         const string sql = """
 SELECT Id, DocumentId, SequenceNumber, PositionType, SourcePositionId, ArticleIdSnapshot,
        Designation, Category, Unit, Quantity, UnitPrice,
-       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountSnapshot,
+       VatCodeSnapshot, VatRatePercentSnapshot, RevenueAccountIdSnapshot, RevenueAccountSnapshot,
        AncillaryClassificationSnapshot, MainTextPlain, MainTextFormatted,
        AdditionalTextPlain, AdditionalTextFormatted, IsFooter
 FROM dbo.FakturierungDokumentPosition WITH (UPDLOCK, HOLDLOCK)
@@ -613,9 +615,10 @@ ORDER BY SequenceNumber;
                 reader.GetString(6), reader.GetString(7), reader.GetString(8),
                 reader.GetDecimal(9), reader.GetDecimal(10), reader.GetString(11),
                 reader.IsDBNull(12) ? null : reader.GetDecimal(12),
-                reader.GetString(13), reader.GetString(14), reader.GetString(15),
-                reader.IsDBNull(16) ? null : reader.GetString(16), reader.GetString(17),
-                reader.IsDBNull(18) ? null : reader.GetString(18), reader.GetBoolean(19)));
+                reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                reader.GetString(14), reader.GetString(15), reader.GetString(16),
+                reader.IsDBNull(17) ? null : reader.GetString(17), reader.GetString(18),
+                reader.IsDBNull(19) ? null : reader.GetString(19), reader.GetBoolean(20)));
         }
         return result;
     }
@@ -708,8 +711,8 @@ ORDER BY EventAt DESC, Id DESC;
         CancellationToken cancellationToken)
     {
         const string sql = """
-SELECT OriginalAmount, CorrectionAmount, OpenAmount,
-       BaseOriginalAmount, BaseCorrectionAmount, BaseOpenAmount
+SELECT OriginalAmount, CorrectionAmount, PaidAmount, OpenAmount,
+       BaseOriginalAmount, BaseCorrectionAmount, BasePaidAmount, BaseOpenAmount
 FROM dbo.FakturierungOffenerPosten WITH (UPDLOCK, HOLDLOCK)
 WHERE DocumentId = @documentId;
 """;
@@ -720,8 +723,8 @@ WHERE DocumentId = @documentId;
         if (!await reader.ReadAsync(cancellationToken))
             throw Validation("Der offene Posten der Bezugsrechnung fehlt.");
         return new OpenItemSnapshot(
-            reader.GetDecimal(0), reader.GetDecimal(1), reader.GetDecimal(2),
-            reader.GetDecimal(3), reader.GetDecimal(4), reader.GetDecimal(5));
+            reader.GetDecimal(0), reader.GetDecimal(1), reader.GetDecimal(2), reader.GetDecimal(3),
+            reader.GetDecimal(4), reader.GetDecimal(5), reader.GetDecimal(6), reader.GetDecimal(7));
     }
 
     private static async Task<FlowTailSnapshot> LoadFlowTailForUpdateAsync(
@@ -1157,16 +1160,19 @@ VALUES
         OpenItemSnapshot openItem,
         decimal amount,
         decimal baseAmount,
-        string adjustmentKind,
         CancellationToken cancellationToken)
     {
         var newCorrection = openItem.CorrectionAmount - amount;
         var newOpen = openItem.OpenAmount - amount;
         var newBaseCorrection = openItem.BaseCorrectionAmount - baseAmount;
         var newBaseOpen = openItem.BaseOpenAmount - baseAmount;
-        var status = adjustmentKind == InvoicingInvoiceKindCodes.Cancellation || newOpen == 0m
-            ? InvoicingOpenItemStatusCodes.Cancelled
-            : InvoicingOpenItemStatusCodes.Corrected;
+        var status = newOpen == 0m
+            ? openItem.PaidAmount > 0m
+                ? InvoicingOpenItemStatusCodes.Paid
+                : InvoicingOpenItemStatusCodes.Cancelled
+            : openItem.PaidAmount > 0m
+                ? InvoicingOpenItemStatusCodes.PartiallyPaid
+                : InvoicingOpenItemStatusCodes.Corrected;
 
         const string sql = """
 UPDATE dbo.FakturierungOffenerPosten
@@ -1306,9 +1312,11 @@ WHERE DocumentId = @documentId
     private sealed record OpenItemSnapshot(
         decimal OriginalAmount,
         decimal CorrectionAmount,
+        decimal PaidAmount,
         decimal OpenAmount,
         decimal BaseOriginalAmount,
         decimal BaseCorrectionAmount,
+        decimal BasePaidAmount,
         decimal BaseOpenAmount);
 
     private sealed record FlowTailSnapshot(int Id, int FlowSequence, string Status);

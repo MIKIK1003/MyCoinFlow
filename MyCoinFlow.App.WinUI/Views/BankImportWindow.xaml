@@ -45,6 +45,9 @@
                 <AppBarButton Label="Laden" Click="OnLoadClick">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE896;" /></AppBarButton.Icon>
                 </AppBarButton>
+                <AppBarButton Label="Klärbestand" Click="OnOpenClarificationClick">
+                    <AppBarButton.Icon><FontIcon Glyph="{StaticResource ActionMessageIconGlyph}" /></AppBarButton.Icon>
+                </AppBarButton>
                 <AppBarSeparator />
                 <AppBarButton Label="Bulk" Click="OnBulkClick">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
@@ -62,7 +65,9 @@
                       Click="OnIncompleteOnlyClick" VerticalAlignment="Center" />
         </Grid>
 
-        <Border Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10">
+        <ScrollViewer Grid.Row="2" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+        <Border MinWidth="1180" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -109,6 +114,12 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <Button Width="34" Height="34" Padding="0" Click="OnMatchPaymentClick"
+                                            Visibility="{Binding StagingId, Converter={StaticResource NotNullToVisibility}}"
+                                            ToolTipService.ToolTip="CAMT-Zahlung einer offenen Rechnung zuordnen">
+                                        <FontIcon Glyph="{StaticResource ActionForwardIconGlyph}"
+                                                  Foreground="{StaticResource MyCoinFlowPositiveBrush}" />
+                                    </Button>
                                     <Button Width="34" Height="34" Padding="0" Click="OnAssignRowClick"
                                             Visibility="{Binding IstVollstaendig, Converter={StaticResource BoolToVisibility}}"
                                             ToolTipService.ToolTip="Zuordnung bearbeiten">
@@ -142,6 +153,8 @@
                                 <TextBlock Grid.Column="3" Text="{Binding RichtungText}" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="4" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding CounterpartyName}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding StructuredReference}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource MyCoinFlowAccentBrush}" />
                                     <TextBlock Text="{Binding Text}" FontSize="11" TextTrimming="CharacterEllipsis"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
@@ -159,6 +172,7 @@
                 </ListView>
             </Grid>
         </Border>
+        </ScrollViewer>
 
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>

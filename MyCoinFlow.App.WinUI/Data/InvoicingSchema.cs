@@ -6,11 +6,11 @@ namespace MyCoinFlow.WinUI.Data;
 
 public static class InvoicingSchema
 {
-    public const int CurrentVersion = 7;
-    private const int ExpectedTableCount = 21;
-    private const int ExpectedForeignKeyCount = 27;
-    private const int ExpectedUniqueIndexCount = 15;
-    private const int ExpectedTriggerCount = 6;
+    public const int CurrentVersion = 9;
+    private const int ExpectedTableCount = 28;
+    private const int ExpectedForeignKeyCount = 40;
+    private const int ExpectedUniqueIndexCount = 20;
+    private const int ExpectedTriggerCount = 11;
 
     public static async Task EnsureAsync(CancellationToken cancellationToken = default)
     {
@@ -98,6 +98,13 @@ SELECT
         OBJECT_ID(N'dbo.FakturierungOffenerPosten'),
         OBJECT_ID(N'dbo.FakturierungRevisionsereignis'),
         OBJECT_ID(N'dbo.FakturierungDokumentAusgabe'),
+        OBJECT_ID(N'dbo.FakturierungZahlung'),
+        OBJECT_ID(N'dbo.FakturierungZahlungAufteilung'),
+        OBJECT_ID(N'dbo.FakturierungZahlungKlaerfall'),
+        OBJECT_ID(N'dbo.FakturierungVersandversuch'),
+        OBJECT_ID(N'dbo.FakturierungVersandanhang'),
+        OBJECT_ID(N'dbo.FakturierungVersandereignis'),
+        OBJECT_ID(N'dbo.FakturierungEmpfaengerProfil'),
         OBJECT_ID(N'dbo.FakturierungEigentuemerProfil'),
         OBJECT_ID(N'dbo.FakturierungEinheitNutzung'),
         OBJECT_ID(N'dbo.FakturierungMietverhaeltnis'))) AS TableCount,
@@ -125,6 +132,19 @@ SELECT
         N'FK_FaktRevision_Referenz',
         N'FK_FaktAusgabe_Dokument',
         N'FK_FaktAusgabe_Zahlungskonto',
+        N'FK_FaktDokumentPosition_ErtragskontoSnapshot',
+        N'FK_FaktZahlung_Rechnung',
+        N'FK_FaktZahlung_Zahlungskonto',
+        N'FK_FaktZahlung_Kurskonto',
+        N'FK_FaktZahlungsaufteilung_Zahlung',
+        N'FK_FaktZahlungsaufteilung_Transaktion',
+        N'FK_FaktZahlungsaufteilung_Ertragskonto',
+        N'FK_FaktKlaerfall_Rechnung',
+        N'FK_FaktKlaerfall_Zahlung',
+        N'FK_FaktVersand_Dokument',
+        N'FK_FaktVersandanhang_Versand',
+        N'FK_FaktVersandereignis_Versand',
+        N'FK_FaktEmpfaengerProfil_Adresse',
         N'FK_FaktEigentuemerProfil_Eigentuemer',
         N'FK_FaktEigentuemerProfil_Rechnungsadresse',
         N'FK_FaktEinheitNutzung_Einheit',
@@ -146,7 +166,12 @@ SELECT
         N'UX_FaktRechnung_Zahlungsreferenz',
         N'UX_FaktRate_Rechnung_Reihenfolge',
         N'UX_FaktRevision_Dokument_Reihenfolge',
-        N'UX_FaktAusgabe_Zahlungsreferenz')) AS UniqueIndexCount,
+        N'UX_FaktAusgabe_Zahlungsreferenz',
+        N'UX_FaktZahlung_Importidentitaet',
+        N'UX_FaktZahlungsaufteilung_Reihenfolge',
+        N'UX_FaktKlaerfall_Importidentitaet',
+        N'UX_FaktVersand_Dokument_Versuch',
+        N'UX_FaktVersandereignis_Versand_Reihenfolge')) AS UniqueIndexCount,
     (SELECT COUNT(*) FROM sys.triggers
      WHERE name IN (
         N'TR_FaktEinheitNutzung_Zeitraum',
@@ -154,7 +179,12 @@ SELECT
         N'TR_FaktDokument_Unveraenderlich',
         N'TR_FaktRechnung_Unveraenderlich',
         N'TR_FaktRevision_AppendOnly',
-        N'TR_FaktAusgabe_Unveraenderlich')) AS TriggerCount;
+        N'TR_FaktAusgabe_Unveraenderlich',
+        N'TR_FaktZahlung_Unveraenderlich',
+        N'TR_FaktZahlungsaufteilung_Unveraenderlich',
+        N'TR_FaktVersand_Unveraenderlich',
+        N'TR_FaktVersandanhang_Unveraenderlich',
+        N'TR_FaktVersandereignis_AppendOnly')) AS TriggerCount;
 """;
 
         await using var command = new SqlCommand(sql, connection);
@@ -256,6 +286,11 @@ BEGIN TRY
             VatNumber nvarchar(40) NOT NULL CONSTRAINT DF_FaktEinstellung_VatNumber DEFAULT(N''),
             InvoiceEmail nvarchar(256) NOT NULL CONSTRAINT DF_FaktEinstellung_InvoiceEmail DEFAULT(N''),
             InvoicePhone nvarchar(80) NOT NULL CONSTRAINT DF_FaktEinstellung_InvoicePhone DEFAULT(N''),
+            SmtpHost nvarchar(256) NOT NULL CONSTRAINT DF_FaktEinstellung_SmtpHost DEFAULT(N''),
+            SmtpPort int NOT NULL CONSTRAINT DF_FaktEinstellung_SmtpPort DEFAULT(587),
+            SmtpUseTls bit NOT NULL CONSTRAINT DF_FaktEinstellung_SmtpUseTls DEFAULT(1),
+            SmtpUserName nvarchar(256) NOT NULL CONSTRAINT DF_FaktEinstellung_SmtpUser DEFAULT(N''),
+            SmtpFromAddress nvarchar(256) NOT NULL CONSTRAINT DF_FaktEinstellung_SmtpFrom DEFAULT(N''),
             DefaultPaymentDays smallint NOT NULL CONSTRAINT DF_FaktEinstellung_PaymentDays DEFAULT(30),
             BaseCurrency char(3) COLLATE Latin1_General_100_BIN2 NOT NULL
                 CONSTRAINT DF_FaktEinstellung_BaseCurrency DEFAULT('CHF'),
@@ -266,6 +301,7 @@ BEGIN TRY
             UpdatedBy nvarchar(64) NOT NULL CONSTRAINT DF_FaktEinstellung_UpdatedBy DEFAULT(N''),
             CONSTRAINT CK_FaktEinstellung_Singleton CHECK (Id = 1),
             CONSTRAINT CK_FaktEinstellung_PaymentDays CHECK (DefaultPaymentDays BETWEEN 0 AND 365),
+            CONSTRAINT CK_FaktEinstellung_SmtpPort CHECK (SmtpPort BETWEEN 1 AND 65535),
             CONSTRAINT CK_FaktEinstellung_CountryCode
                 CHECK (IssuerCountryCode = UPPER(IssuerCountryCode) AND LEN(IssuerCountryCode) = 2),
             CONSTRAINT FK_FaktEinstellung_Basiswaehrung
@@ -276,6 +312,30 @@ BEGIN TRY
                 FOREIGN KEY (ExchangeLossAccountId) REFERENCES dbo.Kontenplan(Id)
         );
     END;
+
+    IF COL_LENGTH(N'dbo.FakturierungEinstellung', N'SmtpHost') IS NULL
+        ALTER TABLE dbo.FakturierungEinstellung ADD SmtpHost nvarchar(256) NOT NULL
+            CONSTRAINT DF_FaktEinstellung_SmtpHost DEFAULT(N'');
+    IF COL_LENGTH(N'dbo.FakturierungEinstellung', N'SmtpPort') IS NULL
+        ALTER TABLE dbo.FakturierungEinstellung ADD SmtpPort int NOT NULL
+            CONSTRAINT DF_FaktEinstellung_SmtpPort DEFAULT(587);
+    IF COL_LENGTH(N'dbo.FakturierungEinstellung', N'SmtpUseTls') IS NULL
+        ALTER TABLE dbo.FakturierungEinstellung ADD SmtpUseTls bit NOT NULL
+            CONSTRAINT DF_FaktEinstellung_SmtpUseTls DEFAULT(1);
+    IF COL_LENGTH(N'dbo.FakturierungEinstellung', N'SmtpUserName') IS NULL
+        ALTER TABLE dbo.FakturierungEinstellung ADD SmtpUserName nvarchar(256) NOT NULL
+            CONSTRAINT DF_FaktEinstellung_SmtpUser DEFAULT(N'');
+    IF COL_LENGTH(N'dbo.FakturierungEinstellung', N'SmtpFromAddress') IS NULL
+        ALTER TABLE dbo.FakturierungEinstellung ADD SmtpFromAddress nvarchar(256) NOT NULL
+            CONSTRAINT DF_FaktEinstellung_SmtpFrom DEFAULT(N'');
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungEinstellung')
+          AND name = N'CK_FaktEinstellung_SmtpPort'
+    )
+        ALTER TABLE dbo.FakturierungEinstellung WITH CHECK ADD
+            CONSTRAINT CK_FaktEinstellung_SmtpPort CHECK (SmtpPort BETWEEN 1 AND 65535);
 
     IF NOT EXISTS (SELECT 1 FROM dbo.FakturierungEinstellung WHERE Id = 1)
         INSERT dbo.FakturierungEinstellung (Id) VALUES (1);
@@ -859,6 +919,7 @@ BEGIN TRY
             UnitPrice decimal(19,4) NOT NULL,
             VatCodeSnapshot nvarchar(32) NOT NULL,
             VatRatePercentSnapshot decimal(9,4) NULL,
+            RevenueAccountIdSnapshot int NULL,
             RevenueAccountSnapshot nvarchar(200) NOT NULL,
             AncillaryClassificationSnapshot varchar(32)
                 COLLATE Latin1_General_100_BIN2 NOT NULL,
@@ -893,6 +954,7 @@ BEGIN TRY
                         AND Quantity > 0
                         AND UnitPrice >= 0
                         AND VatRatePercentSnapshot IS NOT NULL
+                        AND RevenueAccountIdSnapshot IS NOT NULL
                     )
                     OR
                     (
@@ -905,6 +967,7 @@ BEGIN TRY
                         AND UnitPrice = 0
                         AND VatCodeSnapshot = N''
                         AND VatRatePercentSnapshot IS NULL
+                        AND RevenueAccountIdSnapshot IS NULL
                         AND RevenueAccountSnapshot = N''
                         AND AdditionalTextPlain = N''
                         AND AdditionalTextFormatted IS NULL
@@ -918,7 +981,9 @@ BEGIN TRY
                         'RENEWAL',
                         'NON_TRANSFERABLE')),
             CONSTRAINT FK_FaktDokumentPosition_Dokument
-                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungDokument(Id)
+                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungDokument(Id),
+            CONSTRAINT FK_FaktDokumentPosition_ErtragskontoSnapshot
+                FOREIGN KEY (RevenueAccountIdSnapshot) REFERENCES dbo.Kontenplan(Id)
         );
         CREATE UNIQUE INDEX UX_FaktDokumentPosition_Dokument_Reihenfolge
             ON dbo.FakturierungDokumentPosition(DocumentId, SequenceNumber);
@@ -1083,6 +1148,11 @@ BEGIN TRY
             BaseOpenAmount decimal(19,2) NOT NULL,
             DueDate date NOT NULL,
             [Status] varchar(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            DunningLevel tinyint NOT NULL
+                CONSTRAINT DF_FaktOffenerPosten_DunningLevel DEFAULT(0),
+            IsDunningBlocked bit NOT NULL
+                CONSTRAINT DF_FaktOffenerPosten_DunningBlocked DEFAULT(0),
+            LastDunningAt datetime2(0) NULL,
             UpdatedAt datetime2(0) NOT NULL
                 CONSTRAINT DF_FaktOffenerPosten_UpdatedAt DEFAULT(SYSDATETIME()),
             [RowVersion] rowversion NOT NULL,
@@ -1096,19 +1166,24 @@ BEGIN TRY
                 CHECK (
                     OriginalAmount > 0
                     AND CorrectionAmount BETWEEN -OriginalAmount AND 0
-                    AND PaidAmount = 0
-                    AND OpenAmount = OriginalAmount + CorrectionAmount
+                    AND PaidAmount BETWEEN 0 AND OriginalAmount + CorrectionAmount
+                    AND OpenAmount = OriginalAmount + CorrectionAmount - PaidAmount
                     AND BaseOriginalAmount > 0
                     AND BaseCorrectionAmount BETWEEN -BaseOriginalAmount AND 0
-                    AND BasePaidAmount = 0
-                    AND BaseOpenAmount = BaseOriginalAmount + BaseCorrectionAmount),
+                    AND BasePaidAmount BETWEEN 0 AND BaseOriginalAmount + BaseCorrectionAmount
+                    AND BaseOpenAmount = BaseOriginalAmount + BaseCorrectionAmount - BasePaidAmount),
             CONSTRAINT CK_FakturierungOffenerPosten_Status
                 CHECK (
-                    ([Status] = 'OPEN' AND CorrectionAmount = 0 AND OpenAmount = OriginalAmount)
-                    OR
-                    ([Status] = 'CORRECTED' AND CorrectionAmount < 0 AND OpenAmount > 0)
-                    OR
-                    ([Status] = 'CANCELLED' AND CorrectionAmount = -OriginalAmount AND OpenAmount = 0)),
+                    ([Status] = 'OPEN' AND CorrectionAmount = 0 AND PaidAmount = 0
+                     AND OpenAmount = OriginalAmount)
+                    OR ([Status] = 'CORRECTED' AND CorrectionAmount < 0 AND PaidAmount = 0
+                        AND OpenAmount > 0)
+                    OR ([Status] = 'PARTIALLY_PAID' AND PaidAmount > 0 AND OpenAmount > 0)
+                    OR ([Status] = 'PAID' AND PaidAmount > 0 AND OpenAmount = 0)
+                    OR ([Status] = 'CANCELLED' AND CorrectionAmount = -OriginalAmount
+                        AND PaidAmount = 0 AND OpenAmount = 0)),
+            CONSTRAINT CK_FakturierungOffenerPosten_Dunning
+                CHECK (DunningLevel BETWEEN 0 AND 4),
             CONSTRAINT FK_FaktOffenerPosten_Rechnung
                 FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungRechnung(DocumentId)
         );
@@ -1137,10 +1212,12 @@ BEGIN TRY
                     'NEXT_PARTIAL_CREATED',
                     'NEXT_FINAL_CREATED',
                     'CORRECTION_CREATED',
-                    'CANCELLATION_CREATED')),
+                    'CANCELLATION_CREATED',
+                    'PAYMENT_APPLIED',
+                    'EMAIL_SENT')),
             CONSTRAINT CK_FakturierungRevision_Content
                 CHECK (
-                    Amount <> 0
+                    (Amount <> 0 OR EventType = 'EMAIL_SENT')
                     AND CurrencyCode = UPPER(CurrencyCode)
                     AND LEN(CurrencyCode) = 3
                     AND LEN(LTRIM(RTRIM(Narrative))) > 0
@@ -1156,6 +1233,207 @@ BEGIN TRY
         CREATE UNIQUE INDEX UX_FaktRevision_Dokument_Reihenfolge
             ON dbo.FakturierungRevisionsereignis(DocumentId, SequenceNumber);
     END;
+
+    IF COL_LENGTH(N'dbo.FakturierungDokumentPosition', N'RevenueAccountIdSnapshot') IS NULL
+        ALTER TABLE dbo.FakturierungDokumentPosition ADD RevenueAccountIdSnapshot int NULL;
+
+    UPDATE target
+    SET RevenueAccountIdSnapshot = COALESCE(source.RevenueAccountId, account.Id)
+    FROM dbo.FakturierungDokumentPosition target
+    LEFT JOIN dbo.FakturierungPositionsentwurf source ON source.Id = target.SourcePositionId
+    OUTER APPLY
+    (
+        SELECT TOP (1) accountPlan.Id
+        FROM dbo.Kontenplan accountPlan
+        WHERE accountPlan.Kontonummer = TRY_CONVERT(int, LEFT(target.RevenueAccountSnapshot, 4))
+        ORDER BY accountPlan.Id
+    ) account
+    WHERE target.PositionType = 'ARTICLE'
+      AND target.RevenueAccountIdSnapshot IS NULL;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM dbo.FakturierungDokumentPosition
+        WHERE PositionType = 'ARTICLE' AND RevenueAccountIdSnapshot IS NULL
+    )
+        THROW 51026, N'Bestehende definitive Artikelpositionen konnten keinem Ertragskonto zugeordnet werden.', 1;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.foreign_keys
+        WHERE name = N'FK_FaktDokumentPosition_ErtragskontoSnapshot'
+    )
+        ALTER TABLE dbo.FakturierungDokumentPosition WITH CHECK ADD
+            CONSTRAINT FK_FaktDokumentPosition_ErtragskontoSnapshot
+                FOREIGN KEY (RevenueAccountIdSnapshot) REFERENCES dbo.Kontenplan(Id);
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungDokumentPosition')
+          AND name = N'CK_FakturierungDokumentPosition_Values'
+          AND definition LIKE N'%RevenueAccountIdSnapshot%'
+    )
+    BEGIN
+        IF EXISTS
+        (
+            SELECT 1 FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungDokumentPosition')
+              AND name = N'CK_FakturierungDokumentPosition_Values'
+        )
+            ALTER TABLE dbo.FakturierungDokumentPosition
+                DROP CONSTRAINT CK_FakturierungDokumentPosition_Values;
+        ALTER TABLE dbo.FakturierungDokumentPosition WITH CHECK ADD
+            CONSTRAINT CK_FakturierungDokumentPosition_Values
+                CHECK
+                (
+                    (
+                        PositionType = 'ARTICLE'
+                        AND IsFooter = 0
+                        AND LEN(LTRIM(RTRIM(Designation))) > 0
+                        AND LEN(LTRIM(RTRIM(Category))) > 0
+                        AND LEN(LTRIM(RTRIM(Unit))) > 0
+                        AND Quantity > 0
+                        AND UnitPrice >= 0
+                        AND VatRatePercentSnapshot IS NOT NULL
+                        AND RevenueAccountIdSnapshot IS NOT NULL
+                    )
+                    OR
+                    (
+                        PositionType = 'TEXT'
+                        AND ArticleIdSnapshot IS NULL
+                        AND LEN(MainTextPlain) > 0
+                        AND Category = N''
+                        AND Unit = N''
+                        AND Quantity = 0
+                        AND UnitPrice = 0
+                        AND VatCodeSnapshot = N''
+                        AND VatRatePercentSnapshot IS NULL
+                        AND RevenueAccountIdSnapshot IS NULL
+                        AND RevenueAccountSnapshot = N''
+                        AND AdditionalTextPlain = N''
+                        AND AdditionalTextFormatted IS NULL
+                    )
+                );
+    END;
+
+    IF COL_LENGTH(N'dbo.FakturierungOffenerPosten', N'DunningLevel') IS NULL
+        ALTER TABLE dbo.FakturierungOffenerPosten ADD
+            DunningLevel tinyint NOT NULL
+                CONSTRAINT DF_FaktOffenerPosten_DunningLevel DEFAULT(0);
+    IF COL_LENGTH(N'dbo.FakturierungOffenerPosten', N'IsDunningBlocked') IS NULL
+        ALTER TABLE dbo.FakturierungOffenerPosten ADD
+            IsDunningBlocked bit NOT NULL
+                CONSTRAINT DF_FaktOffenerPosten_DunningBlocked DEFAULT(0);
+    IF COL_LENGTH(N'dbo.FakturierungOffenerPosten', N'LastDunningAt') IS NULL
+        ALTER TABLE dbo.FakturierungOffenerPosten ADD LastDunningAt datetime2(0) NULL;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungOffenerPosten')
+          AND name = N'CK_FakturierungOffenerPosten_Dunning'
+    )
+        ALTER TABLE dbo.FakturierungOffenerPosten WITH CHECK ADD
+            CONSTRAINT CK_FakturierungOffenerPosten_Dunning
+                CHECK (DunningLevel BETWEEN 0 AND 4);
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungOffenerPosten')
+          AND name = N'CK_FakturierungOffenerPosten_Amounts'
+          AND definition LIKE N'%PaidAmount BETWEEN%'
+    )
+    BEGIN
+        ALTER TABLE dbo.FakturierungOffenerPosten
+            DROP CONSTRAINT CK_FakturierungOffenerPosten_Amounts;
+        ALTER TABLE dbo.FakturierungOffenerPosten WITH CHECK ADD
+            CONSTRAINT CK_FakturierungOffenerPosten_Amounts
+                CHECK
+                (
+                    OriginalAmount > 0
+                    AND CorrectionAmount BETWEEN -OriginalAmount AND 0
+                    AND PaidAmount BETWEEN 0 AND OriginalAmount + CorrectionAmount
+                    AND OpenAmount = OriginalAmount + CorrectionAmount - PaidAmount
+                    AND BaseOriginalAmount > 0
+                    AND BaseCorrectionAmount BETWEEN -BaseOriginalAmount AND 0
+                    AND BasePaidAmount BETWEEN 0 AND BaseOriginalAmount + BaseCorrectionAmount
+                    AND BaseOpenAmount = BaseOriginalAmount + BaseCorrectionAmount - BasePaidAmount
+                );
+    END;
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungOffenerPosten')
+          AND name = N'CK_FakturierungOffenerPosten_Status'
+          AND definition LIKE N'%PARTIALLY_PAID%'
+    )
+    BEGIN
+        ALTER TABLE dbo.FakturierungOffenerPosten
+            DROP CONSTRAINT CK_FakturierungOffenerPosten_Status;
+        ALTER TABLE dbo.FakturierungOffenerPosten WITH CHECK ADD
+            CONSTRAINT CK_FakturierungOffenerPosten_Status
+                CHECK
+                (
+                    ([Status] = 'OPEN' AND CorrectionAmount = 0 AND PaidAmount = 0
+                     AND OpenAmount = OriginalAmount)
+                    OR ([Status] = 'CORRECTED' AND CorrectionAmount < 0 AND PaidAmount = 0
+                        AND OpenAmount > 0)
+                    OR ([Status] = 'PARTIALLY_PAID' AND PaidAmount > 0 AND OpenAmount > 0)
+                    OR ([Status] = 'PAID' AND PaidAmount > 0 AND OpenAmount = 0)
+                    OR ([Status] = 'CANCELLED' AND CorrectionAmount = -OriginalAmount
+                        AND PaidAmount = 0 AND OpenAmount = 0)
+                );
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungRevisionsereignis')
+          AND name = N'CK_FakturierungRevision_Type'
+          AND definition LIKE N'%EMAIL_SENT%'
+    )
+    BEGIN
+        ALTER TABLE dbo.FakturierungRevisionsereignis
+            DROP CONSTRAINT CK_FakturierungRevision_Type;
+        ALTER TABLE dbo.FakturierungRevisionsereignis WITH CHECK ADD
+            CONSTRAINT CK_FakturierungRevision_Type
+                CHECK (EventType IN (
+                    'INVOICE_FINALIZED', 'NEXT_PARTIAL_CREATED', 'NEXT_FINAL_CREATED',
+                    'CORRECTION_CREATED', 'CANCELLATION_CREATED', 'PAYMENT_APPLIED',
+                    'EMAIL_SENT'));
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID(N'dbo.FakturierungRevisionsereignis')
+          AND name = N'CK_FakturierungRevision_Content'
+          AND definition LIKE N'%EMAIL_SENT%'
+    )
+    BEGIN
+        ALTER TABLE dbo.FakturierungRevisionsereignis
+            DROP CONSTRAINT CK_FakturierungRevision_Content;
+        ALTER TABLE dbo.FakturierungRevisionsereignis WITH CHECK ADD
+            CONSTRAINT CK_FakturierungRevision_Content
+                CHECK (
+                    (Amount <> 0 OR EventType = 'EMAIL_SENT')
+                    AND CurrencyCode = UPPER(CurrencyCode)
+                    AND LEN(CurrencyCode) = 3
+                    AND LEN(LTRIM(RTRIM(Narrative))) > 0
+                    AND (
+                        EventType NOT IN ('CORRECTION_CREATED', 'CANCELLATION_CREATED')
+                        OR ReferenceDocumentId IS NOT NULL
+                    ));
+    END;
+
+    IF OBJECT_ID(N'dbo.BankImportItem', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.BankImportItem', N'StructuredReference') IS NULL
+        ALTER TABLE dbo.BankImportItem ADD StructuredReference nvarchar(80) NULL;
+    IF OBJECT_ID(N'dbo.BankImportItemArchive', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.BankImportItemArchive', N'StructuredReference') IS NULL
+        ALTER TABLE dbo.BankImportItemArchive ADD StructuredReference nvarchar(80) NULL;
 
     IF OBJECT_ID(N'dbo.FakturierungDokumentAusgabe', N'U') IS NULL
     BEGIN
@@ -1229,6 +1507,247 @@ BEGIN TRY
         );
         CREATE UNIQUE INDEX UX_FaktAusgabe_Zahlungsreferenz
             ON dbo.FakturierungDokumentAusgabe(PaymentReference);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungZahlung', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungZahlung
+        (
+            Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungZahlung PRIMARY KEY,
+            DocumentId int NOT NULL,
+            PaymentAccountId int NOT NULL,
+            ImportIdentity nvarchar(200) NOT NULL,
+            SourceItemId int NOT NULL,
+            SourceBatchId int NOT NULL,
+            BookingDate date NOT NULL,
+            ValueDate date NULL,
+            AccountIban varchar(34) NOT NULL,
+            StructuredReference nvarchar(80) NULL,
+            ServiceReference nvarchar(160) NULL,
+            CounterpartyName nvarchar(200) NULL,
+            OriginalCurrencyCode char(3) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            OriginalAmount decimal(19,2) NOT NULL,
+            AllocatedAmount decimal(19,2) NOT NULL,
+            SurplusAmount decimal(19,2) NOT NULL,
+            BaseCurrencyCode char(3) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            ExchangeRateToBase decimal(19,8) NOT NULL,
+            ExchangeRateSource nvarchar(120) NOT NULL,
+            BaseBookedAmount decimal(19,2) NOT NULL,
+            BaseCarryingAmount decimal(19,2) NOT NULL,
+            ExchangeDifferenceBase decimal(19,2) NOT NULL,
+            ExchangeAccountId int NULL,
+            MatchKind varchar(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            CreatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktZahlung_CreatedAt DEFAULT(SYSDATETIME()),
+            CreatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungZahlung_Amounts CHECK
+            (
+                OriginalAmount > 0
+                AND AllocatedAmount > 0
+                AND AllocatedAmount <= OriginalAmount
+                AND SurplusAmount = OriginalAmount - AllocatedAmount
+                AND ExchangeRateToBase > 0
+                AND BaseBookedAmount > 0
+                AND BaseCarryingAmount > 0
+                AND ExchangeDifferenceBase = BaseBookedAmount - BaseCarryingAmount
+            ),
+            CONSTRAINT CK_FakturierungZahlung_Currency CHECK
+            (
+                OriginalCurrencyCode = UPPER(OriginalCurrencyCode)
+                AND BaseCurrencyCode = UPPER(BaseCurrencyCode)
+                AND LEN(OriginalCurrencyCode) = 3
+                AND LEN(BaseCurrencyCode) = 3
+            ),
+            CONSTRAINT CK_FakturierungZahlung_Match CHECK
+                (MatchKind IN ('REFERENCE', 'DOCUMENT_NUMBER', 'MANUAL')),
+            CONSTRAINT CK_FakturierungZahlung_ExchangeAccount CHECK
+                (ExchangeDifferenceBase = 0 OR ExchangeAccountId IS NOT NULL),
+            CONSTRAINT FK_FaktZahlung_Rechnung
+                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungRechnung(DocumentId),
+            CONSTRAINT FK_FaktZahlung_Zahlungskonto
+                FOREIGN KEY (PaymentAccountId) REFERENCES dbo.FakturierungZahlungskonto(Id),
+            CONSTRAINT FK_FaktZahlung_Kurskonto
+                FOREIGN KEY (ExchangeAccountId) REFERENCES dbo.Kontenplan(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktZahlung_Importidentitaet
+            ON dbo.FakturierungZahlung(ImportIdentity);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungZahlungAufteilung', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungZahlungAufteilung
+        (
+            Id bigint IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungZahlungAufteilung PRIMARY KEY,
+            PaymentId bigint NOT NULL,
+            SequenceNumber int NOT NULL,
+            RevenueAccountId int NOT NULL,
+            WeightAmount decimal(19,4) NOT NULL,
+            DocumentAmount decimal(19,2) NOT NULL,
+            BaseAmount decimal(19,2) NOT NULL,
+            TransactionId int NOT NULL,
+            CONSTRAINT CK_FakturierungZahlungsaufteilung_Values CHECK
+            (
+                SequenceNumber > 0 AND SequenceNumber % 10 = 0
+                AND WeightAmount > 0 AND DocumentAmount > 0 AND BaseAmount > 0
+            ),
+            CONSTRAINT FK_FaktZahlungsaufteilung_Zahlung
+                FOREIGN KEY (PaymentId) REFERENCES dbo.FakturierungZahlung(Id),
+            CONSTRAINT FK_FaktZahlungsaufteilung_Transaktion
+                FOREIGN KEY (TransactionId) REFERENCES dbo.Transaktion(Id),
+            CONSTRAINT FK_FaktZahlungsaufteilung_Ertragskonto
+                FOREIGN KEY (RevenueAccountId) REFERENCES dbo.Kontenplan(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktZahlungsaufteilung_Reihenfolge
+            ON dbo.FakturierungZahlungAufteilung(PaymentId, SequenceNumber);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungZahlungKlaerfall', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungZahlungKlaerfall
+        (
+            Id bigint IDENTITY(1,1) NOT NULL
+                CONSTRAINT PK_FakturierungZahlungKlaerfall PRIMARY KEY,
+            ImportIdentity nvarchar(200) NOT NULL,
+            SourceItemId int NOT NULL,
+            SourceBatchId int NOT NULL,
+            DocumentId int NULL,
+            PaymentId bigint NULL,
+            BookingDate date NOT NULL,
+            CurrencyCode char(3) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            Amount decimal(19,2) NOT NULL,
+            ReasonCode varchar(32) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            Narrative nvarchar(500) NOT NULL,
+            [Status] varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL
+                CONSTRAINT DF_FaktKlaerfall_Status DEFAULT('OPEN'),
+            CreatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktKlaerfall_CreatedAt DEFAULT(SYSDATETIME()),
+            CreatedBy nvarchar(64) NOT NULL,
+            ResolvedAt datetime2(0) NULL,
+            ResolvedBy nvarchar(64) NULL,
+            CONSTRAINT CK_FakturierungKlaerfall_Values CHECK
+            (
+                Amount > 0 AND LEN(LTRIM(RTRIM(Narrative))) > 0
+                AND CurrencyCode = UPPER(CurrencyCode) AND LEN(CurrencyCode) = 3
+                AND ReasonCode IN ('NO_MATCH', 'AMBIGUOUS', 'WRONG_DIRECTION',
+                                   'CURRENCY_MISMATCH', 'OVERPAYMENT', 'CONFIGURATION')
+                AND (([Status] = 'OPEN' AND ResolvedAt IS NULL AND ResolvedBy IS NULL)
+                     OR ([Status] = 'RESOLVED' AND ResolvedAt IS NOT NULL
+                         AND LEN(LTRIM(RTRIM(ResolvedBy))) > 0))
+            ),
+            CONSTRAINT FK_FaktKlaerfall_Rechnung
+                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungRechnung(DocumentId),
+            CONSTRAINT FK_FaktKlaerfall_Zahlung
+                FOREIGN KEY (PaymentId) REFERENCES dbo.FakturierungZahlung(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktKlaerfall_Importidentitaet
+            ON dbo.FakturierungZahlungKlaerfall(ImportIdentity);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungVersandversuch', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungVersandversuch
+        (
+            Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungVersandversuch PRIMARY KEY,
+            DocumentId int NOT NULL,
+            AttemptNumber int NOT NULL,
+            MessageId nvarchar(200) NOT NULL,
+            RecipientAddress nvarchar(256) NOT NULL,
+            FromAddress nvarchar(256) NOT NULL,
+            [Subject] nvarchar(300) NOT NULL,
+            Body nvarchar(max) NOT NULL,
+            BodySha256 char(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            PdfSha256 char(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            SmtpHostSnapshot nvarchar(256) NOT NULL,
+            SmtpPortSnapshot int NOT NULL,
+            SmtpUseTlsSnapshot bit NOT NULL,
+            SmtpUserSnapshot nvarchar(256) NOT NULL,
+            CreatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktVersand_CreatedAt DEFAULT(SYSDATETIME()),
+            CreatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungVersand_Values CHECK
+            (
+                AttemptNumber > 0
+                AND LEN(LTRIM(RTRIM(MessageId))) > 0
+                AND LEN(LTRIM(RTRIM(RecipientAddress))) > 0
+                AND LEN(LTRIM(RTRIM(FromAddress))) > 0
+                AND LEN(LTRIM(RTRIM([Subject]))) > 0
+                AND LEN(BodySha256) = 64
+                AND LEN(PdfSha256) = 64
+                AND SmtpPortSnapshot BETWEEN 1 AND 65535
+            ),
+            CONSTRAINT FK_FaktVersand_Dokument
+                FOREIGN KEY (DocumentId) REFERENCES dbo.FakturierungDokument(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktVersand_Dokument_Versuch
+            ON dbo.FakturierungVersandversuch(DocumentId, AttemptNumber);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungVersandanhang', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungVersandanhang
+        (
+            DeliveryAttemptId bigint NOT NULL,
+            SequenceNumber int NOT NULL,
+            DmsAttachmentId int NULL,
+            FileName nvarchar(260) NOT NULL,
+            ContentType nvarchar(120) NOT NULL,
+            ContentSha256 char(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            SizeBytes bigint NOT NULL,
+            IsDocumentPdf bit NOT NULL,
+            CONSTRAINT PK_FakturierungVersandanhang
+                PRIMARY KEY (DeliveryAttemptId, SequenceNumber),
+            CONSTRAINT CK_FakturierungVersandanhang_Values CHECK
+            (
+                SequenceNumber > 0 AND SequenceNumber % 10 = 0
+                AND LEN(LTRIM(RTRIM(FileName))) > 0
+                AND LEN(ContentSha256) = 64
+                AND SizeBytes > 0
+            ),
+            CONSTRAINT FK_FaktVersandanhang_Versand
+                FOREIGN KEY (DeliveryAttemptId) REFERENCES dbo.FakturierungVersandversuch(Id)
+        );
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungVersandereignis', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungVersandereignis
+        (
+            Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_FakturierungVersandereignis PRIMARY KEY,
+            DeliveryAttemptId bigint NOT NULL,
+            SequenceNumber int NOT NULL,
+            [Status] varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL,
+            Narrative nvarchar(2000) NOT NULL,
+            OccurredAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktVersandereignis_OccurredAt DEFAULT(SYSDATETIME()),
+            OccurredBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungVersandereignis_Values CHECK
+            (
+                SequenceNumber > 0 AND SequenceNumber % 10 = 0
+                AND [Status] IN ('STARTED', 'SENT', 'FAILED')
+                AND LEN(LTRIM(RTRIM(Narrative))) > 0
+            ),
+            CONSTRAINT FK_FaktVersandereignis_Versand
+                FOREIGN KEY (DeliveryAttemptId) REFERENCES dbo.FakturierungVersandversuch(Id)
+        );
+        CREATE UNIQUE INDEX UX_FaktVersandereignis_Versand_Reihenfolge
+            ON dbo.FakturierungVersandereignis(DeliveryAttemptId, SequenceNumber);
+    END;
+
+    IF OBJECT_ID(N'dbo.FakturierungEmpfaengerProfil', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.FakturierungEmpfaengerProfil
+        (
+            AddressId int NOT NULL CONSTRAINT PK_FakturierungEmpfaengerProfil PRIMARY KEY,
+            InvoiceEmail nvarchar(256) NOT NULL,
+            UpdatedAt datetime2(0) NOT NULL
+                CONSTRAINT DF_FaktEmpfaengerProfil_UpdatedAt DEFAULT(SYSDATETIME()),
+            UpdatedBy nvarchar(64) NOT NULL,
+            CONSTRAINT CK_FakturierungEmpfaengerProfil_Email
+                CHECK (LEN(LTRIM(RTRIM(InvoiceEmail))) > 0),
+            CONSTRAINT FK_FaktEmpfaengerProfil_Adresse
+                FOREIGN KEY (AddressId) REFERENCES dbo.Adresse(Id)
+        );
     END;
 
     IF OBJECT_ID(N'dbo.FakturierungEigentuemerProfil', N'U') IS NULL
@@ -1422,12 +1941,67 @@ BEGIN TRY
             THROW 51024, N''Ausgabesnapshots dürfen nur aus einer definitiven positiven Rechnung und dem unveränderten aktiven Zahlungskonto entstehen.'', 1;
     END;';
 
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktZahlung_Unveraenderlich
+    ON dbo.FakturierungZahlung
+    AFTER UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        IF EXISTS (SELECT 1 FROM deleted)
+            THROW 51027, N''Gebuchte Zahlungssnapshots sind unveränderlich.'', 1;
+    END;';
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktZahlungsaufteilung_Unveraenderlich
+    ON dbo.FakturierungZahlungAufteilung
+    AFTER UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        IF EXISTS (SELECT 1 FROM deleted)
+            THROW 51028, N''Gebuchte Zahlungsaufteilungen sind unveränderlich.'', 1;
+    END;';
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktVersand_Unveraenderlich
+    ON dbo.FakturierungVersandversuch
+    AFTER UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        IF EXISTS (SELECT 1 FROM deleted)
+            THROW 51029, N''Versandversuche sind unveränderlich.'', 1;
+    END;';
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktVersandanhang_Unveraenderlich
+    ON dbo.FakturierungVersandanhang
+    AFTER UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        IF EXISTS (SELECT 1 FROM deleted)
+            THROW 51030, N''Versandanhänge sind unveränderlich.'', 1;
+    END;';
+
+    EXEC sys.sp_executesql N'
+    CREATE OR ALTER TRIGGER dbo.TR_FaktVersandereignis_AppendOnly
+    ON dbo.FakturierungVersandereignis
+    AFTER UPDATE, DELETE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        IF EXISTS (SELECT 1 FROM deleted)
+            THROW 51031, N''Versandereignisse sind unveränderlich.'', 1;
+    END;';
+
     IF NOT EXISTS (SELECT 1 FROM dbo.FakturierungSchemaVersion WHERE Id = 1)
-        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 7);
+        INSERT dbo.FakturierungSchemaVersion (Id, [Version]) VALUES (1, 9);
     ELSE
         UPDATE dbo.FakturierungSchemaVersion
-        SET [Version] = 7, AppliedAt = SYSDATETIME()
-        WHERE Id = 1 AND [Version] < 7;
+        SET [Version] = 9, AppliedAt = SYSDATETIME()
+        WHERE Id = 1 AND [Version] < 9;
 
     COMMIT TRANSACTION;
 END TRY

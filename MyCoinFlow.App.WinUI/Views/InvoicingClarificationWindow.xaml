@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<window:PersistentWindow
+    x:Class="MyCoinFlow.WinUI.Views.InvoicingClarificationWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:window="using:MyCoinFlow.WinUI"
+    Title="Klärbestand Zahlungen">
+    <Grid x:Name="RootGrid" Padding="24,20" RowSpacing="12"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Spacing="3">
+            <TextBlock Text="Klärbestand Zahlungen" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock Text="Ungeklärte CAMT-Zahlungen, Überzahlungsreste und blockierte Zuordnungen"
+                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+        <InfoBar x:Name="StatusBar" Grid.Row="1" IsOpen="True" IsClosable="False"
+                 Title="Klärbestand" Severity="Informational" />
+        <Border Grid.Row="2" Style="{StaticResource EditorSectionCardStyle}" Padding="0">
+            <Grid>
+                <ListView x:Name="CasesList" SelectionMode="Single" SelectionChanged="OnSelectionChanged">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="12,8" ColumnSpacing="16" MinHeight="70">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.5*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="2*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ReasonDisplay}" FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="{Binding AmountDisplay}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                    <TextBlock Text="{Binding DateDisplay}" FontSize="12" HorizontalAlignment="Right"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding Narrative}" TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Spacing="6">
+                    <FontIcon Glyph="{StaticResource ActionMessageIconGlyph}" FontSize="30"
+                              Foreground="{StaticResource MyCoinFlowPositiveBrush}" />
+                    <TextBlock Text="Kein offener Klärfall" FontWeight="SemiBold" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Click="OnRefreshClick" Style="{StaticResource FunctionButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon Glyph="{StaticResource ActionRefreshIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                    <TextBlock Text="Aktualisieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="ResolveButton" IsEnabled="False" Click="OnResolveClick"
+                    Style="{StaticResource FunctionPrimaryButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon Glyph="{StaticResource ActionForwardIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                    <TextBlock Text="Als geklärt markieren" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                </StackPanel>
+            </Button>
+            <Button Content="Schliessen" Click="OnCloseClick" Style="{StaticResource FunctionButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</window:PersistentWindow>

@@ -75,21 +75,50 @@
                                     <TextBlock Text="Korrektur / Storno" Style="{StaticResource FunctionButtonFullLabelStyle}" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="DunningButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnDunningClick"
+                                    AutomationProperties.Name="Mahnstatus bearbeiten"
+                                    ToolTipService.ToolTip="Zuerst eine Rechnung mit offenem Posten wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionMessageIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Mahnstatus" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
 
                     <StackPanel>
                         <TextBlock Text="AUSGABE" Style="{StaticResource FunctionGroupTitleStyle}" />
-                        <Button x:Name="PreviewPdfButton" Style="{StaticResource FunctionButtonStyle}"
-                                IsEnabled="False" Click="OnPreviewPdfClick"
-                                AutomationProperties.Name="Vorschau und PDF"
-                                ToolTipService.ToolTip="Zuerst ein Dokument wählen.">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
-                                <TextBlock Text="Vorschau / PDF" Style="{StaticResource FunctionButtonFullLabelStyle}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="PreviewPdfButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnPreviewPdfClick"
+                                    AutomationProperties.Name="Vorschau und PDF"
+                                    ToolTipService.ToolTip="Zuerst ein Dokument wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionDocumentIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Vorschau / PDF" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="EmailButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnEmailClick"
+                                    AutomationProperties.Name="Per E-Mail senden"
+                                    ToolTipService.ToolTip="Zuerst ein Dokument wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionMailIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="Per E-Mail senden" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DmsButton" Style="{StaticResource FunctionButtonStyle}"
+                                    IsEnabled="False" Click="OnDmsClick"
+                                    AutomationProperties.Name="DMS und Beilagen"
+                                    ToolTipService.ToolTip="Zuerst ein Dokument wählen.">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="{StaticResource ActionAttachIconGlyph}" Style="{StaticResource ActionIconStyle}" />
+                                    <TextBlock Text="DMS / Beilagen" Style="{StaticResource FunctionButtonFullLabelStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                     <Rectangle Style="{StaticResource FunctionGroupSeparatorStyle}" />
 
@@ -615,6 +644,8 @@
                                                    FontWeight="SemiBold" TextWrapping="Wrap" />
                                         <TextBlock x:Name="OpenItemStatusText" Text="—" TextWrapping="Wrap" />
                                         <TextBlock x:Name="OpenItemDueDateText" Text="—" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock x:Name="OpenItemDunningText" Text="—" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
                                 </Border>
